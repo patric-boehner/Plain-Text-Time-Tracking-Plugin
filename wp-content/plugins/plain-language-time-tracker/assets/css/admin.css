@@ -1,0 +1,371 @@
+/**
+ * Plain Language Time Tracker - Shared Admin Styles
+ */
+
+/* Layout containers */
+.pltt-wrap {
+	max-width: 1350px;
+	margin: 20px 20px 20px 0;
+}
+
+.pltt-header {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	margin-bottom: 20px;
+	flex-wrap: wrap;
+	gap: 15px;
+}
+
+.pltt-header h1 {
+	margin: 0;
+}
+
+.pltt-header-actions {
+	display: flex;
+	gap: 10px;
+}
+
+/* Date display */
+.pltt-date-display {
+	display: flex;
+	align-items: center;
+	gap: 15px;
+	margin-bottom: 20px;
+}
+
+.pltt-date-display h2 {
+	margin: 0;
+	font-size: 1.3em;
+	font-weight: 400;
+}
+
+/* Date navigation */
+.pltt-date-nav {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+}
+
+.pltt-date-nav input[type="date"] {
+	padding: 5px 10px;
+}
+
+/* Summary cards */
+.pltt-summary-cards {
+	display: flex;
+	gap: 20px;
+	margin-bottom: 25px;
+	flex-wrap: wrap;
+}
+
+/* Summary cards — extend WordPress .card with centered layout */
+.pltt-summary-cards .card {
+	min-width: 120px;
+	text-align: center;
+	padding: 20px 25px;
+}
+
+.card-value {
+	font-size: 28px;
+	font-weight: 600;
+	color: #1d2327;
+	line-height: 1.2;
+}
+
+.card-label {
+	font-size: 13px;
+	color: #646970;
+	margin-top: 5px;
+}
+
+/* Badges */
+.pltt-badge {
+	display: inline-block;
+	padding: 3px 8px;
+	border-radius: 3px;
+	font-size: 12px;
+	font-weight: 500;
+}
+
+.pltt-badge-success {
+	background: #d4edda;
+	color: #155724;
+}
+
+.pltt-badge-info {
+	background: #d1ecf1;
+	color: #0c5460;
+}
+
+.pltt-badge-warning {
+	background: #fff3cd;
+	color: #856404;
+}
+
+/* Tables */
+.pltt-time-cell {
+	white-space: nowrap;
+	font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", sans-serif;
+}
+
+.pltt-duration-cell {
+	font-weight: 600;
+	color: #2271b1;
+	white-space: nowrap;
+}
+
+.pltt-empty {
+	color: #a7aaad;
+}
+
+.pltt-no-duration {
+	color: #dba617;
+}
+
+/* Notices — uses WordPress .notice classes, only override p margin */
+.pltt-wrap .notice p {
+	margin: 0.5em 0;
+}
+
+/* Modals */
+.pltt-modal {
+	position: fixed;
+	top: 0;
+	left: 0;
+	right: 0;
+	bottom: 0;
+	background: rgba(0, 0, 0, 0.5);
+	z-index: 100000;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+}
+
+.pltt-modal-content {
+	background: #fff;
+	padding: 25px;
+	border-radius: 4px;
+	min-width: 350px;
+	max-width: 500px;
+	box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+}
+
+.pltt-modal-content h3 {
+	margin-top: 0;
+	margin-bottom: 20px;
+}
+
+.pltt-modal-content label {
+	display: block;
+	margin-bottom: 5px;
+	font-weight: 600;
+}
+
+.pltt-modal-content input[type="text"] {
+	width: 100%;
+}
+
+.pltt-modal-actions {
+	display: flex;
+	gap: 10px;
+	justify-content: flex-end;
+	margin-top: 20px;
+}
+
+/* Form actions */
+.pltt-form-actions {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	margin-top: 25px;
+	padding-top: 20px;
+	border-top: 1px solid #c3c4c7;
+}
+
+.pltt-form-actions-left,
+.pltt-form-actions-right {
+	display: flex;
+	align-items: center;
+	gap: 15px;
+}
+
+/* Status indicators */
+.pltt-status-saved {
+	color: #00a32a;
+}
+
+.pltt-status-saving {
+	color: #dba617;
+}
+
+.pltt-status-error {
+	color: #d63638;
+}
+
+.pltt-status-verified {
+	color: #00a32a;
+	font-weight: 500;
+}
+
+.pltt-status-draft {
+	color: #dba617;
+	font-weight: 500;
+}
+
+.pltt-status-billable {
+	color: #2271b1;
+	font-weight: 500;
+}
+
+/* Report filters */
+.pltt-report-filters {
+	background: #fff;
+	border: 1px solid #c3c4c7;
+	border-radius: 4px;
+	padding: 20px;
+	margin-bottom: 25px;
+}
+
+.pltt-filter-row {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 20px;
+	align-items: flex-end;
+}
+
+.pltt-filter-group {
+	display: flex;
+	flex-direction: column;
+	gap: 5px;
+}
+
+.pltt-filter-group label {
+	font-weight: 600;
+	font-size: 13px;
+}
+
+.pltt-filter-input-wrap {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+}
+
+.pltt-negate-toggle {
+	background: #f0f0f1;
+	border: 1px solid #c3c4c7;
+	border-radius: 3px;
+	color: #50575e;
+	cursor: pointer;
+	font-weight: 500;
+	line-height: 1;
+	padding: 7px 10px;
+	text-transform: lowercase;
+	white-space: nowrap;
+	transition: background-color 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.pltt-negate-toggle:hover {
+	background: #e0e0e0;
+	border-color: #8c8f94;
+}
+
+.pltt-negate-toggle.pltt-negate-active {
+	background: #fcf0f0;
+	border-color: #d63638;
+	color: #d63638;
+}
+
+.pltt-filter-actions {
+	flex-direction: row;
+	gap: 10px;
+}
+
+.pltt-time-edit .submit {
+	padding: 1em 0 0 0;
+}
+
+/* Clients & Projects two-column layout */
+.pltt-two-column {
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	gap: 30px;
+}
+
+.pltt-section {
+	background: #fff;
+	border: 1px solid #c3c4c7;
+	border-radius: 4px;
+	padding: 20px;
+}
+
+.pltt-section-header {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	margin-bottom: 15px;
+	padding-bottom: 10px;
+	border-bottom: 1px solid #dcdcde;
+}
+
+.pltt-section-header h2 {
+	margin: 0;
+}
+
+.pltt-modal-actions {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+}
+
+@media screen and (max-width: 1200px) {
+	.pltt-two-column {
+		grid-template-columns: 1fr;
+	}
+}
+
+/* Responsive */
+@media screen and (max-width: 782px) {
+	.pltt-header {
+		flex-direction: column;
+		align-items: flex-start;
+	}
+
+	.pltt-date-nav {
+		flex-wrap: wrap;
+	}
+
+	.pltt-summary-cards {
+		flex-direction: column;
+	}
+
+	.pltt-summary-cards .card {
+		width: 100%;
+	}
+
+	.pltt-form-actions {
+		flex-direction: column;
+		gap: 15px;
+	}
+
+	.pltt-filter-row {
+		flex-direction: column;
+	}
+
+	.pltt-filter-group {
+		width: 100%;
+	}
+
+	.pltt-filter-group select,
+	.pltt-filter-group input {
+		width: 100%;
+	}
+
+	.pltt-filter-input-wrap {
+		width: 100%;
+	}
+
+	.pltt-filter-input-wrap select {
+		flex: 1;
+	}
+}
