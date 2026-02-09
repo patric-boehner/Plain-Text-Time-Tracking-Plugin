@@ -1,0 +1,111 @@
+<?php
+/**
+ * Plugin Name: Plain Language Time Tracker
+ * Plugin URI: https://github.com/patrickb/plain-language-time-tracker
+ * Description: Time tracking with a "capture first, categorize later" workflow. Jot plain text notes with timestamps, then process them into structured time entries.
+ * Version: 1.1.0
+ * Author: Patrick
+ * Text Domain: plain-language-time-tracker
+ * Domain Path: /languages
+ * Requires at least: 6.0
+ * Requires PHP: 7.4
+ * License: GPL v2 or later
+ * License URI: https://www.gnu.org/licenses/gpl-2.0.html
+ * Update URI: false
+ */
+
+// Prevent direct access.
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
+
+// Plugin constants.
+define( 'PLTT_VERSION', '1.1.0' );
+define( 'PLTT_PLUGIN_FILE', __FILE__ );
+define( 'PLTT_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
+define( 'PLTT_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
+define( 'PLTT_PLUGIN_BASENAME', plugin_basename( __FILE__ ) );
+
+// Configurable defaults — centralized here instead of scattered as magic numbers.
+define( 'PLTT_PREDICTION_WINDOW_DAYS', 30 );
+define( 'PLTT_CONFIDENCE_THRESHOLD', 0.7 );
+define( 'PLTT_ENTRIES_PER_PAGE', 50 );
+define( 'PLTT_LOGS_PER_PAGE', 20 );
+define( 'PLTT_AUTOSAVE_DEBOUNCE_MS', 1500 );
+
+/**
+ * Load plugin dependencies.
+ */
+function pltt_load_dependencies() {
+	// Helpers (procedural functions).
+	require_once PLTT_PLUGIN_DIR . 'includes/helpers.php';
+
+	// Database classes.
+	require_once PLTT_PLUGIN_DIR . 'includes/database/class-pltt-database.php';
+	require_once PLTT_PLUGIN_DIR . 'includes/database/class-pltt-clients.php';
+	require_once PLTT_PLUGIN_DIR . 'includes/database/class-pltt-projects.php';
+	require_once PLTT_PLUGIN_DIR . 'includes/database/class-pltt-entries.php';
+	require_once PLTT_PLUGIN_DIR . 'includes/database/class-pltt-aliases.php';
+
+	// Parser.
+	require_once PLTT_PLUGIN_DIR . 'includes/parser/class-pltt-time-parser.php';
+
+	// API.
+	require_once PLTT_PLUGIN_DIR . 'includes/api/class-pltt-ajax.php';
+
+	// Admin.
+	require_once PLTT_PLUGIN_DIR . 'includes/admin/class-pltt-admin.php';
+	require_once PLTT_PLUGIN_DIR . 'includes/admin/class-pltt-daily-log.php';
+	require_once PLTT_PLUGIN_DIR . 'includes/admin/class-pltt-review.php';
+	require_once PLTT_PLUGIN_DIR . 'includes/admin/class-pltt-reports.php';
+	require_once PLTT_PLUGIN_DIR . 'includes/admin/class-pltt-log-archive.php';
+}
+
+/**
+ * Plugin activation.
+ */
+function pltt_activate() {
+	pltt_load_dependencies();
+	PLTT_Database::create_tables();
+	add_option( 'pltt_version', PLTT_VERSION );
+	add_option( 'pltt_db_version', '1.0.0' );
+}
+register_activation_hook( __FILE__, 'pltt_activate' );
+
+/**
+ * Plugin deactivation.
+ */
+function pltt_deactivate() {
+	// Clean up transients if any.
+	delete_transient( 'pltt_daily_log_cache' );
+}
+register_deactivation_hook( __FILE__, 'pltt_deactivate' );
+
+/**
+ * Initialize the plugin.
+ */
+function pltt_init() {
+	pltt_load_dependencies();
+
+	// Check for database updates.
+	PLTT_Database::maybe_upgrade();
+
+	// Initialize admin.
+	if ( is_admin() ) {
+		PLTT_Admin::init();
+		PLTT_Ajax::init();
+	}
+}
+add_action( 'plugins_loaded', 'pltt_init' );
+
+/**
+ * Load plugin textdomain for translations.
+ */
+function pltt_load_textdomain() {
+	load_plugin_textdomain(
+		'plain-language-time-tracker',
+		false,
+		dirname( PLTT_PLUGIN_BASENAME ) . '/languages'
+	);
+}
+add_action( 'init', 'pltt_load_textdomain' );

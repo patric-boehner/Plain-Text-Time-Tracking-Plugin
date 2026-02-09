@@ -1,0 +1,87 @@
+/**
+ * Reports Screen Styles
+ */
+
+.pltt-report-content {
+	background: #fff;
+	border: 1px solid #c3c4c7;
+	border-radius: 4px;
+	padding: 20px;
+}
+
+.pltt-report-content h3 {
+	margin-top: 0;
+	margin-bottom: 15px;
+	padding-bottom: 10px;
+	border-bottom: 1px solid #dcdcde;
+}
+
+.pltt-report-content table {
+	margin-top: 0;
+}
+
+/* Report tables */
+.pltt-report-content .widefat th,
+.pltt-report-content .widefat td {
+	padding: 10px 12px;
+}
+
+.pltt-report-content .widefat .pltt-duration-cell {
+	font-variant-numeric: tabular-nums;
+}
+
+/* View toggle button group */
+.pltt-view-toggle {
+	display: inline-flex;
+}
+
+.pltt-view-toggle .button {
+	border-radius: 0;
+	margin-left: -1px;
+	text-decoration: none;
+}
+
+.pltt-view-toggle .button:first-child {
+	border-radius: 3px 0 0 3px;
+	margin-left: 0;
+}
+
+.pltt-view-toggle .button:last-child {
+	border-radius: 0 3px 3px 0;
+}
+
+/* Summary totals row */
+.pltt-summary-total td {
+	border-top: 2px solid #c3c4c7;
+}
+
+/* Chart placeholder (future) */
+.pltt-chart-container {
+	margin: 20px 0;
+	padding: 20px;
+	background: #f9f9f9;
+	border-radius: 4px;
+	min-height: 200px;
+}
+
+/* Filter dropdown minimum width */
+.pltt-report-filters .pltt-filter-group select {
+	min-width: 160px;
+}
+
+/* Export button */
+#pltt-export-csv {
+	text-decoration: none;
+}
+
+/* Responsive */
+@media screen and (max-width: 782px) {
+	.pltt-report-content {
+		padding: 15px;
+	}
+
+	.pltt-report-content table {
+		display: block;
+		overflow-x: auto;
+	}
+}

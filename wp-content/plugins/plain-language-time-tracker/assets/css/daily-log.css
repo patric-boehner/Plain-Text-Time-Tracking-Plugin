@@ -1,0 +1,122 @@
+/**
+ * Daily Log Screen Styles
+ */
+
+.pltt-log-container {
+	background: #fff;
+	border: 1px solid #c3c4c7;
+	border-radius: 4px;
+	padding: 20px;
+}
+
+.pltt-log-textarea {
+	width: 100%;
+	min-height: 350px;
+	font-family: Consolas, Monaco, "Andale Mono", "Ubuntu Mono", monospace;
+	font-size: 14px;
+	line-height: 1.7;
+	padding: 15px;
+	border: 1px solid #8c8f94;
+	border-radius: 4px;
+	resize: vertical;
+	tab-size: 4;
+}
+
+.pltt-log-textarea:focus {
+	border-color: #2271b1;
+	box-shadow: 0 0 0 1px #2271b1;
+	outline: none;
+}
+
+.pltt-log-textarea::placeholder {
+	color: #a7aaad;
+	font-style: italic;
+}
+
+.pltt-log-footer {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	margin-top: 15px;
+	padding-top: 15px;
+	border-top: 1px solid #dcdcde;
+	flex-wrap: wrap;
+	gap: 15px;
+}
+
+.pltt-log-hint {
+	color: #646970;
+	font-size: 13px;
+}
+
+.pltt-log-hint p {
+	margin: 0;
+}
+
+.pltt-log-hint code {
+	background: #f0f0f1;
+	padding: 2px 6px;
+	border-radius: 3px;
+	font-size: 12px;
+}
+
+.pltt-log-actions {
+	display: flex;
+	align-items: center;
+	gap: 15px;
+}
+
+.pltt-save-indicator {
+	font-size: 13px;
+	min-width: 60px;
+	text-align: right;
+}
+
+.pltt-save-indicator.saving {
+	color: #dba617;
+}
+
+.pltt-save-indicator.saved {
+	color: #00a32a;
+}
+
+.pltt-save-indicator.error {
+	color: #d63638;
+}
+
+/* Existing entries section */
+.pltt-existing-entries {
+	margin-top: 30px;
+	padding-top: 20px;
+	border-top: 1px solid #c3c4c7;
+}
+
+.pltt-existing-entries h3 {
+	margin-top: 0;
+	margin-bottom: 10px;
+}
+
+.pltt-existing-entries .description {
+	margin-bottom: 15px;
+}
+
+.pltt-existing-entries table {
+	margin-top: 15px;
+}
+
+/* Responsive */
+@media screen and (max-width: 782px) {
+	.pltt-log-textarea {
+		min-height: 250px;
+		font-size: 16px; /* Prevent zoom on iOS */
+	}
+
+	.pltt-log-footer {
+		flex-direction: column;
+		align-items: stretch;
+	}
+
+	.pltt-log-actions {
+		justify-content: space-between;
+	}
+}

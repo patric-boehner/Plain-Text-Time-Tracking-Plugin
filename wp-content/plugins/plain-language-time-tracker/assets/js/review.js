@@ -1,0 +1,583 @@
+/**
+ * Review & Verify Screen JavaScript
+ */
+
+/* global PLTT, plttData, PlttTagInput, plttAllTags */
+
+( function() {
+	'use strict';
+
+	const form = document.getElementById( 'pltt-review-form' );
+	const dateInput = document.getElementById( 'pltt-entry-date' );
+	const saveAllBtn = document.getElementById( 'pltt-save-all' );
+	const saveStatus = document.getElementById( 'pltt-save-status' );
+
+	if ( ! form || ! dateInput ) {
+		return;
+	}
+
+	// Initialize tag pill inputs.
+	var tagSuggestions = ( typeof plttAllTags !== 'undefined' ) ? plttAllTags : [];
+	document.querySelectorAll( '.pltt-tag-input-wrap' ).forEach( function( container ) {
+		new PlttTagInput( container, tagSuggestions );
+	} );
+
+	// Track currently active row for modals.
+	let activeRow = null;
+
+	/**
+	 * Calculate duration in minutes from start and end time strings.
+	 *
+	 * @param {string} startTime HH:MM format.
+	 * @param {string} endTime   HH:MM format.
+	 * @return {number|null} Duration in minutes, or null if inputs are missing.
+	 */
+	function calculateDuration( startTime, endTime ) {
+		if ( ! startTime || ! endTime ) {
+			return null;
+		}
+
+		var startParts = startTime.split( ':' ).map( Number );
+		var endParts = endTime.split( ':' ).map( Number );
+		var minutes = ( endParts[0] * 60 + endParts[1] ) - ( startParts[0] * 60 + startParts[1] );
+
+		// Handle overnight (end before start).
+		if ( minutes < 0 ) {
+			minutes += 24 * 60;
+		}
+
+		return minutes;
+	}
+
+	/**
+	 * Update duration display and hidden input when times change.
+	 *
+	 * @param {HTMLElement} row The entry row.
+	 */
+	function recalcDuration( row ) {
+		var startInput = row.querySelector( '.pltt-start-time' );
+		var endInput = row.querySelector( '.pltt-end-time' );
+		var durationInput = row.querySelector( '.pltt-duration-minutes' );
+		var durationDisplay = row.querySelector( '.pltt-duration-display' );
+
+		if ( ! startInput || ! durationInput || ! durationDisplay ) {
+			return;
+		}
+
+		var minutes = calculateDuration( startInput.value, endInput ? endInput.value : '' );
+
+		if ( minutes !== null ) {
+			durationInput.value = minutes;
+			durationDisplay.textContent = PLTT.formatDuration( minutes );
+		}
+
+		updateSummary();
+	}
+
+	/**
+	 * Initialize time input change handlers for duration auto-calculation.
+	 */
+	document.querySelectorAll( '.pltt-entry-row' ).forEach( function( row ) {
+		var startInput = row.querySelector( '.pltt-start-time' );
+		var endInput = row.querySelector( '.pltt-end-time' );
+
+		if ( startInput ) {
+			startInput.addEventListener( 'change', function() {
+				recalcDuration( row );
+			} );
+		}
+		if ( endInput ) {
+			endInput.addEventListener( 'change', function() {
+				recalcDuration( row );
+			} );
+		}
+	} );
+
+	/**
+	 * Format a time string for display (e.g. "14:30" → "2:30pm").
+	 *
+	 * @param {string} timeStr HH:MM or HH:MM:SS format.
+	 * @return {string} Formatted time string.
+	 */
+	function formatTimeForDisplay( timeStr ) {
+		if ( ! timeStr ) {
+			return '';
+		}
+		var parts = timeStr.split( ':' );
+		var hours = parseInt( parts[0], 10 );
+		var minutes = parts[1];
+		var period = hours >= 12 ? 'pm' : 'am';
+
+		hours = hours % 12;
+		if ( hours === 0 ) {
+			hours = 12;
+		}
+
+		return hours + ':' + minutes + period;
+	}
+
+	/**
+	 * Format a date string for display (e.g. "2026-02-07" → "Feb 7, 2026").
+	 *
+	 * @param {string} dateStr YYYY-MM-DD format.
+	 * @return {string} Formatted date string.
+	 */
+	function formatDateForDisplay( dateStr ) {
+		if ( ! dateStr ) {
+			return '';
+		}
+		var d = new Date( dateStr + 'T00:00:00' );
+		return d.toLocaleDateString( 'en-US', { month: 'short', day: 'numeric', year: 'numeric' } );
+	}
+
+	/**
+	 * Open time editing for a cell: hide display, show edit, store originals.
+	 *
+	 * @param {HTMLElement} cell The td.pltt-time-cell element.
+	 */
+	function openTimeEdit( cell ) {
+		var displayDiv = cell.querySelector( '.pltt-time-display' );
+		var editDiv = cell.querySelector( '.pltt-time-edit' );
+		var dateInput = cell.querySelector( '.pltt-entry-date-input' );
+		var startInput = cell.querySelector( '.pltt-start-time' );
+		var endInput = cell.querySelector( '.pltt-end-time' );
+
+		// Store original values for cancel revert.
+		cell._origDate = dateInput ? dateInput.value : '';
+		cell._origStart = startInput ? startInput.value : '';
+		cell._origEnd = endInput ? endInput.value : '';
+
+		displayDiv.style.display = 'none';
+		editDiv.style.display = 'block';
+
+		if ( dateInput ) {
+			dateInput.focus();
+		}
+	}
+
+	/**
+	 * Apply changes: update display text from inputs, hide edit, show display.
+	 *
+	 * @param {HTMLElement} cell The td.pltt-time-cell element.
+	 */
+	function applyTimeEdit( cell ) {
+		var displayDiv = cell.querySelector( '.pltt-time-display' );
+		var editDiv = cell.querySelector( '.pltt-time-edit' );
+		var dateInput = cell.querySelector( '.pltt-entry-date-input' );
+		var startInput = cell.querySelector( '.pltt-start-time' );
+		var endInput = cell.querySelector( '.pltt-end-time' );
+		var dateText = cell.querySelector( '.pltt-date-text' );
+		var timeText = cell.querySelector( '.pltt-time-text' );
+
+		if ( dateText && dateInput ) {
+			dateText.textContent = formatDateForDisplay( dateInput.value );
+		}
+
+		if ( timeText && startInput ) {
+			var display = formatTimeForDisplay( startInput.value );
+			if ( endInput && endInput.value ) {
+				display += ' \u2013 ' + formatTimeForDisplay( endInput.value );
+			}
+			timeText.textContent = display;
+		}
+
+		editDiv.style.display = 'none';
+		displayDiv.style.display = '';
+	}
+
+	/**
+	 * Cancel editing: restore original values, hide edit, show display.
+	 *
+	 * @param {HTMLElement} cell The td.pltt-time-cell element.
+	 */
+	function cancelTimeEdit( cell ) {
+		var displayDiv = cell.querySelector( '.pltt-time-display' );
+		var editDiv = cell.querySelector( '.pltt-time-edit' );
+		var dateInput = cell.querySelector( '.pltt-entry-date-input' );
+		var startInput = cell.querySelector( '.pltt-start-time' );
+		var endInput = cell.querySelector( '.pltt-end-time' );
+
+		// Restore original values.
+		if ( dateInput ) {
+			dateInput.value = cell._origDate || '';
+		}
+		if ( startInput ) {
+			startInput.value = cell._origStart || '';
+		}
+		if ( endInput ) {
+			endInput.value = cell._origEnd || '';
+		}
+
+		// Recalc duration back to original.
+		var row = cell.closest( '.pltt-entry-row' );
+		if ( row ) {
+			recalcDuration( row );
+		}
+
+		editDiv.style.display = 'none';
+		displayDiv.style.display = '';
+	}
+
+	/**
+	 * Edit link: open time editing.
+	 */
+	document.querySelectorAll( '.pltt-edit-time' ).forEach( function( link ) {
+		link.addEventListener( 'click', function( e ) {
+			e.preventDefault();
+			var cell = this.closest( '.pltt-time-cell' );
+			openTimeEdit( cell );
+		} );
+	} );
+
+	/**
+	 * Update button: apply changes and close editor.
+	 */
+	document.querySelectorAll( '.pltt-save-time' ).forEach( function( btn ) {
+		btn.addEventListener( 'click', function() {
+			var cell = this.closest( '.pltt-time-cell' );
+			applyTimeEdit( cell );
+		} );
+	} );
+
+	/**
+	 * Cancel button: revert and close editor.
+	 */
+	document.querySelectorAll( '.pltt-cancel-time' ).forEach( function( btn ) {
+		btn.addEventListener( 'click', function() {
+			var cell = this.closest( '.pltt-time-cell' );
+			cancelTimeEdit( cell );
+		} );
+	} );
+
+	/**
+	 * Escape key: cancel editing (same as Cancel button).
+	 */
+	document.addEventListener( 'keydown', function( e ) {
+		if ( e.key === 'Escape' ) {
+			document.querySelectorAll( '.pltt-time-cell' ).forEach( function( cell ) {
+				if ( cell.querySelector( '.pltt-time-display' ).style.display === 'none' ) {
+					cancelTimeEdit( cell );
+				}
+			} );
+		}
+	} );
+
+	/**
+	 * Load projects for a client via AJAX.
+	 *
+	 * Used when the user changes the client dropdown.
+	 * Initial project options are rendered server-side.
+	 *
+	 * @param {HTMLSelectElement} clientSelect    Client dropdown.
+	 * @param {HTMLSelectElement} projectSelect   Project dropdown.
+	 * @param {string}           currentProjectId Optional project ID to preserve (may be archived).
+	 */
+	function loadProjects( clientSelect, projectSelect, currentProjectId ) {
+		const clientId = clientSelect.value;
+
+		if ( ! clientId || clientId === 'new' ) {
+			projectSelect.innerHTML = '<option value="">Select project...</option>' +
+				'<option value="new">+ Add new project...</option>';
+			return;
+		}
+
+		const ajaxData = { client_id: clientId };
+		if ( currentProjectId ) {
+			ajaxData.current_project_id = currentProjectId;
+		}
+
+		PLTT.ajax( 'pltt_get_projects', ajaxData, function( response ) {
+			if ( response.success ) {
+				let html = '<option value="">Select project...</option>';
+
+				response.data.projects.forEach( function( project ) {
+					var isArchived = ( project.status === 'archived' );
+					// Only include archived projects if they match the entry's current project.
+					if ( isArchived && String( project.id ) !== String( currentProjectId ) ) {
+						return;
+					}
+					var label = isArchived
+						? PLTT.escapeHtml( project.name ) + ' (Archived)'
+						: PLTT.escapeHtml( project.name );
+					var dataAttr = isArchived ? ' data-archived="1"' : '';
+					html += '<option value="' + project.id + '"' + dataAttr + '>' +
+						label + '</option>';
+				} );
+
+				html += '<option value="new">+ Add new project...</option>';
+				projectSelect.innerHTML = html;
+
+				// Re-select the current project if it was in the list.
+				if ( currentProjectId ) {
+					projectSelect.value = currentProjectId;
+				}
+			}
+		} );
+	}
+
+	/**
+	 * Initialize client dropdown handlers.
+	 */
+	document.querySelectorAll( '.pltt-client-select' ).forEach( function( select ) {
+		const row = select.closest( '.pltt-entry-row' );
+		const projectSelect = row.querySelector( '.pltt-project-select' );
+
+		// Reload projects when client changes.
+		select.addEventListener( 'change', function() {
+			if ( this.value === 'new' ) {
+				activeRow = row;
+				PLTT.showModal( 'pltt-client-modal' );
+				this.value = '';
+				return;
+			}
+
+			var originalProjectId = row.dataset.originalProjectId || '';
+			loadProjects( this, projectSelect, originalProjectId );
+		} );
+	} );
+
+	/**
+	 * Initialize project dropdown handlers.
+	 */
+	document.querySelectorAll( '.pltt-project-select' ).forEach( function( select ) {
+		select.addEventListener( 'change', function() {
+			if ( this.value === 'new' ) {
+				const row = this.closest( '.pltt-entry-row' );
+				const clientSelect = row.querySelector( '.pltt-client-select' );
+
+				if ( ! clientSelect.value || clientSelect.value === 'new' ) {
+					alert( 'Please select a client first.' );
+					this.value = '';
+					return;
+				}
+
+				activeRow = row;
+				document.getElementById( 'pltt-new-project-client-id' ).value = clientSelect.value;
+				PLTT.showModal( 'pltt-project-modal' );
+				this.value = '';
+			}
+		} );
+	} );
+
+	/**
+	 * Handle new client creation.
+	 */
+	const saveClientBtn = document.getElementById( 'pltt-save-client' );
+	if ( saveClientBtn ) {
+		saveClientBtn.addEventListener( 'click', function() {
+			const nameInput = document.getElementById( 'pltt-new-client-name' );
+			const name = nameInput.value.trim();
+
+			if ( ! name ) {
+				alert( 'Please enter a client name.' );
+				nameInput.focus();
+				return;
+			}
+
+			this.disabled = true;
+
+			PLTT.ajax( 'pltt_create_client', { name: name }, function( response ) {
+				saveClientBtn.disabled = false;
+
+				if ( response.success && response.data.client ) {
+					const client = response.data.client;
+
+					// Add to all client dropdowns.
+					document.querySelectorAll( '.pltt-client-select' ).forEach( function( select ) {
+						const option = document.createElement( 'option' );
+						option.value = client.id;
+						option.textContent = client.name;
+
+						// Insert before the "Add new" option.
+						const addNewOption = select.querySelector( 'option[value="new"]' );
+						select.insertBefore( option, addNewOption );
+					} );
+
+					// Select in active row.
+					if ( activeRow ) {
+						const clientSelect = activeRow.querySelector( '.pltt-client-select' );
+						clientSelect.value = client.id;
+
+						// Trigger project load.
+						const projectSelect = activeRow.querySelector( '.pltt-project-select' );
+						loadProjects( clientSelect, projectSelect );
+					}
+
+					PLTT.hideModal( 'pltt-client-modal' );
+				} else {
+					alert( response.data || 'Error creating client.' );
+				}
+			} );
+		} );
+	}
+
+	/**
+	 * Handle new project creation.
+	 */
+	const saveProjectBtn = document.getElementById( 'pltt-save-project' );
+	if ( saveProjectBtn ) {
+		saveProjectBtn.addEventListener( 'click', function() {
+			const nameInput = document.getElementById( 'pltt-new-project-name' );
+			const clientIdInput = document.getElementById( 'pltt-new-project-client-id' );
+			const name = nameInput.value.trim();
+			const clientId = clientIdInput.value;
+
+			if ( ! name ) {
+				alert( 'Please enter a project name.' );
+				nameInput.focus();
+				return;
+			}
+
+			this.disabled = true;
+
+			PLTT.ajax( 'pltt_create_project', {
+				name: name,
+				client_id: clientId
+			}, function( response ) {
+				saveProjectBtn.disabled = false;
+
+				if ( response.success && response.data.project ) {
+					const project = response.data.project;
+
+					// Select in active row.
+					if ( activeRow ) {
+						const projectSelect = activeRow.querySelector( '.pltt-project-select' );
+
+						const option = document.createElement( 'option' );
+						option.value = project.id;
+						option.textContent = project.name;
+						option.selected = true;
+
+						const addNewOption = projectSelect.querySelector( 'option[value="new"]' );
+						projectSelect.insertBefore( option, addNewOption );
+					}
+
+					PLTT.hideModal( 'pltt-project-modal' );
+				} else {
+					alert( response.data || 'Error creating project.' );
+				}
+			} );
+		} );
+	}
+
+	/**
+	 * Handle delete entry buttons.
+	 */
+	document.querySelectorAll( '.pltt-delete-entry' ).forEach( function( btn ) {
+		btn.addEventListener( 'click', function() {
+			if ( ! confirm( plttData.i18n.confirm ) ) {
+				return;
+			}
+
+			const row = this.closest( '.pltt-entry-row' );
+			const entryId = row.dataset.entryId;
+
+			row.classList.add( 'deleting' );
+
+			if ( entryId && entryId !== '0' ) {
+				// Delete from database.
+				PLTT.ajax( 'pltt_delete_entry', { entry_id: entryId }, function( response ) {
+					if ( response.success ) {
+						row.remove();
+						updateSummary();
+					} else {
+						row.classList.remove( 'deleting' );
+						alert( response.data || 'Error deleting entry.' );
+					}
+				} );
+			} else {
+				// Just remove from DOM (not saved yet).
+				row.remove();
+				updateSummary();
+			}
+		} );
+	} );
+
+	/**
+	 * Update summary cards after changes.
+	 */
+	function updateSummary() {
+		const rows = document.querySelectorAll( '.pltt-entry-row' );
+		let totalMinutes = 0;
+
+		rows.forEach( function( row ) {
+			const durationInput = row.querySelector( '.pltt-duration-minutes' );
+			if ( durationInput ) {
+				totalMinutes += parseInt( durationInput.value, 10 ) || 0;
+			}
+		} );
+
+		// Update cards if they exist.
+		const entryCountEl = document.querySelector( '.pltt-card-value' );
+		if ( entryCountEl ) {
+			entryCountEl.textContent = rows.length;
+		}
+
+		const hoursEl = document.querySelectorAll( '.pltt-card-value' )[ 1 ];
+		if ( hoursEl ) {
+			hoursEl.textContent = PLTT.formatHours( totalMinutes );
+		}
+	}
+
+	/**
+	 * Handle form submission (Save All).
+	 */
+	form.addEventListener( 'submit', function( e ) {
+		e.preventDefault();
+
+		const rows = document.querySelectorAll( '.pltt-entry-row' );
+		const entries = [];
+
+		rows.forEach( function( row, index ) {
+			const billableCheckbox = row.querySelector( '.pltt-billable' );
+			const entry = {
+				id: row.dataset.entryId || 0,
+				entry_date: row.querySelector( '.pltt-entry-date-input' ).value,
+				start_time: row.querySelector( '.pltt-start-time' ).value,
+				end_time: row.querySelector( '.pltt-end-time' ).value,
+				duration_minutes: row.querySelector( '.pltt-duration-minutes' ).value,
+				raw_text: row.querySelector( 'input[name*="[raw_text]"]' ).value,
+				description: row.querySelector( '.pltt-description' ).value,
+				client_id: row.querySelector( '.pltt-client-select' ).value,
+				project_id: row.querySelector( '.pltt-project-select' ).value,
+				tags: row.querySelector( '.pltt-tags' ).value,
+				billable: billableCheckbox ? ( billableCheckbox.checked ? 1 : 0 ) : 0
+			};
+
+			entries.push( entry );
+		} );
+
+		if ( entries.length === 0 ) {
+			alert( 'No entries to save.' );
+			return;
+		}
+
+		saveAllBtn.disabled = true;
+		saveAllBtn.textContent = plttData.i18n.saving;
+		saveStatus.textContent = '';
+		saveStatus.className = '';
+
+		PLTT.ajax( 'pltt_save_entries', {
+			date: dateInput.value,
+			entries: JSON.stringify( entries )
+		}, function( response ) {
+			saveAllBtn.disabled = false;
+			saveAllBtn.textContent = 'Save All Entries';
+
+			if ( response.success ) {
+				saveStatus.textContent = response.data.message;
+				saveStatus.className = 'success';
+
+				// Redirect to daily log after brief delay.
+				setTimeout( function() {
+					const url = new URL( window.location.href );
+					url.searchParams.delete( 'screen' );
+					window.location.href = url.toString();
+				}, 1500 );
+			} else {
+				saveStatus.textContent = response.data || 'Error saving entries.';
+				saveStatus.className = 'error';
+			}
+		} );
+	} );
+} )();

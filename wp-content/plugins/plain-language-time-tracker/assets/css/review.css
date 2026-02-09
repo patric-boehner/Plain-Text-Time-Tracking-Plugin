@@ -1,0 +1,308 @@
+/**
+ * Review & Verify Screen Styles
+ */
+
+.pltt-review-table {
+	width: 100%;
+	border-collapse: collapse;
+	background: #fff;
+}
+
+.pltt-review-table th,
+.pltt-review-table td {
+	padding: 12px 10px;
+	text-align: left;
+	border-bottom: 1px solid #c3c4c7;
+	vertical-align: middle;
+}
+
+.pltt-review-table th {
+	background: #f0f0f1;
+	font-weight: 600;
+	font-size: 13px;
+}
+
+.pltt-review-table tbody tr:hover {
+	background: #f9f9f9;
+}
+
+/* Column widths */
+.pltt-col-time {
+	min-width: 130px;
+}
+
+.pltt-col-duration {
+	width: 70px;
+}
+
+.pltt-col-description {
+	min-width: 200px;
+}
+
+.pltt-col-client,
+.pltt-col-project {
+	width: 180px;
+}
+
+.pltt-col-tags {
+	width: 150px;
+}
+
+.pltt-col-actions {
+	width: 40px;
+	text-align: center;
+}
+
+/* Time cell - click to edit */
+.pltt-review-table .pltt-time-cell {
+	font-size: 13px;
+	line-height: 1.4;
+}
+
+.pltt-time-display {
+	line-height: 1.4;
+}
+
+.pltt-edit-time {
+	margin-left: 6px;
+}
+
+.pltt-date-text {
+	font-size: 12px;
+	color: #646970;
+}
+
+.pltt-time-text {
+	white-space: nowrap;
+}
+
+
+.pltt-entry-date-input {
+	width: 100%;
+	max-width: 150px;
+	margin-bottom: 4px;
+	font-size: 12px;
+	padding: 2px 4px;
+}
+
+.pltt-time-inputs {
+	display: flex;
+	align-items: center;
+	gap: 2px;
+}
+
+.pltt-start-time,
+.pltt-end-time {
+	width: 110px;
+	font-size: 12px;
+	padding: 2px 4px;
+}
+
+.pltt-time-separator {
+	color: #646970;
+	font-size: 12px;
+}
+
+/* Duration cell */
+.pltt-duration-display {
+	font-size: 13px;
+	white-space: nowrap;
+}
+
+/* Inputs */
+.pltt-review-table input.pltt-description {
+	width: 100%;
+}
+
+.pltt-review-table select {
+	width: 100%;
+	max-width: 180px;
+}
+
+/* Tag pill input */
+.pltt-tag-input-wrap {
+	position: relative;
+	width: 100%;
+	max-width: 150px;
+}
+
+.pltt-tag-pill-area {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 3px;
+	padding: 3px 5px;
+	border: 1px solid #8c8f94;
+	border-radius: 4px;
+	background: #fff;
+	min-height: 30px;
+	cursor: text;
+}
+
+.pltt-tag-pill-area:focus-within {
+	border-color: #2271b1;
+	box-shadow: 0 0 0 1px #2271b1;
+}
+
+.pltt-tag-pill {
+	display: inline-flex;
+	align-items: center;
+	gap: 2px;
+	padding: 1px 6px;
+	background: #dcdcde;
+	border-radius: 3px;
+	font-size: 12px;
+	line-height: 1.6;
+	white-space: nowrap;
+	max-width: 120px;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.pltt-tag-pill-remove {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	border: none;
+	background: none;
+	color: #646970;
+	cursor: pointer;
+	padding: 0;
+	margin-left: 2px;
+	font-size: 14px;
+	line-height: 1;
+	flex-shrink: 0;
+}
+
+.pltt-tag-pill-remove:hover {
+	color: #d63638;
+}
+
+.pltt-tag-text-input {
+	border: none !important;
+	outline: none !important;
+	box-shadow: none !important;
+	padding: 0 !important;
+	margin: 0 !important;
+	min-width: 40px;
+	flex: 1 1 40px;
+	font-size: 12px;
+	line-height: 1.6;
+	background: transparent;
+}
+
+.pltt-tag-suggestions {
+	position: absolute;
+	top: 100%;
+	left: 0;
+	right: 0;
+	background: #fff;
+	border: 1px solid #8c8f94;
+	border-top: none;
+	border-radius: 0 0 4px 4px;
+	z-index: 100;
+	max-height: 150px;
+	overflow-y: auto;
+	box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.pltt-tag-suggestion {
+	padding: 5px 8px;
+	font-size: 12px;
+	cursor: pointer;
+}
+
+.pltt-tag-suggestion:hover,
+.pltt-tag-suggestion-active {
+	background: #2271b1;
+	color: #fff;
+}
+
+/* Confidence indicators */
+.pltt-predicted {
+	position: relative;
+}
+
+.pltt-confidence-indicator {
+	position: absolute;
+	right: -18px;
+	top: 50%;
+	transform: translateY(-50%);
+	font-size: 14px;
+	color: #dba617;
+	cursor: help;
+}
+
+.pltt-confidence-high .pltt-confidence-indicator {
+	color: #00a32a;
+}
+
+.pltt-confidence-medium {
+	background-color: rgba(255, 243, 205, 0.3);
+}
+
+.pltt-confidence-low {
+	background-color: rgba(248, 215, 218, 0.3);
+}
+
+/* Delete button */
+.pltt-delete-entry {
+	color: #b32d2e;
+	cursor: pointer;
+	padding: 5px;
+	border: none;
+	background: none;
+}
+
+.pltt-delete-entry:hover {
+	color: #d63638;
+}
+
+.pltt-delete-entry .dashicons {
+	font-size: 18px;
+	width: 18px;
+	height: 18px;
+}
+
+/* Entry row being deleted */
+.pltt-entry-row.deleting {
+	opacity: 0.5;
+	pointer-events: none;
+}
+
+/* Save status */
+#pltt-save-status {
+	font-size: 13px;
+}
+
+#pltt-save-status.success {
+	color: #00a32a;
+}
+
+#pltt-save-status.error {
+	color: #d63638;
+}
+
+/* Responsive */
+@media screen and (max-width: 1200px) {
+	.pltt-review-table {
+		display: block;
+		overflow-x: auto;
+	}
+}
+
+@media screen and (max-width: 782px) {
+	.pltt-review-table th,
+	.pltt-review-table td {
+		padding: 10px 8px;
+	}
+
+	.pltt-col-tags {
+		display: none;
+	}
+
+	.pltt-col-client,
+	.pltt-col-project {
+		width: 150px;
+	}
+}

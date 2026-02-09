@@ -1,0 +1,33 @@
+/**
+ * Log Archive Screen Styles
+ */
+
+.pltt-log-preview {
+	color: #646970;
+	max-width: 300px;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+/* Delete link */
+.pltt-link-danger {
+	color: #b32d2e;
+}
+
+.pltt-link-danger:hover {
+	color: #a02526;
+}
+
+/* Row being deleted */
+.pltt-deleting {
+	opacity: 0.5;
+	pointer-events: none;
+}
+
+/* Responsive */
+@media screen and (max-width: 782px) {
+	.pltt-log-preview {
+		max-width: 150px;
+	}
+}
