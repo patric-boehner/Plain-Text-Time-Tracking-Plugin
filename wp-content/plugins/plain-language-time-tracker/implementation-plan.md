@@ -204,27 +204,120 @@ This is a personal tool, not a product — settings should reflect what's actual
 
 These items are noted for the roadmap but don't need architectural preparation now. They'll be planned in detail when the time comes.
 
-**Reports & filtering improvements**:
-- Multi-select filtering (select multiple clients, projects, tags)
-- Multi-select dropdowns with search fields and integrated include/exclude logic
-- Improved reports page design and layout
+### Next Priority (after Step 8)
 
-**Table & layout improvements**:
-- Better entry grouping (by day) in reports table
-- Sortable table columns
-- Clients page → standard WordPress-style table (currently two-column layout)
-- Projects → standard table with pagination (list will grow over time)
+**Filtering & Dropdown Improvements**:
+- Multi-select dropdowns with checkboxes for clients, projects, and tags
+- Special options at top of each dropdown:
+  - Projects: "Without project" checkbox (for auditing unassigned entries)
+  - Tags: "Without tags" checkbox (for cleanup)
+  - Note: Entries always require clients, so no "without client" option needed
+- Archive filtering toggle (less common use, so hidden by default):
+  - Toggle reveals optgroup with "Archived", "Active", or both
+  - Applies to projects dropdown (clients don't archive yet, but will follow same pattern later)
+- Current is/is-not functionality integrated into checkbox selections
+
+**Tag Management Interface**:
+- New admin page: simple list of all tags (similar to WordPress tag screen)
+- Show usage count per tag (helps spot unused/orphaned tags)
+- Add, update, delete functionality
+- No merge/rename needed — bulk updates can be handled through reports view
+- High pagination limit to minimize paging needs
+
+**Client & Project Management Redesign**:
+- Split into separate admin pages (no longer combined two-column layout)
+- Standard WordPress-style tables for each
+- Sortable columns, search/filter, pagination
+- Will scale better as data grows
+- High pagination limit to minimize paging
+
+**Business Metrics in Reports**:
+- **Billable analysis** (simple, high value):
+  - % of time that's billable vs non-billable
+  - % of income from billable vs non-billable
+  - Display: "32.5 hrs billable (76% of time) | $2,437.50"
+- **Billable hours trend**: Track billable hours over time
+- **Daily/weekly work totals**: Hours per day or week to gauge capacity without full capacity tracking
+- **Project velocity** (if project time/cost estimates implemented):
+  - Hours logged per active project in period
+  - Summary/chart views when filtering by individual project or client
+
+**Review Screen Layout Improvement**:
+- Give more room to description column (easier to read during verification)
+- Descriptions are typically one sentence, so show full text (no truncation on review screen)
+- Keep rows compact to avoid screen getting too tall
+- Optional: tooltip/hover for extra-long descriptions, but keep simple
+- Other screens (reports): truncation is acceptable
+
+**Bulk Entry Updates**:
+- Select multiple entries in reports list
+- Apply changes in bulk: reassign client/project, add/remove tags, mark billed, delete
+- Useful for end-of-month cleanup and fixing batches of entries
+- Enables tag cleanup workflow (don't need merge/rename in tag management)
+
+### UI/UX Refinements
+
+**Billable field visual improvement**:
+- Replace text-based "yes" / empty display with icon toggle button
+- Dollar symbol icon ($) that can be clicked on/off
+- Reduces visual text clutter on tables
+- Makes billable status more scannable at a glance
+
+**Tags field interaction improvement**:
+- Current system works well and is liked
+- Future enhancement: When entry has no tags, display "tags" text or icon as clickable trigger
+- Click opens dropdown UI with multi-select checkboxes and search field
+- Makes tag addition faster without typing
+- Reduces visual noise (no always-visible input field)
+- Could use icon instead of "tags" text for even cleaner look
+
+**Tag display consistency**:
+- Currently: Tags sometimes shown as pills, sometimes not
+- Pills typically appear when editing (adding/removing tags)
+- Unify to use pill display across all views for visual consistency
+- Makes tags instantly recognizable regardless of context
+
+**Daily log interface improvements**:
+- **Now/Soon**:
+  - Larger text area for better note visibility (reduce need to scroll)
+  - Less form-like visual treatment (improved typography, lighter styling)
+  - Makes journaling/note-taking feel more natural alongside time tracking
+- **Future enhancements**:
+  - Search functionality in log history
+  - Calendar view showing which days have logs
+  - Visual indicator for days containing notes (non-time-entry text)
+  - Note: Parsing should continue to ignore non-@ text, preserving it as-is for journaling
+
+### Longer-Term Ideas
+
+**Client archiving**:
+- Mirror project archive functionality
+- Archive filtering in dropdowns (same pattern as projects)
 
 **Project estimates**:
 - Time-based or cost-based estimates per project
 - Track progress against estimates in reports
+- Enables project velocity metrics and summary views
+
+**Advanced reporting**:
+- Client concentration metrics (top clients by hours/revenue)
+- Tag usage patterns over time
+- Week-over-week comparisons
+- Custom report builder
+
+**Table & layout improvements**:
+- Better entry grouping (by day) in reports table
+- Sortable table columns in reports
+
+**Data retention**:
+- Bulk delete old records (keep only X years of data)
+- Archive/export before deletion
 
 **Other future features**:
 - Calendar view
 - Reporting visualizations/charts
 - Gap detection, overlap handling
-- Bulk entry updates
-- Invoice tracking
+- Invoice tracking integration
 
 ---
 
