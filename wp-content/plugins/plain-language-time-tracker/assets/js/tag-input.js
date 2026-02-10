@@ -10,15 +10,25 @@
 var PlttTagInput = ( function() {
 	'use strict';
 
+	// Shared global suggestions array - updated when any instance adds a new tag.
+	var globalSuggestions = [];
+
 	/**
 	 * @param {HTMLElement} container  Wrapper div.pltt-tag-input-wrap
 	 * @param {string[]}    suggestions Array of all known tags for autocomplete.
 	 */
 	function PlttTagInput( container, suggestions ) {
 		this.container   = container;
-		this.suggestions = ( suggestions || [] ).map( function( t ) { return t.toLowerCase(); } );
 		this.hiddenInput = container.querySelector( '.pltt-tags' );
 		this.tags        = [];
+
+		// Initialize global suggestions on first instance.
+		if ( suggestions && globalSuggestions.length === 0 ) {
+			globalSuggestions = suggestions.map( function( t ) { return t.toLowerCase(); } );
+		}
+
+		// All instances share the same suggestions array.
+		this.suggestions = globalSuggestions;
 
 		this._buildDOM();
 		this._loadInitial();
@@ -92,6 +102,12 @@ var PlttTagInput = ( function() {
 		this.tags.push( tag );
 		this._renderPill( tag );
 		this._sync();
+
+		// Add to global suggestions if it's a new tag.
+		if ( this.suggestions.indexOf( tag ) === -1 ) {
+			this.suggestions.push( tag );
+		}
+
 		this.textInput.value = '';
 		this._hideDropdown();
 	};
