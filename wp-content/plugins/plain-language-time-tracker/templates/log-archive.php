@@ -89,7 +89,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 											<?php esc_html_e( 'Review Entries', 'plain-language-time-tracker' ); ?>
 										</a>
 									<?php endif; ?>
-									| <a href="#" class="pltt-delete-log pltt-link-danger">
+									| <a href="#" class="pltt-delete-log delete">
 										<?php esc_html_e( 'Delete', 'plain-language-time-tracker' ); ?>
 									</a>
 								</div>
@@ -191,7 +191,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 			<?php endif; ?>
 
 		<?php else : ?>
-			<div class="pltt-notice pltt-notice-info">
+			<div class="notice notice-info">
 				<p>
 					<?php if ( ! empty( $month ) ) : ?>
 						<?php esc_html_e( 'No logs found for the selected month.', 'plain-language-time-tracker' ); ?>

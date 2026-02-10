@@ -172,22 +172,34 @@ function pltt_sanitize_date( $date ) {
 /**
  * Extract hashtags from text.
  *
+ * Supports multi-word tags. Tags continue until they hit:
+ * - Another # (new tag)
+ * - Comma, period, or dash with spaces
+ * - End of string
+ *
  * @param string $text Text to search.
  * @return array Array of tags (without # prefix).
  */
 function pltt_extract_tags( $text ) {
-	preg_match_all( '/#([a-zA-Z0-9_-]+)/', $text, $matches );
-	return array_unique( $matches[1] );
+	preg_match_all( '/#([a-zA-Z0-9_-]+(?:\s+[a-zA-Z0-9_-]+)*?)(?=\s*#|[,.]|\s+-\s+|$)/', $text, $matches );
+
+	// Trim whitespace from each tag and filter empty values.
+	$tags = array_map( 'trim', $matches[1] );
+	$tags = array_filter( $tags );
+
+	return array_unique( $tags );
 }
 
 /**
  * Remove hashtags from text.
  *
+ * Removes multi-word tags that end at punctuation or another #.
+ *
  * @param string $text Text to clean.
  * @return string Text without hashtags.
  */
 function pltt_remove_tags( $text ) {
-	return trim( preg_replace( '/#[a-zA-Z0-9_-]+/', '', $text ) );
+	return trim( preg_replace( '/#[a-zA-Z0-9_-]+(?:\s+[a-zA-Z0-9_-]+)*?(?=\s*#|[,.]|\s+-\s+|$)/', '', $text ) );
 }
 
 /**

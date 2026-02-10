@@ -344,7 +344,7 @@ $tab_base_url = add_query_arg( $filter_params, admin_url( 'admin.php' ) );
 					</tbody>
 				</table>
 			<?php else : ?>
-				<div class="pltt-notice pltt-notice-info">
+				<div class="notice notice-info">
 					<p><?php esc_html_e( 'No verified entries found for the selected filters.', 'plain-language-time-tracker' ); ?></p>
 				</div>
 			<?php endif; ?>
@@ -456,7 +456,7 @@ $tab_base_url = add_query_arg( $filter_params, admin_url( 'admin.php' ) );
 				<?php endif; ?>
 
 			<?php else : ?>
-				<div class="pltt-notice pltt-notice-info">
+				<div class="notice notice-info">
 					<p><?php esc_html_e( 'No entries found for the selected filters.', 'plain-language-time-tracker' ); ?></p>
 				</div>
 			<?php endif; ?>

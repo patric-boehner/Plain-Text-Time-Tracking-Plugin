@@ -36,7 +36,7 @@ foreach ( $entries as $entry ) {
 	</div>
 
 	<?php if ( empty( $entries ) ) : ?>
-		<div class="pltt-notice pltt-notice-warning">
+		<div class="notice notice-warning">
 			<p><?php esc_html_e( 'No time entries found for this date. Go back and add some notes with timestamps.', 'plain-language-time-tracker' ); ?></p>
 		</div>
 	<?php else : ?>
