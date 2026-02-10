@@ -245,19 +245,7 @@
 	background-color: rgba(248, 215, 218, 0.3);
 }
 
-/* Delete button */
-.pltt-delete-entry {
-	color: #b32d2e;
-	cursor: pointer;
-	padding: 5px;
-	border: none;
-	background: none;
-}
-
-.pltt-delete-entry:hover {
-	color: #d63638;
-}
-
+/* Delete button — uses WordPress .button-link-delete, only size icon */
 .pltt-delete-entry .dashicons {
 	font-size: 18px;
 	width: 18px;

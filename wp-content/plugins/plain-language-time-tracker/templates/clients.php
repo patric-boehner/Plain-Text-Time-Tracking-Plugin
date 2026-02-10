@@ -137,15 +137,15 @@ $projects = PLTT_Projects::get_all();
 		<input type="hidden" id="pltt-edit-client-id" value="">
 		<p>
 			<label for="pltt-client-name"><?php esc_html_e( 'Client Name', 'plain-language-time-tracker' ); ?></label>
-			<input type="text" id="pltt-client-name" class="regular-text" style="width: 100%;">
+			<input type="text" id="pltt-client-name" class="regular-text widefat">
 		</p>
 		<p>
 			<label for="pltt-client-description"><?php esc_html_e( 'Description (optional)', 'plain-language-time-tracker' ); ?></label>
-			<textarea id="pltt-client-description" rows="3" style="width: 100%;"></textarea>
+			<textarea id="pltt-client-description" rows="3" class="widefat"></textarea>
 		</p>
 		<p>
 			<label for="pltt-client-rate"><?php esc_html_e( 'Hourly Rate (optional)', 'plain-language-time-tracker' ); ?></label>
-			<input type="number" id="pltt-client-rate" step="0.01" min="0" style="width: 100%;" placeholder="0.00">
+			<input type="number" id="pltt-client-rate" step="0.01" min="0" class="widefat" placeholder="0.00">
 		</p>
 		<p class="pltt-modal-actions">
 			<button type="button" id="pltt-delete-client-btn" class="button button-link-delete" style="display: none; margin-right: auto;"><?php esc_html_e( 'Delete', 'plain-language-time-tracker' ); ?></button>
@@ -162,7 +162,7 @@ $projects = PLTT_Projects::get_all();
 		<input type="hidden" id="pltt-edit-project-id" value="">
 		<p>
 			<label for="pltt-project-client"><?php esc_html_e( 'Client', 'plain-language-time-tracker' ); ?></label>
-			<select id="pltt-project-client" style="width: 100%;">
+			<select id="pltt-project-client" class="widefat">
 				<option value=""><?php esc_html_e( 'Select client...', 'plain-language-time-tracker' ); ?></option>
 				<?php foreach ( $clients as $client ) : ?>
 					<option value="<?php echo esc_attr( $client->id ); ?>"><?php echo esc_html( $client->name ); ?></option>
@@ -171,11 +171,11 @@ $projects = PLTT_Projects::get_all();
 		</p>
 		<p>
 			<label for="pltt-project-name"><?php esc_html_e( 'Project Name', 'plain-language-time-tracker' ); ?></label>
-			<input type="text" id="pltt-project-name" class="regular-text" style="width: 100%;">
+			<input type="text" id="pltt-project-name" class="regular-text widefat">
 		</p>
 		<p>
 			<label for="pltt-project-rate"><?php esc_html_e( 'Hourly Rate (optional)', 'plain-language-time-tracker' ); ?></label>
-			<input type="number" id="pltt-project-rate" step="0.01" min="0" style="width: 100%;" placeholder="0.00">
+			<input type="number" id="pltt-project-rate" step="0.01" min="0" class="widefat" placeholder="0.00">
 			<small class="description"><?php esc_html_e( 'Leave blank to use client rate.', 'plain-language-time-tracker' ); ?></small>
 		</p>
 		<p class="pltt-modal-actions">
@@ -185,47 +185,6 @@ $projects = PLTT_Projects::get_all();
 		</p>
 	</div>
 </div>
-
-<style>
-.pltt-two-column {
-	display: grid;
-	grid-template-columns: 1fr 1fr;
-	gap: 30px;
-}
-
-.pltt-section {
-	background: #fff;
-	border: 1px solid #c3c4c7;
-	border-radius: 4px;
-	padding: 20px;
-}
-
-.pltt-section-header {
-	display: flex;
-	justify-content: space-between;
-	align-items: center;
-	margin-bottom: 15px;
-	padding-bottom: 10px;
-	border-bottom: 1px solid #dcdcde;
-}
-
-.pltt-section-header h2 {
-	margin: 0;
-}
-
-#pltt-client-modal .pltt-modal-actions,
-#pltt-project-modal .pltt-modal-actions {
-	display: flex;
-	align-items: center;
-	gap: 8px;
-}
-
-@media screen and (max-width: 1200px) {
-	.pltt-two-column {
-		grid-template-columns: 1fr;
-	}
-}
-</style>
 
 <script>
 (function() {

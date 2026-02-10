@@ -10,15 +10,6 @@
 	text-overflow: ellipsis;
 }
 
-/* Delete link */
-.pltt-link-danger {
-	color: #b32d2e;
-}
-
-.pltt-link-danger:hover {
-	color: #a02526;
-}
-
 /* Row being deleted */
 .pltt-deleting {
 	opacity: 0.5;

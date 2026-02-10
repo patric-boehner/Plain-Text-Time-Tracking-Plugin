@@ -11,20 +11,19 @@
 
 .pltt-log-textarea {
 	width: 100%;
-	min-height: 350px;
+	min-height: 700px;
 	font-family: Consolas, Monaco, "Andale Mono", "Ubuntu Mono", monospace;
 	font-size: 14px;
 	line-height: 1.7;
 	padding: 15px;
-	border: 1px solid #8c8f94;
-	border-radius: 4px;
+	border: none;
+	border-radius: 0;
 	resize: vertical;
 	tab-size: 4;
+	background: transparent;
 }
 
 .pltt-log-textarea:focus {
-	border-color: #2271b1;
-	box-shadow: 0 0 0 1px #2271b1;
 	outline: none;
 }
 
