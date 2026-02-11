@@ -161,6 +161,58 @@ Write code as if you'll have to debug it at 2 AM while half-asleep (because you 
 - Good error messages
 - Sufficient logging for filters/actions
 
+## WordPress Admin UI Patterns
+
+### Admin Notice Placement
+
+**Critical Rule**: WordPress admin notices (success/error messages) must be placed correctly in the DOM or they will display in the wrong position.
+
+**Correct Pattern**:
+```php
+<div class="wrap">
+    <h1>Page Title</h1>
+
+    <?php
+    // Display notices AFTER the h1 title
+    if ( isset( $_GET['message'] ) ) {
+        echo '<div class="notice notice-success is-dismissible"><p>Success message</p></div>';
+    }
+    ?>
+
+    <!-- Rest of page content -->
+</div>
+```
+
+**Key Points**:
+- Notices must come AFTER the `<h1>` page title (when H1 is at root level)
+- Notices must be at the root level of `.wrap`, not nested in other containers
+- **CRITICAL**: If your page has a header wrapper (e.g., `<div class="pltt-header">`), notices go AFTER the wrapper closes, not before or inside it
+- WordPress will auto-relocate notices if they're in the wrong position, causing flashing/repositioning
+
+**Why This Matters**:
+WordPress's admin CSS expects notices to be siblings of the main page heading. If you place them before the heading or nested inside other containers, WordPress's JavaScript may try to relocate them, causing visual glitches and poor UX.
+
+**Common Mistake**:
+```php
+<div class="wrap">
+    <?php // DON'T put notices before the header ?>
+    <div class="page-header">
+        <h1>Page Title</h1>
+    </div>
+    <!-- Notice here won't display properly -->
+</div>
+```
+
+**URL Cleanup**:
+Always clean up notice query parameters from the URL after display to prevent notices persisting on page reload:
+```javascript
+if (window.location.search.includes('pltt_message')) {
+    var url = new URL(window.location.href);
+    url.searchParams.delete('pltt_message');
+    window.history.replaceState({}, '', url.toString());
+}
+```
+
 ## Accessibility Requirements
 
 ### Non-Negotiable Standards

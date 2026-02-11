@@ -552,32 +552,15 @@
 			return;
 		}
 
+		// Serialize entries into hidden field.
+		const entriesDataInput = document.getElementById( 'pltt-entries-data' );
+		entriesDataInput.value = JSON.stringify( entries );
+
+		// Update button text to show saving state.
 		saveAllBtn.disabled = true;
 		saveAllBtn.textContent = plttData.i18n.saving;
-		saveStatus.textContent = '';
-		saveStatus.className = '';
 
-		PLTT.ajax( 'pltt_save_entries', {
-			date: dateInput.value,
-			entries: JSON.stringify( entries )
-		}, function( response ) {
-			saveAllBtn.disabled = false;
-			saveAllBtn.textContent = 'Save All Entries';
-
-			if ( response.success ) {
-				saveStatus.textContent = response.data.message;
-				saveStatus.className = 'success';
-
-				// Redirect to daily log after brief delay.
-				setTimeout( function() {
-					const url = new URL( window.location.href );
-					url.searchParams.delete( 'screen' );
-					window.location.href = url.toString();
-				}, 1500 );
-			} else {
-				saveStatus.textContent = response.data || 'Error saving entries.';
-				saveStatus.className = 'error';
-			}
-		} );
+		// Submit the form.
+		form.submit();
 	} );
 } )();

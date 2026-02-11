@@ -191,18 +191,16 @@ if ( ! defined( 'ABSPATH' ) ) {
 			<?php endif; ?>
 
 		<?php else : ?>
-			<div class="notice notice-info">
-				<p>
-					<?php if ( ! empty( $month ) ) : ?>
-						<?php esc_html_e( 'No logs found for the selected month.', 'plain-language-time-tracker' ); ?>
-					<?php else : ?>
-						<?php esc_html_e( 'No daily logs yet. Start by writing your first daily log!', 'plain-language-time-tracker' ); ?>
-						<a href="<?php echo esc_url( pltt_get_admin_url( 'daily-log' ) ); ?>">
-							<?php esc_html_e( 'Go to Daily Log', 'plain-language-time-tracker' ); ?> &rarr;
-						</a>
-					<?php endif; ?>
-				</p>
-			</div>
+			<p class="description" style="padding: 20px; text-align: center;">
+				<?php if ( ! empty( $month ) ) : ?>
+					<?php esc_html_e( 'No logs found for the selected month.', 'plain-language-time-tracker' ); ?>
+				<?php else : ?>
+					<?php esc_html_e( 'No daily logs yet. Start by writing your first daily log!', 'plain-language-time-tracker' ); ?>
+					<a href="<?php echo esc_url( pltt_get_admin_url( 'daily-log' ) ); ?>">
+						<?php esc_html_e( 'Go to Daily Log', 'plain-language-time-tracker' ); ?> &rarr;
+					</a>
+				<?php endif; ?>
+			</p>
 		<?php endif; ?>
 	</div>
 </div>

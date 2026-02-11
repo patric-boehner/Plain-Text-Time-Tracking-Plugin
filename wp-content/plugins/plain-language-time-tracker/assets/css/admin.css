@@ -369,3 +369,18 @@
 		flex: 1;
 	}
 }
+
+/* Utility classes */
+.pltt-hidden {
+	display: none !important;
+}
+
+/* Modal delete button */
+.pltt-modal-delete-btn {
+	display: none;
+	margin-right: auto;
+}
+
+.pltt-modal-delete-btn.visible {
+	display: inline-block;
+}

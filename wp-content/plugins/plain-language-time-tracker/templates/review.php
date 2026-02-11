@@ -36,9 +36,9 @@ foreach ( $entries as $entry ) {
 	</div>
 
 	<?php if ( empty( $entries ) ) : ?>
-		<div class="notice notice-warning">
-			<p><?php esc_html_e( 'No time entries found for this date. Go back and add some notes with timestamps.', 'plain-language-time-tracker' ); ?></p>
-		</div>
+		<p class="description" style="padding: 20px; text-align: center; background: #fff3cd; border-left: 4px solid #ffc107;">
+			<?php esc_html_e( 'No time entries found for this date. Go back and add some notes with timestamps.', 'plain-language-time-tracker' ); ?>
+		</p>
 	<?php else : ?>
 
 		<div class="pltt-summary-cards">
@@ -52,7 +52,11 @@ foreach ( $entries as $entry ) {
 			</div>
 		</div>
 
-		<form id="pltt-review-form">
+		<form id="pltt-review-form" method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+			<input type="hidden" name="action" value="pltt_save_entries">
+			<input type="hidden" name="date" value="<?php echo esc_attr( $date ); ?>">
+			<input type="hidden" name="entries" id="pltt-entries-data" value="">
+			<?php wp_nonce_field( 'pltt_save_entries', '_wpnonce', true, true ); ?>
 			<table class="pltt-review-table widefat">
 				<thead>
 					<tr>
@@ -229,7 +233,7 @@ foreach ( $entries as $entry ) {
 <script>var plttAllTags = <?php echo wp_json_encode( $all_tags ); ?>;</script>
 
 <!-- New Client Modal -->
-<div id="pltt-client-modal" class="pltt-modal" style="display: none;">
+<div id="pltt-client-modal" class="pltt-modal pltt-hidden">
 	<div class="pltt-modal-content">
 		<h3><?php esc_html_e( 'Add New Client', 'plain-language-time-tracker' ); ?></h3>
 		<p>
@@ -244,7 +248,7 @@ foreach ( $entries as $entry ) {
 </div>
 
 <!-- New Project Modal -->
-<div id="pltt-project-modal" class="pltt-modal" style="display: none;">
+<div id="pltt-project-modal" class="pltt-modal pltt-hidden">
 	<div class="pltt-modal-content">
 		<h3><?php esc_html_e( 'Add New Project', 'plain-language-time-tracker' ); ?></h3>
 		<p>

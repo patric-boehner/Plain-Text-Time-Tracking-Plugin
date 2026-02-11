@@ -344,9 +344,9 @@ $tab_base_url = add_query_arg( $filter_params, admin_url( 'admin.php' ) );
 					</tbody>
 				</table>
 			<?php else : ?>
-				<div class="notice notice-info">
-					<p><?php esc_html_e( 'No verified entries found for the selected filters.', 'plain-language-time-tracker' ); ?></p>
-				</div>
+				<p class="description" style="padding: 20px; text-align: center;">
+					<?php esc_html_e( 'No verified entries found for the selected filters.', 'plain-language-time-tracker' ); ?>
+				</p>
 			<?php endif; ?>
 
 		<?php else : ?>
@@ -456,9 +456,9 @@ $tab_base_url = add_query_arg( $filter_params, admin_url( 'admin.php' ) );
 				<?php endif; ?>
 
 			<?php else : ?>
-				<div class="notice notice-info">
-					<p><?php esc_html_e( 'No entries found for the selected filters.', 'plain-language-time-tracker' ); ?></p>
-				</div>
+				<p class="description" style="padding: 20px; text-align: center;">
+					<?php esc_html_e( 'No entries found for the selected filters.', 'plain-language-time-tracker' ); ?>
+				</p>
 			<?php endif; ?>
 
 		<?php endif; ?>

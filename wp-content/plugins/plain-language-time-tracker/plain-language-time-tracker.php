@@ -52,6 +52,7 @@ function pltt_load_dependencies() {
 
 	// API.
 	require_once PLTT_PLUGIN_DIR . 'includes/api/class-pltt-ajax.php';
+	require_once PLTT_PLUGIN_DIR . 'includes/api/class-pltt-form-handlers.php';
 
 	// Admin.
 	require_once PLTT_PLUGIN_DIR . 'includes/admin/class-pltt-admin.php';
@@ -94,6 +95,7 @@ function pltt_init() {
 	if ( is_admin() ) {
 		PLTT_Admin::init();
 		PLTT_Ajax::init();
+		PLTT_Form_Handlers::init();
 	}
 }
 add_action( 'plugins_loaded', 'pltt_init' );

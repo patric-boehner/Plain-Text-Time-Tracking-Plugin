@@ -206,7 +206,12 @@ class PLTT_Aliases {
 			$formats
 		);
 
-		return $result ? $wpdb->insert_id : false;
+		if ( $result ) {
+			pltt_flush_alias_cache();
+			return $wpdb->insert_id;
+		}
+
+		return false;
 	}
 
 	/**
@@ -290,6 +295,10 @@ class PLTT_Aliases {
 					$id
 				)
 			);
+		}
+
+		if ( $result ) {
+			pltt_flush_alias_cache();
 		}
 
 		return $result;
@@ -395,7 +404,12 @@ class PLTT_Aliases {
 			array( '%d' )
 		);
 
-		return false !== $result;
+		if ( false !== $result ) {
+			pltt_flush_alias_cache();
+			return true;
+		}
+
+		return false;
 	}
 
 	/**
