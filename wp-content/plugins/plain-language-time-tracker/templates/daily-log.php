@@ -48,6 +48,20 @@ $has_entries      = ! empty( $existing_entries );
 				</a>
 			<?php endif; ?>
 		</div>
+
+		<?php
+		// Display success messages — inside header to prevent WordPress JS relocation.
+		if ( isset( $_GET['pltt_message'] ) ) {
+			$message_code = sanitize_text_field( wp_unslash( $_GET['pltt_message'] ) );
+			$messages     = array(
+				'entries_saved' => __( 'Entries saved successfully.', 'plain-language-time-tracker' ),
+			);
+
+			if ( isset( $messages[ $message_code ] ) ) {
+				echo '<div class="notice notice-success is-dismissible pltt-notice-in-header"><p>' . esc_html( $messages[ $message_code ] ) . '</p></div>';
+			}
+		}
+		?>
 	</div>
 
 	<div class="pltt-date-display">
@@ -143,4 +157,15 @@ $has_entries      = ! empty( $existing_entries );
 			</table>
 		</div>
 	<?php endif; ?>
+
+	<script>
+	// Clean up URL parameters after displaying notices.
+	if (window.location.search.includes('pltt_message') || window.location.search.includes('pltt_error')) {
+		var url = new URL(window.location.href);
+		url.searchParams.delete('pltt_message');
+		url.searchParams.delete('pltt_error');
+		url.searchParams.delete('pltt_error_message');
+		window.history.replaceState({}, '', url.toString());
+	}
+	</script>
 </div>

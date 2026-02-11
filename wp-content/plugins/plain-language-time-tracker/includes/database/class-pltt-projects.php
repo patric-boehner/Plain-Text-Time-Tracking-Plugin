@@ -157,7 +157,12 @@ class PLTT_Projects {
 			$formats
 		);
 
-		return $result ? $wpdb->insert_id : false;
+		if ( $result ) {
+			pltt_flush_project_cache();
+			return $wpdb->insert_id;
+		}
+
+		return false;
 	}
 
 	/**
@@ -237,6 +242,10 @@ class PLTT_Projects {
 					$id
 				)
 			);
+		}
+
+		if ( $result ) {
+			pltt_flush_project_cache();
 		}
 
 		return $result;

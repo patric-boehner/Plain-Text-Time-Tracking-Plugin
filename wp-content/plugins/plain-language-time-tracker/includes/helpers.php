@@ -243,3 +243,82 @@ function pltt_format_currency( $amount ) {
 
 	return '$' . number_format( $amount, 2 );
 }
+
+/**
+ * Get cached clients list.
+ *
+ * @return array Array of client objects.
+ */
+function pltt_get_cached_clients() {
+	$cache_key = 'pltt_clients_list';
+	$clients   = get_transient( $cache_key );
+
+	if ( false === $clients ) {
+		$clients = PLTT_Clients::get_all();
+		set_transient( $cache_key, $clients, HOUR_IN_SECONDS );
+	}
+
+	return $clients;
+}
+
+/**
+ * Flush clients cache.
+ */
+function pltt_flush_client_cache() {
+	delete_transient( 'pltt_clients_list' );
+}
+
+/**
+ * Get cached projects list.
+ *
+ * @param array $args Query arguments.
+ * @return array Array of project objects.
+ */
+function pltt_get_cached_projects( $args = array() ) {
+	// Only cache default "get all" queries.
+	if ( empty( $args ) ) {
+		$cache_key = 'pltt_projects_list';
+		$projects  = get_transient( $cache_key );
+
+		if ( false === $projects ) {
+			$projects = PLTT_Projects::get_all();
+			set_transient( $cache_key, $projects, HOUR_IN_SECONDS );
+		}
+
+		return $projects;
+	}
+
+	// Don't cache filtered queries.
+	return PLTT_Projects::get_all( $args );
+}
+
+/**
+ * Flush projects cache.
+ */
+function pltt_flush_project_cache() {
+	delete_transient( 'pltt_projects_list' );
+}
+
+/**
+ * Get cached aliases list.
+ *
+ * @return array Array of alias objects.
+ */
+function pltt_get_cached_aliases() {
+	$cache_key = 'pltt_aliases_list';
+	$aliases   = get_transient( $cache_key );
+
+	if ( false === $aliases ) {
+		$aliases = PLTT_Aliases::get_all();
+		set_transient( $cache_key, $aliases, HOUR_IN_SECONDS );
+	}
+
+	return $aliases;
+}
+
+/**
+ * Flush aliases cache.
+ */
+function pltt_flush_alias_cache() {
+	delete_transient( 'pltt_aliases_list' );
+}

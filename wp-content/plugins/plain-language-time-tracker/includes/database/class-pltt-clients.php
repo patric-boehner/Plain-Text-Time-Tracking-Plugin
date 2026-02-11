@@ -107,7 +107,12 @@ class PLTT_Clients {
 			$formats
 		);
 
-		return $result ? $wpdb->insert_id : false;
+		if ( $result ) {
+			pltt_flush_client_cache();
+			return $wpdb->insert_id;
+		}
+
+		return false;
 	}
 
 	/**
@@ -177,6 +182,10 @@ class PLTT_Clients {
 			);
 		}
 
+		if ( $result ) {
+			pltt_flush_client_cache();
+		}
+
 		return $result;
 	}
 
@@ -184,10 +193,34 @@ class PLTT_Clients {
 	 * Delete a client.
 	 *
 	 * @param int $id Client ID.
-	 * @return bool True on success.
+	 * @return bool|WP_Error True on success, WP_Error if client has projects.
 	 */
 	public static function delete( $id ) {
 		global $wpdb;
+
+		// Check if client has any projects.
+		$projects_table = PLTT_Database::get_table_name( 'projects' );
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+		$project_count = (int) $wpdb->get_var(
+			$wpdb->prepare( "SELECT COUNT(*) FROM {$projects_table} WHERE client_id = %d", $id )
+		);
+
+		if ( $project_count > 0 ) {
+			return new WP_Error(
+				'client_has_projects',
+				sprintf(
+					/* translators: %d: number of projects */
+					_n(
+						'Cannot delete client. Please delete or reassign its %d project first.',
+						'Cannot delete client. Please delete or reassign its %d projects first.',
+						$project_count,
+						'plain-language-time-tracker'
+					),
+					$project_count
+				)
+			);
+		}
+
 		$table = PLTT_Database::get_table_name( 'clients' );
 
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
@@ -197,7 +230,12 @@ class PLTT_Clients {
 			array( '%d' )
 		);
 
-		return false !== $result;
+		if ( false !== $result ) {
+			pltt_flush_client_cache();
+			return true;
+		}
+
+		return false;
 	}
 
 	/**

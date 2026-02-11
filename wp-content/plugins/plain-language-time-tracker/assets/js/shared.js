@@ -100,7 +100,7 @@ const PLTT = {
 	showModal: function( modalId ) {
 		const modal = document.getElementById( modalId );
 		if ( modal ) {
-			modal.style.display = 'flex';
+			modal.classList.remove( 'pltt-hidden' );
 			const firstInput = modal.querySelector( 'input[type="text"]' );
 			if ( firstInput ) {
 				firstInput.focus();
@@ -116,7 +116,7 @@ const PLTT = {
 	hideModal: function( modalId ) {
 		const modal = document.getElementById( modalId );
 		if ( modal ) {
-			modal.style.display = 'none';
+			modal.classList.add( 'pltt-hidden' );
 			// Clear inputs.
 			modal.querySelectorAll( 'input[type="text"]' ).forEach( input => {
 				input.value = '';
