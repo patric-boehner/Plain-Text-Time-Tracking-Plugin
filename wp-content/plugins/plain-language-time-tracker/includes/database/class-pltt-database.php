@@ -20,7 +20,7 @@ class PLTT_Database {
 	 *
 	 * @var string
 	 */
-	const DB_VERSION = '1.2.0';
+	const DB_VERSION = '1.6.0';
 
 	/**
 	 * Get the full table name with WordPress prefix.
@@ -89,6 +89,9 @@ class PLTT_Database {
 			project_id bigint(20) unsigned,
 			verified tinyint(1) NOT NULL DEFAULT 0,
 			billable tinyint(1) NOT NULL DEFAULT 0,
+			billable_rate decimal(10,2) DEFAULT NULL COMMENT 'Hourly rate at time of verification',
+			billable_amount decimal(10,2) DEFAULT NULL COMMENT 'Calculated billable amount (locked at verification)',
+			billed tinyint(1) NOT NULL DEFAULT 0,
 			tags varchar(500),
 			created_at datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
 			updated_at datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -141,13 +144,38 @@ class PLTT_Database {
 	}
 
 	/**
-	 * Check if database needs upgrade and run migrations.
+	 * Check if database needs upgrade and run create_tables.
 	 */
 	public static function maybe_upgrade() {
 		$current_version = get_option( 'pltt_db_version', '0' );
 
 		if ( version_compare( $current_version, self::DB_VERSION, '<' ) ) {
 			self::create_tables();
+			self::migrate( $current_version );
+		}
+	}
+
+	/**
+	 * Run migrations for specific version upgrades.
+	 *
+	 * @param string $from_version Version upgrading from.
+	 */
+	private static function migrate( $from_version ) {
+		global $wpdb;
+
+		// 1.6.0: Drop task_type from time_entries, billing_model and fixed_fee from projects.
+		if ( version_compare( $from_version, '1.6.0', '<' ) ) {
+			$entries_table  = self::get_table_name( 'time_entries' );
+			$projects_table = self::get_table_name( 'projects' );
+
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.SchemaChange
+			$wpdb->query( "ALTER TABLE {$entries_table} DROP COLUMN IF EXISTS task_type" );
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.SchemaChange
+			$wpdb->query( "ALTER TABLE {$projects_table} DROP COLUMN IF EXISTS billing_model" );
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.SchemaChange
+			$wpdb->query( "ALTER TABLE {$projects_table} DROP COLUMN IF EXISTS fixed_fee" );
+
+			delete_option( 'pltt_task_types' );
 		}
 	}
 
@@ -173,5 +201,6 @@ class PLTT_Database {
 
 		delete_option( 'pltt_version' );
 		delete_option( 'pltt_db_version' );
+		delete_option( 'pltt_task_types' ); // May already be gone from 1.6.0 migration.
 	}
 }

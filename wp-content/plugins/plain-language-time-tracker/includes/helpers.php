@@ -322,3 +322,170 @@ function pltt_get_cached_aliases() {
 function pltt_flush_alias_cache() {
 	delete_transient( 'pltt_aliases_list' );
 }
+
+/**
+ * Render tag badges for a comma-separated tags string.
+ *
+ * Outputs badge spans for each tag, or an em-dash if empty.
+ *
+ * @param string $tags_string Comma-separated tags.
+ */
+function pltt_render_tag_badges( $tags_string ) {
+	if ( ! empty( $tags_string ) ) {
+		foreach ( array_map( 'trim', explode( ',', $tags_string ) ) as $tag_item ) {
+			echo '<span class="pltt-badge pltt-badge-tag">' . esc_html( ucfirst( $tag_item ) ) . '</span>';
+		}
+	} else {
+		echo '<span class="pltt-empty">&mdash;</span>';
+	}
+}
+
+/**
+ * Render pagination controls.
+ *
+ * Outputs the standard WordPress-style tablenav pagination block.
+ *
+ * @param int    $paged          Current page number.
+ * @param int    $total_pages    Total number of pages.
+ * @param int    $total_items    Total number of items.
+ * @param string $base_url       Base URL for pagination links.
+ * @param string $singular_label Singular item label for display (e.g., 'entry').
+ * @param string $plural_label   Plural item label for display (e.g., 'entries').
+ */
+function pltt_render_pagination( $paged, $total_pages, $total_items, $base_url, $singular_label, $plural_label ) {
+	if ( $total_pages <= 1 ) {
+		return;
+	}
+	?>
+	<div class="tablenav bottom">
+		<div class="tablenav-pages">
+			<span class="displaying-num">
+				<?php
+				printf(
+					/* translators: %s: total items */
+					esc_html( _n( '%s ' . $singular_label, '%s ' . $plural_label, $total_items, 'plain-language-time-tracker' ) ),
+					number_format_i18n( $total_items )
+				);
+				?>
+			</span>
+			<span class="pagination-links">
+				<?php if ( $paged > 1 ) : ?>
+					<a class="first-page button" href="<?php echo esc_url( add_query_arg( 'paged', 1, $base_url ) ); ?>">
+						&laquo;
+					</a>
+					<a class="prev-page button" href="<?php echo esc_url( add_query_arg( 'paged', $paged - 1, $base_url ) ); ?>">
+						&lsaquo;
+					</a>
+				<?php else : ?>
+					<span class="tablenav-pages-navspan button disabled">&laquo;</span>
+					<span class="tablenav-pages-navspan button disabled">&lsaquo;</span>
+				<?php endif; ?>
+
+				<span class="paging-input">
+					<?php echo esc_html( $paged ); ?>
+					<?php esc_html_e( 'of', 'plain-language-time-tracker' ); ?>
+					<span class="total-pages"><?php echo esc_html( $total_pages ); ?></span>
+				</span>
+
+				<?php if ( $paged < $total_pages ) : ?>
+					<a class="next-page button" href="<?php echo esc_url( add_query_arg( 'paged', $paged + 1, $base_url ) ); ?>">
+						&rsaquo;
+					</a>
+					<a class="last-page button" href="<?php echo esc_url( add_query_arg( 'paged', $total_pages, $base_url ) ); ?>">
+						&raquo;
+					</a>
+				<?php else : ?>
+					<span class="tablenav-pages-navspan button disabled">&rsaquo;</span>
+					<span class="tablenav-pages-navspan button disabled">&raquo;</span>
+				<?php endif; ?>
+			</span>
+		</div>
+	</div>
+	<?php
+}
+
+/**
+ * Render a read-only entry table.
+ *
+ * Outputs a complete <table> with entry rows showing description,
+ * client, project, tags, time, duration, and billable indicator.
+ *
+ * @param array $entries Array of entry objects.
+ * @param array $options {
+ *     Optional. Display options.
+ *
+ *     @type bool   $show_amount Whether to show the Amount column. Default false.
+ *     @type string $table_class Additional CSS class for the table element.
+ * }
+ */
+function pltt_render_entry_table( $entries, $options = array() ) {
+	$show_amount = ! empty( $options['show_amount'] );
+	$table_class = ! empty( $options['table_class'] ) ? ' ' . esc_attr( $options['table_class'] ) : '';
+
+	if ( empty( $entries ) ) {
+		return;
+	}
+	?>
+	<table class="widefat striped<?php echo $table_class; ?>">
+		<thead>
+			<tr>
+				<th><?php esc_html_e( 'Description', 'plain-language-time-tracker' ); ?></th>
+				<th><?php esc_html_e( 'Client', 'plain-language-time-tracker' ); ?></th>
+				<th><?php esc_html_e( 'Project', 'plain-language-time-tracker' ); ?></th>
+				<th><?php esc_html_e( 'Tags', 'plain-language-time-tracker' ); ?></th>
+				<th><?php esc_html_e( 'Time', 'plain-language-time-tracker' ); ?></th>
+				<th><?php esc_html_e( 'Duration', 'plain-language-time-tracker' ); ?></th>
+				<th><?php esc_html_e( 'Billable', 'plain-language-time-tracker' ); ?></th>
+				<?php if ( $show_amount ) : ?>
+					<th><?php esc_html_e( 'Amount', 'plain-language-time-tracker' ); ?></th>
+				<?php endif; ?>
+			</tr>
+		</thead>
+		<tbody>
+			<?php foreach ( $entries as $entry ) :
+				$client  = ! empty( $entry->client_id ) ? PLTT_Clients::get( $entry->client_id ) : null;
+				$project = ! empty( $entry->project_id ) ? PLTT_Projects::get( $entry->project_id ) : null;
+				?>
+				<tr>
+					<td><?php echo esc_html( $entry->description ); ?></td>
+					<td><?php echo $client ? esc_html( $client->name ) : '<span class="pltt-empty">—</span>'; ?></td>
+					<td><?php echo $project ? esc_html( $project->name ) : '<span class="pltt-empty">—</span>'; ?></td>
+					<td><?php pltt_render_tag_badges( $entry->tags ?? '' ); ?></td>
+					<td class="pltt-time-cell">
+						<?php
+						echo esc_html( pltt_format_time( $entry->start_time ) );
+						if ( $entry->end_time ) {
+							echo ' - ' . esc_html( pltt_format_time( $entry->end_time ) );
+						}
+						?>
+					</td>
+					<td class="pltt-duration-cell">
+						<?php echo esc_html( pltt_format_duration( $entry->duration_minutes ) ); ?>
+					</td>
+					<td class="pltt-billable-indicator"><span class="pltt-billable-symbol <?php echo $entry->billable ? 'is-billable' : 'not-billable'; ?>">$</span></td>
+					<?php if ( $show_amount ) :
+						$billable_amount = 0.0;
+						if ( ! empty( $entry->billable ) && $entry->duration_minutes > 0 ) {
+							if ( null !== $entry->billable_amount ) {
+								$billable_amount = (float) $entry->billable_amount;
+							} else {
+								$hourly_rate = 0.0;
+								if ( $project && $project->hourly_rate > 0 ) {
+									$hourly_rate = (float) $project->hourly_rate;
+								} elseif ( $client && $client->hourly_rate > 0 ) {
+									$hourly_rate = (float) $client->hourly_rate;
+								} elseif ( defined( 'PLTT_DEFAULT_HOURLY_RATE' ) ) {
+									$hourly_rate = (float) PLTT_DEFAULT_HOURLY_RATE;
+								}
+								$billable_amount = round( ( $entry->duration_minutes / 60.0 ) * $hourly_rate, 2 );
+							}
+						}
+						?>
+						<td class="pltt-duration-cell"><?php echo $billable_amount > 0 ? esc_html( pltt_format_currency( $billable_amount ) ) : '<span class="pltt-empty">—</span>'; ?></td>
+					<?php endif; ?>
+				</tr>
+			<?php endforeach; ?>
+		</tbody>
+	</table>
+	<?php
+}

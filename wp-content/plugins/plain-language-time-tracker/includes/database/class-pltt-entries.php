@@ -50,6 +50,7 @@ class PLTT_Entries {
 			'verified'       => null,
 			'tag'            => '',
 			'billable'       => null,
+			'billed'         => null,
 			'client_negate'  => 0,
 			'project_negate' => 0,
 			'tag_negate'     => 0,
@@ -92,7 +93,10 @@ class PLTT_Entries {
 		}
 
 		// Project filter.
-		if ( $args['project_id'] > 0 ) {
+		if ( 'without_project' === $args['project_id'] ) {
+			// Special filter: entries without projects.
+			$where[] = 'project_id IS NULL';
+		} elseif ( $args['project_id'] > 0 ) {
 			if ( ! empty( $args['project_negate'] ) ) {
 				$where[]   = '(project_id IS NULL OR project_id != %d)';
 				$prepare[] = $args['project_id'];
@@ -109,7 +113,10 @@ class PLTT_Entries {
 		}
 
 		// Tag filter (comma-separated tags column).
-		if ( ! empty( $args['tag'] ) ) {
+		if ( 'without_tag' === $args['tag'] ) {
+			// Special filter: entries without tags.
+			$where[] = "(tags IS NULL OR tags = '')";
+		} elseif ( ! empty( $args['tag'] ) ) {
 			if ( ! empty( $args['tag_negate'] ) ) {
 				$where[]   = "(tags IS NULL OR tags = '' OR FIND_IN_SET(%s, tags) = 0)";
 				$prepare[] = $args['tag'];
@@ -123,6 +130,12 @@ class PLTT_Entries {
 		if ( null !== $args['billable'] ) {
 			$where[]   = 'billable = %d';
 			$prepare[] = $args['billable'] ? 1 : 0;
+		}
+
+		// Billed filter (invoiced status).
+		if ( null !== $args['billed'] ) {
+			$where[]   = 'billed = %d';
+			$prepare[] = $args['billed'] ? 1 : 0;
 		}
 
 		$sql = "SELECT * FROM {$table}";
@@ -207,7 +220,93 @@ class PLTT_Entries {
 			}
 		}
 
+		// Merge in custom tags (created via Tags management page).
+		$custom_tags = get_option( 'pltt_custom_tags', array() );
+		foreach ( $custom_tags as $tag ) {
+			$tag = strtolower( trim( $tag ) );
+			if ( '' !== $tag ) {
+				$tags[ $tag ] = true;
+			}
+		}
+
 		return array_keys( $tags );
+	}
+
+	/**
+	 * Count how many entries use a specific tag.
+	 *
+	 * @param string $tag Tag name.
+	 * @return int Usage count.
+	 */
+	public static function count_tag_usage( $tag ) {
+		global $wpdb;
+		$table = PLTT_Database::get_table_name( 'time_entries' );
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+		return (int) $wpdb->get_var(
+			$wpdb->prepare(
+				"SELECT COUNT(*) FROM {$table} WHERE FIND_IN_SET(%s, tags) > 0",
+				$tag
+			)
+		);
+	}
+
+	/**
+	 * Rename a tag across all entries.
+	 *
+	 * @param string $old_tag Old tag name.
+	 * @param string $new_tag New tag name.
+	 * @return bool True on success.
+	 */
+	public static function rename_tag( $old_tag, $new_tag ) {
+		global $wpdb;
+		$table = PLTT_Database::get_table_name( 'time_entries' );
+
+		$old_tag = strtolower( trim( $old_tag ) );
+		$new_tag = strtolower( trim( $new_tag ) );
+
+		if ( empty( $old_tag ) || empty( $new_tag ) || $old_tag === $new_tag ) {
+			return false;
+		}
+
+		// Get all entries containing the old tag.
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+		$entries = $wpdb->get_results(
+			$wpdb->prepare(
+				"SELECT id, tags FROM {$table} WHERE FIND_IN_SET(%s, tags) > 0",
+				$old_tag
+			)
+		);
+
+		if ( empty( $entries ) ) {
+			return true; // Nothing to rename is still success.
+		}
+
+		foreach ( $entries as $entry ) {
+			$tag_list    = array_map( 'trim', explode( ',', $entry->tags ) );
+			$updated     = array();
+
+			foreach ( $tag_list as $tag ) {
+				if ( strtolower( $tag ) === $old_tag ) {
+					$updated[] = $new_tag;
+				} else {
+					$updated[] = $tag;
+				}
+			}
+
+			$new_tags_str = implode( ',', array_unique( $updated ) );
+
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+			$wpdb->update(
+				$table,
+				array( 'tags' => $new_tags_str ),
+				array( 'id' => $entry->id ),
+				array( '%s' ),
+				array( '%d' )
+			);
+		}
+
+		return true;
 	}
 
 	/**
@@ -222,7 +321,6 @@ class PLTT_Entries {
 
 		$client_id  = ! empty( $data['client_id'] ) ? absint( $data['client_id'] ) : null;
 		$project_id = ! empty( $data['project_id'] ) ? absint( $data['project_id'] ) : null;
-
 		$insert_data = array(
 			'entry_date'       => pltt_sanitize_date( $data['entry_date'] ?? '' ),
 			'start_time'       => sanitize_text_field( $data['start_time'] ?? '' ),
@@ -247,7 +345,6 @@ class PLTT_Entries {
 			$insert_data['project_id'] = $project_id;
 			$formats[]                 = '%d';
 		}
-
 		if ( empty( $insert_data['entry_date'] ) || empty( $insert_data['start_time'] ) ) {
 			return false;
 		}
@@ -288,6 +385,9 @@ class PLTT_Entries {
 			'project_id'       => '%d',
 			'verified'         => '%d',
 			'billable'         => '%d',
+			'billable_rate'    => '%f',
+			'billable_amount'  => '%f',
+			'billed'           => '%d',
 			'tags'             => '%s',
 		);
 
@@ -298,7 +398,7 @@ class PLTT_Entries {
 			if ( array_key_exists( $field, $data ) ) {
 				if ( in_array( $field, $nullable_fields, true ) ) {
 					if ( ! empty( $data[ $field ] ) ) {
-						$update_data[ $field ] = absint( $data[ $field ] );
+						$update_data[ $field ] = '%d' === $format ? absint( $data[ $field ] ) : sanitize_text_field( $data[ $field ] );
 						$formats[]             = $format;
 					} else {
 						$null_fields[] = $field;
@@ -306,11 +406,14 @@ class PLTT_Entries {
 				} elseif ( 'duration_minutes' === $field ) {
 					$update_data[ $field ] = absint( $data[ $field ] );
 					$formats[]             = $format;
-				} elseif ( in_array( $field, array( 'verified', 'billable' ), true ) ) {
+				} elseif ( in_array( $field, array( 'verified', 'billable', 'billed' ), true ) ) {
 					$update_data[ $field ] = ! empty( $data[ $field ] ) ? 1 : 0;
 					$formats[]             = $format;
 				} elseif ( 'entry_date' === $field ) {
 					$update_data[ $field ] = pltt_sanitize_date( $data[ $field ] );
+					$formats[]             = $format;
+				} elseif ( '%f' === $format ) {
+					$update_data[ $field ] = (float) $data[ $field ];
 					$formats[]             = $format;
 				} else {
 					$update_data[ $field ] = sanitize_text_field( $data[ $field ] );
@@ -501,12 +604,18 @@ class PLTT_Entries {
 			$prepare[] = $args['billable'] ? 1 : 0;
 		}
 
+		// Billed filter (invoiced status).
+		if ( isset( $args['billed'] ) && null !== $args['billed'] ) {
+			$where[]   = 'e.billed = %d';
+			$prepare[] = $args['billed'] ? 1 : 0;
+		}
+
 		$sql = "SELECT
 			COUNT(*) AS total_count,
 			COALESCE(SUM(e.duration_minutes), 0) AS total_minutes,
 			COALESCE(SUM(CASE WHEN e.billable = 1 THEN e.duration_minutes ELSE 0 END), 0) AS billable_minutes,
 			SUM(CASE WHEN e.verified = 1 THEN 1 ELSE 0 END) AS verified_count,
-			COALESCE(SUM(CASE WHEN e.billable = 1 THEN ROUND(e.duration_minutes / 60.0 * COALESCE(p.hourly_rate, c.hourly_rate, 0), 2) ELSE 0 END), 0) AS billable_amount
+			COALESCE(SUM(CASE WHEN e.billable = 1 THEN COALESCE(e.billable_amount, ROUND(e.duration_minutes / 60.0 * COALESCE(p.hourly_rate, c.hourly_rate, 0), 2)) ELSE 0 END), 0) AS billable_amount
 			FROM {$table} e
 			LEFT JOIN {$projects_table} p ON e.project_id = p.id
 			LEFT JOIN {$clients_table} c ON e.client_id = c.id";
@@ -609,6 +718,12 @@ class PLTT_Entries {
 			$prepare[] = $args['billable'] ? 1 : 0;
 		}
 
+		// Billed filter.
+		if ( isset( $args['billed'] ) && null !== $args['billed'] ) {
+			$where[]   = 'e.billed = %d';
+			$prepare[] = $args['billed'] ? 1 : 0;
+		}
+
 		$where_sql = implode( ' AND ', $where );
 
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
@@ -621,7 +736,7 @@ class PLTT_Entries {
 					c.name AS client_name,
 					SUM(e.duration_minutes) AS total_minutes,
 					COALESCE(SUM(CASE WHEN e.billable = 1 THEN e.duration_minutes ELSE 0 END), 0) AS billable_minutes,
-					COALESCE(SUM(CASE WHEN e.billable = 1 THEN ROUND(e.duration_minutes / 60.0 * COALESCE(p.hourly_rate, c.hourly_rate, 0), 2) ELSE 0 END), 0) AS billable_amount,
+					COALESCE(SUM(CASE WHEN e.billable = 1 THEN COALESCE(e.billable_amount, ROUND(e.duration_minutes / 60.0 * COALESCE(p.hourly_rate, c.hourly_rate, 0), 2)) ELSE 0 END), 0) AS billable_amount,
 					COUNT(e.id) AS entry_count
 				FROM {$entries_table} e
 				LEFT JOIN {$projects_table} p ON e.project_id = p.id

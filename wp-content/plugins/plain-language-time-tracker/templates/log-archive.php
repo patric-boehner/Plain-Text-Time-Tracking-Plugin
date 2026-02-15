@@ -68,9 +68,9 @@ if ( ! defined( 'ABSPATH' ) ) {
 					<tr>
 						<th><?php esc_html_e( 'Date', 'plain-language-time-tracker' ); ?></th>
 						<th><?php esc_html_e( 'Preview', 'plain-language-time-tracker' ); ?></th>
-						<th><?php esc_html_e( 'Status', 'plain-language-time-tracker' ); ?></th>
 						<th><?php esc_html_e( 'Entries', 'plain-language-time-tracker' ); ?></th>
 						<th><?php esc_html_e( 'Hours', 'plain-language-time-tracker' ); ?></th>
+						<th><?php esc_html_e( 'Status', 'plain-language-time-tracker' ); ?></th>
 					</tr>
 				</thead>
 				<tbody>
@@ -89,7 +89,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 											<?php esc_html_e( 'Review Entries', 'plain-language-time-tracker' ); ?>
 										</a>
 									<?php endif; ?>
-									| <a href="#" class="pltt-delete-log delete">
+									| <a href="#" class="pltt-delete-log submitdelete">
 										<?php esc_html_e( 'Delete', 'plain-language-time-tracker' ); ?>
 									</a>
 								</div>
@@ -104,13 +104,6 @@ if ( ! defined( 'ABSPATH' ) ) {
 									echo '<span class="pltt-empty">' . esc_html__( 'Empty', 'plain-language-time-tracker' ) . '</span>';
 								}
 								?>
-							</td>
-							<td>
-								<?php if ( $log->processed ) : ?>
-									<span class="pltt-badge pltt-badge-success"><?php esc_html_e( 'Processed', 'plain-language-time-tracker' ); ?></span>
-								<?php else : ?>
-									<span class="pltt-badge pltt-badge-warning"><?php esc_html_e( 'Not processed', 'plain-language-time-tracker' ); ?></span>
-								<?php endif; ?>
 							</td>
 							<td>
 								<?php if ( (int) $log->entry_count > 0 ) : ?>
@@ -130,65 +123,27 @@ if ( ! defined( 'ABSPATH' ) ) {
 								}
 								?>
 							</td>
+							<td>
+								<?php if ( $log->processed ) : ?>
+									<span class="pltt-badge pltt-badge-success"><?php esc_html_e( 'Processed', 'plain-language-time-tracker' ); ?></span>
+								<?php else : ?>
+									<span class="pltt-badge pltt-badge-warning"><?php esc_html_e( 'Not processed', 'plain-language-time-tracker' ); ?></span>
+								<?php endif; ?>
+							</td>
 						</tr>
 					<?php endforeach; ?>
 				</tbody>
 			</table>
 
-			<?php if ( $total_pages > 1 ) : ?>
-				<div class="tablenav bottom">
-					<div class="tablenav-pages">
-						<span class="displaying-num">
-							<?php
-							printf(
-								/* translators: %s: total logs */
-								esc_html( _n( '%s log', '%s logs', $total_logs, 'plain-language-time-tracker' ) ),
-								number_format_i18n( $total_logs )
-							);
-							?>
-						</span>
-						<span class="pagination-links">
-							<?php
-							$base_url = admin_url( 'admin.php?page=pltt-log-archive' );
-							if ( ! empty( $month ) ) {
-								$base_url = add_query_arg( 'month', $month, $base_url );
-							}
 
-							// First page.
-							if ( $paged > 1 ) :
-								?>
-								<a class="first-page button" href="<?php echo esc_url( add_query_arg( 'paged', 1, $base_url ) ); ?>">
-									&laquo;
-								</a>
-								<a class="prev-page button" href="<?php echo esc_url( add_query_arg( 'paged', $paged - 1, $base_url ) ); ?>">
-									&lsaquo;
-								</a>
-							<?php else : ?>
-								<span class="tablenav-pages-navspan button disabled">&laquo;</span>
-								<span class="tablenav-pages-navspan button disabled">&lsaquo;</span>
-							<?php endif; ?>
+			<?php
+			$base_url = admin_url( 'admin.php?page=pltt-log-archive' );
+			if ( ! empty( $month ) ) {
+				$base_url = add_query_arg( 'month', $month, $base_url );
+			}
+			pltt_render_pagination( $paged, $total_pages, $total_logs, $base_url, 'log', 'logs' );
+			?>
 
-							<span class="paging-input">
-								<?php echo esc_html( $paged ); ?>
-								<?php esc_html_e( 'of', 'plain-language-time-tracker' ); ?>
-								<span class="total-pages"><?php echo esc_html( $total_pages ); ?></span>
-							</span>
-
-							<?php if ( $paged < $total_pages ) : ?>
-								<a class="next-page button" href="<?php echo esc_url( add_query_arg( 'paged', $paged + 1, $base_url ) ); ?>">
-									&rsaquo;
-								</a>
-								<a class="last-page button" href="<?php echo esc_url( add_query_arg( 'paged', $total_pages, $base_url ) ); ?>">
-									&raquo;
-								</a>
-							<?php else : ?>
-								<span class="tablenav-pages-navspan button disabled">&rsaquo;</span>
-								<span class="tablenav-pages-navspan button disabled">&raquo;</span>
-							<?php endif; ?>
-						</span>
-					</div>
-				</div>
-			<?php endif; ?>
 
 		<?php else : ?>
 			<p class="description" style="padding: 20px; text-align: center;">

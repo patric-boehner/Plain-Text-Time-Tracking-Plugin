@@ -11,7 +11,7 @@
 
 .pltt-log-textarea {
 	width: 100%;
-	min-height: 700px;
+	min-height: 70vh;
 	font-family: Consolas, Monaco, "Andale Mono", "Ubuntu Mono", monospace;
 	font-size: 14px;
 	line-height: 1.7;
@@ -21,6 +21,11 @@
 	resize: vertical;
 	tab-size: 4;
 	background: transparent;
+}
+
+/* Smaller height when log is processed (to make room for entries table below) */
+.pltt-log-processed .pltt-log-textarea {
+	min-height: 40vh;
 }
 
 .pltt-log-textarea:focus {
@@ -101,6 +106,20 @@
 
 .pltt-existing-entries table {
 	margin-top: 15px;
+}
+
+.pltt-daily-log-entries th,
+.pltt-daily-log-entries td {
+	padding: 12px 14px;
+}
+
+.pltt-daily-log-entries .pltt-duration-cell {
+	font-variant-numeric: tabular-nums;
+}
+
+.pltt-existing-entries-footer {
+	margin-top: 15px;
+	text-align: right;
 }
 
 /* Responsive */

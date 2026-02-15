@@ -10,7 +10,7 @@
 
 .pltt-review-table th,
 .pltt-review-table td {
-	padding: 12px 10px;
+	padding: 10px 10px;
 	text-align: left;
 	border-bottom: 1px solid #c3c4c7;
 	vertical-align: middle;
@@ -36,7 +36,7 @@
 }
 
 .pltt-col-description {
-	min-width: 200px;
+	min-width: 325px;
 }
 
 .pltt-col-client,
@@ -48,8 +48,23 @@
 	width: 150px;
 }
 
-.pltt-col-actions {
-	width: 40px;
+.pltt-col-billable {
+	cursor: pointer;
+}
+
+.pltt-col-billable .pltt-billable {
+	position: absolute;
+	opacity: 0;
+	pointer-events: none;
+}
+
+.pltt-col-billable .pltt-billable-symbol {
+	cursor: pointer;
+	user-select: none;
+}
+
+.pltt-col-billed {
+	width: 50px;
 	text-align: center;
 }
 
@@ -63,8 +78,29 @@
 	line-height: 1.4;
 }
 
-.pltt-edit-time {
-	margin-left: 6px;
+/* WordPress-style row actions (hover to reveal) */
+.pltt-time-display .row-actions {
+	visibility: hidden;
+	font-size: 13px;
+	color: #646970;
+	padding: 2px 0 0;
+}
+
+.pltt-entry-row:hover .pltt-time-display .row-actions,
+.pltt-entry-row:focus-within .pltt-time-display .row-actions {
+	visibility: visible;
+}
+
+.pltt-time-display .row-actions a {
+	text-decoration: none;
+}
+
+.pltt-time-display .row-actions a.submitdelete {
+	color: #b32d2e;
+}
+
+.pltt-time-display .row-actions a.submitdelete:hover {
+	color: #d63638;
 }
 
 .pltt-date-text {
@@ -119,103 +155,87 @@
 	max-width: 180px;
 }
 
-/* Tag pill input */
+/* Tag picker */
 .pltt-tag-input-wrap {
 	position: relative;
 	width: 100%;
 	max-width: 150px;
 }
 
-.pltt-tag-pill-area {
+.pltt-tag-pills {
 	display: flex;
 	flex-wrap: wrap;
-	align-items: center;
 	gap: 3px;
-	padding: 3px 5px;
-	border: 1px solid #8c8f94;
-	border-radius: 4px;
-	background: #fff;
-	min-height: 30px;
-	cursor: text;
+	margin-bottom: 4px;
 }
 
-.pltt-tag-pill-area:focus-within {
-	border-color: #2271b1;
-	box-shadow: 0 0 0 1px #2271b1;
+.pltt-tag-pills:empty {
+	margin-bottom: 0;
 }
 
-.pltt-tag-pill {
-	display: inline-flex;
-	align-items: center;
-	gap: 2px;
-	padding: 1px 6px;
-	background: #dcdcde;
-	border-radius: 3px;
-	font-size: 12px;
-	line-height: 1.6;
-	white-space: nowrap;
-	max-width: 120px;
-	overflow: hidden;
-	text-overflow: ellipsis;
-}
-
-.pltt-tag-pill-remove {
-	display: inline-flex;
-	align-items: center;
-	justify-content: center;
-	border: none;
-	background: none;
-	color: #646970;
+.pltt-tag-pill-trigger {
 	cursor: pointer;
-	padding: 0;
-	margin-left: 2px;
-	font-size: 14px;
-	line-height: 1;
-	flex-shrink: 0;
 }
 
-.pltt-tag-pill-remove:hover {
-	color: #d63638;
+.pltt-tag-pill-trigger:hover {
+	background: #c9dff0;
 }
 
-.pltt-tag-text-input {
-	border: none !important;
-	outline: none !important;
-	box-shadow: none !important;
-	padding: 0 !important;
-	margin: 0 !important;
-	min-width: 40px;
-	flex: 1 1 40px;
-	font-size: 12px;
-	line-height: 1.6;
-	background: transparent;
-}
-
-.pltt-tag-suggestions {
+.pltt-tag-picker-dropdown {
 	position: absolute;
 	top: 100%;
 	left: 0;
-	right: 0;
+	width: 220px;
 	background: #fff;
 	border: 1px solid #8c8f94;
-	border-top: none;
-	border-radius: 0 0 4px 4px;
+	border-radius: 4px;
+	box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
 	z-index: 100;
-	max-height: 150px;
+	margin-top: 4px;
+}
+
+.pltt-tag-search {
+	width: 100%;
+	padding: 8px 10px;
+	border: none;
+	border-bottom: 1px solid #dcdcde;
+	font-size: 13px;
+	box-sizing: border-box;
+	outline: none;
+}
+
+.pltt-tag-search:focus {
+	border-bottom-color: #2271b1;
+}
+
+.pltt-tag-checkbox-list {
+	max-height: 200px;
 	overflow-y: auto;
-	box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+	padding: 4px 0;
 }
 
-.pltt-tag-suggestion {
-	padding: 5px 8px;
-	font-size: 12px;
+.pltt-tag-checkbox-item {
+	display: block;
+	padding: 6px 12px;
+	font-size: 13px;
 	cursor: pointer;
+	margin: 0;
 }
 
-.pltt-tag-suggestion:hover,
-.pltt-tag-suggestion-active {
-	background: #2271b1;
-	color: #fff;
+.pltt-tag-checkbox-item:hover {
+	background: #f0f0f1;
+}
+
+.pltt-tag-checkbox-item input[type="checkbox"] {
+	margin: 0 8px 0 0;
+	vertical-align: middle;
+}
+
+.pltt-tag-empty {
+	padding: 12px;
+	text-align: center;
+	color: #646970;
+	font-size: 13px;
 }
 
 /* Confidence indicators */
@@ -243,13 +263,6 @@
 
 .pltt-confidence-low {
 	background-color: rgba(248, 215, 218, 0.3);
-}
-
-/* Delete button — uses WordPress .button-link-delete, only size icon */
-.pltt-delete-entry .dashicons {
-	font-size: 18px;
-	width: 18px;
-	height: 18px;
 }
 
 /* Entry row being deleted */

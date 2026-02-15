@@ -4,9 +4,12 @@
  *
  * @package PlainLanguageTimeTracker
  *
- * @var string $date    Current date.
- * @var array  $entries Parsed entries.
- * @var array  $clients All clients.
+ * @var string $date               Current date.
+ * @var array  $entries            Parsed entries.
+ * @var array  $summary            Summary stats (billable_minutes, billable_amount).
+ * @var array  $clients            All clients.
+ * @var array  $projects_by_client Projects grouped by client.
+ * @var array  $all_tags           All known tags.
  */
 
 // Prevent direct access.
@@ -50,8 +53,28 @@ foreach ( $entries as $entry ) {
 				<div class="card-value"><?php echo esc_html( pltt_format_hours( $total_minutes ) ); ?></div>
 				<div class="card-label"><?php esc_html_e( 'Total Hours', 'plain-language-time-tracker' ); ?></div>
 			</div>
+			<div class="card">
+				<div class="card-value"><?php echo esc_html( pltt_format_hours( $summary['billable_minutes'] ) ); ?></div>
+				<div class="card-label"><?php esc_html_e( 'Billable Hours', 'plain-language-time-tracker' ); ?></div>
+			</div>
+			<?php if ( (float) $summary['billable_amount'] > 0 ) : ?>
+				<div class="card">
+					<div class="card-value"><?php echo esc_html( pltt_format_currency( $summary['billable_amount'] ) ); ?></div>
+					<div class="card-label"><?php esc_html_e( 'Billable Amount', 'plain-language-time-tracker' ); ?></div>
+				</div>
+			<?php endif; ?>
 		</div>
 
+		<?php
+		// Check if any entries are already saved (id > 0) to conditionally show billed column.
+		$has_saved_entries = false;
+		foreach ( $entries as $entry ) {
+			if ( ! empty( $entry['id'] ) && $entry['id'] > 0 ) {
+				$has_saved_entries = true;
+				break;
+			}
+		}
+		?>
 		<form id="pltt-review-form" method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
 			<input type="hidden" name="action" value="pltt_save_entries">
 			<input type="hidden" name="date" value="<?php echo esc_attr( $date ); ?>">
@@ -67,7 +90,9 @@ foreach ( $entries as $entry ) {
 						<th class="pltt-col-project"><?php esc_html_e( 'Project', 'plain-language-time-tracker' ); ?></th>
 						<th class="pltt-col-tags"><?php esc_html_e( 'Tags', 'plain-language-time-tracker' ); ?></th>
 						<th class="pltt-col-billable"><?php esc_html_e( 'Billable', 'plain-language-time-tracker' ); ?></th>
-						<th class="pltt-col-actions"></th>
+						<?php if ( $has_saved_entries ) : ?>
+							<th class="pltt-col-billed"><?php esc_html_e( 'Invoiced', 'plain-language-time-tracker' ); ?></th>
+						<?php endif; ?>
 					</tr>
 				</thead>
 				<tbody>
@@ -79,11 +104,13 @@ foreach ( $entries as $entry ) {
 						$client_confidence  = $entry['client_confidence'] ?? 0;
 						$confidence_class   = $client_confidence >= PLTT_CONFIDENCE_THRESHOLD ? 'high' : ( $client_confidence >= 0.4 ? 'medium' : 'low' );
 						$has_prediction     = $predicted_client > 0;
+
+						$row_classes = array( 'pltt-entry-row' );
 						?>
-						<tr class="pltt-entry-row" data-entry-id="<?php echo esc_attr( $entry_id ); ?>" data-index="<?php echo esc_attr( $index ); ?>" data-original-project-id="<?php echo esc_attr( $predicted_project ); ?>">
+						<tr class="<?php echo esc_attr( implode( ' ', $row_classes ) ); ?>" data-entry-id="<?php echo esc_attr( $entry_id ); ?>" data-index="<?php echo esc_attr( $index ); ?>" data-original-project-id="<?php echo esc_attr( $predicted_project ); ?>">
 							<td class="pltt-time-cell">
 								<div class="pltt-time-display">
-									<span class="pltt-date-text"><?php echo esc_html( pltt_format_date( $entry['entry_date'] ?? $date, 'M j, Y' ) ); ?></span>
+									<span class="pltt-date-text"><?php echo esc_html( pltt_format_date( $entry['entry_date'] ?? $date, 'M j, Y' ) ); ?></span> <span class="pltt-time-separator">&middot;</span>
 									<span class="pltt-time-text">
 										<?php
 										echo esc_html( pltt_format_time( $entry['start_time'] ) );
@@ -92,7 +119,10 @@ foreach ( $entries as $entry ) {
 										}
 										?>
 									</span>
-									<a href="#edit_time" class="pltt-edit-time hide-if-no-js" role="button"><?php esc_html_e( 'Edit', 'plain-language-time-tracker' ); ?></a>
+									<div class="row-actions">
+										<span class="edit"><a href="#edit_time" class="pltt-edit-time" role="button"><?php esc_html_e( 'Edit', 'plain-language-time-tracker' ); ?></a> | </span>
+										<span class="trash"><a href="#delete" class="pltt-delete-entry submitdelete" role="button"><?php esc_html_e( 'Delete', 'plain-language-time-tracker' ); ?></a></span>
+									</div>
 								</div>
 								<div class="pltt-time-edit inline-edit-row hide-if-js">
 									<input
@@ -104,16 +134,18 @@ foreach ( $entries as $entry ) {
 									<div class="pltt-time-inputs">
 										<input
 											type="time"
+											step="60"
 											name="entries[<?php echo esc_attr( $index ); ?>][start_time]"
 											class="pltt-start-time"
-											value="<?php echo esc_attr( $entry['start_time'] ?? '' ); ?>"
+											value="<?php echo esc_attr( substr( $entry['start_time'] ?? '', 0, 5 ) ); ?>"
 										>
 										<span class="pltt-time-separator">&ndash;</span>
 										<input
 											type="time"
+											step="60"
 											name="entries[<?php echo esc_attr( $index ); ?>][end_time]"
 											class="pltt-end-time"
-											value="<?php echo esc_attr( $entry['end_time'] ?? '' ); ?>"
+											value="<?php echo esc_attr( substr( $entry['end_time'] ?? '', 0, 5 ) ); ?>"
 										>
 									</div>
 									<div class="submit inline-edit-save">
@@ -121,10 +153,6 @@ foreach ( $entries as $entry ) {
 										<button type="button" class="pltt-cancel-time button cancel"><?php esc_html_e( 'Cancel', 'plain-language-time-tracker' ); ?></button>
 									</div>
 								</div>
-								<input type="hidden" name="entries[<?php echo esc_attr( $index ); ?>][raw_text]" value="<?php echo esc_attr( $entry['raw_text'] ?? '' ); ?>">
-								<?php if ( $entry_id ) : ?>
-									<input type="hidden" name="entries[<?php echo esc_attr( $index ); ?>][id]" value="<?php echo esc_attr( $entry_id ); ?>">
-								<?php endif; ?>
 							</td>
 							<td class="pltt-duration-cell">
 								<span class="pltt-duration-display"><?php echo ! empty( $entry['duration_minutes'] ) ? esc_html( pltt_format_duration( $entry['duration_minutes'] ) ) : '--'; ?></span>
@@ -136,7 +164,12 @@ foreach ( $entries as $entry ) {
 									name="entries[<?php echo esc_attr( $index ); ?>][description]"
 									class="pltt-description regular-text"
 									value="<?php echo esc_attr( $entry['description'] ?? '' ); ?>"
+									title="<?php echo esc_attr( $entry['description'] ?? '' ); ?>"
 								>
+								<input type="hidden" name="entries[<?php echo esc_attr( $index ); ?>][raw_text]" value="<?php echo esc_attr( $entry['raw_text'] ?? '' ); ?>">
+								<?php if ( $entry_id ) : ?>
+									<input type="hidden" name="entries[<?php echo esc_attr( $index ); ?>][id]" value="<?php echo esc_attr( $entry_id ); ?>">
+								<?php endif; ?>
 							</td>
 							<td class="<?php echo $has_prediction ? 'pltt-predicted pltt-confidence-' . esc_attr( $confidence_class ) : ''; ?>">
 								<select name="entries[<?php echo esc_attr( $index ); ?>][client_id]" class="pltt-client-select">
@@ -193,7 +226,8 @@ foreach ( $entries as $entry ) {
 									>
 								</div>
 							</td>
-							<td class="pltt-col-billable">
+							<td class="pltt-col-billable pltt-billable-indicator">
+								<span class="pltt-billable-symbol <?php echo ! empty( $entry['billable'] ) ? 'is-billable' : 'not-billable'; ?>">$</span>
 								<input
 									type="checkbox"
 									name="entries[<?php echo esc_attr( $index ); ?>][billable]"
@@ -202,11 +236,18 @@ foreach ( $entries as $entry ) {
 									<?php checked( ! empty( $entry['billable'] ) ); ?>
 								>
 							</td>
-							<td class="pltt-col-actions">
-								<button type="button" class="pltt-delete-entry button-link-delete" title="<?php esc_attr_e( 'Delete entry', 'plain-language-time-tracker' ); ?>">
-									<span class="dashicons dashicons-trash"></span>
-								</button>
-							</td>
+							<?php if ( $has_saved_entries ) : ?>
+								<td class="pltt-col-billed">
+									<input
+										type="checkbox"
+										name="entries[<?php echo esc_attr( $index ); ?>][billed]"
+										class="pltt-billed"
+										value="1"
+										<?php checked( ! empty( $entry['billed'] ) ); ?>
+										<?php disabled( empty( $entry['billable'] ) ); ?>
+									>
+								</td>
+							<?php endif; ?>
 						</tr>
 					<?php endforeach; ?>
 				</tbody>
@@ -240,6 +281,10 @@ foreach ( $entries as $entry ) {
 			<label for="pltt-new-client-name"><?php esc_html_e( 'Client Name', 'plain-language-time-tracker' ); ?></label>
 			<input type="text" id="pltt-new-client-name" class="regular-text">
 		</p>
+		<p>
+			<label for="pltt-new-client-rate"><?php esc_html_e( 'Hourly Rate (Optional)', 'plain-language-time-tracker' ); ?></label>
+			<input type="number" id="pltt-new-client-rate" step="0.01" min="0" placeholder="<?php echo esc_attr( PLTT_DEFAULT_HOURLY_RATE ); ?>" class="regular-text">
+		</p>
 		<p class="pltt-modal-actions">
 			<button type="button" id="pltt-save-client" class="button button-primary"><?php esc_html_e( 'Create Client', 'plain-language-time-tracker' ); ?></button>
 			<button type="button" class="pltt-modal-close button"><?php esc_html_e( 'Cancel', 'plain-language-time-tracker' ); ?></button>
@@ -255,6 +300,10 @@ foreach ( $entries as $entry ) {
 			<label for="pltt-new-project-name"><?php esc_html_e( 'Project Name', 'plain-language-time-tracker' ); ?></label>
 			<input type="text" id="pltt-new-project-name" class="regular-text">
 			<input type="hidden" id="pltt-new-project-client-id">
+		</p>
+		<p>
+			<label for="pltt-new-project-rate"><?php esc_html_e( 'Hourly Rate (Optional)', 'plain-language-time-tracker' ); ?></label>
+			<input type="number" id="pltt-new-project-rate" step="0.01" min="0" placeholder="<?php esc_attr_e( 'Inherits from client', 'plain-language-time-tracker' ); ?>" class="regular-text">
 		</p>
 		<p class="pltt-modal-actions">
 			<button type="button" id="pltt-save-project" class="button button-primary"><?php esc_html_e( 'Create Project', 'plain-language-time-tracker' ); ?></button>

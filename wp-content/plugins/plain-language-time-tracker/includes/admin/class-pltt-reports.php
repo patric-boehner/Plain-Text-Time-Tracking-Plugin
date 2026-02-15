@@ -31,6 +31,7 @@ class PLTT_Reports {
 		$project_id = isset( $_GET['project_id'] ) ? absint( $_GET['project_id'] ) : 0;
 		$tag        = isset( $_GET['tag'] ) ? sanitize_text_field( wp_unslash( $_GET['tag'] ) ) : '';
 		$billable   = isset( $_GET['billable'] ) && '' !== $_GET['billable'] ? absint( $_GET['billable'] ) : null;
+		$billed     = isset( $_GET['billed'] ) && '' !== $_GET['billed'] ? absint( $_GET['billed'] ) : null;
 
 		// Negate flags for exclusion filters.
 		$client_negate  = ! empty( $_GET['client_negate'] ) ? 1 : 0;
@@ -50,6 +51,7 @@ class PLTT_Reports {
 			'project_id'     => $project_id,
 			'tag'            => $tag,
 			'billable'       => $billable,
+			'billed'         => $billed,
 			'client_negate'  => $client_negate,
 			'project_negate' => $project_negate,
 			'tag_negate'     => $tag_negate,

@@ -11,6 +11,7 @@
  * @var int      $project_id    Selected project ID (0 = all).
  * @var string   $tag           Selected tag ('' = all).
  * @var int|null $billable      Billable filter (null = all, 1 = billable, 0 = non-billable).
+ * @var int|null $billed        Billed/invoiced filter (null = all, 1 = billed, 0 = unbilled).
  * @var int      $client_negate  Whether to negate the client filter (0 or 1).
  * @var int      $project_negate Whether to negate the project filter (0 or 1).
  * @var int      $tag_negate     Whether to negate the tag filter (0 or 1).
@@ -99,6 +100,9 @@ if ( '' !== $tag ) {
 if ( null !== $billable ) {
 	$filter_params['billable'] = $billable;
 }
+if ( null !== $billed ) {
+	$filter_params['billed'] = $billed;
+}
 if ( $client_negate ) {
 	$filter_params['client_negate'] = 1;
 }
@@ -127,12 +131,11 @@ $tab_base_url = add_query_arg( $filter_params, admin_url( 'admin.php' ) );
 		</div>
 	</div>
 
-	<div class="pltt-report-filters">
-		<form method="get" action="">
-			<input type="hidden" name="page" value="pltt-reports">
-			<input type="hidden" name="view" value="<?php echo esc_attr( $view ); ?>">
+	<form method="get" action="" class="pltt-report-filters-form">
+		<input type="hidden" name="page" value="pltt-reports">
+		<input type="hidden" name="view" value="<?php echo esc_attr( $view ); ?>">
 
-			<div class="pltt-filter-row">
+		<div class="pltt-filter-row pltt-filter-row-date">
 				<?php
 				$active_preset = '';
 				foreach ( $presets as $preset ) {
@@ -168,7 +171,8 @@ $tab_base_url = add_query_arg( $filter_params, admin_url( 'admin.php' ) );
 				</div>
 			</div>
 
-			<div class="pltt-filter-row" style="margin-top: 15px;">
+		<div class="pltt-report-filters">
+			<div class="pltt-filter-row">
 				<div class="pltt-filter-group">
 					<label for="pltt-filter-client"><?php esc_html_e( 'Client', 'plain-language-time-tracker' ); ?></label>
 					<div class="pltt-filter-input-wrap">
@@ -204,6 +208,7 @@ $tab_base_url = add_query_arg( $filter_params, admin_url( 'admin.php' ) );
 						<input type="hidden" name="project_negate" value="<?php echo esc_attr( $project_negate ); ?>">
 						<select name="project_id" id="pltt-filter-project">
 							<option value=""><?php esc_html_e( 'All Projects', 'plain-language-time-tracker' ); ?></option>
+							<option value="without_project" <?php selected( $project_id, 'without_project' ); ?>><?php esc_html_e( '— Without Projects —', 'plain-language-time-tracker' ); ?></option>
 							<?php
 							// Show all projects, or only the selected client's projects.
 							$visible_projects = $client_id > 0 && isset( $projects_by_client[ (string) $client_id ] )
@@ -234,6 +239,7 @@ $tab_base_url = add_query_arg( $filter_params, admin_url( 'admin.php' ) );
 						<input type="hidden" name="tag_negate" value="<?php echo esc_attr( $tag_negate ); ?>">
 						<select name="tag" id="pltt-filter-tag">
 							<option value=""><?php esc_html_e( 'All Tags', 'plain-language-time-tracker' ); ?></option>
+							<option value="without_tag" <?php selected( $tag, 'without_tag' ); ?>><?php esc_html_e( '— Without Tag —', 'plain-language-time-tracker' ); ?></option>
 							<?php foreach ( $all_tags as $t ) : ?>
 								<option value="<?php echo esc_attr( $t ); ?>" <?php selected( $tag, $t ); ?>>
 									<?php echo esc_html( $t ); ?>
@@ -252,13 +258,22 @@ $tab_base_url = add_query_arg( $filter_params, admin_url( 'admin.php' ) );
 					</select>
 				</div>
 
+				<div class="pltt-filter-group">
+					<label for="pltt-filter-billed"><?php esc_html_e( 'Invoiced', 'plain-language-time-tracker' ); ?></label>
+					<select name="billed" id="pltt-filter-billed">
+						<option value="" <?php selected( null === $billed ); ?>><?php esc_html_e( 'All', 'plain-language-time-tracker' ); ?></option>
+						<option value="0" <?php selected( 0, $billed ); ?>><?php esc_html_e( 'Unbilled Only', 'plain-language-time-tracker' ); ?></option>
+						<option value="1" <?php selected( 1, $billed ); ?>><?php esc_html_e( 'Billed Only', 'plain-language-time-tracker' ); ?></option>
+					</select>
+				</div>
+
 				<div class="pltt-filter-group pltt-filter-actions">
-					<button type="submit" class="button button-primary"><?php esc_html_e( 'Filter', 'plain-language-time-tracker' ); ?></button>
+					<button type="submit" class="button button-primary"><?php esc_html_e( 'Apply Filter', 'plain-language-time-tracker' ); ?></button>
 					<a href="<?php echo esc_url( admin_url( 'admin.php?page=pltt-reports' ) ); ?>" class="button"><?php esc_html_e( 'Clear', 'plain-language-time-tracker' ); ?></a>
 				</div>
 			</div>
-		</form>
-	</div>
+		</div>
+	</form>
 
 	<script>var plttProjectsByClient = <?php echo wp_json_encode( $projects_by_client ); ?>;</script>
 
@@ -304,10 +319,10 @@ $tab_base_url = add_query_arg( $filter_params, admin_url( 'admin.php' ) );
 						<tr>
 							<th><?php esc_html_e( 'Project', 'plain-language-time-tracker' ); ?></th>
 							<th><?php esc_html_e( 'Client', 'plain-language-time-tracker' ); ?></th>
-							<th><?php esc_html_e( 'Entries', 'plain-language-time-tracker' ); ?></th>
 							<th><?php esc_html_e( 'Hours', 'plain-language-time-tracker' ); ?></th>
 							<th><?php esc_html_e( 'Billable Hours', 'plain-language-time-tracker' ); ?></th>
 							<th><?php esc_html_e( 'Billable Amount', 'plain-language-time-tracker' ); ?></th>
+							<th><?php esc_html_e( 'Entries', 'plain-language-time-tracker' ); ?></th>
 						</tr>
 					</thead>
 					<tbody>
@@ -325,6 +340,7 @@ $tab_base_url = add_query_arg( $filter_params, admin_url( 'admin.php' ) );
 							$detail_args['project_id'] = $row->project_id;
 						}
 						$detail_url = add_query_arg( $detail_args, admin_url( 'admin.php' ) );
+
 						?>
 							<tr>
 								<td>
@@ -335,10 +351,10 @@ $tab_base_url = add_query_arg( $filter_params, admin_url( 'admin.php' ) );
 									<?php endif; ?>
 								</td>
 								<td><?php echo ! empty( $row->client_name ) ? esc_html( $row->client_name ) : '<span class="pltt-empty">—</span>'; ?></td>
-								<td><?php echo esc_html( $row->entry_count ); ?></td>
 								<td class="pltt-duration-cell"><?php echo esc_html( pltt_format_hours( $row->total_minutes ) ); ?></td>
 								<td class="pltt-duration-cell"><?php echo esc_html( pltt_format_hours( $row->billable_minutes ) ); ?></td>
 								<td class="pltt-duration-cell"><?php echo (float) $row->billable_amount > 0 ? esc_html( pltt_format_currency( $row->billable_amount ) ) : '<span class="pltt-empty">—</span>'; ?></td>
+								<td><?php echo esc_html( $row->entry_count ); ?></td>
 							</tr>
 						<?php endforeach; ?>
 					</tbody>
@@ -352,108 +368,38 @@ $tab_base_url = add_query_arg( $filter_params, admin_url( 'admin.php' ) );
 		<?php else : ?>
 
 			<?php if ( ! empty( $entries ) ) : ?>
-				<table class="widefat striped">
-					<thead>
-						<tr>
-							<th><?php esc_html_e( 'Date', 'plain-language-time-tracker' ); ?></th>
-							<th><?php esc_html_e( 'Time', 'plain-language-time-tracker' ); ?></th>
-							<th><?php esc_html_e( 'Duration', 'plain-language-time-tracker' ); ?></th>
-							<th><?php esc_html_e( 'Description', 'plain-language-time-tracker' ); ?></th>
-							<th><?php esc_html_e( 'Client', 'plain-language-time-tracker' ); ?></th>
-							<th><?php esc_html_e( 'Project', 'plain-language-time-tracker' ); ?></th>
-							<th><?php esc_html_e( 'Tags', 'plain-language-time-tracker' ); ?></th>
-							<th><?php esc_html_e( 'Billable', 'plain-language-time-tracker' ); ?></th>
-							<th><?php esc_html_e( 'Status', 'plain-language-time-tracker' ); ?></th>
-						</tr>
-					</thead>
-					<tbody>
-						<?php
-						$current_date = '';
-						foreach ( $entries as $entry ) :
-							$client  = ! empty( $entry->client_id ) ? PLTT_Clients::get( $entry->client_id ) : null;
-							$project = ! empty( $entry->project_id ) ? PLTT_Projects::get( $entry->project_id ) : null;
-							?>
-							<tr>
-								<td>
-									<?php if ( $entry->entry_date !== $current_date ) : ?>
-										<?php $current_date = $entry->entry_date; ?>
-										<?php echo esc_html( pltt_format_date( $entry->entry_date, 'M j, Y' ) ); ?>
-										<div class="row-actions">
-											<a href="<?php echo esc_url( pltt_get_admin_url( 'review', array( 'date' => $entry->entry_date ) ) ); ?>"><?php esc_html_e( 'Edit', 'plain-language-time-tracker' ); ?></a>
-										</div>
-									<?php endif; ?>
-								</td>
-								<td class="pltt-time-cell">
-									<?php
-									echo esc_html( pltt_format_time( $entry->start_time ) );
-									if ( $entry->end_time ) {
-										echo ' - ' . esc_html( pltt_format_time( $entry->end_time ) );
-									}
-									?>
-								</td>
-								<td class="pltt-duration-cell"><?php echo esc_html( pltt_format_duration( $entry->duration_minutes ) ); ?></td>
-								<td><?php echo esc_html( $entry->description ); ?></td>
-								<td><?php echo $client ? esc_html( $client->name ) : '<span class="pltt-empty">—</span>'; ?></td>
-								<td><?php echo $project ? esc_html( $project->name ) : '<span class="pltt-empty">—</span>'; ?></td>
-								<td><?php echo ! empty( $entry->tags ) ? esc_html( $entry->tags ) : '<span class="pltt-empty">—</span>'; ?></td>
-								<td><?php echo $entry->billable ? '<span class="pltt-status-billable">Yes</span>' : '<span class="pltt-empty">—</span>'; ?></td>
-								<td><?php echo $entry->verified ? '<span class="pltt-status-verified">Verified</span>' : '<span class="pltt-status-draft">Draft</span>'; ?></td>
-							</tr>
-						<?php endforeach; ?>
-					</tbody>
-				</table>
+				<?php
+				// Group entries by date for date-grouped display.
+				$entries_by_date = array();
+				foreach ( $entries as $entry ) {
+					$entries_by_date[ $entry->entry_date ][] = $entry;
+				}
+				?>
 
-				<?php if ( $total_pages > 1 ) : ?>
-					<div class="tablenav bottom">
-						<div class="tablenav-pages">
-							<span class="displaying-num">
-								<?php
-								printf(
-									/* translators: %s: total entries */
-									esc_html( _n( '%s entry', '%s entries', $total_entries, 'plain-language-time-tracker' ) ),
-									number_format_i18n( $total_entries )
-								);
-								?>
-							</span>
-							<span class="pagination-links">
-								<?php
-								$base_url = add_query_arg( 'view', $view, $tab_base_url );
-
-								// First page.
-								if ( $paged > 1 ) :
-									?>
-									<a class="first-page button" href="<?php echo esc_url( add_query_arg( 'paged', 1, $base_url ) ); ?>">
-										&laquo;
-									</a>
-									<a class="prev-page button" href="<?php echo esc_url( add_query_arg( 'paged', $paged - 1, $base_url ) ); ?>">
-										&lsaquo;
-									</a>
-								<?php else : ?>
-									<span class="tablenav-pages-navspan button disabled">&laquo;</span>
-									<span class="tablenav-pages-navspan button disabled">&lsaquo;</span>
-								<?php endif; ?>
-
-								<span class="paging-input">
-									<?php echo esc_html( $paged ); ?>
-									<?php esc_html_e( 'of', 'plain-language-time-tracker' ); ?>
-									<span class="total-pages"><?php echo esc_html( $total_pages ); ?></span>
-								</span>
-
-								<?php if ( $paged < $total_pages ) : ?>
-									<a class="next-page button" href="<?php echo esc_url( add_query_arg( 'paged', $paged + 1, $base_url ) ); ?>">
-										&rsaquo;
-									</a>
-									<a class="last-page button" href="<?php echo esc_url( add_query_arg( 'paged', $total_pages, $base_url ) ); ?>">
-										&raquo;
-									</a>
-								<?php else : ?>
-									<span class="tablenav-pages-navspan button disabled">&rsaquo;</span>
-									<span class="tablenav-pages-navspan button disabled">&raquo;</span>
-								<?php endif; ?>
+				<?php foreach ( $entries_by_date as $group_date => $group_entries ) :
+					$date_obj    = new DateTimeImmutable( $group_date, wp_timezone() );
+					$is_today    = $group_date === pltt_get_current_date();
+					$date_label  = $is_today
+						? __( 'Today', 'plain-language-time-tracker' )
+						: $date_obj->format( 'F j, Y' ) . ' · ' . $date_obj->format( 'l' );
+					?>
+					<div class="pltt-date-group">
+						<div class="pltt-date-group-header">
+							<span class="pltt-date-group-title"><?php echo esc_html( $date_label ); ?></span>
+							<span class="pltt-date-group-meta">
+								<a href="<?php echo esc_url( pltt_get_admin_url( 'review', array( 'date' => $group_date ) ) ); ?>" class="button"><?php esc_html_e( 'Edit', 'plain-language-time-tracker' ); ?></a>
 							</span>
 						</div>
+					<?php pltt_render_entry_table( $group_entries, array( 'show_amount' => true ) ); ?>
 					</div>
-				<?php endif; ?>
+				<?php endforeach; ?>
+
+
+				<?php
+				$base_url = add_query_arg( 'view', $view, $tab_base_url );
+				pltt_render_pagination( $paged, $total_pages, $total_entries, $base_url, 'entry', 'entries' );
+				?>
+
 
 			<?php else : ?>
 				<p class="description" style="padding: 20px; text-align: center;">

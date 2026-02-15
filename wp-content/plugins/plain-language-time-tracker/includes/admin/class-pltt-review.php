@@ -22,7 +22,9 @@ class PLTT_Review {
 		$date = isset( $_GET['date'] ) ? pltt_sanitize_date( wp_unslash( $_GET['date'] ) ) : pltt_get_current_date();
 
 		// Always load entries from database - never re-parse.
-		$entries = self::get_entries_for_date( $date );
+		$data    = self::get_entries_for_date( $date );
+		$entries = $data['entries'];
+		$summary = $data['summary'];
 		$clients = PLTT_Clients::get_all();
 
 		// Collect project IDs referenced by entries, grouped by client.
@@ -60,7 +62,7 @@ class PLTT_Review {
 	 * Re-processing only happens when user explicitly clicks "Process" on Daily Log.
 	 *
 	 * @param string $date Date in Y-m-d format.
-	 * @return array Array of entry data.
+	 * @return array Array with 'entries' and 'summary' keys.
 	 */
 	public static function get_entries_for_date( $date ) {
 		$entries = PLTT_Entries::get_all(
@@ -72,7 +74,13 @@ class PLTT_Review {
 		);
 
 		if ( empty( $entries ) ) {
-			return array();
+			return array(
+				'entries' => array(),
+				'summary' => array(
+					'billable_minutes' => 0,
+					'billable_amount'  => 0.0,
+				),
+			);
 		}
 
 		return self::format_entries_for_review( $entries );
@@ -81,13 +89,89 @@ class PLTT_Review {
 	/**
 	 * Format database entries for the review screen.
 	 *
+	 * Enriches entries with computed fields for display:
+	 * - billable_amount: Calculated billable amount using hourly rates
+	 *
 	 * @param array $entries Array of entry objects from database.
-	 * @return array Formatted entries.
+	 * @return array Array with 'entries' and 'summary' keys.
 	 */
 	private static function format_entries_for_review( $entries ) {
 		$formatted = array();
 
+		// Collect unique project and client IDs to minimize DB queries.
+		$project_ids = array();
+		$client_ids  = array();
 		foreach ( $entries as $entry ) {
+			if ( ! empty( $entry->project_id ) ) {
+				$project_ids[] = (int) $entry->project_id;
+			}
+			if ( ! empty( $entry->client_id ) ) {
+				$client_ids[] = (int) $entry->client_id;
+			}
+		}
+
+		// Fetch all referenced projects and clients in bulk.
+		$projects_cache = array();
+		$clients_cache  = array();
+
+		foreach ( array_unique( $project_ids ) as $pid ) {
+			$project = PLTT_Projects::get( $pid );
+			if ( $project ) {
+				$projects_cache[ $pid ] = $project;
+			}
+		}
+
+		foreach ( array_unique( $client_ids ) as $cid ) {
+			$client = PLTT_Clients::get( $cid );
+			if ( $client ) {
+				$clients_cache[ $cid ] = $client;
+			}
+		}
+
+		// Initialize summary totals.
+		$summary = array(
+			'billable_minutes' => 0,
+			'billable_amount'  => 0.0,
+		);
+
+		// Process each entry.
+		foreach ( $entries as $entry ) {
+			$project_id = ! empty( $entry->project_id ) ? (int) $entry->project_id : 0;
+			$client_id  = ! empty( $entry->client_id ) ? (int) $entry->client_id : 0;
+
+			// Calculate billable amount for this entry.
+			// Use stored values for verified entries, calculate on-the-fly for unverified.
+			$billable_amount = 0.0;
+			if ( ! empty( $entry->billable ) && $entry->duration_minutes > 0 ) {
+				// Use stored billable_amount if available (verified entries).
+				if ( ! empty( $entry->verified ) && null !== $entry->billable_amount ) {
+					$billable_amount = (float) $entry->billable_amount;
+				} else {
+					// Calculate dynamically for unverified entries.
+					$hourly_rate = 0.0;
+
+					// Project rate takes precedence, fallback to client rate, fallback to default, fallback to 0.
+					if ( $project_id > 0 && isset( $projects_cache[ $project_id ] ) ) {
+						$hourly_rate = (float) ( $projects_cache[ $project_id ]->hourly_rate ?? 0 );
+					}
+
+					if ( 0.0 === $hourly_rate && $client_id > 0 && isset( $clients_cache[ $client_id ] ) ) {
+						$hourly_rate = (float) ( $clients_cache[ $client_id ]->hourly_rate ?? 0 );
+					}
+
+					if ( 0.0 === $hourly_rate && defined( 'PLTT_DEFAULT_HOURLY_RATE' ) ) {
+						$hourly_rate = (float) PLTT_DEFAULT_HOURLY_RATE;
+					}
+
+					$billable_amount = round( ( $entry->duration_minutes / 60.0 ) * $hourly_rate, 2 );
+				}
+
+				// Add to summary totals.
+				$summary['billable_minutes'] += $entry->duration_minutes;
+				$summary['billable_amount']  += $billable_amount;
+			}
+
+			// Format entry with enriched data.
 			$formatted[] = array(
 				'id'                   => $entry->id,
 				'entry_date'           => $entry->entry_date,
@@ -103,10 +187,15 @@ class PLTT_Review {
 				'tags'                 => $entry->tags,
 				'verified'             => $entry->verified,
 				'billable'             => $entry->billable,
+				'billable_amount'      => $billable_amount,
+				'billed'               => $entry->billed ?? 0,
 			);
 		}
 
-		return $formatted;
+		return array(
+			'entries' => $formatted,
+			'summary' => $summary,
+		);
 	}
 
 	/**
@@ -114,6 +203,7 @@ class PLTT_Review {
 	 *
 	 * Updates existing entries in the database.
 	 * Entries are created during processing, this just updates them.
+	 * Snapshots billable_rate and billable_amount when verifying.
 	 *
 	 * @param string $date    Date in Y-m-d format.
 	 * @param array  $entries Array of entry data from form.
@@ -123,6 +213,30 @@ class PLTT_Review {
 		$saved_count = 0;
 		$error_count = 0;
 
+		// Build caches for clients and projects to resolve rates.
+		$projects_cache = array();
+		$clients_cache  = array();
+
+		// Pre-load all referenced clients and projects.
+		foreach ( $entries as $entry_data ) {
+			$client_id  = ! empty( $entry_data['client_id'] ) ? absint( $entry_data['client_id'] ) : 0;
+			$project_id = ! empty( $entry_data['project_id'] ) ? absint( $entry_data['project_id'] ) : 0;
+
+			if ( $client_id > 0 && ! isset( $clients_cache[ $client_id ] ) ) {
+				$client = PLTT_Clients::get( $client_id );
+				if ( $client ) {
+					$clients_cache[ $client_id ] = $client;
+				}
+			}
+
+			if ( $project_id > 0 && ! isset( $projects_cache[ $project_id ] ) ) {
+				$project = PLTT_Projects::get( $project_id );
+				if ( $project ) {
+					$projects_cache[ $project_id ] = $project;
+				}
+			}
+		}
+
 		foreach ( $entries as $entry_data ) {
 			$entry_id = ! empty( $entry_data['id'] ) ? absint( $entry_data['id'] ) : 0;
 
@@ -131,7 +245,7 @@ class PLTT_Review {
 				continue;
 			}
 
-			// Load original entry before updating (for alias learning).
+			// Load original entry before updating (for alias learning and rate snapshotting).
 			$original = PLTT_Entries::get( $entry_id );
 
 			// Update all editable fields from the review screen.
@@ -142,6 +256,7 @@ class PLTT_Review {
 				'project_id'  => ! empty( $entry_data['project_id'] ) ? absint( $entry_data['project_id'] ) : null,
 				'tags'        => sanitize_text_field( $entry_data['tags'] ?? '' ),
 				'billable'    => ! empty( $entry_data['billable'] ) ? 1 : 0,
+				'billed'      => ! empty( $entry_data['billed'] ) ? 1 : 0,
 				'verified'    => 1,
 			);
 
@@ -157,6 +272,30 @@ class PLTT_Review {
 			}
 			if ( isset( $entry_data['duration_minutes'] ) ) {
 				$data['duration_minutes'] = $entry_data['duration_minutes'];
+			}
+
+			// Snapshot billable rate and amount when verifying.
+			$duration_minutes = isset( $data['duration_minutes'] ) ? (int) $data['duration_minutes'] : ( $original ? (int) $original->duration_minutes : 0 );
+
+			if ( $data['billable'] && $duration_minutes > 0 ) {
+				// Check if this is a newly verified entry or already verified.
+				$was_verified = $original && ! empty( $original->verified );
+
+				if ( ! $was_verified ) {
+					// Newly verified: resolve and snapshot the rate.
+					$data['billable_rate']   = self::resolve_billable_rate( $data, $clients_cache, $projects_cache );
+					$data['billable_amount'] = round( ( $duration_minutes / 60.0 ) * $data['billable_rate'], 2 );
+				} else {
+					// Already verified: keep existing rate, recalculate amount if duration changed.
+					if ( null !== $original->billable_rate ) {
+						$data['billable_rate']   = $original->billable_rate;
+						$data['billable_amount'] = round( ( $duration_minutes / 60.0 ) * $original->billable_rate, 2 );
+					}
+				}
+			} else {
+				// Not billable or no duration: set to 0.
+				$data['billable_rate']   = 0.00;
+				$data['billable_amount'] = 0.00;
 			}
 
 			$result = PLTT_Entries::update( $entry_id, $data );
@@ -190,6 +329,45 @@ class PLTT_Review {
 					$error_count
 				),
 		);
+	}
+
+	/**
+	 * Resolve billable rate using hierarchy.
+	 *
+	 * Resolution order: Project rate → Client rate → Default rate → $0.
+	 *
+	 * @param array $entry_data      Entry data with client_id and project_id.
+	 * @param array $clients_cache   Cache of client objects.
+	 * @param array $projects_cache  Cache of project objects.
+	 * @return float Resolved hourly rate.
+	 */
+	private static function resolve_billable_rate( $entry_data, $clients_cache, $projects_cache ) {
+		$client_id  = ! empty( $entry_data['client_id'] ) ? (int) $entry_data['client_id'] : 0;
+		$project_id = ! empty( $entry_data['project_id'] ) ? (int) $entry_data['project_id'] : 0;
+
+		// 1. Check project rate.
+		if ( $project_id > 0 && isset( $projects_cache[ $project_id ] ) ) {
+			$project_rate = (float) ( $projects_cache[ $project_id ]->hourly_rate ?? 0 );
+			if ( $project_rate > 0 ) {
+				return $project_rate;
+			}
+		}
+
+		// 2. Check client rate.
+		if ( $client_id > 0 && isset( $clients_cache[ $client_id ] ) ) {
+			$client_rate = (float) ( $clients_cache[ $client_id ]->hourly_rate ?? 0 );
+			if ( $client_rate > 0 ) {
+				return $client_rate;
+			}
+		}
+
+		// 3. Use default rate.
+		if ( defined( 'PLTT_DEFAULT_HOURLY_RATE' ) ) {
+			return (float) PLTT_DEFAULT_HOURLY_RATE;
+		}
+
+		// 4. Fallback to $0.
+		return 0.00;
 	}
 
 	/**

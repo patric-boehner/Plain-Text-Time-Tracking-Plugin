@@ -48,20 +48,24 @@ class PLTT_Daily_Log {
 	 * @param string $content Log content.
 	 * @return bool True on success.
 	 */
-	public static function save_log( $date, $content ) {
+	public static function save_log( $date, $content, $preserve_processed = false ) {
 		global $wpdb;
 		$table = PLTT_Database::get_table_name( 'daily_logs' );
 
 		$existing = self::get_log( $date );
 
 		if ( $existing ) {
+			$update_data = array( 'content' => $content );
+
+			// Only reset processed if not preserving.
+			if ( ! $preserve_processed ) {
+				$update_data['processed'] = 0;
+			}
+
 			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
 			$result = $wpdb->update(
 				$table,
-				array(
-					'content'   => $content,
-					'processed' => 0,
-				),
+				$update_data,
 				array( 'log_date' => $date ),
 				array( '%s', '%d' ),
 				array( '%s' )

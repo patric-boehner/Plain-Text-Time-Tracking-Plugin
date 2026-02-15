@@ -30,6 +30,10 @@ class PLTT_Form_Handlers {
 
 		// Review screen.
 		add_action( 'admin_post_pltt_save_entries', array( __CLASS__, 'handle_save_entries' ) );
+
+		// Tag operations.
+		add_action( 'admin_post_pltt_create_tag', array( __CLASS__, 'handle_create_tag' ) );
+		add_action( 'admin_post_pltt_rename_tag', array( __CLASS__, 'handle_rename_tag' ) );
 	}
 
 	/**
@@ -155,6 +159,88 @@ class PLTT_Form_Handlers {
 		} else {
 			self::redirect_back( array( 'pltt_error' => 'project_update_failed' ) );
 		}
+	}
+
+	/**
+	 * Handle tag creation.
+	 */
+	public static function handle_create_tag() {
+		self::verify_nonce( 'pltt_manage_tag' );
+
+		$tag_name = isset( $_POST['tag_name'] ) ? sanitize_text_field( wp_unslash( $_POST['tag_name'] ) ) : '';
+		$tag_name = strtolower( trim( $tag_name ) );
+
+		$redirect_url = admin_url( 'admin.php?page=pltt-tags' );
+
+		if ( empty( $tag_name ) ) {
+			wp_safe_redirect( add_query_arg( 'pltt_error', 'invalid_tag', $redirect_url ) );
+			exit;
+		}
+
+		// Check if tag already exists.
+		$all_tags = PLTT_Entries::get_all_tags();
+		if ( in_array( $tag_name, $all_tags, true ) ) {
+			wp_safe_redirect( add_query_arg( 'pltt_error', 'tag_exists', $redirect_url ) );
+			exit;
+		}
+
+		// Tags are stored in entries, so "creating" a tag means adding it to the available pool.
+		// We store it by creating a transient that gets merged with get_all_tags results.
+		$custom_tags   = get_option( 'pltt_custom_tags', array() );
+		$custom_tags[] = $tag_name;
+		$custom_tags   = array_unique( $custom_tags );
+		update_option( 'pltt_custom_tags', $custom_tags );
+
+		wp_safe_redirect( add_query_arg( 'pltt_message', 'tag_created', $redirect_url ) );
+		exit;
+	}
+
+	/**
+	 * Handle tag rename.
+	 */
+	public static function handle_rename_tag() {
+		self::verify_nonce( 'pltt_manage_tag' );
+
+		$old_tag = isset( $_POST['old_tag'] ) ? sanitize_text_field( wp_unslash( $_POST['old_tag'] ) ) : '';
+		$new_tag = isset( $_POST['tag_name'] ) ? sanitize_text_field( wp_unslash( $_POST['tag_name'] ) ) : '';
+		$old_tag = strtolower( trim( $old_tag ) );
+		$new_tag = strtolower( trim( $new_tag ) );
+
+		$redirect_url = admin_url( 'admin.php?page=pltt-tags' );
+
+		if ( empty( $old_tag ) || empty( $new_tag ) ) {
+			wp_safe_redirect( add_query_arg( 'pltt_error', 'invalid_tag', $redirect_url ) );
+			exit;
+		}
+
+		if ( $old_tag === $new_tag ) {
+			wp_safe_redirect( $redirect_url );
+			exit;
+		}
+
+		// Check if new tag name already exists.
+		$all_tags = PLTT_Entries::get_all_tags();
+		if ( in_array( $new_tag, $all_tags, true ) ) {
+			wp_safe_redirect( add_query_arg( 'pltt_error', 'tag_exists', $redirect_url ) );
+			exit;
+		}
+
+		$success = PLTT_Entries::rename_tag( $old_tag, $new_tag );
+
+		// Also update custom tags list if the old tag was a custom tag.
+		$custom_tags = get_option( 'pltt_custom_tags', array() );
+		$key         = array_search( $old_tag, $custom_tags, true );
+		if ( false !== $key ) {
+			$custom_tags[ $key ] = $new_tag;
+			update_option( 'pltt_custom_tags', array_values( array_unique( $custom_tags ) ) );
+		}
+
+		if ( $success ) {
+			wp_safe_redirect( add_query_arg( 'pltt_message', 'tag_renamed', $redirect_url ) );
+		} else {
+			wp_safe_redirect( add_query_arg( 'pltt_error', 'tag_rename_failed', $redirect_url ) );
+		}
+		exit;
 	}
 
 	/**

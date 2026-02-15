@@ -184,10 +184,10 @@ Write code as if you'll have to debug it at 2 AM while half-asleep (because you 
 ```
 
 **Key Points**:
-- Notices must come AFTER the `<h1>` page title (when H1 is at root level)
-- Notices must be at the root level of `.wrap`, not nested in other containers
-- **CRITICAL**: If your page has a header wrapper (e.g., `<div class="pltt-header">`), notices go AFTER the wrapper closes, not before or inside it
-- WordPress will auto-relocate notices if they're in the wrong position, causing flashing/repositioning
+- Notices must come AFTER the `<h1>` page title
+- WordPress expects notices near the H1 and will auto-relocate them if they're too far away
+- **CRITICAL**: If your page has a header wrapper (e.g., `<div class="pltt-header">`), keep notices INSIDE the wrapper near the H1 to prevent WordPress JS from relocating them
+- If the header uses flexbox layout, use CSS to style notices properly (see Flex Container Pattern below)
 
 **Why This Matters**:
 WordPress's admin CSS expects notices to be siblings of the main page heading. If you place them before the heading or nested inside other containers, WordPress's JavaScript may try to relocate them, causing visual glitches and poor UX.
@@ -202,6 +202,52 @@ WordPress's admin CSS expects notices to be siblings of the main page heading. I
     <!-- Notice here won't display properly -->
 </div>
 ```
+
+**Grid Container Pattern**:
+When your header has multiple elements in a row (e.g., title on left, navigation on right), use CSS Grid with explicit positioning. Keep notices INSIDE the header to prevent WordPress JS relocation:
+
+```php
+<div class="wrap">
+    <div class="pltt-header">
+        <h1>Page Title</h1>
+
+        <?php
+        // Notice in middle of HTML - will be positioned to row 2 via CSS
+        if ( isset( $_GET['pltt_message'] ) ) {
+            echo '<div class="notice notice-success is-dismissible pltt-notice-in-header"><p>Success!</p></div>';
+        }
+        ?>
+
+        <div class="pltt-date-nav">
+            <!-- Navigation buttons -->
+        </div>
+    </div>
+    <!-- Rest of content -->
+</div>
+```
+
+CSS using grid with explicit positioning - notice is in middle of HTML but displays at bottom:
+```css
+.pltt-header {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 15px;
+}
+
+/* Keep date nav in row 1, column 2 */
+.pltt-date-nav {
+    grid-row: 1;
+    grid-column: 2;
+}
+
+/* Position notice to row 2, spanning both columns */
+.pltt-header .pltt-notice-in-header {
+    grid-row: 2;
+    grid-column: 1 / -1;
+}
+```
+
+This creates a layout where H1 and navigation are side-by-side in row 1, with the notice spanning full width in row 2, regardless of HTML order.
 
 **URL Cleanup**:
 Always clean up notice query parameters from the URL after display to prevent notices persisting on page reload:
