@@ -48,6 +48,9 @@ class PLTT_Review {
 			}
 		}
 
+		// Load daily log for notes reference.
+		$log = PLTT_Daily_Log::get_log( $date );
+
 		// Collect all known tags for autocomplete.
 		$all_tags = PLTT_Entries::get_all_tags();
 		sort( $all_tags );

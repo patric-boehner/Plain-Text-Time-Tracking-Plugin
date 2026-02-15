@@ -10,7 +10,6 @@
 
 .pltt-review-table th,
 .pltt-review-table td {
-	padding: 10px 10px;
 	text-align: left;
 	border-bottom: 1px solid #c3c4c7;
 	vertical-align: middle;
@@ -165,7 +164,7 @@
 .pltt-tag-pills {
 	display: flex;
 	flex-wrap: wrap;
-	gap: 3px;
+	gap: 10px;
 	margin-bottom: 4px;
 }
 
@@ -284,6 +283,68 @@
 	color: #d63638;
 }
 
+/* Collapsible notes reference — matches WP health-check-accordion style */
+.pltt-notes-reference {
+	margin-bottom: 25px;
+	border: 1px solid #c3c4c7;
+	background: #fff;
+}
+
+.pltt-notes-reference summary {
+	display: flex;
+	align-items: center;
+	padding: 12px 1.5em;
+	cursor: pointer;
+	color: #2c3338;
+	font-size: 13px;
+	font-weight: 600;
+	list-style: none;
+}
+
+.pltt-notes-reference summary::-webkit-details-marker {
+	display: none;
+}
+
+.pltt-notes-reference summary::after {
+	content: "";
+	border: solid #50575e;
+	border-width: 0 2px 2px 0;
+	height: 0.5rem;
+	width: 0.5rem;
+	margin-left: auto;
+	transform: translateY(-30%) rotate(45deg);
+	pointer-events: none;
+}
+
+.pltt-notes-reference[open] summary::after {
+	transform: translateY(15%) rotate(-135deg);
+}
+
+.pltt-notes-reference summary:hover {
+	background: #f6f7f7;
+}
+
+.pltt-notes-reference summary:focus {
+	color: #1d2327;
+	border: none;
+	box-shadow: none;
+	outline-offset: -1px;
+	outline: 2px solid #2271b1;
+}
+
+.pltt-notes-pre {
+	margin: 0;
+	padding: 1em 1.5em;
+	border-top: 1px solid #c3c4c7;
+	white-space: pre-wrap;
+	word-wrap: break-word;
+	font-family: inherit;
+	font-size: 13px;
+	line-height: 1.6;
+	color: #1d2327;
+	background: #fff;
+}
+
 /* Responsive */
 @media screen and (max-width: 1200px) {
 	.pltt-review-table {
@@ -293,11 +354,6 @@
 }
 
 @media screen and (max-width: 782px) {
-	.pltt-review-table th,
-	.pltt-review-table td {
-		padding: 10px 8px;
-	}
-
 	.pltt-col-tags {
 		display: none;
 	}

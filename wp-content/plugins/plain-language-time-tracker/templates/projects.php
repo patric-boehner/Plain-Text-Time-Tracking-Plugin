@@ -17,43 +17,42 @@ $projects = PLTT_Projects::get_all();
 <div class="wrap pltt-wrap">
 	<div class="pltt-header">
 		<h1><?php esc_html_e( 'Projects', 'plain-language-time-tracker' ); ?></h1>
+		<?php
+		// Display success/error messages.
+		if ( isset( $_GET['pltt_message'] ) ) {
+			$message_code = sanitize_text_field( wp_unslash( $_GET['pltt_message'] ) );
+			$messages     = array(
+				'project_created' => __( 'Project created successfully.', 'plain-language-time-tracker' ),
+				'project_updated' => __( 'Project updated successfully.', 'plain-language-time-tracker' ),
+			);
+			if ( isset( $messages[ $message_code ] ) ) {
+				echo '<div class="notice notice-success is-dismissible"><p>' . esc_html( $messages[ $message_code ] ) . '</p></div>';
+			}
+		}
+
+		if ( isset( $_GET['pltt_error'] ) ) {
+			$error_code = sanitize_text_field( wp_unslash( $_GET['pltt_error'] ) );
+
+			if ( isset( $_GET['pltt_error_message'] ) ) {
+				$error_message = sanitize_text_field( wp_unslash( $_GET['pltt_error_message'] ) );
+				echo '<div class="notice notice-error is-dismissible"><p>' . esc_html( $error_message ) . '</p></div>';
+			} else {
+				$errors = array(
+					'invalid_project_id'    => __( 'Invalid project ID.', 'plain-language-time-tracker' ),
+					'project_update_failed' => __( 'Failed to update project.', 'plain-language-time-tracker' ),
+				);
+				if ( isset( $errors[ $error_code ] ) ) {
+					echo '<div class="notice notice-error is-dismissible"><p>' . esc_html( $errors[ $error_code ] ) . '</p></div>';
+				}
+			}
+		}
+		?>
 		<div class="pltt-header-actions">
 			<button type="button" id="pltt-add-project-btn" class="button button-primary" <?php echo empty( $clients ) ? 'disabled' : ''; ?>>
 				<?php esc_html_e( 'Add Project', 'plain-language-time-tracker' ); ?>
 			</button>
 		</div>
 	</div>
-
-	<?php
-	// Display success/error messages.
-	if ( isset( $_GET['pltt_message'] ) ) {
-		$message_code = sanitize_text_field( wp_unslash( $_GET['pltt_message'] ) );
-		$messages     = array(
-			'project_created' => __( 'Project created successfully.', 'plain-language-time-tracker' ),
-			'project_updated' => __( 'Project updated successfully.', 'plain-language-time-tracker' ),
-		);
-		if ( isset( $messages[ $message_code ] ) ) {
-			echo '<div class="notice notice-success is-dismissible"><p>' . esc_html( $messages[ $message_code ] ) . '</p></div>';
-		}
-	}
-
-	if ( isset( $_GET['pltt_error'] ) ) {
-		$error_code = sanitize_text_field( wp_unslash( $_GET['pltt_error'] ) );
-
-		if ( isset( $_GET['pltt_error_message'] ) ) {
-			$error_message = sanitize_text_field( wp_unslash( $_GET['pltt_error_message'] ) );
-			echo '<div class="notice notice-error is-dismissible"><p>' . esc_html( $error_message ) . '</p></div>';
-		} else {
-			$errors = array(
-				'invalid_project_id'    => __( 'Invalid project ID.', 'plain-language-time-tracker' ),
-				'project_update_failed' => __( 'Failed to update project.', 'plain-language-time-tracker' ),
-			);
-			if ( isset( $errors[ $error_code ] ) ) {
-				echo '<div class="notice notice-error is-dismissible"><p>' . esc_html( $errors[ $error_code ] ) . '</p></div>';
-			}
-		}
-	}
-	?>
 
 	<?php if ( empty( $clients ) ) : ?>
 		<div class="notice notice-warning">
@@ -76,6 +75,8 @@ $projects = PLTT_Projects::get_all();
 					<th><?php esc_html_e( 'Name', 'plain-language-time-tracker' ); ?></th>
 					<th><?php esc_html_e( 'Client', 'plain-language-time-tracker' ); ?></th>
 					<th><?php esc_html_e( 'Rate', 'plain-language-time-tracker' ); ?></th>
+					<th><?php esc_html_e( 'Hours', 'plain-language-time-tracker' ); ?></th>
+					<th><?php esc_html_e( 'Amount', 'plain-language-time-tracker' ); ?></th>
 					<th><?php esc_html_e( 'Status', 'plain-language-time-tracker' ); ?></th>
 				</tr>
 			</thead>
@@ -96,6 +97,9 @@ $projects = PLTT_Projects::get_all();
 						</td>
 						<td><?php echo $project_client ? esc_html( $project_client->name ) : '—'; ?></td>
 						<td><?php echo null !== $project->hourly_rate ? esc_html( pltt_format_currency( $project->hourly_rate ) ) : '<span class="pltt-empty">—</span>'; ?></td>
+						<?php $project_stats = PLTT_Entries::get_stats( array( 'project_id' => $project->id ) ); ?>
+						<td class="pltt-duration-cell"><?php echo esc_html( pltt_format_hours( $project_stats->total_minutes ?? 0 ) ); ?></td>
+						<td><?php echo esc_html( pltt_format_currency( $project_stats->billable_amount ?? 0 ) ); ?></td>
 						<td>
 							<?php if ( 'archived' === $project->status ) : ?>
 								<span class="pltt-badge pltt-badge-warning"><?php esc_html_e( 'Archived', 'plain-language-time-tracker' ); ?></span>

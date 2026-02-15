@@ -87,6 +87,11 @@ All planned features are complete. Use the tool. See what's actually missing.
 
 ---
 
+## Rough Idea Notes
+- **Billed Status** - There is no way to currently know in reports when a entry has been invoiced. Maybe subtle visual indication on rows without the setting
+
+---
+
 ## Ideas & Wishlist
 
 These are backburnered. Only build if a genuine need emerges from actual use.

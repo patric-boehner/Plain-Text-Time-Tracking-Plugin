@@ -2,13 +2,6 @@
  * Reports Screen Styles
  */
 
-.pltt-report-content {
-	/* background: #fff;
-	border: 1px solid #c3c4c7;
-	border-radius: 4px;
-	padding: 20px;
-} */
-
 .pltt-report-content h3 {
 	margin-top: 0;
 	margin-bottom: 15px;
@@ -21,11 +14,6 @@
 }
 
 /* Report tables */
-.pltt-report-content .widefat th,
-.pltt-report-content .widefat td {
-	padding: 16px 14px;
-}
-
 .pltt-report-content .widefat .pltt-duration-cell {
 	font-variant-numeric: tabular-nums;
 }
