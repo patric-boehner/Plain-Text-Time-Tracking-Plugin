@@ -17,38 +17,37 @@ sort( $all_tags );
 <div class="wrap pltt-wrap">
 	<div class="pltt-header">
 		<h1><?php esc_html_e( 'Tags', 'plain-language-time-tracker' ); ?></h1>
+		<?php
+		// Display success/error messages.
+		if ( isset( $_GET['pltt_message'] ) ) {
+			$message_code = sanitize_text_field( wp_unslash( $_GET['pltt_message'] ) );
+			$messages     = array(
+				'tag_created' => __( 'Tag created successfully.', 'plain-language-time-tracker' ),
+				'tag_renamed' => __( 'Tag renamed successfully.', 'plain-language-time-tracker' ),
+			);
+			if ( isset( $messages[ $message_code ] ) ) {
+				echo '<div class="notice notice-success is-dismissible"><p>' . esc_html( $messages[ $message_code ] ) . '</p></div>';
+			}
+		}
+
+		if ( isset( $_GET['pltt_error'] ) ) {
+			$error_code = sanitize_text_field( wp_unslash( $_GET['pltt_error'] ) );
+			$errors     = array(
+				'tag_exists'        => __( 'A tag with that name already exists.', 'plain-language-time-tracker' ),
+				'tag_rename_failed' => __( 'Failed to rename tag.', 'plain-language-time-tracker' ),
+				'invalid_tag'       => __( 'Invalid tag name.', 'plain-language-time-tracker' ),
+			);
+			if ( isset( $errors[ $error_code ] ) ) {
+				echo '<div class="notice notice-error is-dismissible"><p>' . esc_html( $errors[ $error_code ] ) . '</p></div>';
+			}
+		}
+		?>
 		<div class="pltt-header-actions">
 			<button type="button" id="pltt-add-tag-btn" class="button button-primary">
 				<?php esc_html_e( 'Add Tag', 'plain-language-time-tracker' ); ?>
 			</button>
 		</div>
 	</div>
-
-	<?php
-	// Display success/error messages.
-	if ( isset( $_GET['pltt_message'] ) ) {
-		$message_code = sanitize_text_field( wp_unslash( $_GET['pltt_message'] ) );
-		$messages     = array(
-			'tag_created' => __( 'Tag created successfully.', 'plain-language-time-tracker' ),
-			'tag_renamed' => __( 'Tag renamed successfully.', 'plain-language-time-tracker' ),
-		);
-		if ( isset( $messages[ $message_code ] ) ) {
-			echo '<div class="notice notice-success is-dismissible"><p>' . esc_html( $messages[ $message_code ] ) . '</p></div>';
-		}
-	}
-
-	if ( isset( $_GET['pltt_error'] ) ) {
-		$error_code = sanitize_text_field( wp_unslash( $_GET['pltt_error'] ) );
-		$errors     = array(
-			'tag_exists'        => __( 'A tag with that name already exists.', 'plain-language-time-tracker' ),
-			'tag_rename_failed' => __( 'Failed to rename tag.', 'plain-language-time-tracker' ),
-			'invalid_tag'       => __( 'Invalid tag name.', 'plain-language-time-tracker' ),
-		);
-		if ( isset( $errors[ $error_code ] ) ) {
-			echo '<div class="notice notice-error is-dismissible"><p>' . esc_html( $errors[ $error_code ] ) . '</p></div>';
-		}
-	}
-	?>
 
 	<?php if ( empty( $all_tags ) ) : ?>
 		<p class="description"><?php esc_html_e( 'No tags yet. Tags will appear here once you add them to time entries or create them manually.', 'plain-language-time-tracker' ); ?></p>

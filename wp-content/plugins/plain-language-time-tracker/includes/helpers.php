@@ -361,11 +361,19 @@ function pltt_render_pagination( $paged, $total_pages, $total_items, $base_url, 
 		<div class="tablenav-pages">
 			<span class="displaying-num">
 				<?php
-				printf(
-					/* translators: %s: total items */
-					esc_html( _n( '%s ' . $singular_label, '%s ' . $plural_label, $total_items, 'plain-language-time-tracker' ) ),
-					number_format_i18n( $total_items )
-				);
+				if ( 'log' === $singular_label ) {
+					printf(
+						/* translators: %s: number of logs */
+						esc_html( _n( '%s log', '%s logs', $total_items, 'plain-language-time-tracker' ) ),
+						esc_html( number_format_i18n( $total_items ) )
+					);
+				} else {
+					printf(
+						/* translators: %s: number of entries */
+						esc_html( _n( '%s entry', '%s entries', $total_items, 'plain-language-time-tracker' ) ),
+						esc_html( number_format_i18n( $total_items ) )
+					);
+				}
 				?>
 			</span>
 			<span class="pagination-links">
@@ -420,13 +428,13 @@ function pltt_render_pagination( $paged, $total_pages, $total_items, $base_url, 
  */
 function pltt_render_entry_table( $entries, $options = array() ) {
 	$show_amount = ! empty( $options['show_amount'] );
-	$table_class = ! empty( $options['table_class'] ) ? ' ' . esc_attr( $options['table_class'] ) : '';
+	$table_class = ! empty( $options['table_class'] ) ? ' ' . $options['table_class'] : '';
 
 	if ( empty( $entries ) ) {
 		return;
 	}
 	?>
-	<table class="widefat striped<?php echo $table_class; ?>">
+	<table class="widefat striped<?php echo esc_attr( $table_class ); ?>">
 		<thead>
 			<tr>
 				<th><?php esc_html_e( 'Description', 'plain-language-time-tracker' ); ?></th>
@@ -450,7 +458,7 @@ function pltt_render_entry_table( $entries, $options = array() ) {
 					<td><?php echo esc_html( $entry->description ); ?></td>
 					<td><?php echo $client ? esc_html( $client->name ) : '<span class="pltt-empty">—</span>'; ?></td>
 					<td><?php echo $project ? esc_html( $project->name ) : '<span class="pltt-empty">—</span>'; ?></td>
-					<td><?php pltt_render_tag_badges( $entry->tags ?? '' ); ?></td>
+					<td class="pltt-tag-pills"><?php pltt_render_tag_badges( $entry->tags ?? '' ); ?></td>
 					<td class="pltt-time-cell">
 						<?php
 						echo esc_html( pltt_format_time( $entry->start_time ) );
@@ -462,7 +470,9 @@ function pltt_render_entry_table( $entries, $options = array() ) {
 					<td class="pltt-duration-cell">
 						<?php echo esc_html( pltt_format_duration( $entry->duration_minutes ) ); ?>
 					</td>
-					<td class="pltt-billable-indicator"><span class="pltt-billable-symbol <?php echo $entry->billable ? 'is-billable' : 'not-billable'; ?>">$</span></td>
+					<td class="pltt-billable-indicator">
+						<span class="pltt-billable-symbol <?php echo $entry->billable ? 'is-billable' : 'not-billable'; ?>" aria-label="<?php echo $entry->billable ? esc_attr__( 'Billable', 'plain-language-time-tracker' ) : esc_attr__( 'Not billable', 'plain-language-time-tracker' ); ?>" title="<?php echo $entry->billable ? esc_attr__( 'Billable', 'plain-language-time-tracker' ) : esc_attr__( 'Not billable', 'plain-language-time-tracker' ); ?>">$</span>
+					</td>
 					<?php if ( $show_amount ) :
 						$billable_amount = 0.0;
 						if ( ! empty( $entry->billable ) && $entry->duration_minutes > 0 ) {

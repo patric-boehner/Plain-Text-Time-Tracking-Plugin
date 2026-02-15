@@ -17,45 +17,44 @@ $projects = PLTT_Projects::get_all();
 <div class="wrap pltt-wrap">
 	<div class="pltt-header">
 		<h1><?php esc_html_e( 'Clients', 'plain-language-time-tracker' ); ?></h1>
+		<?php
+		// Display success/error messages.
+		if ( isset( $_GET['pltt_message'] ) ) {
+			$message_code = sanitize_text_field( wp_unslash( $_GET['pltt_message'] ) );
+			$messages     = array(
+				'client_created' => __( 'Client created successfully.', 'plain-language-time-tracker' ),
+				'client_updated' => __( 'Client updated successfully.', 'plain-language-time-tracker' ),
+				'client_deleted' => __( 'Client deleted successfully.', 'plain-language-time-tracker' ),
+			);
+			if ( isset( $messages[ $message_code ] ) ) {
+				echo '<div class="notice notice-success is-dismissible"><p>' . esc_html( $messages[ $message_code ] ) . '</p></div>';
+			}
+		}
+
+		if ( isset( $_GET['pltt_error'] ) ) {
+			$error_code = sanitize_text_field( wp_unslash( $_GET['pltt_error'] ) );
+
+			if ( isset( $_GET['pltt_error_message'] ) ) {
+				$error_message = sanitize_text_field( wp_unslash( $_GET['pltt_error_message'] ) );
+				echo '<div class="notice notice-error is-dismissible"><p>' . esc_html( $error_message ) . '</p></div>';
+			} else {
+				$errors = array(
+					'invalid_client_id'    => __( 'Invalid client ID.', 'plain-language-time-tracker' ),
+					'client_update_failed' => __( 'Failed to update client.', 'plain-language-time-tracker' ),
+					'client_delete_failed' => __( 'Failed to delete client.', 'plain-language-time-tracker' ),
+				);
+				if ( isset( $errors[ $error_code ] ) ) {
+					echo '<div class="notice notice-error is-dismissible"><p>' . esc_html( $errors[ $error_code ] ) . '</p></div>';
+				}
+			}
+		}
+		?>
 		<div class="pltt-header-actions">
 			<button type="button" id="pltt-add-client-btn" class="button button-primary">
 				<?php esc_html_e( 'Add Client', 'plain-language-time-tracker' ); ?>
 			</button>
 		</div>
 	</div>
-
-	<?php
-	// Display success/error messages.
-	if ( isset( $_GET['pltt_message'] ) ) {
-		$message_code = sanitize_text_field( wp_unslash( $_GET['pltt_message'] ) );
-		$messages     = array(
-			'client_created' => __( 'Client created successfully.', 'plain-language-time-tracker' ),
-			'client_updated' => __( 'Client updated successfully.', 'plain-language-time-tracker' ),
-			'client_deleted' => __( 'Client deleted successfully.', 'plain-language-time-tracker' ),
-		);
-		if ( isset( $messages[ $message_code ] ) ) {
-			echo '<div class="notice notice-success is-dismissible"><p>' . esc_html( $messages[ $message_code ] ) . '</p></div>';
-		}
-	}
-
-	if ( isset( $_GET['pltt_error'] ) ) {
-		$error_code = sanitize_text_field( wp_unslash( $_GET['pltt_error'] ) );
-
-		if ( isset( $_GET['pltt_error_message'] ) ) {
-			$error_message = sanitize_text_field( wp_unslash( $_GET['pltt_error_message'] ) );
-			echo '<div class="notice notice-error is-dismissible"><p>' . esc_html( $error_message ) . '</p></div>';
-		} else {
-			$errors = array(
-				'invalid_client_id'    => __( 'Invalid client ID.', 'plain-language-time-tracker' ),
-				'client_update_failed' => __( 'Failed to update client.', 'plain-language-time-tracker' ),
-				'client_delete_failed' => __( 'Failed to delete client.', 'plain-language-time-tracker' ),
-			);
-			if ( isset( $errors[ $error_code ] ) ) {
-				echo '<div class="notice notice-error is-dismissible"><p>' . esc_html( $errors[ $error_code ] ) . '</p></div>';
-			}
-		}
-	}
-	?>
 
 	<?php if ( empty( $clients ) ) : ?>
 		<p class="description"><?php esc_html_e( 'No clients yet. Add your first client to get started.', 'plain-language-time-tracker' ); ?></p>

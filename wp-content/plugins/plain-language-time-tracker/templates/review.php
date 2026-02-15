@@ -10,6 +10,7 @@
  * @var array  $clients            All clients.
  * @var array  $projects_by_client Projects grouped by client.
  * @var array  $all_tags           All known tags.
+ * @var object $log                Daily log object (may be null).
  */
 
 // Prevent direct access.
@@ -64,6 +65,13 @@ foreach ( $entries as $entry ) {
 				</div>
 			<?php endif; ?>
 		</div>
+
+		<?php if ( ! empty( $log ) && ! empty( $log->content ) ) : ?>
+			<details class="pltt-notes-reference">
+				<summary><?php esc_html_e( 'Show Original Notes', 'plain-language-time-tracker' ); ?></summary>
+				<pre class="pltt-notes-pre"><?php echo esc_html( $log->content ); ?></pre>
+			</details>
+		<?php endif; ?>
 
 		<?php
 		// Check if any entries are already saved (id > 0) to conditionally show billed column.
@@ -182,7 +190,8 @@ foreach ( $entries as $entry ) {
 									<option value="new">+ <?php esc_html_e( 'Add new client...', 'plain-language-time-tracker' ); ?></option>
 								</select>
 								<?php if ( $has_prediction && $client_confidence > 0 ) : ?>
-									<span class="pltt-confidence-indicator" title="<?php printf( esc_attr__( 'Confidence: %s%%', 'plain-language-time-tracker' ), round( $client_confidence * 100 ) ); ?>">
+									<?php /* translators: %s: confidence percentage */ ?>
+								<span class="pltt-confidence-indicator" title="<?php printf( esc_attr__( 'Confidence: %s%%', 'plain-language-time-tracker' ), esc_attr( round( $client_confidence * 100 ) ) ); ?>">
 										<?php echo $client_confidence >= PLTT_CONFIDENCE_THRESHOLD ? '★' : '☆'; ?>
 									</span>
 								<?php endif; ?>

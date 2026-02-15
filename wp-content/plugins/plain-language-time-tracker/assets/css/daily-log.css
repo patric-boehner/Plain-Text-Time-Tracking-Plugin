@@ -108,11 +108,6 @@
 	margin-top: 15px;
 }
 
-.pltt-daily-log-entries th,
-.pltt-daily-log-entries td {
-	padding: 12px 14px;
-}
-
 .pltt-daily-log-entries .pltt-duration-cell {
 	font-variant-numeric: tabular-nums;
 }

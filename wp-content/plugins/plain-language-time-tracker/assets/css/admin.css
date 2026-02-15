@@ -120,6 +120,15 @@
 	visibility: visible;
 }
 
+.widefat.striped {
+	border-radius: 4px;
+}
+
+.widefat th,
+.widefat td {
+	padding: 12px 12px;
+}
+
 .pltt-wrap .widefat .row-actions a {
 	text-decoration: none;
 }
@@ -164,7 +173,7 @@
 }
 
 /* Notices inside grid header containers go to row 2, spanning both columns */
-.pltt-header .pltt-notice-in-header {
+.pltt-header .notice {
 	grid-row: 2;
 	grid-column: 1 / -1;
 }
@@ -449,3 +458,5 @@
 .pltt-modal-delete-btn.visible {
 	display: inline-block;
 }
+
+

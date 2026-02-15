@@ -58,7 +58,7 @@ $has_entries      = ! empty( $existing_entries );
 			);
 
 			if ( isset( $messages[ $message_code ] ) ) {
-				echo '<div class="notice notice-success is-dismissible pltt-notice-in-header"><p>' . esc_html( $messages[ $message_code ] ) . '</p></div>';
+				echo '<div class="notice notice-success is-dismissible"><p>' . esc_html( $messages[ $message_code ] ) . '</p></div>';
 			}
 		}
 		?>
