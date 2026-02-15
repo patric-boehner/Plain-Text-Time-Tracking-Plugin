@@ -82,7 +82,7 @@ $has_entries      = ! empty( $existing_entries );
 		<?php endif; ?>
 	</div>
 
-	<div class="pltt-log-container">
+	<div class="pltt-log-container <?php echo $is_processed ? 'pltt-log-processed' : ''; ?>">
 		<textarea
 			id="pltt-log-textarea"
 			class="pltt-log-textarea"
@@ -100,9 +100,21 @@ $has_entries      = ! empty( $existing_entries );
 
 			<div class="pltt-log-actions">
 				<span id="pltt-save-indicator" class="pltt-save-indicator"></span>
-				<button type="button" id="pltt-process-btn" class="button button-primary button-large">
-					<?php esc_html_e( 'Process Time Entries', 'plain-language-time-tracker' ); ?> &rarr;
-				</button>
+				<?php if ( $is_processed ) : ?>
+					<!-- Primary: Update Notes (preserves processed state) -->
+					<button type="button" id="pltt-update-notes-btn" class="button button-primary button-large">
+						<?php esc_html_e( 'Update Notes', 'plain-language-time-tracker' ); ?>
+					</button>
+					<!-- Secondary: Process Entries (destructive action) -->
+					<button type="button" id="pltt-process-btn" class="button button-secondary">
+						<?php esc_html_e( 'Process Entries', 'plain-language-time-tracker' ); ?>
+					</button>
+				<?php else : ?>
+					<!-- Unprocessed: show only Process button -->
+					<button type="button" id="pltt-process-btn" class="button button-primary button-large">
+						<?php esc_html_e( 'Process Time Entries', 'plain-language-time-tracker' ); ?> &rarr;
+					</button>
+				<?php endif; ?>
 			</div>
 		</div>
 	</div>
@@ -112,49 +124,15 @@ $has_entries      = ! empty( $existing_entries );
 			<h3><?php esc_html_e( 'Recorded Entries', 'plain-language-time-tracker' ); ?></h3>
 			<p class="description">
 				<?php esc_html_e( 'You have already processed entries for this date.', 'plain-language-time-tracker' ); ?>
-				<a href="<?php echo esc_url( pltt_get_admin_url( 'review', array( 'date' => $date ) ) ); ?>">
-					<?php esc_html_e( 'View or edit entries', 'plain-language-time-tracker' ); ?> &rarr;
-				</a>
 			</p>
 
-			<table class="widefat striped">
-				<thead>
-					<tr>
-						<th><?php esc_html_e( 'Time', 'plain-language-time-tracker' ); ?></th>
-						<th><?php esc_html_e( 'Duration', 'plain-language-time-tracker' ); ?></th>
-						<th><?php esc_html_e( 'Description', 'plain-language-time-tracker' ); ?></th>
-						<th><?php esc_html_e( 'Client', 'plain-language-time-tracker' ); ?></th>
-						<th><?php esc_html_e( 'Project', 'plain-language-time-tracker' ); ?></th>
-						<th><?php esc_html_e( 'Tags', 'plain-language-time-tracker' ); ?></th>
-						<th><?php esc_html_e( 'Billable', 'plain-language-time-tracker' ); ?></th>
-					</tr>
-				</thead>
-				<tbody>
-					<?php foreach ( $existing_entries as $entry ) :
-						$client  = ! empty( $entry->client_id ) ? PLTT_Clients::get( $entry->client_id ) : null;
-						$project = ! empty( $entry->project_id ) ? PLTT_Projects::get( $entry->project_id ) : null;
-						?>
-						<tr>
-							<td class="pltt-time-cell">
-								<?php
-								echo esc_html( pltt_format_time( $entry->start_time ) );
-								if ( $entry->end_time ) {
-									echo ' - ' . esc_html( pltt_format_time( $entry->end_time ) );
-								}
-								?>
-							</td>
-							<td class="pltt-duration-cell">
-								<?php echo esc_html( pltt_format_duration( $entry->duration_minutes ) ); ?>
-							</td>
-							<td><?php echo esc_html( $entry->description ); ?></td>
-							<td><?php echo $client ? esc_html( $client->name ) : '<span class="pltt-empty">—</span>'; ?></td>
-							<td><?php echo $project ? esc_html( $project->name ) : '<span class="pltt-empty">—</span>'; ?></td>
-							<td><?php echo ! empty( $entry->tags ) ? esc_html( $entry->tags ) : '<span class="pltt-empty">—</span>'; ?></td>
-							<td><?php echo $entry->billable ? '<span class="pltt-status-billable">Yes</span>' : '<span class="pltt-empty">—</span>'; ?></td>
-						</tr>
-					<?php endforeach; ?>
-				</tbody>
-			</table>
+			<?php pltt_render_entry_table( $existing_entries, array( 'table_class' => 'pltt-daily-log-entries' ) ); ?>
+
+			<div class="pltt-existing-entries-footer">
+				<a href="<?php echo esc_url( pltt_get_admin_url( 'review', array( 'date' => $date ) ) ); ?>" class="button button-primary">
+					<?php esc_html_e( 'View & Edit Entries', 'plain-language-time-tracker' ); ?> &rarr;
+				</a>
+			</div>
 		</div>
 	<?php endif; ?>
 

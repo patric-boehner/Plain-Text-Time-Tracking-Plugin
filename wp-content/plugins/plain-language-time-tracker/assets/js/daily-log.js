@@ -61,7 +61,11 @@
 		saveIndicator.textContent = plttData.i18n.saving;
 		saveIndicator.className = 'pltt-save-indicator saving';
 
-		PLTT.ajax( 'pltt_save_daily_log', {
+		// Detect if log is processed (check if update notes button exists).
+		const isProcessed = document.getElementById( 'pltt-update-notes-btn' ) !== null;
+		const action = isProcessed ? 'pltt_update_daily_log' : 'pltt_save_daily_log';
+
+		PLTT.ajax( action, {
 			date: dateInput.value,
 			content: textarea.value
 		}, function( response ) {
@@ -112,6 +116,15 @@
 				return;
 			}
 
+			// Check if log is already processed (button has secondary class).
+			if ( processBtn.classList.contains( 'button-secondary' ) ) {
+				const confirmMsg = 'This will delete all existing entries and recreate them from the parsed log text.\n\n' +
+					'To edit individual entries, use the Review screen instead.\n\nContinue?';
+				if ( ! confirm( confirmMsg ) ) {
+					return;
+				}
+			}
+
 			processBtn.disabled = true;
 			processBtn.textContent = plttData.i18n.processing;
 
@@ -126,6 +139,40 @@
 					processBtn.disabled = false;
 					processBtn.textContent = 'Process Time Entries →';
 				}
+			} );
+		} );
+	}
+
+	/**
+	 * Handle update notes button (preserves processed state).
+	 */
+	const updateNotesBtn = document.getElementById( 'pltt-update-notes-btn' );
+	if ( updateNotesBtn ) {
+		updateNotesBtn.addEventListener( 'click', function() {
+			const content = textarea.value.trim();
+
+			updateNotesBtn.disabled = true;
+			const originalText = updateNotesBtn.textContent;
+			updateNotesBtn.textContent = plttData.i18n.saving;
+
+			PLTT.ajax( 'pltt_update_daily_log', {
+				date: dateInput.value,
+				content: content
+			}, function( response ) {
+				if ( response.success ) {
+					saveIndicator.textContent = plttData.i18n.saved;
+					saveIndicator.className = 'pltt-save-indicator saved';
+
+					setTimeout( function() {
+						saveIndicator.textContent = '';
+						saveIndicator.className = 'pltt-save-indicator';
+					}, 2000 );
+				} else {
+					alert( response.data || 'Error updating notes.' );
+				}
+
+				updateNotesBtn.disabled = false;
+				updateNotesBtn.textContent = originalText;
 			} );
 		} );
 	}

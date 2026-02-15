@@ -21,6 +21,7 @@ class PLTT_Ajax {
 	public static function init() {
 		// Daily log operations.
 		add_action( 'wp_ajax_pltt_save_daily_log', array( __CLASS__, 'save_daily_log' ) );
+		add_action( 'wp_ajax_pltt_update_daily_log', array( __CLASS__, 'update_daily_log' ) );
 		add_action( 'wp_ajax_pltt_process_log', array( __CLASS__, 'process_log' ) );
 		add_action( 'wp_ajax_pltt_delete_daily_log', array( __CLASS__, 'delete_daily_log' ) );
 
@@ -74,6 +75,28 @@ class PLTT_Ajax {
 			wp_send_json_success( array( 'message' => __( 'Saved', 'plain-language-time-tracker' ) ) );
 		} else {
 			wp_send_json_error( __( 'Failed to save.', 'plain-language-time-tracker' ) );
+		}
+	}
+
+	/**
+	 * Update daily log content (preserves processed state).
+	 */
+	public static function update_daily_log() {
+		self::verify_request();
+
+		$date    = isset( $_POST['date'] ) ? pltt_sanitize_date( wp_unslash( $_POST['date'] ) ) : '';
+		$content = isset( $_POST['content'] ) ? sanitize_textarea_field( wp_unslash( $_POST['content'] ) ) : '';
+
+		if ( empty( $date ) ) {
+			wp_send_json_error( __( 'Invalid date.', 'plain-language-time-tracker' ) );
+		}
+
+		$result = PLTT_Daily_Log::save_log( $date, $content, true ); // Preserve processed.
+
+		if ( $result ) {
+			wp_send_json_success( array( 'message' => __( 'Notes updated', 'plain-language-time-tracker' ) ) );
+		} else {
+			wp_send_json_error( __( 'Failed to update.', 'plain-language-time-tracker' ) );
 		}
 	}
 

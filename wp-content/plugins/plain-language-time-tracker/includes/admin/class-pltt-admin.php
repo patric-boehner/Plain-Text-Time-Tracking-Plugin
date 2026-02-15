@@ -68,14 +68,34 @@ class PLTT_Admin {
 			array( __CLASS__, 'render_reports_page' )
 		);
 
-		// Submenu: Clients & Projects.
+		// Submenu: Clients.
 		add_submenu_page(
 			'pltt-time-tracker',
-			__( 'Clients & Projects', 'plain-language-time-tracker' ),
-			__( 'Clients & Projects', 'plain-language-time-tracker' ),
+			__( 'Clients', 'plain-language-time-tracker' ),
+			__( 'Clients', 'plain-language-time-tracker' ),
 			'manage_options',
 			'pltt-clients',
 			array( __CLASS__, 'render_clients_page' )
+		);
+
+		// Submenu: Projects.
+		add_submenu_page(
+			'pltt-time-tracker',
+			__( 'Projects', 'plain-language-time-tracker' ),
+			__( 'Projects', 'plain-language-time-tracker' ),
+			'manage_options',
+			'pltt-projects',
+			array( __CLASS__, 'render_projects_page' )
+		);
+
+		// Submenu: Tags.
+		add_submenu_page(
+			'pltt-time-tracker',
+			__( 'Tags', 'plain-language-time-tracker' ),
+			__( 'Tags', 'plain-language-time-tracker' ),
+			'manage_options',
+			'pltt-tags',
+			array( __CLASS__, 'render_tags_page' )
 		);
 	}
 
@@ -123,7 +143,7 @@ class PLTT_Admin {
 	}
 
 	/**
-	 * Render the clients & projects page.
+	 * Render the clients page.
 	 */
 	public static function render_clients_page() {
 		if ( ! pltt_user_can_access() ) {
@@ -131,6 +151,28 @@ class PLTT_Admin {
 		}
 
 		include PLTT_PLUGIN_DIR . 'templates/clients.php';
+	}
+
+	/**
+	 * Render the projects page.
+	 */
+	public static function render_projects_page() {
+		if ( ! pltt_user_can_access() ) {
+			wp_die( esc_html__( 'You do not have permission to access this page.', 'plain-language-time-tracker' ) );
+		}
+
+		include PLTT_PLUGIN_DIR . 'templates/projects.php';
+	}
+
+	/**
+	 * Render the tags page.
+	 */
+	public static function render_tags_page() {
+		if ( ! pltt_user_can_access() ) {
+			wp_die( esc_html__( 'You do not have permission to access this page.', 'plain-language-time-tracker' ) );
+		}
+
+		include PLTT_PLUGIN_DIR . 'templates/tags.php';
 	}
 
 	/**
@@ -145,6 +187,8 @@ class PLTT_Admin {
 			'time-tracker_page_pltt-log-archive',
 			'time-tracker_page_pltt-reports',
 			'time-tracker_page_pltt-clients',
+			'time-tracker_page_pltt-projects',
+			'time-tracker_page_pltt-tags',
 		);
 
 		if ( ! in_array( $hook, $plugin_pages, true ) ) {
@@ -200,8 +244,8 @@ class PLTT_Admin {
 					$version
 				);
 				wp_enqueue_script(
-					'pltt-tag-input',
-					PLTT_PLUGIN_URL . 'assets/js/tag-input.js',
+					'pltt-tag-picker',
+					PLTT_PLUGIN_URL . 'assets/js/tag-picker.js',
 					array(),
 					$version,
 					true
@@ -209,7 +253,7 @@ class PLTT_Admin {
 				wp_enqueue_script(
 					'pltt-review',
 					PLTT_PLUGIN_URL . 'assets/js/review.js',
-					array( 'pltt-shared', 'pltt-tag-input' ),
+					array( 'pltt-shared', 'pltt-tag-picker' ),
 					$version,
 					true
 				);
@@ -286,6 +330,14 @@ class PLTT_Admin {
 
 			if ( 'pltt-clients' === $page ) {
 				return 'clients';
+			}
+
+			if ( 'pltt-projects' === $page ) {
+				return 'projects';
+			}
+
+			if ( 'pltt-tags' === $page ) {
+				return 'tags';
 			}
 		}
 

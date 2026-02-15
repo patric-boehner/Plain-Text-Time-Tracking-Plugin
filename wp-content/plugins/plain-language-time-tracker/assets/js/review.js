@@ -2,7 +2,7 @@
  * Review & Verify Screen JavaScript
  */
 
-/* global PLTT, plttData, PlttTagInput, plttAllTags */
+/* global PLTT, plttData, PlttTagPicker, plttAllTags */
 
 ( function() {
 	'use strict';
@@ -16,10 +16,46 @@
 		return;
 	}
 
-	// Initialize tag pill inputs.
+	// Initialize tag picker dropdowns.
 	var tagSuggestions = ( typeof plttAllTags !== 'undefined' ) ? plttAllTags : [];
 	document.querySelectorAll( '.pltt-tag-input-wrap' ).forEach( function( container ) {
-		new PlttTagInput( container, tagSuggestions );
+		new PlttTagPicker( container, tagSuggestions );
+	} );
+
+	// Billable $ symbol click handler — toggles the hidden checkbox.
+	document.querySelectorAll( '.pltt-billable-symbol' ).forEach( function( symbol ) {
+		symbol.addEventListener( 'click', function() {
+			var cell = this.closest( 'td' );
+			var checkbox = cell.querySelector( '.pltt-billable' );
+			if ( checkbox ) {
+				checkbox.checked = ! checkbox.checked;
+				checkbox.dispatchEvent( new Event( 'change' ) );
+			}
+		} );
+	} );
+
+	// Billable checkbox change — update $ symbol and sync billed state.
+	document.querySelectorAll( '.pltt-billable' ).forEach( function( checkbox ) {
+		checkbox.addEventListener( 'change', function() {
+			var cell = this.closest( 'td' );
+			var symbol = cell.querySelector( '.pltt-billable-symbol' );
+			if ( symbol ) {
+				symbol.classList.toggle( 'is-billable', this.checked );
+				symbol.classList.toggle( 'not-billable', ! this.checked );
+			}
+
+			// If unchecking billable, also uncheck and disable billed.
+			var row = this.closest( '.pltt-entry-row' );
+			var billedCheckbox = row.querySelector( '.pltt-billed' );
+			if ( billedCheckbox ) {
+				if ( ! this.checked ) {
+					billedCheckbox.checked = false;
+					billedCheckbox.disabled = true;
+				} else {
+					billedCheckbox.disabled = false;
+				}
+			}
+		} );
 	} );
 
 	// Track currently active row for modals.
@@ -366,7 +402,9 @@
 	if ( saveClientBtn ) {
 		saveClientBtn.addEventListener( 'click', function() {
 			const nameInput = document.getElementById( 'pltt-new-client-name' );
+			const rateInput = document.getElementById( 'pltt-new-client-rate' );
 			const name = nameInput.value.trim();
+			const rate = rateInput.value.trim();
 
 			if ( ! name ) {
 				alert( 'Please enter a client name.' );
@@ -376,7 +414,10 @@
 
 			this.disabled = true;
 
-			PLTT.ajax( 'pltt_create_client', { name: name }, function( response ) {
+			PLTT.ajax( 'pltt_create_client', {
+				name: name,
+				hourly_rate: rate || null
+			}, function( response ) {
 				saveClientBtn.disabled = false;
 
 				if ( response.success && response.data.client ) {
@@ -404,6 +445,8 @@
 					}
 
 					PLTT.hideModal( 'pltt-client-modal' );
+					nameInput.value = '';
+					rateInput.value = '';
 				} else {
 					alert( response.data || 'Error creating client.' );
 				}
@@ -419,8 +462,10 @@
 		saveProjectBtn.addEventListener( 'click', function() {
 			const nameInput = document.getElementById( 'pltt-new-project-name' );
 			const clientIdInput = document.getElementById( 'pltt-new-project-client-id' );
+			const rateInput = document.getElementById( 'pltt-new-project-rate' );
 			const name = nameInput.value.trim();
 			const clientId = clientIdInput.value;
+			const rate = rateInput.value.trim();
 
 			if ( ! name ) {
 				alert( 'Please enter a project name.' );
@@ -432,7 +477,8 @@
 
 			PLTT.ajax( 'pltt_create_project', {
 				name: name,
-				client_id: clientId
+				client_id: clientId,
+				hourly_rate: rate || null
 			}, function( response ) {
 				saveProjectBtn.disabled = false;
 
@@ -453,6 +499,8 @@
 					}
 
 					PLTT.hideModal( 'pltt-project-modal' );
+					nameInput.value = '';
+					rateInput.value = '';
 				} else {
 					alert( response.data || 'Error creating project.' );
 				}
@@ -464,7 +512,8 @@
 	 * Handle delete entry buttons.
 	 */
 	document.querySelectorAll( '.pltt-delete-entry' ).forEach( function( btn ) {
-		btn.addEventListener( 'click', function() {
+		btn.addEventListener( 'click', function( e ) {
+			e.preventDefault();
 			if ( ! confirm( plttData.i18n.confirm ) ) {
 				return;
 			}
@@ -530,6 +579,7 @@
 
 		rows.forEach( function( row, index ) {
 			const billableCheckbox = row.querySelector( '.pltt-billable' );
+			const billedCheckbox = row.querySelector( '.pltt-billed' );
 			const entry = {
 				id: row.dataset.entryId || 0,
 				entry_date: row.querySelector( '.pltt-entry-date-input' ).value,
@@ -541,7 +591,8 @@
 				client_id: row.querySelector( '.pltt-client-select' ).value,
 				project_id: row.querySelector( '.pltt-project-select' ).value,
 				tags: row.querySelector( '.pltt-tags' ).value,
-				billable: billableCheckbox ? ( billableCheckbox.checked ? 1 : 0 ) : 0
+				billable: billableCheckbox ? ( billableCheckbox.checked ? 1 : 0 ) : 0,
+				billed: billedCheckbox ? ( billedCheckbox.checked ? 1 : 0 ) : 0
 			};
 
 			entries.push( entry );

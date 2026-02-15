@@ -3,7 +3,7 @@
  * Plugin Name: Plain Language Time Tracker
  * Plugin URI: https://github.com/patrickb/plain-language-time-tracker
  * Description: Time tracking with a "capture first, categorize later" workflow. Jot plain text notes with timestamps, then process them into structured time entries.
- * Version: 1.1.0
+ * Version: 1.2.0
  * Author: Patrick
  * Text Domain: plain-language-time-tracker
  * Domain Path: /languages
@@ -32,6 +32,7 @@ define( 'PLTT_CONFIDENCE_THRESHOLD', 0.7 );
 define( 'PLTT_ENTRIES_PER_PAGE', 50 );
 define( 'PLTT_LOGS_PER_PAGE', 20 );
 define( 'PLTT_AUTOSAVE_DEBOUNCE_MS', 1500 );
+define( 'PLTT_DEFAULT_HOURLY_RATE', 100.00 );
 
 /**
  * Load plugin dependencies.

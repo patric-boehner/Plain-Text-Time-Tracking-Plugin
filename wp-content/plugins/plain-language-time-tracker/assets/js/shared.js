@@ -150,8 +150,8 @@ document.addEventListener( 'DOMContentLoaded', function() {
 	document.querySelectorAll( '.pltt-modal-close' ).forEach( function( btn ) {
 		btn.addEventListener( 'click', function() {
 			const modal = this.closest( '.pltt-modal' );
-			if ( modal ) {
-				modal.style.display = 'none';
+			if ( modal && modal.id ) {
+				PLTT.hideModal( modal.id );
 			}
 		} );
 	} );
@@ -159,8 +159,8 @@ document.addEventListener( 'DOMContentLoaded', function() {
 	// Close modals on backdrop click.
 	document.querySelectorAll( '.pltt-modal' ).forEach( function( modal ) {
 		modal.addEventListener( 'click', function( e ) {
-			if ( e.target === this ) {
-				this.style.display = 'none';
+			if ( e.target === this && this.id ) {
+				PLTT.hideModal( this.id );
 			}
 		} );
 	} );
@@ -169,7 +169,9 @@ document.addEventListener( 'DOMContentLoaded', function() {
 	document.addEventListener( 'keydown', function( e ) {
 		if ( e.key === 'Escape' ) {
 			document.querySelectorAll( '.pltt-modal' ).forEach( function( modal ) {
-				modal.style.display = 'none';
+				if ( modal.id && !modal.classList.contains( 'pltt-hidden' ) ) {
+					PLTT.hideModal( modal.id );
+				}
 			} );
 		}
 	} );
