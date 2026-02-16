@@ -51,7 +51,7 @@ Processed entries appear in a structured table with time ranges, durations, clie
 Three-tier rate hierarchy: Project rate > Client rate > System default ($100/hr). Rates are snapshotted when entries are verified (historical accuracy preserved even if rates change later). Billable hours and amounts tracked in summary cards.
 
 ### Reports
-Filter by date range, client, project, tags, billable status. Summary and detailed views. Summary cards show total hours, billable hours, billable amounts. Pagination for large result sets.
+Filter by date range, client, project, tags, billable status. Summary and detailed views. Summary cards: Active Projects (with client count), Total Hours (with daily average), Billable Hours (with utilization %), Billable Amount (with period-over-period comparison), and Overall EHR (effective hourly rate vs. target). Pagination for large result sets.
 
 ### Daily Log & Log History
 Auto-saving notes persist across sessions. Log History screen provides chronological archive of all daily logs, filterable by month. Navigate to any past day to review or re-process.
@@ -84,11 +84,6 @@ Time Entry (many) --> (many) Tags
 ## Status
 
 All planned features are complete. Use the tool. See what's actually missing.
-
----
-
-## Rough Idea Notes
-- **Billed Status** - There is no way to currently know in reports when a entry has been invoiced. Maybe subtle visual indication on rows without the setting
 
 ---
 

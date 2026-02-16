@@ -242,7 +242,7 @@ $tab_base_url = add_query_arg( $filter_params, admin_url( 'admin.php' ) );
 							<option value="without_tag" <?php selected( $tag, 'without_tag' ); ?>><?php esc_html_e( '— Without Tag —', 'plain-language-time-tracker' ); ?></option>
 							<?php foreach ( $all_tags as $t ) : ?>
 								<option value="<?php echo esc_attr( $t ); ?>" <?php selected( $tag, $t ); ?>>
-									<?php echo esc_html( $t ); ?>
+									<?php echo esc_html( ucwords( $t ) ); ?>
 								</option>
 							<?php endforeach; ?>
 						</select>
@@ -279,33 +279,125 @@ $tab_base_url = add_query_arg( $filter_params, admin_url( 'admin.php' ) );
 
 	<?php if ( $total_entries > 0 ) : ?>
 		<div class="pltt-summary-cards">
+
+			<!-- Card 1: Active Projects -->
 			<div class="card">
-				<div class="card-value"><?php echo esc_html( $total_entries ); ?></div>
-				<div class="card-label"><?php esc_html_e( 'Entries', 'plain-language-time-tracker' ); ?></div>
+				<div class="card-label"><?php esc_html_e( 'Active Projects', 'plain-language-time-tracker' ); ?></div>
+				<div class="card-value"><?php echo esc_html( $stats->active_projects ); ?></div>
+				<div class="card-secondary">
+					<?php
+					printf(
+						/* translators: %d: number of clients */
+						esc_html( _n( 'Across %d client', 'Across %d clients', (int) $stats->active_clients, 'plain-language-time-tracker' ) ),
+						(int) $stats->active_clients
+					);
+					?>
+				</div>
 			</div>
+
+			<!-- Card 2: Total Hours -->
 			<div class="card">
-				<div class="card-value"><?php echo esc_html( pltt_format_hours( $stats->total_minutes ) ); ?></div>
 				<div class="card-label"><?php esc_html_e( 'Total Hours', 'plain-language-time-tracker' ); ?></div>
+				<div class="card-value"><?php echo esc_html( pltt_format_hours( $stats->total_minutes ) ); ?></div>
+				<?php if ( $working_days > 0 ) : ?>
+					<div class="card-secondary">
+						<?php
+						$avg_per_day = $stats->total_minutes / 60 / $working_days;
+						printf(
+							esc_html__( '%s hrs/day avg', 'plain-language-time-tracker' ),
+							esc_html( number_format( $avg_per_day, 1 ) )
+						);
+						?>
+					</div>
+				<?php endif; ?>
 			</div>
+
+			<!-- Card 3: Billable Hours -->
 			<div class="card">
-				<div class="card-value"><?php echo esc_html( pltt_format_hours( $stats->billable_minutes ) ); ?></div>
 				<div class="card-label"><?php esc_html_e( 'Billable Hours', 'plain-language-time-tracker' ); ?></div>
+				<div class="card-value"><?php echo esc_html( pltt_format_hours( $stats->billable_minutes ) ); ?></div>
+				<div class="card-secondary">
+					<?php
+					$util_class = ( $utilization >= 60 && $utilization <= 70 ) ? 'status-good' : 'status-warning';
+					$util_icon  = ( $utilization >= 60 && $utilization <= 70 ) ? '✓' : '⚠';
+					?>
+					<span class="<?php echo esc_attr( $util_class ); ?>">
+						<?php
+						printf(
+							'%s %s',
+							esc_html( number_format( $utilization, 1 ) . '%' ),
+							esc_html__( 'utilization', 'plain-language-time-tracker' )
+						);
+						echo ' ' . esc_html( $util_icon );
+						?>
+					</span>
+				</div>
 			</div>
+
+			<!-- Card 4: Billable Amount -->
 			<?php if ( (float) $stats->billable_amount > 0 ) : ?>
 				<div class="card">
-					<div class="card-value"><?php echo esc_html( pltt_format_currency( $stats->billable_amount ) ); ?></div>
 					<div class="card-label"><?php esc_html_e( 'Billable Amount', 'plain-language-time-tracker' ); ?></div>
+					<div class="card-value"><?php echo esc_html( pltt_format_currency( $stats->billable_amount ) ); ?></div>
+					<div class="card-secondary">
+						<?php
+						$prev_amount = $prev_stats ? (float) $prev_stats->billable_amount : 0;
+						$curr_amount = (float) $stats->billable_amount;
+
+						if ( $prev_amount > 0 ) {
+							$pct_change = ( $curr_amount - $prev_amount ) / $prev_amount * 100;
+						} else {
+							$pct_change = 100;
+						}
+
+						if ( abs( $pct_change ) < 5 ) {
+							$change_class = 'status-neutral';
+							$change_icon  = '→';
+						} elseif ( $pct_change > 0 ) {
+							$change_class = 'status-increase';
+							$change_icon  = '↑';
+						} else {
+							$change_class = 'status-decrease';
+							$change_icon  = '↓';
+						}
+
+						printf(
+							esc_html__( 'vs. %s last period', 'plain-language-time-tracker' ),
+							esc_html( pltt_format_currency( $prev_amount ) )
+						);
+						?>
+						&bull;
+						<span class="<?php echo esc_attr( $change_class ); ?>">
+							<?php echo esc_html( $change_icon . ' ' . number_format( abs( $pct_change ), 0 ) . '%' ); ?>
+						</span>
+					</div>
 				</div>
 			<?php endif; ?>
-			<?php
-			$unverified_count = $total_entries - (int) $stats->verified_count;
-			if ( $unverified_count > 0 ) :
-				?>
-				<div class="card card-warning">
-					<div class="card-value"><?php echo esc_html( $unverified_count ); ?></div>
-					<div class="card-label"><?php esc_html_e( 'Unverified', 'plain-language-time-tracker' ); ?></div>
+
+			<!-- Card 5: Overall EHR -->
+			<?php if ( $overall_ehr > 0 ) : ?>
+				<div class="card">
+					<div class="card-label"><?php esc_html_e( 'Overall EHR', 'plain-language-time-tracker' ); ?></div>
+					<div class="card-value"><?php echo esc_html( pltt_format_currency( $overall_ehr ) . '/hr' ); ?></div>
+					<div class="card-secondary">
+						<?php
+						$ehr_target = PLTT_DEFAULT_HOURLY_RATE;
+						$ehr_class  = ( $overall_ehr >= $ehr_target ) ? 'status-good' : 'status-warning';
+						$ehr_icon   = ( $overall_ehr >= $ehr_target ) ? '✓' : '⚠';
+						?>
+						<span class="<?php echo esc_attr( $ehr_class ); ?>">
+							<?php
+							printf(
+								esc_html__( 'Target: %s+/hr', 'plain-language-time-tracker' ),
+								esc_html( pltt_format_currency( $ehr_target ) )
+							);
+							echo ' ' . esc_html( $ehr_icon );
+							?>
+						</span>
+					</div>
 				</div>
 			<?php endif; ?>
+
 		</div>
 	<?php endif; ?>
 
