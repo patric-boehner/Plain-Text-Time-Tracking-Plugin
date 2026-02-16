@@ -78,7 +78,7 @@ sort( $all_tags );
 </div>
 
 <!-- Add/Rename Tag Modal -->
-<div id="pltt-tag-modal" class="pltt-modal pltt-hidden">
+<div id="pltt-tag-modal" class="pltt-modal pltt-hidden" role="dialog" aria-modal="true" aria-labelledby="pltt-tag-modal-title">
 	<div class="pltt-modal-content">
 		<h3 id="pltt-tag-modal-title"><?php esc_html_e( 'Add Tag', 'plain-language-time-tracker' ); ?></h3>
 		<form id="pltt-tag-form" method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">

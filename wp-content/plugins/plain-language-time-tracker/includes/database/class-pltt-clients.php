@@ -90,13 +90,21 @@ class PLTT_Clients {
 
 		$formats = array( '%s', '%s' );
 
-		if ( empty( $insert_data['name'] ) ) {
-			return false;
+		// Validate required field.
+		if ( empty( $insert_data['name'] ) || '' === trim( $insert_data['name'] ) ) {
+			return new WP_Error( 'missing_name', __( 'Client name is required.', 'plain-language-time-tracker' ) );
 		}
 
 		// Nullable: omit from array when NULL so MySQL uses column default.
 		if ( isset( $data['hourly_rate'] ) && '' !== $data['hourly_rate'] ) {
-			$insert_data['hourly_rate'] = floatval( $data['hourly_rate'] );
+			$rate = floatval( $data['hourly_rate'] );
+
+			// Validate hourly rate bounds.
+			if ( $rate < 0 || $rate > 10000 ) {
+				return new WP_Error( 'invalid_rate', __( 'Hourly rate must be between $0 and $10,000.', 'plain-language-time-tracker' ) );
+			}
+
+			$insert_data['hourly_rate'] = $rate;
 			$formats[]                  = '%f';
 		}
 
@@ -131,7 +139,14 @@ class PLTT_Clients {
 		$null_fields = array();
 
 		if ( array_key_exists( 'name', $data ) ) {
-			$update_data['name'] = sanitize_text_field( $data['name'] );
+			$name = sanitize_text_field( $data['name'] );
+
+			// Validate required field.
+			if ( empty( $name ) || '' === trim( $name ) ) {
+				return new WP_Error( 'missing_name', __( 'Client name is required.', 'plain-language-time-tracker' ) );
+			}
+
+			$update_data['name'] = $name;
 			$formats[]           = '%s';
 		}
 
@@ -142,7 +157,14 @@ class PLTT_Clients {
 
 		if ( array_key_exists( 'hourly_rate', $data ) ) {
 			if ( '' !== $data['hourly_rate'] && null !== $data['hourly_rate'] ) {
-				$update_data['hourly_rate'] = floatval( $data['hourly_rate'] );
+				$rate = floatval( $data['hourly_rate'] );
+
+				// Validate hourly rate bounds.
+				if ( $rate < 0 || $rate > 10000 ) {
+					return new WP_Error( 'invalid_rate', __( 'Hourly rate must be between $0 and $10,000.', 'plain-language-time-tracker' ) );
+				}
+
+				$update_data['hourly_rate'] = $rate;
 				$formats[]                  = '%f';
 			} else {
 				$null_fields[] = 'hourly_rate';

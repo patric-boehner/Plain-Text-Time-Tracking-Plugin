@@ -140,13 +140,25 @@ class PLTT_Projects {
 
 		$formats = array( '%d', '%s', '%s', '%s' );
 
-		if ( empty( $insert_data['name'] ) || empty( $insert_data['client_id'] ) ) {
-			return false;
+		// Validate required fields.
+		if ( empty( $insert_data['client_id'] ) ) {
+			return new WP_Error( 'missing_client', __( 'Client is required.', 'plain-language-time-tracker' ) );
+		}
+
+		if ( empty( $insert_data['name'] ) || '' === trim( $insert_data['name'] ) ) {
+			return new WP_Error( 'missing_name', __( 'Project name is required.', 'plain-language-time-tracker' ) );
 		}
 
 		// Nullable: omit from array when NULL so MySQL uses column default.
 		if ( isset( $data['hourly_rate'] ) && '' !== $data['hourly_rate'] ) {
-			$insert_data['hourly_rate'] = floatval( $data['hourly_rate'] );
+			$rate = floatval( $data['hourly_rate'] );
+
+			// Validate hourly rate bounds.
+			if ( $rate < 0 || $rate > 10000 ) {
+				return new WP_Error( 'invalid_rate', __( 'Hourly rate must be between $0 and $10,000.', 'plain-language-time-tracker' ) );
+			}
+
+			$insert_data['hourly_rate'] = $rate;
 			$formats[]                  = '%f';
 		}
 
@@ -181,12 +193,26 @@ class PLTT_Projects {
 		$null_fields = array();
 
 		if ( array_key_exists( 'name', $data ) ) {
-			$update_data['name'] = sanitize_text_field( $data['name'] );
+			$name = sanitize_text_field( $data['name'] );
+
+			// Validate required field.
+			if ( empty( $name ) || '' === trim( $name ) ) {
+				return new WP_Error( 'missing_name', __( 'Project name is required.', 'plain-language-time-tracker' ) );
+			}
+
+			$update_data['name'] = $name;
 			$formats[]           = '%s';
 		}
 
 		if ( array_key_exists( 'client_id', $data ) ) {
-			$update_data['client_id'] = absint( $data['client_id'] );
+			$client_id = absint( $data['client_id'] );
+
+			// Validate required field.
+			if ( empty( $client_id ) ) {
+				return new WP_Error( 'missing_client', __( 'Client is required.', 'plain-language-time-tracker' ) );
+			}
+
+			$update_data['client_id'] = $client_id;
 			$formats[]                = '%d';
 		}
 
@@ -204,7 +230,14 @@ class PLTT_Projects {
 
 		if ( array_key_exists( 'hourly_rate', $data ) ) {
 			if ( '' !== $data['hourly_rate'] && null !== $data['hourly_rate'] ) {
-				$update_data['hourly_rate'] = floatval( $data['hourly_rate'] );
+				$rate = floatval( $data['hourly_rate'] );
+
+				// Validate hourly rate bounds.
+				if ( $rate < 0 || $rate > 10000 ) {
+					return new WP_Error( 'invalid_rate', __( 'Hourly rate must be between $0 and $10,000.', 'plain-language-time-tracker' ) );
+				}
+
+				$update_data['hourly_rate'] = $rate;
 				$formats[]                  = '%f';
 			} else {
 				$null_fields[] = 'hourly_rate';

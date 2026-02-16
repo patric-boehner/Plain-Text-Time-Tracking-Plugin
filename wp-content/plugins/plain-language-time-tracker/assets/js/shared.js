@@ -100,10 +100,55 @@ const PLTT = {
 	showModal: function( modalId ) {
 		const modal = document.getElementById( modalId );
 		if ( modal ) {
+			// Store the element that had focus before modal opened
+			modal.dataset.previousFocus = document.activeElement ? document.activeElement.id || '' : '';
+
 			modal.classList.remove( 'pltt-hidden' );
-			const firstInput = modal.querySelector( 'input[type="text"]' );
-			if ( firstInput ) {
-				firstInput.focus();
+
+			// Get all focusable elements in the modal
+			const focusableElements = modal.querySelectorAll(
+				'a[href]:not([disabled]), button:not([disabled]), textarea:not([disabled]), input:not([disabled]):not([type="hidden"]), select:not([disabled]), [tabindex]:not([tabindex="-1"])'
+			);
+			const firstElement = focusableElements[0];
+			const lastElement = focusableElements[focusableElements.length - 1];
+
+			// Focus first element
+			if ( firstElement ) {
+				firstElement.focus();
+			}
+
+			// Set up focus trap
+			if ( !modal.dataset.focusTrapBound ) {
+				modal.dataset.focusTrapBound = 'true';
+				modal.addEventListener( 'keydown', function( e ) {
+					// Only trap focus if modal is visible
+					if ( modal.classList.contains( 'pltt-hidden' ) ) {
+						return;
+					}
+
+					if ( e.key === 'Tab' ) {
+						// Get current focusable elements (in case they've changed)
+						const currentFocusable = modal.querySelectorAll(
+							'a[href]:not([disabled]), button:not([disabled]), textarea:not([disabled]), input:not([disabled]):not([type="hidden"]), select:not([disabled]), [tabindex]:not([tabindex="-1"])'
+						);
+						const currentFirst = currentFocusable[0];
+						const currentLast = currentFocusable[currentFocusable.length - 1];
+
+						if ( e.shiftKey ) {
+							// Shift+Tab: moving backwards
+							if ( document.activeElement === currentFirst ) {
+								e.preventDefault();
+								currentLast.focus();
+							}
+						} else {
+							// Tab: moving forwards
+							if ( document.activeElement === currentLast ) {
+								e.preventDefault();
+								currentFirst.focus();
+							}
+						}
+					}
+				} );
 			}
 		}
 	},
@@ -117,6 +162,15 @@ const PLTT = {
 		const modal = document.getElementById( modalId );
 		if ( modal ) {
 			modal.classList.add( 'pltt-hidden' );
+
+			// Return focus to element that had focus before modal opened
+			if ( modal.dataset.previousFocus ) {
+				const previousElement = document.getElementById( modal.dataset.previousFocus );
+				if ( previousElement ) {
+					previousElement.focus();
+				}
+			}
+
 			// Clear inputs.
 			modal.querySelectorAll( 'input[type="text"]' ).forEach( input => {
 				input.value = '';

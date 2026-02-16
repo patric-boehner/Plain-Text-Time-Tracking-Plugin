@@ -20,7 +20,7 @@ class PLTT_Database {
 	 *
 	 * @var string
 	 */
-	const DB_VERSION = '1.6.0';
+	const DB_VERSION = '1.7.0';
 
 	/**
 	 * Get the full table name with WordPress prefix.
@@ -71,7 +71,8 @@ class PLTT_Database {
 			PRIMARY KEY (id),
 			KEY client_id (client_id),
 			KEY status (status),
-			KEY name (name(191))
+			KEY name (name(191)),
+			KEY client_status (client_id, status)
 		) {$charset_collate};";
 		dbDelta( $sql_projects );
 
@@ -100,7 +101,10 @@ class PLTT_Database {
 			KEY client_id (client_id),
 			KEY project_id (project_id),
 			KEY verified (verified),
-			KEY date_client (entry_date, client_id)
+			KEY date_client (entry_date, client_id),
+			KEY billable (billable),
+			KEY billed (billed),
+			KEY verified_billable (verified, billable)
 		) {$charset_collate};";
 		dbDelta( $sql_entries );
 
@@ -176,6 +180,24 @@ class PLTT_Database {
 			$wpdb->query( "ALTER TABLE {$projects_table} DROP COLUMN IF EXISTS fixed_fee" );
 
 			delete_option( 'pltt_task_types' );
+		}
+
+		// 1.7.0: Add performance indexes for billable/billed filtering and project queries.
+		if ( version_compare( $from_version, '1.7.0', '<' ) ) {
+			$entries_table  = self::get_table_name( 'time_entries' );
+			$projects_table = self::get_table_name( 'projects' );
+
+			// Add indexes to time_entries table.
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.SchemaChange
+			$wpdb->query( "ALTER TABLE {$entries_table} ADD INDEX billable (billable)" );
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.SchemaChange
+			$wpdb->query( "ALTER TABLE {$entries_table} ADD INDEX billed (billed)" );
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.SchemaChange
+			$wpdb->query( "ALTER TABLE {$entries_table} ADD INDEX verified_billable (verified, billable)" );
+
+			// Add composite index to projects table.
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.SchemaChange
+			$wpdb->query( "ALTER TABLE {$projects_table} ADD INDEX client_status (client_id, status)" );
 		}
 	}
 

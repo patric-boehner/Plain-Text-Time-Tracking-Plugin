@@ -283,9 +283,9 @@ foreach ( $entries as $entry ) {
 <script>var plttAllTags = <?php echo wp_json_encode( $all_tags ); ?>;</script>
 
 <!-- New Client Modal -->
-<div id="pltt-client-modal" class="pltt-modal pltt-hidden">
+<div id="pltt-client-modal" class="pltt-modal pltt-hidden" role="dialog" aria-modal="true" aria-labelledby="pltt-review-client-modal-title">
 	<div class="pltt-modal-content">
-		<h3><?php esc_html_e( 'Add New Client', 'plain-language-time-tracker' ); ?></h3>
+		<h3 id="pltt-review-client-modal-title"><?php esc_html_e( 'Add New Client', 'plain-language-time-tracker' ); ?></h3>
 		<p>
 			<label for="pltt-new-client-name"><?php esc_html_e( 'Client Name', 'plain-language-time-tracker' ); ?></label>
 			<input type="text" id="pltt-new-client-name" class="regular-text">
@@ -302,9 +302,9 @@ foreach ( $entries as $entry ) {
 </div>
 
 <!-- New Project Modal -->
-<div id="pltt-project-modal" class="pltt-modal pltt-hidden">
+<div id="pltt-project-modal" class="pltt-modal pltt-hidden" role="dialog" aria-modal="true" aria-labelledby="pltt-review-project-modal-title">
 	<div class="pltt-modal-content">
-		<h3><?php esc_html_e( 'Add New Project', 'plain-language-time-tracker' ); ?></h3>
+		<h3 id="pltt-review-project-modal-title"><?php esc_html_e( 'Add New Project', 'plain-language-time-tracker' ); ?></h3>
 		<p>
 			<label for="pltt-new-project-name"><?php esc_html_e( 'Project Name', 'plain-language-time-tracker' ); ?></label>
 			<input type="text" id="pltt-new-project-name" class="regular-text">
