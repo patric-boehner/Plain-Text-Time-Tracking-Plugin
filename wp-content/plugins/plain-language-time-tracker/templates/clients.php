@@ -12,6 +12,15 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 $clients  = PLTT_Clients::get_all();
 $projects = PLTT_Projects::get_all();
+
+// Group projects by client_id to avoid repeated filtering in loop.
+$projects_by_client = array();
+foreach ( $projects as $project ) {
+	if ( ! isset( $projects_by_client[ $project->client_id ] ) ) {
+		$projects_by_client[ $project->client_id ] = array();
+	}
+	$projects_by_client[ $project->client_id ][] = $project;
+}
 ?>
 
 <div class="wrap pltt-wrap">
@@ -70,12 +79,8 @@ $projects = PLTT_Projects::get_all();
 			<tbody id="pltt-clients-list">
 				<?php foreach ( $clients as $client ) : ?>
 					<?php
-					$client_projects = array_filter(
-						$projects,
-						function ( $p ) use ( $client ) {
-							return $p->client_id === $client->id;
-						}
-					);
+					// Use pre-grouped data to avoid repeated filtering.
+					$client_projects = $projects_by_client[ $client->id ] ?? array();
 					?>
 					<tr data-client-id="<?php echo esc_attr( $client->id ); ?>" data-name="<?php echo esc_attr( $client->name ); ?>" data-description="<?php echo esc_attr( $client->description ); ?>" data-rate="<?php echo esc_attr( $client->hourly_rate ?? '' ); ?>">
 						<td>
@@ -98,7 +103,7 @@ $projects = PLTT_Projects::get_all();
 </div>
 
 <!-- Add/Edit Client Modal -->
-<div id="pltt-client-modal" class="pltt-modal pltt-hidden">
+<div id="pltt-client-modal" class="pltt-modal pltt-hidden" role="dialog" aria-modal="true" aria-labelledby="pltt-client-modal-title">
 	<div class="pltt-modal-content">
 		<h3 id="pltt-client-modal-title"><?php esc_html_e( 'Add Client', 'plain-language-time-tracker' ); ?></h3>
 		<form id="pltt-client-form" method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">

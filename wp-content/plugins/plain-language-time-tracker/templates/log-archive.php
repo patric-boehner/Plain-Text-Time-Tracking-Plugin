@@ -89,7 +89,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 											<?php esc_html_e( 'Review Entries', 'plain-language-time-tracker' ); ?>
 										</a>
 									<?php endif; ?>
-									| <a href="#" class="pltt-delete-log submitdelete">
+									| <a href="#" class="pltt-delete-log submitdelete" role="button">
 										<?php esc_html_e( 'Delete', 'plain-language-time-tracker' ); ?>
 									</a>
 								</div>

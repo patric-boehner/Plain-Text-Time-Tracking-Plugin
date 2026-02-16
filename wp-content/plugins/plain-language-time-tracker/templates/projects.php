@@ -12,6 +12,21 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 $clients  = PLTT_Clients::get_all();
 $projects = PLTT_Projects::get_all();
+
+// Build client lookup array to avoid N+1 queries.
+$clients_by_id = array();
+foreach ( $clients as $client ) {
+	$clients_by_id[ $client->id ] = $client;
+}
+
+// Pre-fetch all project stats to avoid N+1 queries.
+$project_stats_by_id = array();
+if ( ! empty( $projects ) ) {
+	foreach ( $projects as $project ) {
+		$stats                                = PLTT_Entries::get_stats( array( 'project_id' => $project->id ) );
+		$project_stats_by_id[ $project->id ] = $stats;
+	}
+}
 ?>
 
 <div class="wrap pltt-wrap">
@@ -82,7 +97,11 @@ $projects = PLTT_Projects::get_all();
 			</thead>
 			<tbody id="pltt-projects-list">
 				<?php foreach ( $projects as $project ) : ?>
-					<?php $project_client = PLTT_Clients::get( $project->client_id ); ?>
+					<?php
+					// Use pre-fetched data to avoid N+1 queries.
+					$project_client = $clients_by_id[ $project->client_id ] ?? null;
+					$project_stats  = $project_stats_by_id[ $project->id ] ?? null;
+					?>
 					<tr data-project-id="<?php echo esc_attr( $project->id ); ?>" data-name="<?php echo esc_attr( $project->name ); ?>" data-client-id="<?php echo esc_attr( $project->client_id ); ?>" data-status="<?php echo esc_attr( $project->status ); ?>" data-rate="<?php echo esc_attr( $project->hourly_rate ?? '' ); ?>">
 						<td>
 							<strong><?php echo esc_html( $project->name ); ?></strong>
@@ -97,7 +116,6 @@ $projects = PLTT_Projects::get_all();
 						</td>
 						<td><?php echo $project_client ? esc_html( $project_client->name ) : '—'; ?></td>
 						<td><?php echo null !== $project->hourly_rate ? esc_html( pltt_format_currency( $project->hourly_rate ) ) : '<span class="pltt-empty">—</span>'; ?></td>
-						<?php $project_stats = PLTT_Entries::get_stats( array( 'project_id' => $project->id ) ); ?>
 						<td class="pltt-duration-cell"><?php echo esc_html( pltt_format_hours( $project_stats->total_minutes ?? 0 ) ); ?></td>
 						<td><?php echo esc_html( pltt_format_currency( $project_stats->billable_amount ?? 0 ) ); ?></td>
 						<td>
@@ -115,7 +133,7 @@ $projects = PLTT_Projects::get_all();
 </div>
 
 <!-- Add/Edit Project Modal -->
-<div id="pltt-project-modal" class="pltt-modal pltt-hidden">
+<div id="pltt-project-modal" class="pltt-modal pltt-hidden" role="dialog" aria-modal="true" aria-labelledby="pltt-project-modal-title">
 	<div class="pltt-modal-content">
 		<h3 id="pltt-project-modal-title"><?php esc_html_e( 'Add Project', 'plain-language-time-tracker' ); ?></h3>
 		<form id="pltt-project-form" method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">

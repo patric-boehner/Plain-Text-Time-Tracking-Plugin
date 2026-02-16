@@ -433,6 +433,36 @@ function pltt_render_entry_table( $entries, $options = array() ) {
 	if ( empty( $entries ) ) {
 		return;
 	}
+
+	// Collect unique project and client IDs to avoid N+1 queries.
+	$project_ids = array();
+	$client_ids  = array();
+	foreach ( $entries as $entry ) {
+		if ( ! empty( $entry->project_id ) ) {
+			$project_ids[] = (int) $entry->project_id;
+		}
+		if ( ! empty( $entry->client_id ) ) {
+			$client_ids[] = (int) $entry->client_id;
+		}
+	}
+
+	// Fetch all referenced projects and clients in bulk.
+	$projects_cache = array();
+	$clients_cache  = array();
+
+	foreach ( array_unique( $project_ids ) as $pid ) {
+		$project = PLTT_Projects::get( $pid );
+		if ( $project ) {
+			$projects_cache[ $pid ] = $project;
+		}
+	}
+
+	foreach ( array_unique( $client_ids ) as $cid ) {
+		$client = PLTT_Clients::get( $cid );
+		if ( $client ) {
+			$clients_cache[ $cid ] = $client;
+		}
+	}
 	?>
 	<table class="widefat striped<?php echo esc_attr( $table_class ); ?>">
 		<thead>
@@ -451,8 +481,9 @@ function pltt_render_entry_table( $entries, $options = array() ) {
 		</thead>
 		<tbody>
 			<?php foreach ( $entries as $entry ) :
-				$client  = ! empty( $entry->client_id ) ? PLTT_Clients::get( $entry->client_id ) : null;
-				$project = ! empty( $entry->project_id ) ? PLTT_Projects::get( $entry->project_id ) : null;
+				// Use pre-fetched data to avoid N+1 queries.
+				$client  = ! empty( $entry->client_id ) && isset( $clients_cache[ $entry->client_id ] ) ? $clients_cache[ $entry->client_id ] : null;
+				$project = ! empty( $entry->project_id ) && isset( $projects_cache[ $entry->project_id ] ) ? $projects_cache[ $entry->project_id ] : null;
 				?>
 				<tr>
 					<td><?php echo esc_html( $entry->description ); ?></td>

@@ -28,8 +28,9 @@
 	min-height: 40vh;
 }
 
-.pltt-log-textarea:focus {
-	outline: none;
+.pltt-log-textarea:focus-visible {
+	outline: 2px solid #2271b1;
+	outline-offset: -2px;
 }
 
 .pltt-log-textarea::placeholder {

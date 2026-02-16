@@ -200,11 +200,12 @@
 	border-bottom: 1px solid #dcdcde;
 	font-size: 13px;
 	box-sizing: border-box;
-	outline: none;
 }
 
 .pltt-tag-search:focus {
 	border-bottom-color: #2271b1;
+	outline: 2px solid #2271b1;
+	outline-offset: -2px;
 }
 
 .pltt-tag-checkbox-list {
