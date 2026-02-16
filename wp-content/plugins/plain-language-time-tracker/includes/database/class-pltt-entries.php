@@ -615,7 +615,9 @@ class PLTT_Entries {
 			COALESCE(SUM(e.duration_minutes), 0) AS total_minutes,
 			COALESCE(SUM(CASE WHEN e.billable = 1 THEN e.duration_minutes ELSE 0 END), 0) AS billable_minutes,
 			SUM(CASE WHEN e.verified = 1 THEN 1 ELSE 0 END) AS verified_count,
-			COALESCE(SUM(CASE WHEN e.billable = 1 THEN COALESCE(e.billable_amount, ROUND(e.duration_minutes / 60.0 * COALESCE(p.hourly_rate, c.hourly_rate, 0), 2)) ELSE 0 END), 0) AS billable_amount
+			COALESCE(SUM(CASE WHEN e.billable = 1 THEN COALESCE(e.billable_amount, ROUND(e.duration_minutes / 60.0 * COALESCE(p.hourly_rate, c.hourly_rate, 0), 2)) ELSE 0 END), 0) AS billable_amount,
+			COUNT(DISTINCT CASE WHEN e.billable = 1 AND (c.name IS NULL OR LOWER(c.name) != 'internal') THEN e.project_id END) AS active_projects,
+			COUNT(DISTINCT CASE WHEN e.billable = 1 AND (c.name IS NULL OR LOWER(c.name) != 'internal') THEN e.client_id END) AS active_clients
 			FROM {$table} e
 			LEFT JOIN {$projects_table} p ON e.project_id = p.id
 			LEFT JOIN {$clients_table} c ON e.client_id = c.id";

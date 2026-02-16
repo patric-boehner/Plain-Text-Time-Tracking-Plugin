@@ -47,21 +47,21 @@ foreach ( $entries as $entry ) {
 
 		<div class="pltt-summary-cards">
 			<div class="card">
-				<div class="card-value"><?php echo esc_html( count( $entries ) ); ?></div>
 				<div class="card-label"><?php esc_html_e( 'Entries', 'plain-language-time-tracker' ); ?></div>
+				<div class="card-value"><?php echo esc_html( count( $entries ) ); ?></div>
 			</div>
 			<div class="card">
-				<div class="card-value"><?php echo esc_html( pltt_format_hours( $total_minutes ) ); ?></div>
 				<div class="card-label"><?php esc_html_e( 'Total Hours', 'plain-language-time-tracker' ); ?></div>
+				<div class="card-value"><?php echo esc_html( pltt_format_hours( $total_minutes ) ); ?></div>
 			</div>
 			<div class="card">
-				<div class="card-value"><?php echo esc_html( pltt_format_hours( $summary['billable_minutes'] ) ); ?></div>
 				<div class="card-label"><?php esc_html_e( 'Billable Hours', 'plain-language-time-tracker' ); ?></div>
+				<div class="card-value"><?php echo esc_html( pltt_format_hours( $summary['billable_minutes'] ) ); ?></div>
 			</div>
 			<?php if ( (float) $summary['billable_amount'] > 0 ) : ?>
 				<div class="card">
-					<div class="card-value"><?php echo esc_html( pltt_format_currency( $summary['billable_amount'] ) ); ?></div>
 					<div class="card-label"><?php esc_html_e( 'Billable Amount', 'plain-language-time-tracker' ); ?></div>
+					<div class="card-value"><?php echo esc_html( pltt_format_currency( $summary['billable_amount'] ) ); ?></div>
 				</div>
 			<?php endif; ?>
 		</div>

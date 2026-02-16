@@ -245,6 +245,55 @@ function pltt_format_currency( $amount ) {
 }
 
 /**
+ * Count working days (weekdays only) between two dates, inclusive.
+ *
+ * @param string $date_from Start date (Y-m-d format).
+ * @param string $date_to   End date (Y-m-d format).
+ * @return int Number of weekdays (Monday-Friday) in the range.
+ */
+function pltt_count_working_days( $date_from, $date_to ) {
+	$start = new DateTimeImmutable( $date_from, wp_timezone() );
+	$end   = new DateTimeImmutable( $date_to, wp_timezone() );
+	$end   = $end->modify( '+1 day' );
+
+	$interval = new DateInterval( 'P1D' );
+	$period   = new DatePeriod( $start, $interval, $end );
+
+	$working_days = 0;
+	foreach ( $period as $date ) {
+		$day_of_week = (int) $date->format( 'N' );
+		if ( $day_of_week <= 5 ) {
+			$working_days++;
+		}
+	}
+
+	return $working_days;
+}
+
+/**
+ * Calculate the previous period dates for comparison.
+ *
+ * Given a date range, returns the equivalent previous period (same duration, shifted back).
+ *
+ * @param string $date_from Current period start date (Y-m-d).
+ * @param string $date_to   Current period end date (Y-m-d).
+ * @return array Associative array with 'from' and 'to' keys.
+ */
+function pltt_get_previous_period( $date_from, $date_to ) {
+	$start = new DateTimeImmutable( $date_from, wp_timezone() );
+	$end   = new DateTimeImmutable( $date_to, wp_timezone() );
+
+	$days       = (int) $start->diff( $end )->format( '%a' ) + 1;
+	$prev_end   = $start->modify( '-1 day' );
+	$prev_start = $prev_end->modify( '-' . ( $days - 1 ) . ' days' );
+
+	return array(
+		'from' => $prev_start->format( 'Y-m-d' ),
+		'to'   => $prev_end->format( 'Y-m-d' ),
+	);
+}
+
+/**
  * Get cached clients list.
  *
  * @return array Array of client objects.
@@ -485,8 +534,13 @@ function pltt_render_entry_table( $entries, $options = array() ) {
 				$client  = ! empty( $entry->client_id ) && isset( $clients_cache[ $entry->client_id ] ) ? $clients_cache[ $entry->client_id ] : null;
 				$project = ! empty( $entry->project_id ) && isset( $projects_cache[ $entry->project_id ] ) ? $projects_cache[ $entry->project_id ] : null;
 				?>
-				<tr>
-					<td><?php echo esc_html( $entry->description ); ?></td>
+				<tr<?php echo ! empty( $entry->billed ) ? ' class="pltt-billed" aria-label="' . esc_attr__( 'Invoiced entry', 'plain-language-time-tracker' ) . '"' : ''; ?>>
+					<td>
+						<?php if ( ! empty( $entry->billed ) ) : ?>
+							<span class="screen-reader-text"><?php esc_html_e( 'Invoiced:', 'plain-language-time-tracker' ); ?></span>
+						<?php endif; ?>
+						<?php echo esc_html( $entry->description ); ?>
+					</td>
 					<td><?php echo $client ? esc_html( $client->name ) : '<span class="pltt-empty">—</span>'; ?></td>
 					<td><?php echo $project ? esc_html( $project->name ) : '<span class="pltt-empty">—</span>'; ?></td>
 					<td class="pltt-tag-pills"><?php pltt_render_tag_badges( $entry->tags ?? '' ); ?></td>

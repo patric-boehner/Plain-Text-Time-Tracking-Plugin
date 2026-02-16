@@ -55,8 +55,8 @@ if ( ! defined( 'ABSPATH' ) ) {
 	<?php if ( $total_logs > 0 ) : ?>
 		<div class="pltt-summary-cards">
 			<div class="card">
-				<div class="card-value"><?php echo esc_html( $total_logs ); ?></div>
 				<div class="card-label"><?php esc_html_e( 'Daily Logs', 'plain-language-time-tracker' ); ?></div>
+				<div class="card-value"><?php echo esc_html( $total_logs ); ?></div>
 			</div>
 		</div>
 	<?php endif; ?>

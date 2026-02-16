@@ -62,6 +62,27 @@ class PLTT_Reports {
 
 		$total_entries = $stats ? (int) $stats->total_count : 0;
 
+		// Previous period stats for comparison (Card 4).
+		$prev_period      = pltt_get_previous_period( $date_from, $date_to );
+		$prev_filter_args = array_merge( $filter_args, array(
+			'date_from' => $prev_period['from'],
+			'date_to'   => $prev_period['to'],
+		) );
+		$prev_stats = PLTT_Entries::get_stats( $prev_filter_args );
+
+		// Working days for daily averages (Card 2).
+		$working_days = pltt_count_working_days( $date_from, $date_to );
+
+		// Utilization percentage (Card 3).
+		$utilization = $stats && $stats->total_minutes > 0
+			? ( $stats->billable_minutes / $stats->total_minutes ) * 100
+			: 0;
+
+		// Overall Effective Hourly Rate (Card 5).
+		$overall_ehr = $stats && $stats->total_minutes > 0 && (float) $stats->billable_amount > 0
+			? (float) $stats->billable_amount / ( $stats->total_minutes / 60 )
+			: 0;
+
 		// View-specific data.
 		$entries     = array();
 		$summary     = array();
