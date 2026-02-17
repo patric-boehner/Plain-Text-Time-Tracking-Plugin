@@ -239,30 +239,12 @@
 }
 
 /* Confidence indicators */
-.pltt-predicted {
-	position: relative;
-}
-
 .pltt-confidence-indicator {
-	position: absolute;
-	right: -18px;
-	top: 50%;
-	transform: translateY(-50%);
-	font-size: 14px;
-	color: #dba617;
+	display: inline-block;
+	font-size: 11px;
+	color: #8c8f94;
+	margin-top: 4px;
 	cursor: help;
-}
-
-.pltt-confidence-high .pltt-confidence-indicator {
-	color: #00a32a;
-}
-
-.pltt-confidence-medium {
-	background-color: rgba(255, 243, 205, 0.3);
-}
-
-.pltt-confidence-low {
-	background-color: rgba(248, 215, 218, 0.3);
 }
 
 /* Entry row being deleted */

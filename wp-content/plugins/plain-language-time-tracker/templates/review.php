@@ -22,15 +22,23 @@ $total_minutes = 0;
 foreach ( $entries as $entry ) {
 	$total_minutes += $entry['duration_minutes'] ?? 0;
 }
+
+$return_to = isset( $_GET['return_to'] ) ? esc_url_raw( wp_unslash( $_GET['return_to'] ) ) : '';
 ?>
 
 <div class="wrap pltt-wrap">
 	<div class="pltt-header">
 		<h1><?php esc_html_e( 'Review Time Entries', 'plain-language-time-tracker' ); ?></h1>
 		<div class="pltt-header-actions">
-			<a href="<?php echo esc_url( pltt_get_admin_url( 'daily-log', array( 'date' => $date ) ) ); ?>" class="button">
-				&larr; <?php esc_html_e( 'Back to Notes', 'plain-language-time-tracker' ); ?>
-			</a>
+			<?php if ( $return_to ) : ?>
+				<a href="<?php echo esc_url( $return_to ); ?>" class="button">
+					&larr; <?php esc_html_e( 'Back to Reports', 'plain-language-time-tracker' ); ?>
+				</a>
+			<?php else : ?>
+				<a href="<?php echo esc_url( pltt_get_admin_url( 'daily-log', array( 'date' => $date ) ) ); ?>" class="button">
+					&larr; <?php esc_html_e( 'Back to Notes', 'plain-language-time-tracker' ); ?>
+				</a>
+			<?php endif; ?>
 		</div>
 	</div>
 
@@ -87,6 +95,9 @@ foreach ( $entries as $entry ) {
 			<input type="hidden" name="action" value="pltt_save_entries">
 			<input type="hidden" name="date" value="<?php echo esc_attr( $date ); ?>">
 			<input type="hidden" name="entries" id="pltt-entries-data" value="">
+			<?php if ( $return_to ) : ?>
+				<input type="hidden" name="return_to" value="<?php echo esc_attr( $return_to ); ?>">
+			<?php endif; ?>
 			<?php wp_nonce_field( 'pltt_save_entries', '_wpnonce', true, true ); ?>
 			<table class="pltt-review-table widefat">
 				<thead>
@@ -110,7 +121,6 @@ foreach ( $entries as $entry ) {
 						$predicted_client   = $entry['predicted_client_id'] ?? 0;
 						$predicted_project  = $entry['predicted_project_id'] ?? 0;
 						$client_confidence  = $entry['client_confidence'] ?? 0;
-						$confidence_class   = $client_confidence >= PLTT_CONFIDENCE_THRESHOLD ? 'high' : ( $client_confidence >= 0.4 ? 'medium' : 'low' );
 						$has_prediction     = $predicted_client > 0;
 
 						$row_classes = array( 'pltt-entry-row' );
@@ -179,7 +189,7 @@ foreach ( $entries as $entry ) {
 									<input type="hidden" name="entries[<?php echo esc_attr( $index ); ?>][id]" value="<?php echo esc_attr( $entry_id ); ?>">
 								<?php endif; ?>
 							</td>
-							<td class="<?php echo $has_prediction ? 'pltt-predicted pltt-confidence-' . esc_attr( $confidence_class ) : ''; ?>">
+							<td>
 								<select name="entries[<?php echo esc_attr( $index ); ?>][client_id]" class="pltt-client-select">
 									<option value=""><?php esc_html_e( 'Select client...', 'plain-language-time-tracker' ); ?></option>
 									<?php foreach ( $clients as $client ) : ?>
@@ -191,8 +201,8 @@ foreach ( $entries as $entry ) {
 								</select>
 								<?php if ( $has_prediction && $client_confidence > 0 ) : ?>
 									<?php /* translators: %s: confidence percentage */ ?>
-								<span class="pltt-confidence-indicator" title="<?php printf( esc_attr__( 'Confidence: %s%%', 'plain-language-time-tracker' ), esc_attr( round( $client_confidence * 100 ) ) ); ?>">
-										<?php echo $client_confidence >= PLTT_CONFIDENCE_THRESHOLD ? '★' : '☆'; ?>
+									<span class="pltt-confidence-indicator" title="<?php printf( esc_attr__( 'Auto-matched (confidence: %s%%)', 'plain-language-time-tracker' ), esc_attr( round( $client_confidence * 100 ) ) ); ?>">
+										<?php esc_html_e( 'auto', 'plain-language-time-tracker' ); ?>
 									</span>
 								<?php endif; ?>
 							</td>
