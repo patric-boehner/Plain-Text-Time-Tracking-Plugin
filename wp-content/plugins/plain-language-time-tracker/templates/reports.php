@@ -262,8 +262,8 @@ $tab_base_url = add_query_arg( $filter_params, admin_url( 'admin.php' ) );
 					<label for="pltt-filter-billed"><?php esc_html_e( 'Invoiced', 'plain-language-time-tracker' ); ?></label>
 					<select name="billed" id="pltt-filter-billed">
 						<option value="" <?php selected( null === $billed ); ?>><?php esc_html_e( 'All', 'plain-language-time-tracker' ); ?></option>
-						<option value="0" <?php selected( 0, $billed ); ?>><?php esc_html_e( 'Unbilled Only', 'plain-language-time-tracker' ); ?></option>
-						<option value="1" <?php selected( 1, $billed ); ?>><?php esc_html_e( 'Billed Only', 'plain-language-time-tracker' ); ?></option>
+						<option value="0" <?php selected( 0, $billed ); ?>><?php esc_html_e( 'Uninvoiced Only', 'plain-language-time-tracker' ); ?></option>
+						<option value="1" <?php selected( 1, $billed ); ?>><?php esc_html_e( 'Invoiced Only', 'plain-language-time-tracker' ); ?></option>
 					</select>
 				</div>
 
@@ -468,6 +468,10 @@ $tab_base_url = add_query_arg( $filter_params, admin_url( 'admin.php' ) );
 				}
 				?>
 
+				<?php
+				$return_url = add_query_arg( $_GET, admin_url( 'admin.php' ) );
+				?>
+
 				<?php foreach ( $entries_by_date as $group_date => $group_entries ) :
 					$date_obj    = new DateTimeImmutable( $group_date, wp_timezone() );
 					$is_today    = $group_date === pltt_get_current_date();
@@ -479,7 +483,7 @@ $tab_base_url = add_query_arg( $filter_params, admin_url( 'admin.php' ) );
 						<div class="pltt-date-group-header">
 							<span class="pltt-date-group-title"><?php echo esc_html( $date_label ); ?></span>
 							<span class="pltt-date-group-meta">
-								<a href="<?php echo esc_url( pltt_get_admin_url( 'review', array( 'date' => $group_date ) ) ); ?>" class="button"><?php esc_html_e( 'Edit', 'plain-language-time-tracker' ); ?></a>
+								<a href="<?php echo esc_url( pltt_get_admin_url( 'review', array( 'date' => $group_date, 'return_to' => urlencode( $return_url ) ) ) ); ?>" class="button"><?php esc_html_e( 'Edit', 'plain-language-time-tracker' ); ?></a>
 							</span>
 						</div>
 					<?php pltt_render_entry_table( $group_entries, array( 'show_amount' => true ) ); ?>

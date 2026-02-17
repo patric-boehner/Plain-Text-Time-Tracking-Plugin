@@ -273,8 +273,15 @@ class PLTT_Form_Handlers {
 		$result = PLTT_Review::save_entries( $date, $entries );
 
 		if ( $result['success'] ) {
-			// Redirect to daily log page with success message.
-			$redirect_url = pltt_get_admin_url( 'daily-log', array( 'date' => $date ) );
+			$return_to = isset( $_POST['return_to'] ) ? esc_url_raw( wp_unslash( $_POST['return_to'] ) ) : '';
+			$default   = pltt_get_admin_url( 'daily-log', array( 'date' => $date ) );
+
+			if ( $return_to ) {
+				$redirect_url = wp_validate_redirect( $return_to, $default );
+			} else {
+				$redirect_url = $default;
+			}
+
 			$redirect_url = add_query_arg( array( 'pltt_message' => 'entries_saved' ), $redirect_url );
 			wp_safe_redirect( $redirect_url );
 			exit;
