@@ -18,8 +18,15 @@
 
 	// Initialize tag picker dropdowns.
 	var tagSuggestions = ( typeof plttAllTags !== 'undefined' ) ? plttAllTags : [];
+	var allTagPickers = [];
+	var activeTagPicker = null;
+
 	document.querySelectorAll( '.pltt-tag-input-wrap' ).forEach( function( container ) {
-		new PlttTagPicker( container, tagSuggestions );
+		var picker = new PlttTagPicker( container, tagSuggestions, function( p ) {
+			activeTagPicker = p;
+			PLTT.showModal( 'pltt-tag-modal' );
+		} );
+		allTagPickers.push( picker );
 	} );
 
 	// Billable $ symbol click handler — toggles the hidden checkbox.
@@ -503,6 +510,49 @@
 					rateInput.value = '';
 				} else {
 					alert( response.data || 'Error creating project.' );
+				}
+			} );
+		} );
+	}
+
+	/**
+	 * Handle new tag creation.
+	 */
+	const saveTagBtn = document.getElementById( 'pltt-save-tag' );
+	if ( saveTagBtn ) {
+		saveTagBtn.addEventListener( 'click', function() {
+			const nameInput = document.getElementById( 'pltt-new-tag-name' );
+			const name = nameInput.value.trim();
+
+			if ( ! name ) {
+				alert( 'Please enter a tag name.' );
+				nameInput.focus();
+				return;
+			}
+
+			this.disabled = true;
+
+			PLTT.ajax( 'pltt_create_tag', { tag_name: name }, function( response ) {
+				saveTagBtn.disabled = false;
+
+				if ( response.success && response.data.tag ) {
+					const tag = response.data.tag;
+
+					// Add tag to all pickers' available lists; auto-select only in the triggering picker.
+					allTagPickers.forEach( function( picker ) {
+						picker.addTagOption( tag, picker === activeTagPicker );
+					} );
+
+					// Also keep tagSuggestions in sync for any future pickers.
+					if ( tagSuggestions.indexOf( tag ) === -1 ) {
+						tagSuggestions.push( tag );
+					}
+
+					PLTT.hideModal( 'pltt-tag-modal' );
+					nameInput.value = '';
+					activeTagPicker = null;
+				} else {
+					alert( response.data || 'Error creating tag.' );
 				}
 			} );
 		} );

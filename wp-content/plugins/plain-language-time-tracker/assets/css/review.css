@@ -165,7 +165,6 @@
 	display: flex;
 	flex-wrap: wrap;
 	gap: 10px;
-	margin-bottom: 4px;
 }
 
 .pltt-tag-pills:empty {
@@ -214,7 +213,8 @@
 	padding: 4px 0;
 }
 
-.pltt-tag-checkbox-item {
+.pltt-tag-checkbox-item,
+.pltt-tag-add-new {
 	display: block;
 	padding: 6px 12px;
 	font-size: 13px;
@@ -222,7 +222,8 @@
 	margin: 0;
 }
 
-.pltt-tag-checkbox-item:hover {
+.pltt-tag-checkbox-item:hover,
+.pltt-tag-add-new:hover {
 	background: #f0f0f1;
 }
 

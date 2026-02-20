@@ -15,14 +15,16 @@ var PlttTagPicker = ( function() {
 	/**
 	 * Create a tag picker instance.
 	 *
-	 * @param {HTMLElement} container  The .pltt-tag-input-wrap element.
-	 * @param {Array}       allTags    Array of all known tag strings.
+	 * @param {HTMLElement}   container The .pltt-tag-input-wrap element.
+	 * @param {Array}         allTags   Array of all known tag strings.
+	 * @param {Function|null} onAddNew  Optional callback when "Add new tag…" is clicked; receives picker instance.
 	 */
-	function PlttTagPicker( container, allTags ) {
+	function PlttTagPicker( container, allTags, onAddNew ) {
 		this.container = container;
 		this.hiddenInput = container.querySelector( '.pltt-tags' );
 		this.allTags = allTags || [];
 		this.selectedTags = [];
+		this.onAddNew = onAddNew || null;
 
 		this._buildDOM();
 		this._loadInitial();
@@ -120,37 +122,74 @@ var PlttTagPicker = ( function() {
 			empty.className = 'pltt-tag-empty';
 			empty.textContent = 'No tags available';
 			this.checkboxList.appendChild( empty );
-			return;
-		}
-
-		// Sort: selected tags first, then the rest alphabetically.
-		var sorted = this.allTags.slice().sort( function( a, b ) {
-			var aSelected = self.selectedTags.indexOf( a ) !== -1;
-			var bSelected = self.selectedTags.indexOf( b ) !== -1;
-			if ( aSelected && ! bSelected ) return -1;
-			if ( ! aSelected && bSelected ) return 1;
-			return a.localeCompare( b );
-		} );
-
-		sorted.forEach( function( tag ) {
-			var label = document.createElement( 'label' );
-			label.className = 'pltt-tag-checkbox-item';
-
-			var checkbox = document.createElement( 'input' );
-			checkbox.type = 'checkbox';
-			checkbox.value = tag;
-			checkbox.checked = self.selectedTags.indexOf( tag ) !== -1;
-
-			checkbox.addEventListener( 'change', function() {
-				self._onCheckboxChange( tag, this.checked );
+		} else {
+			// Sort: selected tags first, then the rest alphabetically.
+			var sorted = this.allTags.slice().sort( function( a, b ) {
+				var aSelected = self.selectedTags.indexOf( a ) !== -1;
+				var bSelected = self.selectedTags.indexOf( b ) !== -1;
+				if ( aSelected && ! bSelected ) return -1;
+				if ( ! aSelected && bSelected ) return 1;
+				return a.localeCompare( b );
 			} );
 
-			var text = document.createTextNode( ' ' + tag.charAt( 0 ).toUpperCase() + tag.slice( 1 ) );
+			sorted.forEach( function( tag ) {
+				var label = document.createElement( 'label' );
+				label.className = 'pltt-tag-checkbox-item';
 
-			label.appendChild( checkbox );
-			label.appendChild( text );
-			self.checkboxList.appendChild( label );
-		} );
+				var checkbox = document.createElement( 'input' );
+				checkbox.type = 'checkbox';
+				checkbox.value = tag;
+				checkbox.checked = self.selectedTags.indexOf( tag ) !== -1;
+
+				checkbox.addEventListener( 'change', function() {
+					self._onCheckboxChange( tag, this.checked );
+				} );
+
+				var text = document.createTextNode( ' ' + tag.charAt( 0 ).toUpperCase() + tag.slice( 1 ) );
+
+				label.appendChild( checkbox );
+				label.appendChild( text );
+				self.checkboxList.appendChild( label );
+			} );
+		}
+
+		// "Add new tag…" link — only shown when a callback is provided.
+		if ( self.onAddNew ) {
+			var addLink = document.createElement( 'div' );
+			addLink.className = 'pltt-tag-add-new';
+			var a = document.createElement( 'a' );
+			a.href = '#add-tag';
+			a.textContent = '+ Add new tag\u2026';
+			a.addEventListener( 'click', function( e ) {
+				e.preventDefault();
+				e.stopPropagation();
+				self.onAddNew( self );
+			} );
+			addLink.appendChild( a );
+			self.checkboxList.appendChild( addLink );
+		}
+	};
+
+	/**
+	 * Add a newly created tag to this picker's available list and optionally select it.
+	 *
+	 * @param {string}  tagName    The normalized tag name to add.
+	 * @param {boolean} autoSelect Whether to auto-select the tag after adding.
+	 */
+	PlttTagPicker.prototype.addTagOption = function( tagName, autoSelect ) {
+		if ( this.allTags.indexOf( tagName ) === -1 ) {
+			this.allTags.push( tagName );
+		}
+		if ( autoSelect && this.selectedTags.indexOf( tagName ) === -1 ) {
+			this.selectedTags.push( tagName );
+			this._renderPills();
+			this._sync();
+		}
+		// Re-render if dropdown is open.
+		if ( this.dropdown.style.display !== 'none' ) {
+			this._renderCheckboxes();
+			this._filterCheckboxes();
+		}
 	};
 
 	/**

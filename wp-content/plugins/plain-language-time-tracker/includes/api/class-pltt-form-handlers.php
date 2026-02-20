@@ -27,6 +27,7 @@ class PLTT_Form_Handlers {
 
 		// Project operations.
 		add_action( 'admin_post_pltt_update_project', array( __CLASS__, 'handle_update_project' ) );
+		add_action( 'admin_post_pltt_delete_project', array( __CLASS__, 'handle_delete_project' ) );
 
 		// Review screen.
 		add_action( 'admin_post_pltt_save_entries', array( __CLASS__, 'handle_save_entries' ) );
@@ -34,6 +35,7 @@ class PLTT_Form_Handlers {
 		// Tag operations.
 		add_action( 'admin_post_pltt_create_tag', array( __CLASS__, 'handle_create_tag' ) );
 		add_action( 'admin_post_pltt_rename_tag', array( __CLASS__, 'handle_rename_tag' ) );
+		add_action( 'admin_post_pltt_delete_tag', array( __CLASS__, 'handle_delete_tag' ) );
 	}
 
 	/**
@@ -112,7 +114,7 @@ class PLTT_Form_Handlers {
 		if ( is_wp_error( $result ) ) {
 			self::redirect_back(
 				array(
-					'pltt_error'         => 'client_has_projects',
+					'pltt_error'         => $result->get_error_code(),
 					'pltt_error_message' => $result->get_error_message(),
 				)
 			);
@@ -158,6 +160,34 @@ class PLTT_Form_Handlers {
 			self::redirect_back( array( 'pltt_message' => 'project_updated' ) );
 		} else {
 			self::redirect_back( array( 'pltt_error' => 'project_update_failed' ) );
+		}
+	}
+
+	/**
+	 * Handle project deletion.
+	 */
+	public static function handle_delete_project() {
+		self::verify_nonce( 'pltt_delete_project' );
+
+		$project_id = isset( $_POST['project_id'] ) ? absint( $_POST['project_id'] ) : 0;
+
+		if ( empty( $project_id ) ) {
+			self::redirect_back( array( 'pltt_error' => 'invalid_project_id' ) );
+		}
+
+		$result = PLTT_Projects::delete( $project_id );
+
+		if ( is_wp_error( $result ) ) {
+			self::redirect_back(
+				array(
+					'pltt_error'         => $result->get_error_code(),
+					'pltt_error_message' => $result->get_error_message(),
+				)
+			);
+		} elseif ( $result ) {
+			self::redirect_back( array( 'pltt_message' => 'project_deleted' ) );
+		} else {
+			self::redirect_back( array( 'pltt_error' => 'project_delete_failed' ) );
 		}
 	}
 
@@ -240,6 +270,41 @@ class PLTT_Form_Handlers {
 		} else {
 			wp_safe_redirect( add_query_arg( 'pltt_error', 'tag_rename_failed', $redirect_url ) );
 		}
+		exit;
+	}
+
+	/**
+	 * Handle tag deletion.
+	 */
+	public static function handle_delete_tag() {
+		self::verify_nonce( 'pltt_manage_tag' );
+
+		$tag_name = isset( $_POST['tag_name'] ) ? sanitize_text_field( wp_unslash( $_POST['tag_name'] ) ) : '';
+		$tag_name = strtolower( trim( $tag_name ) );
+
+		$redirect_url = admin_url( 'admin.php?page=pltt-tags' );
+
+		if ( empty( $tag_name ) ) {
+			wp_safe_redirect( add_query_arg( 'pltt_error', 'invalid_tag', $redirect_url ) );
+			exit;
+		}
+
+		// Server-side safety check: refuse if tag is still in use.
+		$usage_count = PLTT_Entries::count_tag_usage( $tag_name );
+		if ( $usage_count > 0 ) {
+			wp_safe_redirect( add_query_arg( 'pltt_error', 'tag_in_use', $redirect_url ) );
+			exit;
+		}
+
+		// Remove from custom tags option.
+		$custom_tags = get_option( 'pltt_custom_tags', array() );
+		$key         = array_search( $tag_name, $custom_tags, true );
+		if ( false !== $key ) {
+			array_splice( $custom_tags, $key, 1 );
+			update_option( 'pltt_custom_tags', array_values( $custom_tags ) );
+		}
+
+		wp_safe_redirect( add_query_arg( 'pltt_message', 'tag_deleted', $redirect_url ) );
 		exit;
 	}
 

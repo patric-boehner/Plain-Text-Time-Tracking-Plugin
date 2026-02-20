@@ -305,26 +305,6 @@ class PLTT_Projects {
 	}
 
 	/**
-	 * Delete a project.
-	 *
-	 * @param int $id Project ID.
-	 * @return bool True on success.
-	 */
-	public static function delete( $id ) {
-		global $wpdb;
-		$table = PLTT_Database::get_table_name( 'projects' );
-
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
-		$result = $wpdb->delete(
-			$table,
-			array( 'id' => $id ),
-			array( '%d' )
-		);
-
-		return false !== $result;
-	}
-
-	/**
 	 * Get the most recently used project for a client.
 	 *
 	 * Looks at recent time entries within PLTT_PREDICTION_WINDOW_DAYS.
@@ -413,5 +393,45 @@ class PLTT_Projects {
 
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
 		return (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$table}" );
+	}
+
+	/**
+	 * Permanently delete a project.
+	 *
+	 * Only succeeds if the project has no time entries assigned to it.
+	 *
+	 * @param int $id Project ID.
+	 * @return bool|WP_Error True on success, WP_Error if entries exist, false on DB failure.
+	 */
+	public static function delete( $id ) {
+		global $wpdb;
+
+		$entries_table = PLTT_Database::get_table_name( 'time_entries' );
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+		$entry_count = (int) $wpdb->get_var(
+			$wpdb->prepare( "SELECT COUNT(*) FROM {$entries_table} WHERE project_id = %d", $id )
+		);
+
+		if ( $entry_count > 0 ) {
+			return new WP_Error(
+				'project_has_entries',
+				sprintf(
+					/* translators: %d: number of entries */
+					_n(
+						'Cannot delete project. Please delete or reassign its %d time entry first.',
+						'Cannot delete project. Please delete or reassign its %d time entries first.',
+						$entry_count,
+						'plain-language-time-tracker'
+					),
+					$entry_count
+				)
+			);
+		}
+
+		$table = PLTT_Database::get_table_name( 'projects' );
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+		$result = $wpdb->delete( $table, array( 'id' => $id ), array( '%d' ) );
+
+		return false !== $result;
 	}
 }
