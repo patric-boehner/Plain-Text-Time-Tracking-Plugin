@@ -243,6 +243,29 @@ class PLTT_Clients {
 			);
 		}
 
+		// Check if client has any direct time entries.
+		$entries_table = PLTT_Database::get_table_name( 'time_entries' );
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+		$entry_count = (int) $wpdb->get_var(
+			$wpdb->prepare( "SELECT COUNT(*) FROM {$entries_table} WHERE client_id = %d", $id )
+		);
+
+		if ( $entry_count > 0 ) {
+			return new WP_Error(
+				'client_has_entries',
+				sprintf(
+					/* translators: %d: number of entries */
+					_n(
+						'Cannot delete client. Please delete or reassign its %d time entry first.',
+						'Cannot delete client. Please delete or reassign its %d time entries first.',
+						$entry_count,
+						'plain-language-time-tracker'
+					),
+					$entry_count
+				)
+			);
+		}
+
 		$table = PLTT_Database::get_table_name( 'clients' );
 
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching

@@ -71,31 +71,39 @@
 			defaultOpt.textContent = 'All Projects';
 			projectSelect.appendChild( defaultOpt );
 
-			var projects;
+			var foundCurrent = false;
 
 			if ( clientId === '' ) {
-				// No client selected: show ALL projects across all clients.
-				projects = [];
+				// No client selected: show all projects grouped by client.
 				Object.keys( plttProjectsByClient ).forEach( function( cid ) {
+					var group = document.createElement( 'optgroup' );
+					group.label = ( typeof plttClientNames !== 'undefined' && plttClientNames[ cid ] )
+						? plttClientNames[ cid ]
+						: 'Client ' + cid;
 					plttProjectsByClient[ cid ].forEach( function( proj ) {
-						projects.push( proj );
+						var opt = document.createElement( 'option' );
+						opt.value = proj.id;
+						opt.textContent = proj.name;
+						if ( String( proj.id ) === currentProject ) {
+							foundCurrent = true;
+						}
+						group.appendChild( opt );
 					} );
+					projectSelect.appendChild( group );
 				} );
 			} else {
-				// Client selected: show only that client's projects.
-				projects = plttProjectsByClient[ clientId ] || [];
+				// Single client selected: flat list.
+				var projects = plttProjectsByClient[ clientId ] || [];
+				projects.forEach( function( proj ) {
+					var opt = document.createElement( 'option' );
+					opt.value = proj.id;
+					opt.textContent = proj.name;
+					if ( String( proj.id ) === currentProject ) {
+						foundCurrent = true;
+					}
+					projectSelect.appendChild( opt );
+				} );
 			}
-
-			var foundCurrent = false;
-			projects.forEach( function( proj ) {
-				var opt = document.createElement( 'option' );
-				opt.value = proj.id;
-				opt.textContent = proj.name;
-				projectSelect.appendChild( opt );
-				if ( String( proj.id ) === currentProject ) {
-					foundCurrent = true;
-				}
-			} );
 
 			// Restore previous selection if still valid, otherwise reset.
 			projectSelect.value = foundCurrent ? currentProject : '';

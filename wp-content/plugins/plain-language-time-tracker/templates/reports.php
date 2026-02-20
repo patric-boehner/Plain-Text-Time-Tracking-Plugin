@@ -82,6 +82,12 @@ foreach ( $all_projects as $proj ) {
 	);
 }
 
+// Build client name map for optgroup labels.
+$client_names = array();
+foreach ( $all_clients as $c ) {
+	$client_names[ (string) $c->id ] = $c->name;
+}
+
 // Build base URL that preserves all active filters (used for view tabs + pagination).
 $filter_params = array(
 	'page' => 'pltt-reports',
@@ -210,18 +216,35 @@ $tab_base_url = add_query_arg( $filter_params, admin_url( 'admin.php' ) );
 							<option value=""><?php esc_html_e( 'All Projects', 'plain-language-time-tracker' ); ?></option>
 							<option value="without_project" <?php selected( $project_id, 'without_project' ); ?>><?php esc_html_e( '— Without Projects —', 'plain-language-time-tracker' ); ?></option>
 							<?php
-							// Show all projects, or only the selected client's projects.
-							$visible_projects = $client_id > 0 && isset( $projects_by_client[ (string) $client_id ] )
-								? $projects_by_client[ (string) $client_id ]
-								: $all_projects;
-							foreach ( $visible_projects as $p ) :
-								$pid   = is_array( $p ) ? $p['id'] : (int) $p->id;
-								$pname = is_array( $p ) ? $p['name'] : $p->name;
-								?>
-								<option value="<?php echo esc_attr( $pid ); ?>" <?php selected( $project_id, $pid ); ?>>
-									<?php echo esc_html( $pname ); ?>
-								</option>
-							<?php endforeach; ?>
+							if ( $client_id > 0 ) {
+								// Single client selected: flat list (one client, grouping adds nothing).
+								$visible_projects = $projects_by_client[ (string) $client_id ] ?? array();
+								foreach ( $visible_projects as $p ) :
+									$pid   = is_array( $p ) ? $p['id'] : (int) $p->id;
+									$pname = is_array( $p ) ? $p['name'] : $p->name;
+									?>
+									<option value="<?php echo esc_attr( $pid ); ?>" <?php selected( $project_id, $pid ); ?>>
+										<?php echo esc_html( $pname ); ?>
+									</option>
+								<?php endforeach;
+							} else {
+								// All clients: group projects under client optgroup labels.
+								foreach ( $projects_by_client as $cid => $cprojects ) :
+									$cname = $client_names[ $cid ] ?? __( 'Unknown Client', 'plain-language-time-tracker' );
+									?>
+									<optgroup label="<?php echo esc_attr( $cname ); ?>">
+										<?php foreach ( $cprojects as $p ) :
+											$pid   = is_array( $p ) ? $p['id'] : (int) $p->id;
+											$pname = is_array( $p ) ? $p['name'] : $p->name;
+											?>
+											<option value="<?php echo esc_attr( $pid ); ?>" <?php selected( $project_id, $pid ); ?>>
+												<?php echo esc_html( $pname ); ?>
+											</option>
+										<?php endforeach; ?>
+									</optgroup>
+								<?php endforeach;
+							}
+							?>
 						</select>
 					</div>
 				</div>
@@ -275,7 +298,10 @@ $tab_base_url = add_query_arg( $filter_params, admin_url( 'admin.php' ) );
 		</div>
 	</form>
 
-	<script>var plttProjectsByClient = <?php echo wp_json_encode( $projects_by_client ); ?>;</script>
+	<script>
+		var plttProjectsByClient = <?php echo wp_json_encode( $projects_by_client ); ?>;
+		var plttClientNames = <?php echo wp_json_encode( $client_names ); ?>;
+	</script>
 
 	<?php if ( $total_entries > 0 ) : ?>
 		<div class="pltt-summary-cards">
@@ -374,6 +400,8 @@ $tab_base_url = add_query_arg( $filter_params, admin_url( 'admin.php' ) );
 				</div>
 			<?php endif; ?>
 
+			<?php // EHR card hidden — needs full billing context to be useful. Re-enable when ready. ?>
+			<?php if ( false ) : // phpcs:ignore ?>
 			<!-- Card 5: Overall EHR -->
 			<?php if ( $overall_ehr > 0 ) : ?>
 				<div class="card">
@@ -396,6 +424,7 @@ $tab_base_url = add_query_arg( $filter_params, admin_url( 'admin.php' ) );
 						</span>
 					</div>
 				</div>
+			<?php endif; ?>
 			<?php endif; ?>
 
 		</div>

@@ -311,6 +311,21 @@ $return_to = isset( $_GET['return_to'] ) ? esc_url_raw( wp_unslash( $_GET['retur
 	</div>
 </div>
 
+<!-- New Tag Modal -->
+<div id="pltt-tag-modal" class="pltt-modal pltt-hidden" role="dialog" aria-modal="true" aria-labelledby="pltt-review-tag-modal-title">
+	<div class="pltt-modal-content">
+		<h3 id="pltt-review-tag-modal-title"><?php esc_html_e( 'Add New Tag', 'plain-language-time-tracker' ); ?></h3>
+		<p>
+			<label for="pltt-new-tag-name"><?php esc_html_e( 'Tag Name', 'plain-language-time-tracker' ); ?></label>
+			<input type="text" id="pltt-new-tag-name" class="regular-text">
+		</p>
+		<p class="pltt-modal-actions">
+			<button type="button" id="pltt-save-tag" class="button button-primary"><?php esc_html_e( 'Create Tag', 'plain-language-time-tracker' ); ?></button>
+			<button type="button" class="pltt-modal-close button"><?php esc_html_e( 'Cancel', 'plain-language-time-tracker' ); ?></button>
+		</p>
+	</div>
+</div>
+
 <!-- New Project Modal -->
 <div id="pltt-project-modal" class="pltt-modal pltt-hidden" role="dialog" aria-modal="true" aria-labelledby="pltt-review-project-modal-title">
 	<div class="pltt-modal-content">

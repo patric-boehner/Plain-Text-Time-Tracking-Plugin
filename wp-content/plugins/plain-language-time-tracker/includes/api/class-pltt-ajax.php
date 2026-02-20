@@ -35,6 +35,9 @@ class PLTT_Ajax {
 		add_action( 'wp_ajax_pltt_get_projects', array( __CLASS__, 'get_projects' ) );
 		add_action( 'wp_ajax_pltt_create_project', array( __CLASS__, 'create_project' ) );
 
+		// Tag operations (create - used from review screen modal).
+		add_action( 'wp_ajax_pltt_create_tag', array( __CLASS__, 'create_tag' ) );
+
 	}
 
 	/**
@@ -291,6 +294,31 @@ class PLTT_Ajax {
 		} else {
 			wp_send_json_error( __( 'Failed to create project.', 'plain-language-time-tracker' ) );
 		}
+	}
+
+	/**
+	 * Create a new tag (used from the review screen modal).
+	 */
+	public static function create_tag() {
+		self::verify_request();
+
+		$tag_name = isset( $_POST['tag_name'] ) ? sanitize_text_field( wp_unslash( $_POST['tag_name'] ) ) : '';
+		$tag_name = strtolower( trim( $tag_name ) );
+
+		if ( empty( $tag_name ) ) {
+			wp_send_json_error( __( 'Tag name is required.', 'plain-language-time-tracker' ) );
+		}
+
+		$all_tags = PLTT_Entries::get_all_tags();
+		if ( in_array( $tag_name, $all_tags, true ) ) {
+			wp_send_json_error( __( 'A tag with that name already exists.', 'plain-language-time-tracker' ) );
+		}
+
+		$custom_tags   = get_option( 'pltt_custom_tags', array() );
+		$custom_tags[] = $tag_name;
+		update_option( 'pltt_custom_tags', array_values( array_unique( $custom_tags ) ) );
+
+		wp_send_json_success( array( 'tag' => $tag_name ) );
 	}
 
 	/**

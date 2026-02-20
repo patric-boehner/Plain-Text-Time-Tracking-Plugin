@@ -21,6 +21,15 @@ foreach ( $projects as $project ) {
 	}
 	$projects_by_client[ $project->client_id ][] = $project;
 }
+
+// Pre-fetch entry counts per client to determine if delete is safe.
+$entry_counts_by_client = array();
+if ( ! empty( $clients ) ) {
+	foreach ( $clients as $client ) {
+		$stats = PLTT_Entries::get_stats( array( 'client_id' => $client->id ) );
+		$entry_counts_by_client[ $client->id ] = isset( $stats->total_count ) ? (int) $stats->total_count : 0;
+	}
+}
 ?>
 
 <div class="wrap pltt-wrap">
@@ -80,21 +89,26 @@ foreach ( $projects as $project ) {
 				<?php foreach ( $clients as $client ) : ?>
 					<?php
 					// Use pre-grouped data to avoid repeated filtering.
-					$client_projects = $projects_by_client[ $client->id ] ?? array();
+					$client_projects    = $projects_by_client[ $client->id ] ?? array();
+					$client_proj_count  = count( $client_projects );
+					$client_entry_count = $entry_counts_by_client[ $client->id ] ?? 0;
+					$client_deletable   = 0 === $client_proj_count && 0 === $client_entry_count;
 					?>
-					<tr data-client-id="<?php echo esc_attr( $client->id ); ?>" data-name="<?php echo esc_attr( $client->name ); ?>" data-description="<?php echo esc_attr( $client->description ); ?>" data-rate="<?php echo esc_attr( $client->hourly_rate ?? '' ); ?>">
+					<tr data-client-id="<?php echo esc_attr( $client->id ); ?>" data-name="<?php echo esc_attr( $client->name ); ?>" data-description="<?php echo esc_attr( $client->description ); ?>" data-rate="<?php echo esc_attr( $client->hourly_rate ?? '' ); ?>" data-projects-count="<?php echo esc_attr( $client_proj_count ); ?>" data-entry-count="<?php echo esc_attr( $client_entry_count ); ?>">
 						<td>
 							<strong><?php echo esc_html( $client->name ); ?></strong>
 							<?php if ( $client->description ) : ?>
 								<br><small class="description"><?php echo esc_html( $client->description ); ?></small>
 							<?php endif; ?>
 							<div class="row-actions">
-								<span class="edit"><a href="#edit" class="pltt-edit-client" role="button"><?php esc_html_e( 'Edit', 'plain-language-time-tracker' ); ?></a> | </span>
-								<span class="trash"><a href="#delete" class="pltt-delete-client submitdelete" role="button"><?php esc_html_e( 'Delete', 'plain-language-time-tracker' ); ?></a></span>
+								<span class="edit"><a href="#edit" class="pltt-edit-client" role="button"><?php esc_html_e( 'Edit', 'plain-language-time-tracker' ); ?></a><?php if ( $client_deletable ) : ?> | <?php endif; ?></span>
+								<?php if ( $client_deletable ) : ?>
+									<span class="trash"><a href="#delete" class="pltt-delete-client submitdelete" role="button"><?php esc_html_e( 'Delete', 'plain-language-time-tracker' ); ?></a></span>
+								<?php endif; ?>
 							</div>
 						</td>
 						<td><?php echo null !== $client->hourly_rate ? esc_html( pltt_format_currency( $client->hourly_rate ) ) : '<span class="pltt-empty">—</span>'; ?></td>
-						<td><?php echo count( $client_projects ); ?></td>
+						<td><?php echo esc_html( $client_proj_count ); ?></td>
 					</tr>
 				<?php endforeach; ?>
 			</tbody>
@@ -168,12 +182,18 @@ foreach ( $projects as $project ) {
 		link.addEventListener('click', function(e) {
 			e.preventDefault();
 			var row = this.closest('tr');
+			var isDeletable = row.dataset.projectsCount === '0' && row.dataset.entryCount === '0';
 			document.getElementById('pltt-client-modal-title').textContent = '<?php echo esc_js( __( 'Edit Client', 'plain-language-time-tracker' ) ); ?>';
 			document.getElementById('pltt-edit-client-id').value = row.dataset.clientId;
 			document.getElementById('pltt-client-name').value = row.dataset.name;
 			document.getElementById('pltt-client-description').value = row.dataset.description || '';
 			document.getElementById('pltt-client-rate').value = row.dataset.rate || '';
-			document.getElementById('pltt-delete-client-btn').classList.add('visible');
+			var deleteBtn = document.getElementById('pltt-delete-client-btn');
+			if (isDeletable) {
+				deleteBtn.classList.add('visible');
+			} else {
+				deleteBtn.classList.remove('visible');
+			}
 			document.getElementById('pltt-client-form-action').value = 'pltt_update_client';
 			PLTT.showModal('pltt-client-modal');
 		});
@@ -183,7 +203,7 @@ foreach ( $projects as $project ) {
 	document.querySelectorAll('.pltt-delete-client').forEach(function(link) {
 		link.addEventListener('click', function(e) {
 			e.preventDefault();
-			if (!confirm('Are you sure you want to delete this client? (Deletion will be blocked if the client has any projects.)')) {
+			if (!confirm('<?php echo esc_js( __( 'Delete this client? This cannot be undone.', 'plain-language-time-tracker' ) ); ?>')) {
 				return;
 			}
 			var row = this.closest('tr');
@@ -214,7 +234,7 @@ foreach ( $projects as $project ) {
 
 	// Delete Client button (in modal).
 	document.getElementById('pltt-delete-client-btn').addEventListener('click', function() {
-		if (!confirm('Are you sure you want to delete this client? (Deletion will be blocked if the client has any projects.)')) {
+		if (!confirm('<?php echo esc_js( __( 'Delete this client? This cannot be undone.', 'plain-language-time-tracker' ) ); ?>')) {
 			return;
 		}
 		var id = document.getElementById('pltt-edit-client-id').value;

@@ -39,6 +39,7 @@ if ( ! empty( $projects ) ) {
 			$messages     = array(
 				'project_created' => __( 'Project created successfully.', 'plain-language-time-tracker' ),
 				'project_updated' => __( 'Project updated successfully.', 'plain-language-time-tracker' ),
+				'project_deleted' => __( 'Project deleted successfully.', 'plain-language-time-tracker' ),
 			);
 			if ( isset( $messages[ $message_code ] ) ) {
 				echo '<div class="notice notice-success is-dismissible"><p>' . esc_html( $messages[ $message_code ] ) . '</p></div>';
@@ -102,7 +103,8 @@ if ( ! empty( $projects ) ) {
 					$project_client = $clients_by_id[ $project->client_id ] ?? null;
 					$project_stats  = $project_stats_by_id[ $project->id ] ?? null;
 					?>
-					<tr data-project-id="<?php echo esc_attr( $project->id ); ?>" data-name="<?php echo esc_attr( $project->name ); ?>" data-client-id="<?php echo esc_attr( $project->client_id ); ?>" data-status="<?php echo esc_attr( $project->status ); ?>" data-rate="<?php echo esc_attr( $project->hourly_rate ?? '' ); ?>">
+					<?php $project_entry_count = isset( $project_stats->total_count ) ? (int) $project_stats->total_count : 0; ?>
+				<tr data-project-id="<?php echo esc_attr( $project->id ); ?>" data-name="<?php echo esc_attr( $project->name ); ?>" data-client-id="<?php echo esc_attr( $project->client_id ); ?>" data-status="<?php echo esc_attr( $project->status ); ?>" data-rate="<?php echo esc_attr( $project->hourly_rate ?? '' ); ?>" data-entry-count="<?php echo esc_attr( $project_entry_count ); ?>">
 						<td>
 							<strong><?php echo esc_html( $project->name ); ?></strong>
 							<div class="row-actions">
@@ -160,6 +162,7 @@ if ( ! empty( $projects ) ) {
 			</p>
 			<p class="pltt-modal-actions">
 				<button type="button" id="pltt-archive-project-btn" class="button button-link-delete pltt-modal-delete-btn"><?php esc_html_e( 'Archive', 'plain-language-time-tracker' ); ?></button>
+				<button type="button" id="pltt-delete-project-btn" class="button button-link-delete pltt-modal-delete-btn"><?php esc_html_e( 'Delete', 'plain-language-time-tracker' ); ?></button>
 				<button type="submit" id="pltt-save-project-btn" class="button button-primary"><?php esc_html_e( 'Save', 'plain-language-time-tracker' ); ?></button>
 				<button type="button" class="pltt-modal-close button"><?php esc_html_e( 'Cancel', 'plain-language-time-tracker' ); ?></button>
 			</p>
@@ -171,6 +174,13 @@ if ( ! empty( $projects ) ) {
 			<input type="hidden" name="project_id" id="pltt-archive-project-id" value="">
 			<input type="hidden" name="status" id="pltt-archive-project-status" value="">
 			<?php wp_nonce_field( 'pltt_update_project', '_wpnonce', true, true ); ?>
+		</form>
+
+		<!-- Delete form (hidden, submitted via JS) -->
+		<form id="pltt-delete-project-form" method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" class="pltt-hidden">
+			<input type="hidden" name="action" value="pltt_delete_project">
+			<input type="hidden" name="project_id" id="pltt-delete-project-id" value="">
+			<?php wp_nonce_field( 'pltt_delete_project', '_wpnonce', true, true ); ?>
 		</form>
 	</div>
 </div>
@@ -199,6 +209,7 @@ if ( ! empty( $projects ) ) {
 			document.getElementById('pltt-project-name').value = '';
 			document.getElementById('pltt-project-rate').value = '';
 			document.getElementById('pltt-archive-project-btn').classList.remove('visible');
+			document.getElementById('pltt-delete-project-btn').classList.remove('visible');
 			document.getElementById('pltt-project-form-action').value = 'pltt_create_project';
 			PLTT.showModal('pltt-project-modal');
 		});
@@ -210,6 +221,7 @@ if ( ! empty( $projects ) ) {
 			e.preventDefault();
 			var row = this.closest('tr');
 			var isArchived = row.dataset.status === 'archived';
+			var isDeletable = row.dataset.entryCount === '0';
 			document.getElementById('pltt-project-modal-title').textContent = '<?php echo esc_js( __( 'Edit Project', 'plain-language-time-tracker' ) ); ?>';
 			document.getElementById('pltt-edit-project-id').value = row.dataset.projectId;
 			document.getElementById('pltt-project-client').value = row.dataset.clientId;
@@ -220,6 +232,13 @@ if ( ! empty( $projects ) ) {
 			archiveBtn.classList.add('visible');
 			archiveBtn.textContent = isArchived ? '<?php echo esc_js( __( 'Restore', 'plain-language-time-tracker' ) ); ?>' : '<?php echo esc_js( __( 'Archive', 'plain-language-time-tracker' ) ); ?>';
 			archiveBtn.dataset.newStatus = isArchived ? 'active' : 'archived';
+
+			var deleteBtn = document.getElementById('pltt-delete-project-btn');
+			if (isDeletable) {
+				deleteBtn.classList.add('visible');
+			} else {
+				deleteBtn.classList.remove('visible');
+			}
 
 			document.getElementById('pltt-project-form-action').value = 'pltt_update_project';
 			PLTT.showModal('pltt-project-modal');
@@ -264,6 +283,16 @@ if ( ! empty( $projects ) ) {
 		document.getElementById('pltt-archive-project-id').value = id;
 		document.getElementById('pltt-archive-project-status').value = newStatus;
 		document.getElementById('pltt-archive-project-form').submit();
+	});
+
+	// Delete Project button (in modal).
+	document.getElementById('pltt-delete-project-btn').addEventListener('click', function() {
+		if (!confirm('<?php echo esc_js( __( 'Delete this project? This cannot be undone.', 'plain-language-time-tracker' ) ); ?>')) {
+			return;
+		}
+		var id = document.getElementById('pltt-edit-project-id').value;
+		document.getElementById('pltt-delete-project-id').value = id;
+		document.getElementById('pltt-delete-project-form').submit();
 	});
 })();
 </script>
