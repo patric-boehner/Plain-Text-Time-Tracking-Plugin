@@ -112,16 +112,18 @@ class PLTT_Entries {
 			$prepare[] = $args['verified'] ? 1 : 0;
 		}
 
-		// Tag filter (comma-separated tags column).
+		// Tag filter (junction table).
+		$entry_tags_table = PLTT_Database::get_table_name( 'entry_tags' );
+		$tags_table       = PLTT_Database::get_table_name( 'tags' );
 		if ( 'without_tag' === $args['tag'] ) {
-			// Special filter: entries without tags.
-			$where[] = "(tags IS NULL OR tags = '')";
+			// Special filter: entries without any tags.
+			$where[] = "NOT EXISTS (SELECT 1 FROM {$entry_tags_table} WHERE entry_id = {$table}.id)";
 		} elseif ( ! empty( $args['tag'] ) ) {
 			if ( ! empty( $args['tag_negate'] ) ) {
-				$where[]   = "(tags IS NULL OR tags = '' OR FIND_IN_SET(%s, tags) = 0)";
+				$where[]   = "NOT EXISTS (SELECT 1 FROM {$entry_tags_table} et JOIN {$tags_table} t ON et.tag_id = t.id WHERE et.entry_id = {$table}.id AND t.name = %s)";
 				$prepare[] = $args['tag'];
 			} else {
-				$where[]   = 'FIND_IN_SET(%s, tags) > 0';
+				$where[]   = "EXISTS (SELECT 1 FROM {$entry_tags_table} et JOIN {$tags_table} t ON et.tag_id = t.id WHERE et.entry_id = {$table}.id AND t.name = %s)";
 				$prepare[] = $args['tag'];
 			}
 		}
@@ -195,121 +197,6 @@ class PLTT_Entries {
 	}
 
 	/**
-	 * Get all unique tags across entries.
-	 *
-	 * Collects distinct tag values from the comma-separated tags column
-	 * and returns them normalized to lowercase.
-	 *
-	 * @return array Array of unique lowercase tag strings.
-	 */
-	public static function get_all_tags() {
-		global $wpdb;
-		$table = PLTT_Database::get_table_name( 'time_entries' );
-
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
-		$rows = $wpdb->get_col( "SELECT DISTINCT tags FROM {$table} WHERE tags != ''" );
-
-		$tags = array();
-		foreach ( $rows as $row ) {
-			$parts = explode( ',', $row );
-			foreach ( $parts as $tag ) {
-				$tag = strtolower( trim( $tag ) );
-				if ( '' !== $tag ) {
-					$tags[ $tag ] = true;
-				}
-			}
-		}
-
-		// Merge in custom tags (created via Tags management page).
-		$custom_tags = get_option( 'pltt_custom_tags', array() );
-		foreach ( $custom_tags as $tag ) {
-			$tag = strtolower( trim( $tag ) );
-			if ( '' !== $tag ) {
-				$tags[ $tag ] = true;
-			}
-		}
-
-		return array_keys( $tags );
-	}
-
-	/**
-	 * Count how many entries use a specific tag.
-	 *
-	 * @param string $tag Tag name.
-	 * @return int Usage count.
-	 */
-	public static function count_tag_usage( $tag ) {
-		global $wpdb;
-		$table = PLTT_Database::get_table_name( 'time_entries' );
-
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
-		return (int) $wpdb->get_var(
-			$wpdb->prepare(
-				"SELECT COUNT(*) FROM {$table} WHERE FIND_IN_SET(%s, tags) > 0",
-				$tag
-			)
-		);
-	}
-
-	/**
-	 * Rename a tag across all entries.
-	 *
-	 * @param string $old_tag Old tag name.
-	 * @param string $new_tag New tag name.
-	 * @return bool True on success.
-	 */
-	public static function rename_tag( $old_tag, $new_tag ) {
-		global $wpdb;
-		$table = PLTT_Database::get_table_name( 'time_entries' );
-
-		$old_tag = strtolower( trim( $old_tag ) );
-		$new_tag = strtolower( trim( $new_tag ) );
-
-		if ( empty( $old_tag ) || empty( $new_tag ) || $old_tag === $new_tag ) {
-			return false;
-		}
-
-		// Get all entries containing the old tag.
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
-		$entries = $wpdb->get_results(
-			$wpdb->prepare(
-				"SELECT id, tags FROM {$table} WHERE FIND_IN_SET(%s, tags) > 0",
-				$old_tag
-			)
-		);
-
-		if ( empty( $entries ) ) {
-			return true; // Nothing to rename is still success.
-		}
-
-		foreach ( $entries as $entry ) {
-			$tag_list    = array_map( 'trim', explode( ',', $entry->tags ) );
-			$updated     = array();
-
-			foreach ( $tag_list as $tag ) {
-				if ( strtolower( $tag ) === $old_tag ) {
-					$updated[] = $new_tag;
-				} else {
-					$updated[] = $tag;
-				}
-			}
-
-			$new_tags_str = implode( ',', array_unique( $updated ) );
-
-			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
-			$wpdb->update(
-				$table,
-				array( 'tags' => $new_tags_str ),
-				array( 'id' => $entry->id ),
-				array( '%s' ),
-				array( '%d' )
-			);
-		}
-
-		return true;
-	}
-
-	/**
 	 * Create a new time entry.
 	 *
 	 * @param array $data Entry data.
@@ -330,10 +217,9 @@ class PLTT_Entries {
 			'description'      => sanitize_textarea_field( $data['description'] ?? '' ),
 			'verified'         => ! empty( $data['verified'] ) ? 1 : 0,
 			'billable'         => array_key_exists( 'billable', $data ) ? ( ! empty( $data['billable'] ) ? 1 : 0 ) : 1,
-			'tags'             => sanitize_text_field( $data['tags'] ?? '' ),
 		);
 
-		$formats = array( '%s', '%s', '%s', '%d', '%s', '%s', '%d', '%d', '%s' );
+		$formats = array( '%s', '%s', '%s', '%d', '%s', '%s', '%d', '%d' );
 
 		// Only include nullable fields when they have values.
 		// wpdb->insert() converts NULL to 0 with %d format; omitting them lets MySQL use NULL.
@@ -356,7 +242,18 @@ class PLTT_Entries {
 			$formats
 		);
 
-		return $result ? $wpdb->insert_id : false;
+		if ( ! $result ) {
+			return false;
+		}
+
+		$insert_id = $wpdb->insert_id;
+
+		// Sync tags to the junction table.
+		if ( ! empty( $data['tags'] ) ) {
+			PLTT_Tags::sync_entry_tags( $insert_id, $data['tags'] );
+		}
+
+		return $insert_id;
 	}
 
 	/**
@@ -388,7 +285,6 @@ class PLTT_Entries {
 			'billable_rate'    => '%f',
 			'billable_amount'  => '%f',
 			'billed'           => '%d',
-			'tags'             => '%s',
 		);
 
 		// Nullable fields: wpdb->update() cannot set columns to NULL with %d format.
@@ -456,6 +352,11 @@ class PLTT_Entries {
 			);
 		}
 
+		// Sync tags when the caller provides a 'tags' key.
+		if ( $result && array_key_exists( 'tags', $data ) ) {
+			PLTT_Tags::sync_entry_tags( $id, $data['tags'] );
+		}
+
 		return $result;
 	}
 
@@ -468,6 +369,9 @@ class PLTT_Entries {
 	public static function delete( $id ) {
 		global $wpdb;
 		$table = PLTT_Database::get_table_name( 'time_entries' );
+
+		// Remove tag associations before deleting the entry.
+		PLTT_Tags::delete_for_entry( $id );
 
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
 		$result = $wpdb->delete(
@@ -488,6 +392,16 @@ class PLTT_Entries {
 	public static function delete_by_date( $date ) {
 		global $wpdb;
 		$table = PLTT_Database::get_table_name( 'time_entries' );
+
+		// Get IDs first so we can clean up junction rows.
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+		$ids = $wpdb->get_col(
+			$wpdb->prepare( "SELECT id FROM {$table} WHERE entry_date = %s", $date )
+		);
+
+		foreach ( $ids as $id ) {
+			PLTT_Tags::delete_for_entry( (int) $id );
+		}
 
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
 		return $wpdb->delete(
@@ -590,11 +504,13 @@ class PLTT_Entries {
 		}
 
 		if ( ! empty( $args['tag'] ) ) {
+			$entry_tags_table = PLTT_Database::get_table_name( 'entry_tags' );
+			$tags_table       = PLTT_Database::get_table_name( 'tags' );
 			if ( ! empty( $args['tag_negate'] ) ) {
-				$where[]   = "(e.tags IS NULL OR e.tags = '' OR FIND_IN_SET(%s, e.tags) = 0)";
+				$where[]   = "NOT EXISTS (SELECT 1 FROM {$entry_tags_table} et JOIN {$tags_table} t ON et.tag_id = t.id WHERE et.entry_id = e.id AND t.name = %s)";
 				$prepare[] = $args['tag'];
 			} else {
-				$where[]   = 'FIND_IN_SET(%s, e.tags) > 0';
+				$where[]   = "EXISTS (SELECT 1 FROM {$entry_tags_table} et JOIN {$tags_table} t ON et.tag_id = t.id WHERE et.entry_id = e.id AND t.name = %s)";
 				$prepare[] = $args['tag'];
 			}
 		}
@@ -706,11 +622,13 @@ class PLTT_Entries {
 		}
 
 		if ( ! empty( $args['tag'] ) ) {
+			$entry_tags_table = PLTT_Database::get_table_name( 'entry_tags' );
+			$tags_table       = PLTT_Database::get_table_name( 'tags' );
 			if ( ! empty( $args['tag_negate'] ) ) {
-				$where[]   = "(e.tags IS NULL OR e.tags = '' OR FIND_IN_SET(%s, e.tags) = 0)";
+				$where[]   = "NOT EXISTS (SELECT 1 FROM {$entry_tags_table} et JOIN {$tags_table} t ON et.tag_id = t.id WHERE et.entry_id = e.id AND t.name = %s)";
 				$prepare[] = $args['tag'];
 			} else {
-				$where[]   = 'FIND_IN_SET(%s, e.tags) > 0';
+				$where[]   = "EXISTS (SELECT 1 FROM {$entry_tags_table} et JOIN {$tags_table} t ON et.tag_id = t.id WHERE et.entry_id = e.id AND t.name = %s)";
 				$prepare[] = $args['tag'];
 			}
 		}

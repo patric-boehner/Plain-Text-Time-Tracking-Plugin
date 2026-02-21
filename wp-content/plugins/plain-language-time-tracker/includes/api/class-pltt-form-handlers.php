@@ -207,21 +207,19 @@ class PLTT_Form_Handlers {
 			exit;
 		}
 
-		// Check if tag already exists.
-		$all_tags = PLTT_Entries::get_all_tags();
-		if ( in_array( $tag_name, $all_tags, true ) ) {
+		// Check for duplicate.
+		if ( PLTT_Tags::get_by_name( $tag_name ) ) {
 			wp_safe_redirect( add_query_arg( 'pltt_error', 'tag_exists', $redirect_url ) );
 			exit;
 		}
 
-		// Tags are stored in entries, so "creating" a tag means adding it to the available pool.
-		// We store it by creating a transient that gets merged with get_all_tags results.
-		$custom_tags   = get_option( 'pltt_custom_tags', array() );
-		$custom_tags[] = $tag_name;
-		$custom_tags   = array_unique( $custom_tags );
-		update_option( 'pltt_custom_tags', $custom_tags );
+		$result = PLTT_Tags::create( $tag_name );
 
-		wp_safe_redirect( add_query_arg( 'pltt_message', 'tag_created', $redirect_url ) );
+		if ( $result ) {
+			wp_safe_redirect( add_query_arg( 'pltt_message', 'tag_created', $redirect_url ) );
+		} else {
+			wp_safe_redirect( add_query_arg( 'pltt_error', 'tag_create_failed', $redirect_url ) );
+		}
 		exit;
 	}
 
@@ -231,39 +229,25 @@ class PLTT_Form_Handlers {
 	public static function handle_rename_tag() {
 		self::verify_nonce( 'pltt_manage_tag' );
 
-		$old_tag = isset( $_POST['old_tag'] ) ? sanitize_text_field( wp_unslash( $_POST['old_tag'] ) ) : '';
+		$tag_id  = isset( $_POST['tag_id'] ) ? absint( $_POST['tag_id'] ) : 0;
 		$new_tag = isset( $_POST['tag_name'] ) ? sanitize_text_field( wp_unslash( $_POST['tag_name'] ) ) : '';
-		$old_tag = strtolower( trim( $old_tag ) );
 		$new_tag = strtolower( trim( $new_tag ) );
 
 		$redirect_url = admin_url( 'admin.php?page=pltt-tags' );
 
-		if ( empty( $old_tag ) || empty( $new_tag ) ) {
+		if ( ! $tag_id || empty( $new_tag ) ) {
 			wp_safe_redirect( add_query_arg( 'pltt_error', 'invalid_tag', $redirect_url ) );
 			exit;
 		}
 
-		if ( $old_tag === $new_tag ) {
-			wp_safe_redirect( $redirect_url );
-			exit;
-		}
-
-		// Check if new tag name already exists.
-		$all_tags = PLTT_Entries::get_all_tags();
-		if ( in_array( $new_tag, $all_tags, true ) ) {
+		// Check if new name already exists (different tag).
+		$existing = PLTT_Tags::get_by_name( $new_tag );
+		if ( $existing && (int) $existing->id !== $tag_id ) {
 			wp_safe_redirect( add_query_arg( 'pltt_error', 'tag_exists', $redirect_url ) );
 			exit;
 		}
 
-		$success = PLTT_Entries::rename_tag( $old_tag, $new_tag );
-
-		// Also update custom tags list if the old tag was a custom tag.
-		$custom_tags = get_option( 'pltt_custom_tags', array() );
-		$key         = array_search( $old_tag, $custom_tags, true );
-		if ( false !== $key ) {
-			$custom_tags[ $key ] = $new_tag;
-			update_option( 'pltt_custom_tags', array_values( array_unique( $custom_tags ) ) );
-		}
+		$success = PLTT_Tags::rename( $tag_id, $new_tag );
 
 		if ( $success ) {
 			wp_safe_redirect( add_query_arg( 'pltt_message', 'tag_renamed', $redirect_url ) );
@@ -279,32 +263,22 @@ class PLTT_Form_Handlers {
 	public static function handle_delete_tag() {
 		self::verify_nonce( 'pltt_manage_tag' );
 
-		$tag_name = isset( $_POST['tag_name'] ) ? sanitize_text_field( wp_unslash( $_POST['tag_name'] ) ) : '';
-		$tag_name = strtolower( trim( $tag_name ) );
+		$tag_id = isset( $_POST['tag_id'] ) ? absint( $_POST['tag_id'] ) : 0;
 
 		$redirect_url = admin_url( 'admin.php?page=pltt-tags' );
 
-		if ( empty( $tag_name ) ) {
+		if ( ! $tag_id ) {
 			wp_safe_redirect( add_query_arg( 'pltt_error', 'invalid_tag', $redirect_url ) );
 			exit;
 		}
 
-		// Server-side safety check: refuse if tag is still in use.
-		$usage_count = PLTT_Entries::count_tag_usage( $tag_name );
-		if ( $usage_count > 0 ) {
-			wp_safe_redirect( add_query_arg( 'pltt_error', 'tag_in_use', $redirect_url ) );
-			exit;
-		}
+		$success = PLTT_Tags::delete( $tag_id );
 
-		// Remove from custom tags option.
-		$custom_tags = get_option( 'pltt_custom_tags', array() );
-		$key         = array_search( $tag_name, $custom_tags, true );
-		if ( false !== $key ) {
-			array_splice( $custom_tags, $key, 1 );
-			update_option( 'pltt_custom_tags', array_values( $custom_tags ) );
+		if ( $success ) {
+			wp_safe_redirect( add_query_arg( 'pltt_message', 'tag_deleted', $redirect_url ) );
+		} else {
+			wp_safe_redirect( add_query_arg( 'pltt_error', 'tag_delete_failed', $redirect_url ) );
 		}
-
-		wp_safe_redirect( add_query_arg( 'pltt_message', 'tag_deleted', $redirect_url ) );
 		exit;
 	}
 

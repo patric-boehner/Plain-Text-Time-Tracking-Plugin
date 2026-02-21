@@ -309,16 +309,17 @@ class PLTT_Ajax {
 			wp_send_json_error( __( 'Tag name is required.', 'plain-language-time-tracker' ) );
 		}
 
-		$all_tags = PLTT_Entries::get_all_tags();
-		if ( in_array( $tag_name, $all_tags, true ) ) {
+		if ( PLTT_Tags::get_by_name( $tag_name ) ) {
 			wp_send_json_error( __( 'A tag with that name already exists.', 'plain-language-time-tracker' ) );
 		}
 
-		$custom_tags   = get_option( 'pltt_custom_tags', array() );
-		$custom_tags[] = $tag_name;
-		update_option( 'pltt_custom_tags', array_values( array_unique( $custom_tags ) ) );
+		$result = PLTT_Tags::create( $tag_name );
 
-		wp_send_json_success( array( 'tag' => $tag_name ) );
+		if ( $result ) {
+			wp_send_json_success( array( 'tag' => $tag_name ) );
+		} else {
+			wp_send_json_error( __( 'Failed to create tag.', 'plain-language-time-tracker' ) );
+		}
 	}
 
 	/**

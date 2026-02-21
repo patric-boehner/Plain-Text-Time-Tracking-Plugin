@@ -66,7 +66,7 @@ $presets = array(
 // Load data for filter dropdown options.
 $all_clients  = PLTT_Clients::get_all();
 $all_projects = PLTT_Projects::get_all();
-$all_tags     = PLTT_Entries::get_all_tags();
+$all_tags     = array_column( PLTT_Tags::get_all(), 'name' );
 sort( $all_tags );
 
 // Build projects grouped by client for JS cascade.
