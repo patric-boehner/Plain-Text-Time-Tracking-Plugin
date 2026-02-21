@@ -20,7 +20,7 @@ class PLTT_Database {
 	 *
 	 * @var string
 	 */
-	const DB_VERSION = '1.7.0';
+	const DB_VERSION = '1.8.0';
 
 	/**
 	 * Get the full table name with WordPress prefix.
@@ -93,7 +93,6 @@ class PLTT_Database {
 			billable_rate decimal(10,2) DEFAULT NULL COMMENT 'Hourly rate at time of verification',
 			billable_amount decimal(10,2) DEFAULT NULL COMMENT 'Calculated billable amount (locked at verification)',
 			billed tinyint(1) NOT NULL DEFAULT 0,
-			tags varchar(500),
 			created_at datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
 			updated_at datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
 			PRIMARY KEY (id),
@@ -142,6 +141,27 @@ class PLTT_Database {
 			UNIQUE KEY log_date (log_date)
 		) {$charset_collate};";
 		dbDelta( $sql_logs );
+
+		// Tags registry table.
+		$table_tags = self::get_table_name( 'tags' );
+		$sql_tags   = "CREATE TABLE {$table_tags} (
+			id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+			name varchar(100) NOT NULL,
+			created_at datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			PRIMARY KEY (id),
+			UNIQUE KEY name (name)
+		) {$charset_collate};";
+		dbDelta( $sql_tags );
+
+		// Entry-tag junction table.
+		$table_entry_tags = self::get_table_name( 'entry_tags' );
+		$sql_entry_tags   = "CREATE TABLE {$table_entry_tags} (
+			entry_id bigint(20) unsigned NOT NULL,
+			tag_id bigint(20) unsigned NOT NULL,
+			PRIMARY KEY (entry_id, tag_id),
+			KEY tag_id (tag_id)
+		) {$charset_collate};";
+		dbDelta( $sql_entry_tags );
 
 		// Update database version.
 		update_option( 'pltt_db_version', self::DB_VERSION );
@@ -199,6 +219,97 @@ class PLTT_Database {
 			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.SchemaChange
 			$wpdb->query( "ALTER TABLE {$projects_table} ADD INDEX client_status (client_id, status)" );
 		}
+
+		// 1.8.0: Normalize tags from CSV column to junction tables.
+		if ( version_compare( $from_version, '1.8.0', '<' ) ) {
+			$entries_table    = self::get_table_name( 'time_entries' );
+			$tags_table       = self::get_table_name( 'tags' );
+			$entry_tags_table = self::get_table_name( 'entry_tags' );
+
+			// Guard: only run if the tags column still exists.
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+			$column_exists = $wpdb->get_var(
+				$wpdb->prepare(
+					'SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = %s AND TABLE_NAME = %s AND COLUMN_NAME = %s',
+					DB_NAME,
+					$entries_table,
+					'tags'
+				)
+			);
+
+			if ( $column_exists ) {
+				// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.SchemaChange
+				$wpdb->query( 'START TRANSACTION' );
+
+				// Collect all unique tag names from CSV column + pltt_custom_tags option.
+				// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+				$csv_rows = $wpdb->get_col( "SELECT DISTINCT tags FROM {$entries_table} WHERE tags != '' AND tags IS NOT NULL" );
+
+				$all_tag_names = array();
+				foreach ( $csv_rows as $csv ) {
+					foreach ( explode( ',', $csv ) as $name ) {
+						$name = strtolower( trim( $name ) );
+						if ( '' !== $name ) {
+							$all_tag_names[ $name ] = true;
+						}
+					}
+				}
+
+				$custom_tags = get_option( 'pltt_custom_tags', array() );
+				foreach ( $custom_tags as $name ) {
+					$name = strtolower( trim( $name ) );
+					if ( '' !== $name ) {
+						$all_tag_names[ $name ] = true;
+					}
+				}
+
+				// Bulk insert all unique tag names.
+				foreach ( array_keys( $all_tag_names ) as $name ) {
+					// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
+					$wpdb->query(
+						$wpdb->prepare( "INSERT IGNORE INTO {$tags_table} (name) VALUES (%s)", $name )
+					);
+				}
+
+				// Build name → id lookup map.
+				// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+				$tag_rows  = $wpdb->get_results( "SELECT id, name FROM {$tags_table}" );
+				$tag_id_map = array();
+				foreach ( $tag_rows as $row ) {
+					$tag_id_map[ $row->name ] = (int) $row->id;
+				}
+
+				// Populate junction table from existing entries.
+				// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+				$entries = $wpdb->get_results( "SELECT id, tags FROM {$entries_table} WHERE tags != '' AND tags IS NOT NULL" );
+				foreach ( $entries as $entry ) {
+					foreach ( explode( ',', $entry->tags ) as $name ) {
+						$name = strtolower( trim( $name ) );
+						if ( '' !== $name && isset( $tag_id_map[ $name ] ) ) {
+							$tag_id = $tag_id_map[ $name ];
+							// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
+							$wpdb->query(
+								$wpdb->prepare(
+									"INSERT IGNORE INTO {$entry_tags_table} (entry_id, tag_id) VALUES (%d, %d)",
+									$entry->id,
+									$tag_id
+								)
+							);
+						}
+					}
+				}
+
+				// Drop the old CSV column.
+				// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.SchemaChange
+				$wpdb->query( "ALTER TABLE {$entries_table} DROP COLUMN tags" );
+
+				// Remove the custom tags option.
+				delete_option( 'pltt_custom_tags' );
+
+				// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.SchemaChange
+				$wpdb->query( 'COMMIT' );
+			}
+		}
 	}
 
 	/**
@@ -208,6 +319,8 @@ class PLTT_Database {
 		global $wpdb;
 
 		$tables = array(
+			'entry_tags',
+			'tags',
 			'time_entries',
 			'projects',
 			'clients',
@@ -223,6 +336,7 @@ class PLTT_Database {
 
 		delete_option( 'pltt_version' );
 		delete_option( 'pltt_db_version' );
-		delete_option( 'pltt_task_types' ); // May already be gone from 1.6.0 migration.
+		delete_option( 'pltt_task_types' );    // May already be gone from 1.6.0 migration.
+		delete_option( 'pltt_custom_tags' );   // May already be gone from 1.8.0 migration.
 	}
 }

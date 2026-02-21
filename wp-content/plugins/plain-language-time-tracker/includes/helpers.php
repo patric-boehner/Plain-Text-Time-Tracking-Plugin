@@ -373,15 +373,42 @@ function pltt_flush_alias_cache() {
 }
 
 /**
- * Render tag badges for a comma-separated tags string.
+ * Get cached tags list.
+ *
+ * @return array Array of tag objects.
+ */
+function pltt_get_cached_tags() {
+	$cache_key = 'pltt_tags_list';
+	$tags      = get_transient( $cache_key );
+
+	if ( false === $tags ) {
+		$tags = PLTT_Tags::get_all();
+		set_transient( $cache_key, $tags, HOUR_IN_SECONDS );
+	}
+
+	return $tags;
+}
+
+/**
+ * Flush tags cache.
+ */
+function pltt_flush_tag_cache() {
+	delete_transient( 'pltt_tags_list' );
+}
+
+/**
+ * Render tag badges for a comma-separated tags string or array.
  *
  * Outputs badge spans for each tag, or an em-dash if empty.
  *
- * @param string $tags_string Comma-separated tags.
+ * @param string|array $tags Comma-separated tag string or array of tag names.
  */
-function pltt_render_tag_badges( $tags_string ) {
-	if ( ! empty( $tags_string ) ) {
-		foreach ( array_map( 'trim', explode( ',', $tags_string ) ) as $tag_item ) {
+function pltt_render_tag_badges( $tags ) {
+	$tag_list = is_array( $tags ) ? $tags : array_map( 'trim', explode( ',', $tags ) );
+	$tag_list = array_filter( $tag_list );
+
+	if ( ! empty( $tag_list ) ) {
+		foreach ( $tag_list as $tag_item ) {
 			echo '<span class="pltt-badge pltt-badge-tag">' . esc_html( ucfirst( $tag_item ) ) . '</span>';
 		}
 	} else {

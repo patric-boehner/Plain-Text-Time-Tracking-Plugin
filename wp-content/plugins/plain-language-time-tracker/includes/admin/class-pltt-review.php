@@ -52,7 +52,7 @@ class PLTT_Review {
 		$log = PLTT_Daily_Log::get_log( $date );
 
 		// Collect all known tags for autocomplete.
-		$all_tags = PLTT_Entries::get_all_tags();
+		$all_tags = array_column( PLTT_Tags::get_all(), 'name' );
 		sort( $all_tags );
 
 		include PLTT_PLUGIN_DIR . 'templates/review.php';
@@ -101,10 +101,12 @@ class PLTT_Review {
 	private static function format_entries_for_review( $entries ) {
 		$formatted = array();
 
-		// Collect unique project and client IDs to minimize DB queries.
+		// Collect unique entry, project, and client IDs to minimize DB queries.
+		$entry_ids   = array();
 		$project_ids = array();
 		$client_ids  = array();
 		foreach ( $entries as $entry ) {
+			$entry_ids[] = (int) $entry->id;
 			if ( ! empty( $entry->project_id ) ) {
 				$project_ids[] = (int) $entry->project_id;
 			}
@@ -112,6 +114,9 @@ class PLTT_Review {
 				$client_ids[] = (int) $entry->client_id;
 			}
 		}
+
+		// Bulk-load tags for all entries in a single query.
+		$tags_by_entry = PLTT_Tags::get_for_entries( $entry_ids );
 
 		// Fetch all referenced projects and clients in bulk.
 		$projects_cache = array();
@@ -187,7 +192,7 @@ class PLTT_Review {
 				'project_id'           => $entry->project_id,
 				'predicted_client_id'  => $entry->client_id,
 				'predicted_project_id' => $entry->project_id,
-				'tags'                 => $entry->tags,
+				'tags'                 => implode( ',', $tags_by_entry[ (int) $entry->id ] ?? array() ),
 				'verified'             => $entry->verified,
 				'billable'             => $entry->billable,
 				'billable_amount'      => $billable_amount,

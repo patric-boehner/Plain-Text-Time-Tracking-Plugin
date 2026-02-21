@@ -108,6 +108,15 @@ class PLTT_Reports {
 					)
 				)
 			);
+
+			// Bulk-load tags for all fetched entries and attach as CSV for template rendering.
+			if ( ! empty( $entries ) ) {
+				$entry_ids     = array_map( function( $e ) { return (int) $e->id; }, $entries );
+				$tags_by_entry = PLTT_Tags::get_for_entries( $entry_ids );
+				foreach ( $entries as $entry ) {
+					$entry->tags = implode( ',', $tags_by_entry[ (int) $entry->id ] ?? array() );
+				}
+			}
 		}
 
 		include PLTT_PLUGIN_DIR . 'templates/reports.php';

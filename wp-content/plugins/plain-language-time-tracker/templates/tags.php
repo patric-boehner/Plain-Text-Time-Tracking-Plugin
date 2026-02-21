@@ -10,8 +10,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-$all_tags = PLTT_Entries::get_all_tags();
-sort( $all_tags );
+$all_tags = PLTT_Tags::get_all_with_counts();
 ?>
 
 <div class="wrap pltt-wrap">
@@ -36,8 +35,9 @@ sort( $all_tags );
 			$errors     = array(
 				'tag_exists'        => __( 'A tag with that name already exists.', 'plain-language-time-tracker' ),
 				'tag_rename_failed' => __( 'Failed to rename tag.', 'plain-language-time-tracker' ),
+				'tag_create_failed' => __( 'Failed to create tag.', 'plain-language-time-tracker' ),
+				'tag_delete_failed' => __( 'Failed to delete tag.', 'plain-language-time-tracker' ),
 				'invalid_tag'       => __( 'Invalid tag name.', 'plain-language-time-tracker' ),
-				'tag_in_use'        => __( 'Cannot delete tag: it is still assigned to time entries.', 'plain-language-time-tracker' ),
 			);
 			if ( isset( $errors[ $error_code ] ) ) {
 				echo '<div class="notice notice-error is-dismissible"><p>' . esc_html( $errors[ $error_code ] ) . '</p></div>';
@@ -63,18 +63,15 @@ sort( $all_tags );
 			</thead>
 			<tbody>
 				<?php foreach ( $all_tags as $tag ) : ?>
-					<?php $usage_count = PLTT_Entries::count_tag_usage( $tag ); ?>
-					<tr data-tag="<?php echo esc_attr( $tag ); ?>">
+					<tr data-tag-id="<?php echo esc_attr( $tag->id ); ?>" data-tag-name="<?php echo esc_attr( $tag->name ); ?>">
 						<td>
-							<span class="pltt-badge pltt-badge-tag"><?php echo esc_html( ucfirst( $tag ) ); ?></span>
+							<span class="pltt-badge pltt-badge-tag"><?php echo esc_html( ucfirst( $tag->name ) ); ?></span>
 							<div class="row-actions">
-								<span class="edit"><a href="#rename" class="pltt-rename-tag" role="button"><?php esc_html_e( 'Rename', 'plain-language-time-tracker' ); ?></a><?php if ( 0 === $usage_count ) : ?> | <?php endif; ?></span>
-								<?php if ( 0 === $usage_count ) : ?>
-									<span class="trash"><a href="#delete" class="pltt-delete-tag submitdelete" role="button"><?php esc_html_e( 'Delete', 'plain-language-time-tracker' ); ?></a></span>
-								<?php endif; ?>
+								<span class="edit"><a href="#rename" class="pltt-rename-tag" role="button"><?php esc_html_e( 'Rename', 'plain-language-time-tracker' ); ?></a> | </span>
+								<span class="trash"><a href="#delete" class="pltt-delete-tag submitdelete" role="button"><?php esc_html_e( 'Delete', 'plain-language-time-tracker' ); ?></a></span>
 							</div>
 						</td>
-						<td><?php echo esc_html( $usage_count ); ?></td>
+						<td><?php echo esc_html( (int) $tag->usage_count ); ?></td>
 					</tr>
 				<?php endforeach; ?>
 			</tbody>
@@ -85,7 +82,7 @@ sort( $all_tags );
 <!-- Hidden delete tag form -->
 <form id="pltt-delete-tag-form" method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" style="display:none;">
 	<input type="hidden" name="action" value="pltt_delete_tag">
-	<input type="hidden" name="tag_name" id="pltt-delete-tag-name" value="">
+	<input type="hidden" name="tag_id" id="pltt-delete-tag-id" value="">
 	<?php wp_nonce_field( 'pltt_manage_tag', '_wpnonce', true, true ); ?>
 </form>
 
@@ -95,7 +92,7 @@ sort( $all_tags );
 		<h3 id="pltt-tag-modal-title"><?php esc_html_e( 'Add Tag', 'plain-language-time-tracker' ); ?></h3>
 		<form id="pltt-tag-form" method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
 			<input type="hidden" name="action" id="pltt-tag-form-action" value="pltt_create_tag">
-			<input type="hidden" id="pltt-old-tag-name" name="old_tag" value="">
+			<input type="hidden" id="pltt-tag-id" name="tag_id" value="">
 			<?php wp_nonce_field( 'pltt_manage_tag', '_wpnonce', true, true ); ?>
 			<p>
 				<label for="pltt-tag-name"><?php esc_html_e( 'Tag Name', 'plain-language-time-tracker' ); ?></label>
@@ -124,7 +121,7 @@ sort( $all_tags );
 	// Add Tag button.
 	document.getElementById('pltt-add-tag-btn').addEventListener('click', function() {
 		document.getElementById('pltt-tag-modal-title').textContent = '<?php echo esc_js( __( 'Add Tag', 'plain-language-time-tracker' ) ); ?>';
-		document.getElementById('pltt-old-tag-name').value = '';
+		document.getElementById('pltt-tag-id').value = '';
 		document.getElementById('pltt-tag-name').value = '';
 		document.getElementById('pltt-tag-form-action').value = 'pltt_create_tag';
 		PLTT.showModal('pltt-tag-modal');
@@ -134,10 +131,10 @@ sort( $all_tags );
 	document.querySelectorAll('.pltt-rename-tag').forEach(function(link) {
 		link.addEventListener('click', function(e) {
 			e.preventDefault();
-			var tag = this.closest('tr').dataset.tag;
+			var row = this.closest('tr');
 			document.getElementById('pltt-tag-modal-title').textContent = '<?php echo esc_js( __( 'Rename Tag', 'plain-language-time-tracker' ) ); ?>';
-			document.getElementById('pltt-old-tag-name').value = tag;
-			document.getElementById('pltt-tag-name').value = tag;
+			document.getElementById('pltt-tag-id').value = row.dataset.tagId;
+			document.getElementById('pltt-tag-name').value = row.dataset.tagName;
 			document.getElementById('pltt-tag-form-action').value = 'pltt_rename_tag';
 			PLTT.showModal('pltt-tag-modal');
 		});
@@ -150,8 +147,8 @@ sort( $all_tags );
 			if (!confirm('<?php echo esc_js( __( 'Delete this tag? This cannot be undone.', 'plain-language-time-tracker' ) ); ?>')) {
 				return;
 			}
-			var tag = this.closest('tr').dataset.tag;
-			document.getElementById('pltt-delete-tag-name').value = tag;
+			var tagId = this.closest('tr').dataset.tagId;
+			document.getElementById('pltt-delete-tag-id').value = tagId;
 			document.getElementById('pltt-delete-tag-form').submit();
 		});
 	});

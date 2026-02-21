@@ -45,6 +45,7 @@ function pltt_load_dependencies() {
 	require_once PLTT_PLUGIN_DIR . 'includes/database/class-pltt-database.php';
 	require_once PLTT_PLUGIN_DIR . 'includes/database/class-pltt-clients.php';
 	require_once PLTT_PLUGIN_DIR . 'includes/database/class-pltt-projects.php';
+	require_once PLTT_PLUGIN_DIR . 'includes/database/class-pltt-tags.php';
 	require_once PLTT_PLUGIN_DIR . 'includes/database/class-pltt-entries.php';
 	require_once PLTT_PLUGIN_DIR . 'includes/database/class-pltt-aliases.php';
 
