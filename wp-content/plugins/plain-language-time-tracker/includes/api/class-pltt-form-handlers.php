@@ -68,6 +68,9 @@ class PLTT_Form_Handlers {
 	 * Handle client update form submission.
 	 */
 	public static function handle_update_client() {
+		if ( ! pltt_user_can_access() ) {
+			wp_die( esc_html__( 'Unauthorized', 'plain-language-time-tracker' ), '', array( 'response' => 403 ) );
+		}
 		self::verify_nonce( 'pltt_update_client' );
 
 		$client_id   = isset( $_POST['client_id'] ) ? absint( $_POST['client_id'] ) : 0;
@@ -85,7 +88,8 @@ class PLTT_Form_Handlers {
 
 		// Pass hourly_rate through — empty string clears it to NULL.
 		if ( isset( $_POST['hourly_rate'] ) ) {
-			$update_data['hourly_rate'] = wp_unslash( $_POST['hourly_rate'] );
+			$raw_rate = wp_unslash( $_POST['hourly_rate'] );
+			$update_data['hourly_rate'] = '' === $raw_rate ? '' : floatval( $raw_rate );
 		}
 
 		$result = PLTT_Clients::update( $client_id, $update_data );
@@ -101,6 +105,9 @@ class PLTT_Form_Handlers {
 	 * Handle client deletion form submission.
 	 */
 	public static function handle_delete_client() {
+		if ( ! pltt_user_can_access() ) {
+			wp_die( esc_html__( 'Unauthorized', 'plain-language-time-tracker' ), '', array( 'response' => 403 ) );
+		}
 		self::verify_nonce( 'pltt_delete_client' );
 
 		$client_id = isset( $_POST['client_id'] ) ? absint( $_POST['client_id'] ) : 0;
@@ -129,6 +136,9 @@ class PLTT_Form_Handlers {
 	 * Handle project update form submission.
 	 */
 	public static function handle_update_project() {
+		if ( ! pltt_user_can_access() ) {
+			wp_die( esc_html__( 'Unauthorized', 'plain-language-time-tracker' ), '', array( 'response' => 403 ) );
+		}
 		self::verify_nonce( 'pltt_update_project' );
 
 		$project_id  = isset( $_POST['project_id'] ) ? absint( $_POST['project_id'] ) : 0;
@@ -151,7 +161,8 @@ class PLTT_Form_Handlers {
 			$data['description'] = $description;
 		}
 		if ( isset( $_POST['hourly_rate'] ) ) {
-			$data['hourly_rate'] = wp_unslash( $_POST['hourly_rate'] );
+			$raw_rate = wp_unslash( $_POST['hourly_rate'] );
+			$data['hourly_rate'] = '' === $raw_rate ? '' : floatval( $raw_rate );
 		}
 
 		$result = PLTT_Projects::update( $project_id, $data );
@@ -167,6 +178,9 @@ class PLTT_Form_Handlers {
 	 * Handle project deletion.
 	 */
 	public static function handle_delete_project() {
+		if ( ! pltt_user_can_access() ) {
+			wp_die( esc_html__( 'Unauthorized', 'plain-language-time-tracker' ), '', array( 'response' => 403 ) );
+		}
 		self::verify_nonce( 'pltt_delete_project' );
 
 		$project_id = isset( $_POST['project_id'] ) ? absint( $_POST['project_id'] ) : 0;
@@ -195,6 +209,9 @@ class PLTT_Form_Handlers {
 	 * Handle tag creation.
 	 */
 	public static function handle_create_tag() {
+		if ( ! pltt_user_can_access() ) {
+			wp_die( esc_html__( 'Unauthorized', 'plain-language-time-tracker' ), '', array( 'response' => 403 ) );
+		}
 		self::verify_nonce( 'pltt_manage_tag' );
 
 		$tag_name = isset( $_POST['tag_name'] ) ? sanitize_text_field( wp_unslash( $_POST['tag_name'] ) ) : '';
@@ -227,6 +244,9 @@ class PLTT_Form_Handlers {
 	 * Handle tag rename.
 	 */
 	public static function handle_rename_tag() {
+		if ( ! pltt_user_can_access() ) {
+			wp_die( esc_html__( 'Unauthorized', 'plain-language-time-tracker' ), '', array( 'response' => 403 ) );
+		}
 		self::verify_nonce( 'pltt_manage_tag' );
 
 		$tag_id  = isset( $_POST['tag_id'] ) ? absint( $_POST['tag_id'] ) : 0;
@@ -261,6 +281,9 @@ class PLTT_Form_Handlers {
 	 * Handle tag deletion.
 	 */
 	public static function handle_delete_tag() {
+		if ( ! pltt_user_can_access() ) {
+			wp_die( esc_html__( 'Unauthorized', 'plain-language-time-tracker' ), '', array( 'response' => 403 ) );
+		}
 		self::verify_nonce( 'pltt_manage_tag' );
 
 		$tag_id = isset( $_POST['tag_id'] ) ? absint( $_POST['tag_id'] ) : 0;
@@ -286,6 +309,9 @@ class PLTT_Form_Handlers {
 	 * Handle save entries form submission from review screen.
 	 */
 	public static function handle_save_entries() {
+		if ( ! pltt_user_can_access() ) {
+			wp_die( esc_html__( 'Unauthorized', 'plain-language-time-tracker' ), '', array( 'response' => 403 ) );
+		}
 		self::verify_nonce( 'pltt_save_entries' );
 
 		$date = isset( $_POST['date'] ) ? pltt_sanitize_date( wp_unslash( $_POST['date'] ) ) : '';
@@ -302,11 +328,11 @@ class PLTT_Form_Handlers {
 		}
 
 		if ( empty( $date ) ) {
-			wp_die( esc_html__( 'Invalid date.', 'plain-language-time-tracker' ), '', array( 'response' => 400 ) );
+			self::redirect_back( array( 'pltt_error' => 'invalid_date' ) );
 		}
 
 		if ( empty( $entries ) || ! is_array( $entries ) ) {
-			wp_die( esc_html__( 'No entries to save.', 'plain-language-time-tracker' ), '', array( 'response' => 400 ) );
+			self::redirect_back( array( 'pltt_error' => 'no_entries' ) );
 		}
 
 		$result = PLTT_Review::save_entries( $date, $entries );
@@ -325,7 +351,7 @@ class PLTT_Form_Handlers {
 			wp_safe_redirect( $redirect_url );
 			exit;
 		} else {
-			wp_die( esc_html( $result['message'] ?? __( 'Failed to save entries.', 'plain-language-time-tracker' ) ), '', array( 'response' => 500 ) );
+			self::redirect_back( array( 'pltt_error' => 'save_failed' ) );
 		}
 	}
 }

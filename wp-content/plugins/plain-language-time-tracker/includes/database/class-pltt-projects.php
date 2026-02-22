@@ -32,6 +32,34 @@ class PLTT_Projects {
 	}
 
 	/**
+	 * Get multiple projects by ID in a single query.
+	 *
+	 * @param int[] $ids Array of project IDs.
+	 * @return array ID-keyed map of project objects (missing IDs are omitted).
+	 */
+	public static function get_multiple( $ids ) {
+		$ids = array_filter( array_map( 'absint', $ids ) );
+		if ( empty( $ids ) ) {
+			return array();
+		}
+
+		global $wpdb;
+		$table        = PLTT_Database::get_table_name( 'projects' );
+		$placeholders = implode( ',', array_fill( 0, count( $ids ), '%d' ) );
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.NotPrepared
+		$rows = $wpdb->get_results(
+			$wpdb->prepare( "SELECT * FROM {$table} WHERE id IN ({$placeholders})", $ids )
+		);
+
+		$map = array();
+		foreach ( $rows as $row ) {
+			$map[ (int) $row->id ] = $row;
+		}
+		return $map;
+	}
+
+	/**
 	 * Get all projects.
 	 *
 	 * @param array $args Query arguments.
@@ -151,13 +179,11 @@ class PLTT_Projects {
 
 		// Nullable: omit from array when NULL so MySQL uses column default.
 		if ( isset( $data['hourly_rate'] ) && '' !== $data['hourly_rate'] ) {
-			$rate = floatval( $data['hourly_rate'] );
-
-			// Validate hourly rate bounds.
-			if ( $rate < 0 || $rate > 10000 ) {
-				return new WP_Error( 'invalid_rate', __( 'Hourly rate must be between $0 and $10,000.', 'plain-language-time-tracker' ) );
+			$rate       = floatval( $data['hourly_rate'] );
+			$rate_valid = pltt_validate_hourly_rate( $rate );
+			if ( is_wp_error( $rate_valid ) ) {
+				return $rate_valid;
 			}
-
 			$insert_data['hourly_rate'] = $rate;
 			$formats[]                  = '%f';
 		}
@@ -230,13 +256,11 @@ class PLTT_Projects {
 
 		if ( array_key_exists( 'hourly_rate', $data ) ) {
 			if ( '' !== $data['hourly_rate'] && null !== $data['hourly_rate'] ) {
-				$rate = floatval( $data['hourly_rate'] );
-
-				// Validate hourly rate bounds.
-				if ( $rate < 0 || $rate > 10000 ) {
-					return new WP_Error( 'invalid_rate', __( 'Hourly rate must be between $0 and $10,000.', 'plain-language-time-tracker' ) );
+				$rate       = floatval( $data['hourly_rate'] );
+				$rate_valid = pltt_validate_hourly_rate( $rate );
+				if ( is_wp_error( $rate_valid ) ) {
+					return $rate_valid;
 				}
-
 				$update_data['hourly_rate'] = $rate;
 				$formats[]                  = '%f';
 			} else {
@@ -263,18 +287,7 @@ class PLTT_Projects {
 
 		// Set nullable fields to NULL directly since wpdb converts NULL to 0.
 		if ( $result && ! empty( $null_fields ) ) {
-			$set_clauses = array();
-			foreach ( $null_fields as $field ) {
-				$set_clauses[] = "`{$field}` = NULL";
-			}
-			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.NotPrepared
-			$result = false !== $wpdb->query(
-				$wpdb->prepare(
-					// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
-					"UPDATE {$table} SET " . implode( ', ', $set_clauses ) . ' WHERE id = %d',
-					$id
-				)
-			);
+			$result = pltt_set_nullable_fields( $table, $id, $null_fields );
 		}
 
 		if ( $result ) {
@@ -427,6 +440,13 @@ class PLTT_Projects {
 				)
 			);
 		}
+
+		// Clear stale alias references so the alias predictor does not suggest a deleted project.
+		$aliases_table = PLTT_Database::get_table_name( 'aliases' );
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+		$wpdb->query(
+			$wpdb->prepare( "UPDATE {$aliases_table} SET project_id = NULL WHERE project_id = %d", $id )
+		);
 
 		$table = PLTT_Database::get_table_name( 'projects' );
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching

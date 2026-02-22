@@ -56,11 +56,11 @@ $return_to = isset( $_GET['return_to'] ) ? esc_url_raw( wp_unslash( $_GET['retur
 		<div class="pltt-summary-cards">
 			<div class="card">
 				<div class="card-label"><?php esc_html_e( 'Entries', 'plain-language-time-tracker' ); ?></div>
-				<div class="card-value"><?php echo esc_html( count( $entries ) ); ?></div>
+				<div class="card-value" data-card="entry-count"><?php echo esc_html( count( $entries ) ); ?></div>
 			</div>
 			<div class="card">
 				<div class="card-label"><?php esc_html_e( 'Total Hours', 'plain-language-time-tracker' ); ?></div>
-				<div class="card-value"><?php echo esc_html( pltt_format_hours( $total_minutes ) ); ?></div>
+				<div class="card-value" data-card="hours"><?php echo esc_html( pltt_format_hours( $total_minutes ) ); ?></div>
 			</div>
 			<div class="card">
 				<div class="card-label"><?php esc_html_e( 'Billable Hours', 'plain-language-time-tracker' ); ?></div>

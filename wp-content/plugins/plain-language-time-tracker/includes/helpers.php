@@ -489,6 +489,52 @@ function pltt_render_pagination( $paged, $total_pages, $total_items, $base_url, 
 }
 
 /**
+ * Set nullable columns to NULL for a given row.
+ *
+ * wpdb->update() cannot write NULL with a %d format specifier — it stores 0
+ * instead.  This helper issues a raw UPDATE so the columns are genuinely NULL.
+ *
+ * @param string $table  Fully-qualified table name.
+ * @param int    $id     Row ID.
+ * @param array  $fields Column names to set to NULL.
+ * @return bool True on success, false on DB error.
+ */
+function pltt_set_nullable_fields( $table, $id, $fields ) {
+	if ( empty( $fields ) ) {
+		return true;
+	}
+
+	global $wpdb;
+
+	$set_clauses = array();
+	foreach ( $fields as $field ) {
+		$set_clauses[] = '`' . esc_sql( $field ) . '` = NULL';
+	}
+
+	// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.NotPrepared
+	return false !== $wpdb->query(
+		$wpdb->prepare(
+			// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+			'UPDATE ' . $table . ' SET ' . implode( ', ', $set_clauses ) . ' WHERE id = %d',
+			$id
+		)
+	);
+}
+
+/**
+ * Validate an hourly rate value.
+ *
+ * @param float $rate Rate to validate.
+ * @return true|WP_Error True if valid, WP_Error if out of range.
+ */
+function pltt_validate_hourly_rate( $rate ) {
+	if ( $rate < 0 || $rate > 10000 ) {
+		return new WP_Error( 'invalid_rate', __( 'Hourly rate must be between $0 and $10,000.', 'plain-language-time-tracker' ) );
+	}
+	return true;
+}
+
+/**
  * Render a read-only entry table.
  *
  * Outputs a complete <table> with entry rows showing description,
@@ -522,23 +568,13 @@ function pltt_render_entry_table( $entries, $options = array() ) {
 		}
 	}
 
-	// Fetch all referenced projects and clients in bulk.
-	$projects_cache = array();
-	$clients_cache  = array();
+	// Fetch all referenced projects and clients in bulk (single query each).
+	$projects_cache = PLTT_Projects::get_multiple( array_unique( $project_ids ) );
+	$clients_cache  = PLTT_Clients::get_multiple( array_unique( $client_ids ) );
 
-	foreach ( array_unique( $project_ids ) as $pid ) {
-		$project = PLTT_Projects::get( $pid );
-		if ( $project ) {
-			$projects_cache[ $pid ] = $project;
-		}
-	}
-
-	foreach ( array_unique( $client_ids ) as $cid ) {
-		$client = PLTT_Clients::get( $cid );
-		if ( $client ) {
-			$clients_cache[ $cid ] = $client;
-		}
-	}
+	// Bulk-load tags from the junction table to avoid N+1 queries.
+	$entry_ids     = array_map( fn( $e ) => (int) $e->id, $entries );
+	$tags_by_entry = PLTT_Tags::get_for_entries( $entry_ids );
 	?>
 	<table class="widefat striped<?php echo esc_attr( $table_class ); ?>">
 		<thead>
@@ -570,7 +606,7 @@ function pltt_render_entry_table( $entries, $options = array() ) {
 					</td>
 					<td><?php echo $client ? esc_html( $client->name ) : '<span class="pltt-empty">—</span>'; ?></td>
 					<td><?php echo $project ? esc_html( $project->name ) : '<span class="pltt-empty">—</span>'; ?></td>
-					<td class="pltt-tag-pills"><?php pltt_render_tag_badges( $entry->tags ?? '' ); ?></td>
+					<td class="pltt-tag-pills"><?php pltt_render_tag_badges( $tags_by_entry[ (int) $entry->id ] ?? [] ); ?></td>
 					<td class="pltt-time-cell">
 						<?php
 						echo esc_html( pltt_format_time( $entry->start_time ) );

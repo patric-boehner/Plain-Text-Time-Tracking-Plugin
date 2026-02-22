@@ -239,6 +239,7 @@ class PLTT_Tags {
 	 *
 	 * @param int          $entry_id  Entry ID.
 	 * @param string|array $tag_names Array of tag name strings or CSV string.
+	 * @return bool True on success, false if a DB operation failed.
 	 */
 	public static function sync_entry_tags( $entry_id, $tag_names ) {
 		global $wpdb;
@@ -262,10 +263,13 @@ class PLTT_Tags {
 
 		// Delete existing junction rows for this entry.
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
-		$wpdb->delete( $entry_tags_table, array( 'entry_id' => $entry_id ), array( '%d' ) );
+		$deleted = $wpdb->delete( $entry_tags_table, array( 'entry_id' => $entry_id ), array( '%d' ) );
+		if ( false === $deleted ) {
+			return false;
+		}
 
 		if ( empty( $tag_names ) ) {
-			return;
+			return true;
 		}
 
 		// Ensure all tags exist in the tags table.
@@ -287,26 +291,35 @@ class PLTT_Tags {
 			)
 		);
 
+		if ( null === $tag_rows ) {
+			return false;
+		}
+
 		$tag_id_map = array();
 		foreach ( $tag_rows as $row ) {
 			$tag_id_map[ $row->name ] = (int) $row->id;
 		}
 
 		// Insert new junction rows.
+		$success = true;
 		foreach ( $tag_names as $name ) {
 			if ( isset( $tag_id_map[ $name ] ) ) {
 				// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
-				$wpdb->query(
+				$r = $wpdb->query(
 					$wpdb->prepare(
 						"INSERT IGNORE INTO {$entry_tags_table} (entry_id, tag_id) VALUES (%d, %d)",
 						$entry_id,
 						$tag_id_map[ $name ]
 					)
 				);
+				if ( false === $r ) {
+					$success = false;
+				}
 			}
 		}
 
 		pltt_flush_tag_cache();
+		return $success;
 	}
 
 	/**

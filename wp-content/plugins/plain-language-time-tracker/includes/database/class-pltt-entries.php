@@ -235,6 +235,13 @@ class PLTT_Entries {
 			return false;
 		}
 
+		// Start our own transaction only if the caller has not already opened one.
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+		$own_transaction = ! (bool) $wpdb->get_var( 'SELECT @@in_transaction' );
+		if ( $own_transaction ) {
+			$wpdb->query( 'START TRANSACTION' );
+		}
+
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
 		$result = $wpdb->insert(
 			$table,
@@ -243,17 +250,25 @@ class PLTT_Entries {
 		);
 
 		if ( ! $result ) {
+			if ( $own_transaction ) {
+				$wpdb->query( 'ROLLBACK' );
+			}
 			return false;
 		}
 
 		$insert_id = $wpdb->insert_id;
 
-		// Sync tags to the junction table.
+		// Sync tags to the junction table; roll back the entry if sync fails.
+		$sync_ok = true;
 		if ( ! empty( $data['tags'] ) ) {
-			PLTT_Tags::sync_entry_tags( $insert_id, $data['tags'] );
+			$sync_ok = PLTT_Tags::sync_entry_tags( $insert_id, $data['tags'] );
 		}
 
-		return $insert_id;
+		if ( $own_transaction ) {
+			$wpdb->query( $sync_ok ? 'COMMIT' : 'ROLLBACK' );
+		}
+
+		return $sync_ok ? $insert_id : false;
 	}
 
 	/**
@@ -322,6 +337,8 @@ class PLTT_Entries {
 			return false;
 		}
 
+		$wpdb->query( 'START TRANSACTION' );
+
 		$result = true;
 
 		// Update non-null fields via wpdb->update().
@@ -338,24 +355,15 @@ class PLTT_Entries {
 
 		// Set nullable fields to NULL directly since wpdb->update() converts NULL to 0 with %d.
 		if ( $result && ! empty( $null_fields ) ) {
-			$set_clauses = array();
-			foreach ( $null_fields as $field ) {
-				$set_clauses[] = "`{$field}` = NULL";
-			}
-			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.NotPrepared
-			$result = false !== $wpdb->query(
-				$wpdb->prepare(
-					// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
-					"UPDATE {$table} SET " . implode( ', ', $set_clauses ) . ' WHERE id = %d',
-					$id
-				)
-			);
+			$result = pltt_set_nullable_fields( $table, $id, $null_fields );
 		}
 
 		// Sync tags when the caller provides a 'tags' key.
 		if ( $result && array_key_exists( 'tags', $data ) ) {
-			PLTT_Tags::sync_entry_tags( $id, $data['tags'] );
+			$result = PLTT_Tags::sync_entry_tags( $id, $data['tags'] );
 		}
+
+		$wpdb->query( $result ? 'COMMIT' : 'ROLLBACK' );
 
 		return $result;
 	}
