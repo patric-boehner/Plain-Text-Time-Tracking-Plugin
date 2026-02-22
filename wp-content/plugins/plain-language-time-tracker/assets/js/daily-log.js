@@ -133,7 +133,14 @@
 				content: content
 			}, function( response ) {
 				if ( response.success && response.data.redirect ) {
-					window.location.href = response.data.redirect;
+					try {
+						const redirectUrl = new URL( response.data.redirect, window.location.origin );
+						if ( redirectUrl.origin === window.location.origin ) {
+							window.location.href = redirectUrl.href;
+						}
+					} catch ( e ) {
+						// Malformed URL — ignore.
+					}
 				} else {
 					alert( response.data || 'Error processing entries.' );
 					processBtn.disabled = false;

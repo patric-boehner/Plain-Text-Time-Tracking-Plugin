@@ -155,6 +155,8 @@ class PLTT_Ajax {
 
 			if ( false === $result ) {
 				$all_created = false;
+				// phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
+				error_log( sprintf( 'PLTT: Entry creation failed for date %s. Entry data: %s', $date, wp_json_encode( $entry ) ) );
 				break;
 			}
 		}
@@ -216,7 +218,7 @@ class PLTT_Ajax {
 			'description' => $description,
 		);
 		if ( '' !== $hourly_rate ) {
-			$client_data['hourly_rate'] = $hourly_rate;
+			$client_data['hourly_rate'] = floatval( $hourly_rate );
 		}
 
 		$client_id = PLTT_Clients::create( $client_data );
@@ -278,7 +280,7 @@ class PLTT_Ajax {
 			'description' => $description,
 		);
 		if ( '' !== $hourly_rate ) {
-			$project_data['hourly_rate'] = $hourly_rate;
+			$project_data['hourly_rate'] = floatval( $hourly_rate );
 		}
 
 		$project_id = PLTT_Projects::create( $project_data );

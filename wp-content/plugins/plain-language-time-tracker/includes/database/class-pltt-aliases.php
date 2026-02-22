@@ -283,18 +283,7 @@ class PLTT_Aliases {
 
 		// Set nullable fields to NULL directly since wpdb->update() converts NULL to 0 with %d.
 		if ( $result && ! empty( $null_fields ) ) {
-			$set_clauses = array();
-			foreach ( $null_fields as $field ) {
-				$set_clauses[] = "`{$field}` = NULL";
-			}
-			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.NotPrepared
-			$result = false !== $wpdb->query(
-				$wpdb->prepare(
-					// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
-					"UPDATE {$table} SET " . implode( ', ', $set_clauses ) . ' WHERE id = %d',
-					$id
-				)
-			);
+			$result = pltt_set_nullable_fields( $table, $id, $null_fields );
 		}
 
 		if ( $result ) {
@@ -347,7 +336,7 @@ class PLTT_Aliases {
 	 * @return array Array of matching alias objects with positions.
 	 */
 	public static function find_in_text( $text ) {
-		$aliases = self::get_all();
+		$aliases = pltt_get_cached_aliases();
 		$matches = array();
 
 		foreach ( $aliases as $alias ) {
@@ -458,7 +447,7 @@ class PLTT_Aliases {
 		);
 
 		// Filter out known tags (words already used as hashtags).
-		$known_tags = PLTT_Entries::get_all_tags();
+		$known_tags = array_column( PLTT_Tags::get_all(), 'name' );
 		if ( ! empty( $known_tags ) ) {
 			$potentials = array_filter(
 				$potentials,

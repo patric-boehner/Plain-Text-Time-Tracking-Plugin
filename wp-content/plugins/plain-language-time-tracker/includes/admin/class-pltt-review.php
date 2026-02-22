@@ -118,23 +118,9 @@ class PLTT_Review {
 		// Bulk-load tags for all entries in a single query.
 		$tags_by_entry = PLTT_Tags::get_for_entries( $entry_ids );
 
-		// Fetch all referenced projects and clients in bulk.
-		$projects_cache = array();
-		$clients_cache  = array();
-
-		foreach ( array_unique( $project_ids ) as $pid ) {
-			$project = PLTT_Projects::get( $pid );
-			if ( $project ) {
-				$projects_cache[ $pid ] = $project;
-			}
-		}
-
-		foreach ( array_unique( $client_ids ) as $cid ) {
-			$client = PLTT_Clients::get( $cid );
-			if ( $client ) {
-				$clients_cache[ $cid ] = $client;
-			}
-		}
+		// Fetch all referenced projects and clients in bulk (single query each).
+		$projects_cache = PLTT_Projects::get_multiple( array_unique( $project_ids ) );
+		$clients_cache  = PLTT_Clients::get_multiple( array_unique( $client_ids ) );
 
 		// Initialize summary totals.
 		$summary = array(
@@ -278,8 +264,17 @@ class PLTT_Review {
 			if ( isset( $entry_data['end_time'] ) ) {
 				$data['end_time'] = $entry_data['end_time'];
 			}
-			if ( isset( $entry_data['duration_minutes'] ) ) {
-				$data['duration_minutes'] = $entry_data['duration_minutes'];
+
+			// Recalculate duration server-side when both times are present.
+			// Discards the client-supplied value to prevent tampering.
+			if ( isset( $data['start_time'] ) && isset( $data['end_time'] ) && '' !== $data['start_time'] ) {
+				$start_mins            = pltt_time_to_minutes( $data['start_time'] );
+				$end_mins              = pltt_time_to_minutes( $data['end_time'] );
+				$data['duration_minutes'] = ( $end_mins >= $start_mins )
+					? ( $end_mins - $start_mins )
+					: ( 1440 - $start_mins + $end_mins ); // Overnight span.
+			} elseif ( isset( $entry_data['duration_minutes'] ) ) {
+				$data['duration_minutes'] = absint( $entry_data['duration_minutes'] );
 			}
 
 			// Snapshot billable rate and amount when verifying.

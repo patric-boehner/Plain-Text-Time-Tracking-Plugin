@@ -559,37 +559,40 @@
 	}
 
 	/**
-	 * Handle delete entry buttons.
+	 * Handle delete entry buttons via event delegation.
 	 */
-	document.querySelectorAll( '.pltt-delete-entry' ).forEach( function( btn ) {
-		btn.addEventListener( 'click', function( e ) {
-			e.preventDefault();
-			if ( ! confirm( plttData.i18n.confirm ) ) {
-				return;
-			}
+	document.addEventListener( 'click', function( e ) {
+		const btn = e.target.closest( '.pltt-delete-entry' );
+		if ( ! btn ) {
+			return;
+		}
 
-			const row = this.closest( '.pltt-entry-row' );
-			const entryId = row.dataset.entryId;
+		e.preventDefault();
+		if ( ! confirm( plttData.i18n.confirm ) ) {
+			return;
+		}
 
-			row.classList.add( 'deleting' );
+		const row = btn.closest( '.pltt-entry-row' );
+		const entryId = row.dataset.entryId;
 
-			if ( entryId && entryId !== '0' ) {
-				// Delete from database.
-				PLTT.ajax( 'pltt_delete_entry', { entry_id: entryId }, function( response ) {
-					if ( response.success ) {
-						row.remove();
-						updateSummary();
-					} else {
-						row.classList.remove( 'deleting' );
-						alert( response.data || 'Error deleting entry.' );
-					}
-				} );
-			} else {
-				// Just remove from DOM (not saved yet).
-				row.remove();
-				updateSummary();
-			}
-		} );
+		row.classList.add( 'deleting' );
+
+		if ( entryId && entryId !== '0' ) {
+			// Delete from database.
+			PLTT.ajax( 'pltt_delete_entry', { entry_id: entryId }, function( response ) {
+				if ( response.success ) {
+					row.remove();
+					updateSummary();
+				} else {
+					row.classList.remove( 'deleting' );
+					alert( response.data || 'Error deleting entry.' );
+				}
+			} );
+		} else {
+			// Just remove from DOM (not saved yet).
+			row.remove();
+			updateSummary();
+		}
 	} );
 
 	/**
@@ -607,12 +610,12 @@
 		} );
 
 		// Update cards if they exist.
-		const entryCountEl = document.querySelector( '.pltt-card-value' );
+		const entryCountEl = document.querySelector( '[data-card="entry-count"]' );
 		if ( entryCountEl ) {
 			entryCountEl.textContent = rows.length;
 		}
 
-		const hoursEl = document.querySelectorAll( '.pltt-card-value' )[ 1 ];
+		const hoursEl = document.querySelector( '[data-card="hours"]' );
 		if ( hoursEl ) {
 			hoursEl.textContent = PLTT.formatHours( totalMinutes );
 		}
