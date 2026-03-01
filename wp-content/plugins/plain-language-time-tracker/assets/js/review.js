@@ -41,7 +41,39 @@
 		} );
 	} );
 
-	// Billable checkbox change — update $ symbol and sync billed state.
+	// Invoiced toggle — AJAX immediate save (same pattern as Reports page).
+	document.querySelectorAll( '.pltt-invoiced-toggle' ).forEach( function( btn ) {
+		btn.addEventListener( 'click', function() {
+			var currentValue = this.dataset.value === '1';
+			var newValue     = currentValue ? '0' : '1';
+			var isInvoiced   = ! currentValue;
+			var self         = this;
+
+			// Optimistic update.
+			this.classList.toggle( 'is-invoiced', isInvoiced );
+			this.classList.toggle( 'not-invoiced', ! isInvoiced );
+			this.dataset.value = newValue;
+			this.textContent   = isInvoiced ? '\u2713' : '\u25cb';
+
+			this.disabled = true;
+			PLTT.ajax(
+				'pltt_update_entry_field',
+				{ entry_id: this.dataset.entryId, field: 'billed', value: newValue },
+				function( response ) {
+					self.disabled = false;
+					if ( ! response.success ) {
+						// Revert.
+						self.classList.toggle( 'is-invoiced', currentValue );
+						self.classList.toggle( 'not-invoiced', ! currentValue );
+						self.dataset.value = currentValue ? '1' : '0';
+						self.textContent   = currentValue ? '\u2713' : '\u25cb';
+					}
+				}
+			);
+		} );
+	} );
+
+	// Billable checkbox change — update $ symbol and sync invoiced toggle visibility.
 	document.querySelectorAll( '.pltt-billable' ).forEach( function( checkbox ) {
 		checkbox.addEventListener( 'change', function() {
 			var cell = this.closest( 'td' );
@@ -51,15 +83,25 @@
 				symbol.classList.toggle( 'not-billable', ! this.checked );
 			}
 
-			// If unchecking billable, also uncheck and disable billed.
+			// If unchecking billable, hide the invoiced toggle and clear its state via AJAX.
 			var row = this.closest( '.pltt-entry-row' );
-			var billedCheckbox = row.querySelector( '.pltt-billed' );
-			if ( billedCheckbox ) {
+			var invoicedBtn = row.querySelector( '.pltt-invoiced-toggle' );
+			if ( invoicedBtn ) {
 				if ( ! this.checked ) {
-					billedCheckbox.checked = false;
-					billedCheckbox.disabled = true;
+					invoicedBtn.style.visibility = 'hidden';
+					if ( invoicedBtn.dataset.value === '1' ) {
+						invoicedBtn.classList.remove( 'is-invoiced' );
+						invoicedBtn.classList.add( 'not-invoiced' );
+						invoicedBtn.dataset.value = '0';
+						invoicedBtn.textContent = '\u25cb';
+						PLTT.ajax( 'pltt_update_entry_field', {
+							entry_id: invoicedBtn.dataset.entryId,
+							field: 'billed',
+							value: '0'
+						}, function() {} );
+					}
 				} else {
-					billedCheckbox.disabled = false;
+					invoicedBtn.style.visibility = '';
 				}
 			}
 		} );
@@ -632,7 +674,6 @@
 
 		rows.forEach( function( row, index ) {
 			const billableCheckbox = row.querySelector( '.pltt-billable' );
-			const billedCheckbox = row.querySelector( '.pltt-billed' );
 			const entry = {
 				id: row.dataset.entryId || 0,
 				entry_date: row.querySelector( '.pltt-entry-date-input' ).value,
@@ -644,8 +685,7 @@
 				client_id: row.querySelector( '.pltt-client-select' ).value,
 				project_id: row.querySelector( '.pltt-project-select' ).value,
 				tags: row.querySelector( '.pltt-tags' ).value,
-				billable: billableCheckbox ? ( billableCheckbox.checked ? 1 : 0 ) : 0,
-				billed: billedCheckbox ? ( billedCheckbox.checked ? 1 : 0 ) : 0
+				billable: billableCheckbox ? ( billableCheckbox.checked ? 1 : 0 ) : 0
 			};
 
 			entries.push( entry );

@@ -160,13 +160,14 @@ class PLTT_Projects {
 		$table = PLTT_Database::get_table_name( 'projects' );
 
 		$insert_data = array(
-			'client_id'   => absint( $data['client_id'] ?? 0 ),
-			'name'        => sanitize_text_field( $data['name'] ?? '' ),
-			'status'      => 'active',
-			'description' => sanitize_textarea_field( $data['description'] ?? '' ),
+			'client_id'           => absint( $data['client_id'] ?? 0 ),
+			'name'                => sanitize_text_field( $data['name'] ?? '' ),
+			'status'              => 'active',
+			'description'         => sanitize_textarea_field( $data['description'] ?? '' ),
+			'billability_default' => isset( $data['billability_default'] ) ? ( $data['billability_default'] ? 1 : 0 ) : 1,
 		);
 
-		$formats = array( '%d', '%s', '%s', '%s' );
+		$formats = array( '%d', '%s', '%s', '%s', '%d' );
 
 		// Validate required fields.
 		if ( empty( $insert_data['client_id'] ) ) {
@@ -186,6 +187,24 @@ class PLTT_Projects {
 			}
 			$insert_data['hourly_rate'] = $rate;
 			$formats[]                  = '%f';
+		}
+
+		// Nullable: recurring_period is NULL when not set.
+		if ( isset( $data['recurring_period'] ) && '' !== $data['recurring_period'] ) {
+			$allowed_periods = array( 'monthly' );
+			if ( in_array( $data['recurring_period'], $allowed_periods, true ) ) {
+				$insert_data['recurring_period'] = $data['recurring_period'];
+				$formats[]                       = '%s';
+			}
+		}
+
+		// Nullable: budget_hours is NULL when not set.
+		if ( isset( $data['budget_hours'] ) && '' !== $data['budget_hours'] ) {
+			$hours = floatval( $data['budget_hours'] );
+			if ( $hours >= 0 ) {
+				$insert_data['budget_hours'] = $hours;
+				$formats[]                   = '%f';
+			}
 		}
 
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
@@ -265,6 +284,35 @@ class PLTT_Projects {
 				$formats[]                  = '%f';
 			} else {
 				$null_fields[] = 'hourly_rate';
+			}
+		}
+
+		if ( array_key_exists( 'billability_default', $data ) ) {
+			$update_data['billability_default'] = $data['billability_default'] ? 1 : 0;
+			$formats[]                          = '%d';
+		}
+
+		if ( array_key_exists( 'recurring_period', $data ) ) {
+			if ( '' !== $data['recurring_period'] && null !== $data['recurring_period'] ) {
+				$allowed_periods = array( 'monthly' );
+				if ( in_array( $data['recurring_period'], $allowed_periods, true ) ) {
+					$update_data['recurring_period'] = $data['recurring_period'];
+					$formats[]                       = '%s';
+				}
+			} else {
+				$null_fields[] = 'recurring_period';
+			}
+		}
+
+		if ( array_key_exists( 'budget_hours', $data ) ) {
+			if ( '' !== $data['budget_hours'] && null !== $data['budget_hours'] ) {
+				$hours = floatval( $data['budget_hours'] );
+				if ( $hours >= 0 ) {
+					$update_data['budget_hours'] = $hours;
+					$formats[]                   = '%f';
+				}
+			} else {
+				$null_fields[] = 'budget_hours';
 			}
 		}
 

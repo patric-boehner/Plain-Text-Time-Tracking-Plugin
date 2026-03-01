@@ -164,6 +164,18 @@ class PLTT_Form_Handlers {
 			$raw_rate = wp_unslash( $_POST['hourly_rate'] );
 			$data['hourly_rate'] = '' === $raw_rate ? '' : floatval( $raw_rate );
 		}
+		if ( isset( $_POST['recurring_period'] ) ) {
+			$data['recurring_period'] = sanitize_text_field( wp_unslash( $_POST['recurring_period'] ) );
+		}
+		if ( isset( $_POST['budget_hours'] ) ) {
+			$raw_hours = wp_unslash( $_POST['budget_hours'] );
+			$data['budget_hours'] = '' === $raw_hours ? '' : floatval( $raw_hours );
+		}
+		// Non-billable checkbox: present means non-billable (billability_default=0); absent means billable (billability_default=1).
+		// Gate on 'name' being in the payload so archive-only submits don't clobber this field.
+		if ( isset( $_POST['name'] ) ) {
+			$data['billability_default'] = isset( $_POST['non_billable'] ) ? 0 : 1;
+		}
 
 		$result = PLTT_Projects::update( $project_id, $data );
 

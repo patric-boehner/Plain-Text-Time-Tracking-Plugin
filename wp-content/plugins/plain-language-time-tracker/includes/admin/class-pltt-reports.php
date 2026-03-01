@@ -26,7 +26,7 @@ class PLTT_Reports {
 	public static function render() {
 		$date_from  = isset( $_GET['from'] ) ? pltt_sanitize_date( wp_unslash( $_GET['from'] ) ) : current_time( 'Y-m-01' );
 		$date_to    = isset( $_GET['to'] ) ? pltt_sanitize_date( wp_unslash( $_GET['to'] ) ) : pltt_get_current_date();
-		$view       = isset( $_GET['view'] ) ? sanitize_text_field( wp_unslash( $_GET['view'] ) ) : 'detailed';
+		$view       = isset( $_GET['view'] ) ? sanitize_text_field( wp_unslash( $_GET['view'] ) ) : 'summary';
 		$client_id  = isset( $_GET['client_id'] ) ? absint( $_GET['client_id'] ) : 0;
 		$project_id = isset( $_GET['project_id'] ) ? absint( $_GET['project_id'] ) : 0;
 		$tag        = isset( $_GET['tag'] ) ? sanitize_text_field( wp_unslash( $_GET['tag'] ) ) : '';
@@ -40,7 +40,7 @@ class PLTT_Reports {
 
 		// Whitelist valid views.
 		if ( ! in_array( $view, array( 'detailed', 'summary' ), true ) ) {
-			$view = 'detailed';
+			$view = 'summary';
 		}
 
 		// Build filter args shared across all queries.
@@ -89,8 +89,33 @@ class PLTT_Reports {
 		$total_pages = 1;
 		$paged       = 1;
 
+		// Allocation stats for the summary table — always the full picture, not filtered by date.
+		$alloc_stats = array();
+
 		if ( 'summary' === $view ) {
 			$summary = PLTT_Entries::get_summary_by_project( $date_from, $date_to, $filter_args );
+
+			// For projects with a budget, fetch allocation-aware stats.
+			// Recurring: hours within the selected date range vs monthly allocation.
+			// Fixed budget: all-time hours vs estimate.
+			if ( ! empty( $summary ) ) {
+				foreach ( $summary as $row ) {
+					if ( empty( $row->project_id ) || empty( $row->budget_hours ) ) {
+						continue;
+					}
+					if ( ! empty( $row->recurring_period ) ) {
+						$alloc_stats[ $row->project_id ] = PLTT_Entries::get_stats( array(
+							'project_id' => (int) $row->project_id,
+							'date_from'  => $date_from,
+							'date_to'    => $date_to,
+						) );
+					} else {
+						$alloc_stats[ $row->project_id ] = PLTT_Entries::get_stats( array(
+							'project_id' => (int) $row->project_id,
+						) );
+					}
+				}
+			}
 		} else {
 			$paged      = isset( $_GET['paged'] ) ? max( 1, absint( $_GET['paged'] ) ) : 1;
 			$per_page   = self::PER_PAGE;

@@ -18,13 +18,15 @@ var PlttTagPicker = ( function() {
 	 * @param {HTMLElement}   container The .pltt-tag-input-wrap element.
 	 * @param {Array}         allTags   Array of all known tag strings.
 	 * @param {Function|null} onAddNew  Optional callback when "Add new tag…" is clicked; receives picker instance.
+	 * @param {Function|null} onClose   Optional callback when the dropdown closes; receives (selectedTags, csvValue).
 	 */
-	function PlttTagPicker( container, allTags, onAddNew ) {
+	function PlttTagPicker( container, allTags, onAddNew, onClose ) {
 		this.container = container;
 		this.hiddenInput = container.querySelector( '.pltt-tags' );
 		this.allTags = allTags || [];
 		this.selectedTags = [];
 		this.onAddNew = onAddNew || null;
+		this.onClose = onClose || null;
 
 		this._buildDOM();
 		this._loadInitial();
@@ -320,6 +322,9 @@ var PlttTagPicker = ( function() {
 	 */
 	PlttTagPicker.prototype._closeDropdown = function() {
 		this.dropdown.style.display = 'none';
+		if ( this.onClose ) {
+			this.onClose( this.selectedTags.slice(), this.hiddenInput.value );
+		}
 	};
 
 	/**

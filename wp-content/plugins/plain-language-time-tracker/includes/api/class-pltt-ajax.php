@@ -27,6 +27,7 @@ class PLTT_Ajax {
 
 		// Entry operations.
 		add_action( 'wp_ajax_pltt_delete_entry', array( __CLASS__, 'delete_entry' ) );
+		add_action( 'wp_ajax_pltt_update_entry_field', array( __CLASS__, 'update_entry_field' ) );
 
 		// Client operations (create only - used from review screen modals).
 		add_action( 'wp_ajax_pltt_create_client', array( __CLASS__, 'create_client' ) );
@@ -179,6 +180,53 @@ class PLTT_Ajax {
 	}
 
 	/**
+	 * Update a single field on a time entry (billable, billed, or tags).
+	 *
+	 * Used by the inline editing controls on the Reports page.
+	 */
+	public static function update_entry_field() {
+		self::verify_request();
+
+		$entry_id = isset( $_POST['entry_id'] ) ? absint( $_POST['entry_id'] ) : 0;
+		$field    = isset( $_POST['field'] ) ? sanitize_key( wp_unslash( $_POST['field'] ) ) : '';
+		$value    = isset( $_POST['value'] ) ? sanitize_text_field( wp_unslash( $_POST['value'] ) ) : '';
+
+		if ( empty( $entry_id ) ) {
+			wp_send_json_error( __( 'Invalid entry ID.', 'plain-language-time-tracker' ) );
+		}
+
+		$allowed_fields = array( 'billable', 'billed', 'tags' );
+		if ( ! in_array( $field, $allowed_fields, true ) ) {
+			wp_send_json_error( __( 'Invalid field.', 'plain-language-time-tracker' ) );
+		}
+
+		global $wpdb;
+		$table = PLTT_Database::get_table_name( 'time_entries' );
+
+		if ( 'tags' === $field ) {
+			$tag_names = '' !== $value ? explode( ',', $value ) : array();
+			$result    = PLTT_Tags::sync_entry_tags( $entry_id, $tag_names );
+			if ( false === $result ) {
+				wp_send_json_error( __( 'Failed to update tags.', 'plain-language-time-tracker' ) );
+			}
+		} else {
+			$int_value = (int) $value;
+			$result    = $wpdb->update(
+				$table,
+				array( $field => $int_value ),
+				array( 'id' => $entry_id ),
+				array( '%d' ),
+				array( '%d' )
+			);
+			if ( false === $result ) {
+				wp_send_json_error( __( 'Failed to update entry.', 'plain-language-time-tracker' ) );
+			}
+		}
+
+		wp_send_json_success( array( 'message' => __( 'Saved.', 'plain-language-time-tracker' ) ) );
+	}
+
+	/**
 	 * Delete a time entry.
 	 */
 	public static function delete_entry() {
@@ -261,10 +309,14 @@ class PLTT_Ajax {
 	public static function create_project() {
 		self::verify_request();
 
-		$client_id   = isset( $_POST['client_id'] ) ? absint( $_POST['client_id'] ) : 0;
-		$name        = isset( $_POST['name'] ) ? sanitize_text_field( wp_unslash( $_POST['name'] ) ) : '';
-		$description = isset( $_POST['description'] ) ? sanitize_textarea_field( wp_unslash( $_POST['description'] ) ) : '';
-		$hourly_rate = isset( $_POST['hourly_rate'] ) ? wp_unslash( $_POST['hourly_rate'] ) : '';
+		$client_id        = isset( $_POST['client_id'] ) ? absint( $_POST['client_id'] ) : 0;
+		$name             = isset( $_POST['name'] ) ? sanitize_text_field( wp_unslash( $_POST['name'] ) ) : '';
+		$description      = isset( $_POST['description'] ) ? sanitize_textarea_field( wp_unslash( $_POST['description'] ) ) : '';
+		$hourly_rate      = isset( $_POST['hourly_rate'] ) ? wp_unslash( $_POST['hourly_rate'] ) : '';
+		$recurring_period    = isset( $_POST['recurring_period'] ) ? sanitize_text_field( wp_unslash( $_POST['recurring_period'] ) ) : '';
+		$budget_hours        = isset( $_POST['budget_hours'] ) ? wp_unslash( $_POST['budget_hours'] ) : '';
+		// non_billable=1 means the checkbox was checked → billability_default=0; absent = billable by default.
+		$billability_default = isset( $_POST['non_billable'] ) && '1' === $_POST['non_billable'] ? 0 : 1;
 
 		if ( empty( $name ) ) {
 			wp_send_json_error( __( 'Project name is required.', 'plain-language-time-tracker' ) );
@@ -275,12 +327,19 @@ class PLTT_Ajax {
 		}
 
 		$project_data = array(
-			'client_id'   => $client_id,
-			'name'        => $name,
-			'description' => $description,
+			'client_id'           => $client_id,
+			'name'                => $name,
+			'description'         => $description,
+			'billability_default' => $billability_default,
 		);
 		if ( '' !== $hourly_rate ) {
 			$project_data['hourly_rate'] = floatval( $hourly_rate );
+		}
+		if ( '' !== $recurring_period ) {
+			$project_data['recurring_period'] = $recurring_period;
+		}
+		if ( '' !== $budget_hours ) {
+			$project_data['budget_hours'] = floatval( $budget_hours );
 		}
 
 		$project_id = PLTT_Projects::create( $project_data );

@@ -110,7 +110,7 @@ $return_to = isset( $_GET['return_to'] ) ? esc_url_raw( wp_unslash( $_GET['retur
 						<th class="pltt-col-tags"><?php esc_html_e( 'Tags', 'plain-language-time-tracker' ); ?></th>
 						<th class="pltt-col-billable"><?php esc_html_e( 'Billable', 'plain-language-time-tracker' ); ?></th>
 						<?php if ( $has_saved_entries ) : ?>
-							<th class="pltt-col-billed"><?php esc_html_e( 'Invoiced', 'plain-language-time-tracker' ); ?></th>
+							<th class="pltt-col-billed"><?php esc_html_e( 'Inv.', 'plain-language-time-tracker' ); ?></th>
 						<?php endif; ?>
 					</tr>
 				</thead>
@@ -255,16 +255,21 @@ $return_to = isset( $_GET['return_to'] ) ? esc_url_raw( wp_unslash( $_GET['retur
 									<?php checked( ! empty( $entry['billable'] ) ); ?>
 								>
 							</td>
-							<?php if ( $has_saved_entries ) : ?>
+							<?php if ( $has_saved_entries ) :
+							$is_entry_billed   = ! empty( $entry['billed'] );
+							$is_entry_billable = ! empty( $entry['billable'] );
+							?>
 								<td class="pltt-col-billed">
-									<input
-										type="checkbox"
-										name="entries[<?php echo esc_attr( $index ); ?>][billed]"
-										class="pltt-billed"
-										value="1"
-										<?php checked( ! empty( $entry['billed'] ) ); ?>
-										<?php disabled( empty( $entry['billable'] ) ); ?>
-									>
+									<button type="button"
+										class="pltt-invoiced-toggle <?php echo $is_entry_billed ? 'is-invoiced' : 'not-invoiced'; ?>"
+										data-entry-id="<?php echo esc_attr( $entry['id'] ); ?>"
+										data-field="billed"
+										data-value="<?php echo $is_entry_billed ? '1' : '0'; ?>"
+										aria-label="<?php echo $is_entry_billed ? esc_attr__( 'Invoiced — click to toggle', 'plain-language-time-tracker' ) : esc_attr__( 'Not invoiced — click to toggle', 'plain-language-time-tracker' ); ?>"
+										title="<?php echo $is_entry_billed ? esc_attr__( 'Invoiced — click to toggle', 'plain-language-time-tracker' ) : esc_attr__( 'Not invoiced — click to toggle', 'plain-language-time-tracker' ); ?>"
+										<?php echo ! $is_entry_billable ? 'style="visibility:hidden"' : ''; ?>>
+										<?php echo $is_entry_billed ? '✓' : '○'; ?>
+									</button>
 								</td>
 							<?php endif; ?>
 						</tr>

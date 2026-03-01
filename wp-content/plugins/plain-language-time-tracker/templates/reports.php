@@ -126,13 +126,13 @@ $tab_base_url = add_query_arg( $filter_params, admin_url( 'admin.php' ) );
 	<div class="pltt-header">
 		<h1><?php esc_html_e( 'Time Entries', 'plain-language-time-tracker' ); ?></h1>
 		<div class="pltt-view-toggle">
-			<a href="<?php echo esc_url( add_query_arg( 'view', 'detailed', $tab_base_url ) ); ?>"
-				class="button <?php echo 'detailed' === $view ? 'button-primary' : ''; ?>">
-				<?php esc_html_e( 'Detailed', 'plain-language-time-tracker' ); ?>
-			</a>
 			<a href="<?php echo esc_url( add_query_arg( 'view', 'summary', $tab_base_url ) ); ?>"
 				class="button <?php echo 'summary' === $view ? 'button-primary' : ''; ?>">
 				<?php esc_html_e( 'Summary', 'plain-language-time-tracker' ); ?>
+			</a>
+			<a href="<?php echo esc_url( add_query_arg( 'view', 'detailed', $tab_base_url ) ); ?>"
+				class="button <?php echo 'detailed' === $view ? 'button-primary' : ''; ?>">
+				<?php esc_html_e( 'Detailed', 'plain-language-time-tracker' ); ?>
 			</a>
 		</div>
 	</div>
@@ -301,6 +301,7 @@ $tab_base_url = add_query_arg( $filter_params, admin_url( 'admin.php' ) );
 	<script>
 		var plttProjectsByClient = <?php echo wp_json_encode( $projects_by_client ); ?>;
 		var plttClientNames = <?php echo wp_json_encode( $client_names ); ?>;
+		var plttAllTags = <?php echo wp_json_encode( $all_tags ); ?>;
 	</script>
 
 	<?php if ( $total_entries > 0 ) : ?>
@@ -400,6 +401,7 @@ $tab_base_url = add_query_arg( $filter_params, admin_url( 'admin.php' ) );
 				</div>
 			<?php endif; ?>
 
+
 			<?php // EHR card hidden — needs full billing context to be useful. Re-enable when ready. ?>
 			<?php if ( false ) : // phpcs:ignore ?>
 			<!-- Card 5: Overall EHR -->
@@ -440,10 +442,11 @@ $tab_base_url = add_query_arg( $filter_params, admin_url( 'admin.php' ) );
 						<tr>
 							<th><?php esc_html_e( 'Project', 'plain-language-time-tracker' ); ?></th>
 							<th><?php esc_html_e( 'Client', 'plain-language-time-tracker' ); ?></th>
+							<th><?php esc_html_e( 'Type', 'plain-language-time-tracker' ); ?></th>
 							<th><?php esc_html_e( 'Hours', 'plain-language-time-tracker' ); ?></th>
+							<th><?php esc_html_e( 'Allocation / Budget', 'plain-language-time-tracker' ); ?></th>
 							<th><?php esc_html_e( 'Billable Hours', 'plain-language-time-tracker' ); ?></th>
-							<th><?php esc_html_e( 'Billable Amount', 'plain-language-time-tracker' ); ?></th>
-							<th><?php esc_html_e( 'Entries', 'plain-language-time-tracker' ); ?></th>
+							<th><?php esc_html_e( 'Amount', 'plain-language-time-tracker' ); ?></th>
 						</tr>
 					</thead>
 					<tbody>
@@ -472,11 +475,38 @@ $tab_base_url = add_query_arg( $filter_params, admin_url( 'admin.php' ) );
 									<?php endif; ?>
 								</td>
 								<td><?php echo ! empty( $row->client_name ) ? esc_html( $row->client_name ) : '<span class="pltt-empty">—</span>'; ?></td>
-								<td class="pltt-duration-cell"><?php echo esc_html( pltt_format_hours( $row->total_minutes ) ); ?></td>
+								<td>
+									<?php $billing_type = pltt_get_billing_type( $row ); ?>
+									<?php if ( 'none' === $billing_type ) : ?>
+										<span class="pltt-badge"><?php esc_html_e( 'Internal', 'plain-language-time-tracker' ); ?></span>
+									<?php elseif ( 'recurring' === $billing_type ) : ?>
+										<span class="pltt-badge pltt-badge-info"><?php esc_html_e( 'Monthly', 'plain-language-time-tracker' ); ?></span>
+									<?php elseif ( 'fixed' === $billing_type ) : ?>
+										<span class="pltt-badge pltt-badge-purple"><?php esc_html_e( 'Fixed Budget', 'plain-language-time-tracker' ); ?></span>
+									<?php else : ?>
+										<span class="pltt-badge pltt-badge-success"><?php esc_html_e( 'Hourly', 'plain-language-time-tracker' ); ?></span>
+									<?php endif; ?>
+								</td>
+								<?php
+								$has_alloc = ! empty( $row->budget_hours ) && ! empty( $row->project_id ) && isset( $alloc_stats[ $row->project_id ] );
+								if ( $has_alloc ) {
+									$sa_budget_hours = (float) $row->budget_hours;
+									$sa_used_mins    = (float) $alloc_stats[ $row->project_id ]->total_minutes;
+								}
+								?>
+								<td class="pltt-duration-cell">
+									<?php echo esc_html( pltt_format_hours( $row->total_minutes ) ); ?>
+								</td>
+								<td class="pltt-duration-cell">
+									<?php if ( $has_alloc ) :
+										pltt_render_allocation_bar( $sa_used_mins, $sa_budget_hours, $billing_type );
+									else : ?>
+										<span class="pltt-empty">—</span>
+									<?php endif; ?>
+								</td>
 								<td class="pltt-duration-cell"><?php echo esc_html( pltt_format_hours( $row->billable_minutes ) ); ?></td>
 								<td class="pltt-duration-cell"><?php echo (float) $row->billable_amount > 0 ? esc_html( pltt_format_currency( $row->billable_amount ) ) : '<span class="pltt-empty">—</span>'; ?></td>
-								<td><?php echo esc_html( $row->entry_count ); ?></td>
-							</tr>
+								</tr>
 						<?php endforeach; ?>
 					</tbody>
 				</table>
@@ -515,7 +545,7 @@ $tab_base_url = add_query_arg( $filter_params, admin_url( 'admin.php' ) );
 								<a href="<?php echo esc_url( pltt_get_admin_url( 'review', array( 'date' => $group_date, 'return_to' => urlencode( $return_url ) ) ) ); ?>" class="button"><?php esc_html_e( 'Edit', 'plain-language-time-tracker' ); ?></a>
 							</span>
 						</div>
-					<?php pltt_render_entry_table( $group_entries, array( 'show_amount' => true ) ); ?>
+					<?php pltt_render_entry_table( $group_entries, array( 'show_amount' => true, 'inline_edit' => true, 'all_tags' => $all_tags ) ); ?>
 					</div>
 				<?php endforeach; ?>
 
