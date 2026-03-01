@@ -535,10 +535,11 @@ function pltt_validate_hourly_rate( $rate ) {
 }
 
 /**
- * Render a read-only entry table.
+ * Render an entry table.
  *
  * Outputs a complete <table> with entry rows showing description,
  * client, project, tags, time, duration, and billable indicator.
+ * When inline_edit is true, Tags, Billable, and Invoiced are interactive.
  *
  * @param array $entries Array of entry objects.
  * @param array $options {
@@ -546,11 +547,15 @@ function pltt_validate_hourly_rate( $rate ) {
  *
  *     @type bool   $show_amount Whether to show the Amount column. Default false.
  *     @type string $table_class Additional CSS class for the table element.
+ *     @type bool   $inline_edit Whether to render interactive inline edit controls. Default false.
+ *     @type array  $all_tags    All available tag name strings. Required when inline_edit is true.
  * }
  */
 function pltt_render_entry_table( $entries, $options = array() ) {
 	$show_amount = ! empty( $options['show_amount'] );
 	$table_class = ! empty( $options['table_class'] ) ? ' ' . $options['table_class'] : '';
+	$inline_edit = ! empty( $options['inline_edit'] );
+	$all_tags    = $inline_edit && ! empty( $options['all_tags'] ) ? $options['all_tags'] : array();
 
 	if ( empty( $entries ) ) {
 		return;
@@ -586,27 +591,41 @@ function pltt_render_entry_table( $entries, $options = array() ) {
 				<th><?php esc_html_e( 'Time', 'plain-language-time-tracker' ); ?></th>
 				<th><?php esc_html_e( 'Duration', 'plain-language-time-tracker' ); ?></th>
 				<th><?php esc_html_e( 'Billable', 'plain-language-time-tracker' ); ?></th>
+				<?php if ( $inline_edit ) : ?>
+					<th class="pltt-invoiced-col"><?php esc_html_e( 'Inv.', 'plain-language-time-tracker' ); ?></th>
+				<?php endif; ?>
 				<?php if ( $show_amount ) : ?>
-					<th><?php esc_html_e( 'Amount', 'plain-language-time-tracker' ); ?></th>
+					<th class="pltt-amount-col"><?php esc_html_e( 'Amount', 'plain-language-time-tracker' ); ?></th>
 				<?php endif; ?>
 			</tr>
 		</thead>
 		<tbody>
 			<?php foreach ( $entries as $entry ) :
 				// Use pre-fetched data to avoid N+1 queries.
-				$client  = ! empty( $entry->client_id ) && isset( $clients_cache[ $entry->client_id ] ) ? $clients_cache[ $entry->client_id ] : null;
-				$project = ! empty( $entry->project_id ) && isset( $projects_cache[ $entry->project_id ] ) ? $projects_cache[ $entry->project_id ] : null;
+				$client       = ! empty( $entry->client_id ) && isset( $clients_cache[ $entry->client_id ] ) ? $clients_cache[ $entry->client_id ] : null;
+				$project      = ! empty( $entry->project_id ) && isset( $projects_cache[ $entry->project_id ] ) ? $projects_cache[ $entry->project_id ] : null;
+				$entry_tags   = $tags_by_entry[ (int) $entry->id ] ?? array();
+				$is_billed    = ! empty( $entry->billed );
+				$is_billable  = ! empty( $entry->billable );
 				?>
-				<tr<?php echo ! empty( $entry->billed ) ? ' class="pltt-billed" aria-label="' . esc_attr__( 'Invoiced entry', 'plain-language-time-tracker' ) . '"' : ''; ?>>
+				<tr<?php echo $is_billed ? ' class="pltt-billed"' : ''; ?><?php echo $inline_edit ? ' data-entry-id="' . esc_attr( $entry->id ) . '"' : ''; ?>>
 					<td>
-						<?php if ( ! empty( $entry->billed ) ) : ?>
+						<?php if ( $is_billed && ! $inline_edit ) : ?>
 							<span class="screen-reader-text"><?php esc_html_e( 'Invoiced:', 'plain-language-time-tracker' ); ?></span>
 						<?php endif; ?>
 						<?php echo esc_html( $entry->description ); ?>
 					</td>
 					<td><?php echo $client ? esc_html( $client->name ) : '<span class="pltt-empty">—</span>'; ?></td>
 					<td><?php echo $project ? esc_html( $project->name ) : '<span class="pltt-empty">—</span>'; ?></td>
-					<td class="pltt-tag-pills"><?php pltt_render_tag_badges( $tags_by_entry[ (int) $entry->id ] ?? [] ); ?></td>
+					<td class="pltt-tag-cell">
+						<?php if ( $inline_edit ) : ?>
+							<div class="pltt-tag-input-wrap" data-entry-id="<?php echo esc_attr( $entry->id ); ?>">
+								<input type="hidden" class="pltt-tags" value="<?php echo esc_attr( implode( ',', $entry_tags ) ); ?>">
+							</div>
+						<?php else : ?>
+							<div class="pltt-tag-pills"><?php pltt_render_tag_badges( $entry_tags ); ?></div>
+						<?php endif; ?>
+					</td>
 					<td class="pltt-time-cell">
 						<?php
 						echo esc_html( pltt_format_time( $entry->start_time ) );
@@ -619,11 +638,35 @@ function pltt_render_entry_table( $entries, $options = array() ) {
 						<?php echo esc_html( pltt_format_duration( $entry->duration_minutes ) ); ?>
 					</td>
 					<td class="pltt-billable-indicator">
-						<span class="pltt-billable-symbol <?php echo $entry->billable ? 'is-billable' : 'not-billable'; ?>" aria-label="<?php echo $entry->billable ? esc_attr__( 'Billable', 'plain-language-time-tracker' ) : esc_attr__( 'Not billable', 'plain-language-time-tracker' ); ?>" title="<?php echo $entry->billable ? esc_attr__( 'Billable', 'plain-language-time-tracker' ) : esc_attr__( 'Not billable', 'plain-language-time-tracker' ); ?>">$</span>
+						<?php if ( $inline_edit ) : ?>
+							<button type="button"
+								class="pltt-billable-symbol pltt-inline-toggle <?php echo $is_billable ? 'is-billable' : 'not-billable'; ?>"
+								data-entry-id="<?php echo esc_attr( $entry->id ); ?>"
+								data-field="billable"
+								data-value="<?php echo $is_billable ? '1' : '0'; ?>"
+								aria-label="<?php echo $is_billable ? esc_attr__( 'Billable — click to toggle', 'plain-language-time-tracker' ) : esc_attr__( 'Not billable — click to toggle', 'plain-language-time-tracker' ); ?>"
+								title="<?php echo $is_billable ? esc_attr__( 'Billable — click to toggle', 'plain-language-time-tracker' ) : esc_attr__( 'Not billable — click to toggle', 'plain-language-time-tracker' ); ?>">$</button>
+						<?php else : ?>
+							<span class="pltt-billable-symbol <?php echo $is_billable ? 'is-billable' : 'not-billable'; ?>" aria-label="<?php echo $is_billable ? esc_attr__( 'Billable', 'plain-language-time-tracker' ) : esc_attr__( 'Not billable', 'plain-language-time-tracker' ); ?>" title="<?php echo $is_billable ? esc_attr__( 'Billable', 'plain-language-time-tracker' ) : esc_attr__( 'Not billable', 'plain-language-time-tracker' ); ?>">$</span>
+						<?php endif; ?>
 					</td>
+					<?php if ( $inline_edit ) : ?>
+						<td class="pltt-invoiced-col">
+							<button type="button"
+								class="pltt-invoiced-toggle <?php echo $is_billed ? 'is-invoiced' : 'not-invoiced'; ?>"
+								data-entry-id="<?php echo esc_attr( $entry->id ); ?>"
+								data-field="billed"
+								data-value="<?php echo $is_billed ? '1' : '0'; ?>"
+								aria-label="<?php echo $is_billed ? esc_attr__( 'Invoiced — click to toggle', 'plain-language-time-tracker' ) : esc_attr__( 'Not invoiced — click to toggle', 'plain-language-time-tracker' ); ?>"
+								title="<?php echo $is_billed ? esc_attr__( 'Invoiced — click to toggle', 'plain-language-time-tracker' ) : esc_attr__( 'Not invoiced — click to toggle', 'plain-language-time-tracker' ); ?>"
+								<?php echo ! $is_billable ? 'style="visibility:hidden"' : ''; ?>>
+								<?php echo $is_billed ? '✓' : '○'; ?>
+							</button>
+						</td>
+					<?php endif; ?>
 					<?php if ( $show_amount ) :
 						$billable_amount = 0.0;
-						if ( ! empty( $entry->billable ) && $entry->duration_minutes > 0 ) {
+						if ( $is_billable && $entry->duration_minutes > 0 ) {
 							if ( null !== $entry->billable_amount ) {
 								$billable_amount = (float) $entry->billable_amount;
 							} else {
@@ -639,11 +682,69 @@ function pltt_render_entry_table( $entries, $options = array() ) {
 							}
 						}
 						?>
-						<td class="pltt-duration-cell"><?php echo $billable_amount > 0 ? esc_html( pltt_format_currency( $billable_amount ) ) : '<span class="pltt-empty">—</span>'; ?></td>
+						<td class="pltt-duration-cell pltt-amount-col"><?php echo $billable_amount > 0 ? esc_html( pltt_format_currency( $billable_amount ) ) : '<span class="pltt-empty">—</span>'; ?></td>
 					<?php endif; ?>
 				</tr>
 			<?php endforeach; ?>
 		</tbody>
 	</table>
+	<?php
+}
+
+/**
+ * Derive the billing type for a project object or summary row.
+ *
+ * Returns one of: 'recurring' | 'fixed' | 'none' | 'hourly'.
+ *
+ * NOTE: budget_hours MUST be checked before billability_default because Fixed
+ * Budget projects have billability_default = 0, which would otherwise classify
+ * them as Internal ('none').
+ *
+ * @param object $project Any object with recurring_period, budget_hours, billability_default properties.
+ * @return string
+ */
+function pltt_get_billing_type( $project ) {
+	if ( ! empty( $project->recurring_period ) ) {
+		return 'recurring';
+	} elseif ( ! empty( $project->budget_hours ) ) {
+		return 'fixed';
+	} elseif ( empty( $project->billability_default ) ) {
+		return 'none';
+	}
+	return 'hourly';
+}
+
+/**
+ * Render the allocation bar HTML for a project.
+ *
+ * Outputs a progress bar showing how much of the budget/allocation has been used.
+ * For recurring projects the suffix is "hrs/mo"; for fixed budgets "hrs est.".
+ *
+ * @param float  $alloc_mins   Minutes logged in the relevant allocation period.
+ * @param float  $budget_hours Allocation budget in hours.
+ * @param string $billing_type 'recurring' or 'fixed'.
+ */
+function pltt_render_allocation_bar( $alloc_mins, $budget_hours, $billing_type ) {
+	$alloc_hours = $alloc_mins / 60;
+	$pct         = $budget_hours > 0 ? ( $alloc_hours / $budget_hours ) * 100 : 0;
+	$is_over     = $pct >= 100;
+	$bar_width   = min( $pct, 100 );
+	$label_pct   = round( $pct );
+	$alloc_fmt   = pltt_format_hours( $alloc_mins );
+	$budget_fmt  = rtrim( rtrim( number_format( $budget_hours, 1 ), '0' ), '.' );
+	$suffix      = 'fixed' === $billing_type ? ' hrs est.' : ' hrs/mo';
+	?>
+	<div class="pltt-alloc-cell">
+		<div class="pltt-alloc-bar-wrap">
+			<div class="pltt-alloc-bar<?php echo $is_over ? ' pltt-alloc-over' : ''; ?>"
+				 style="width:<?php echo esc_attr( $bar_width ); ?>%"></div>
+		</div>
+		<span class="pltt-alloc-label">
+			<?php echo esc_html( $alloc_fmt . ' of ' . $budget_fmt . $suffix ); ?>
+			&middot; <?php echo esc_html( $label_pct ); ?>%<?php if ( $is_over ) :
+				$over_fmt = pltt_format_hours( ( $alloc_hours - $budget_hours ) * 60 );
+				?> &middot; +<?php echo esc_html( $over_fmt ); ?> <?php esc_html_e( 'over', 'plain-language-time-tracker' ); ?><?php endif; ?>
+		</span>
+	</div>
 	<?php
 }

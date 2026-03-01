@@ -20,7 +20,7 @@ class PLTT_Database {
 	 *
 	 * @var string
 	 */
-	const DB_VERSION = '1.8.0';
+	const DB_VERSION = '1.9.1';
 
 	/**
 	 * Get the full table name with WordPress prefix.
@@ -66,6 +66,9 @@ class PLTT_Database {
 			status varchar(20) NOT NULL DEFAULT 'active',
 			description text,
 			hourly_rate decimal(10,2) DEFAULT NULL,
+			billability_default tinyint(1) NOT NULL DEFAULT 1,
+			recurring_period varchar(20) DEFAULT NULL,
+			budget_hours decimal(8,2) DEFAULT NULL,
 			created_at datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
 			updated_at datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
 			PRIMARY KEY (id),
@@ -220,8 +223,8 @@ class PLTT_Database {
 			$wpdb->query( "ALTER TABLE {$projects_table} ADD INDEX client_status (client_id, status)" );
 		}
 
-		// 1.8.0: Normalize tags from CSV column to junction tables.
-		if ( version_compare( $from_version, '1.8.0', '<' ) ) {
+		// 1.8.1: Normalize tags from CSV column to junction tables.
+		if ( version_compare( $from_version, '1.8.1', '<' ) ) {
 			$entries_table    = self::get_table_name( 'time_entries' );
 			$tags_table       = self::get_table_name( 'tags' );
 			$entry_tags_table = self::get_table_name( 'entry_tags' );
@@ -310,6 +313,24 @@ class PLTT_Database {
 				$wpdb->query( 'COMMIT' );
 			}
 		}
+
+		// 1.9.0: Add billability_default and recurring_period to projects.
+		if ( version_compare( $from_version, '1.9.0', '<' ) ) {
+			$projects_table = self::get_table_name( 'projects' );
+
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.SchemaChange
+			$wpdb->query( "ALTER TABLE {$projects_table} ADD COLUMN IF NOT EXISTS billability_default tinyint(1) NOT NULL DEFAULT 1" );
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.SchemaChange
+			$wpdb->query( "ALTER TABLE {$projects_table} ADD COLUMN IF NOT EXISTS recurring_period varchar(20) DEFAULT NULL" );
+		}
+
+		// 1.9.1: Add budget_hours to projects.
+		if ( version_compare( $from_version, '1.9.1', '<' ) ) {
+			$projects_table = self::get_table_name( 'projects' );
+
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.SchemaChange
+			$wpdb->query( "ALTER TABLE {$projects_table} ADD COLUMN IF NOT EXISTS budget_hours decimal(8,2) DEFAULT NULL" );
+		}
 	}
 
 	/**
@@ -337,6 +358,6 @@ class PLTT_Database {
 		delete_option( 'pltt_version' );
 		delete_option( 'pltt_db_version' );
 		delete_option( 'pltt_task_types' );    // May already be gone from 1.6.0 migration.
-		delete_option( 'pltt_custom_tags' );   // May already be gone from 1.8.0 migration.
+		delete_option( 'pltt_custom_tags' );   // May already be gone from 1.8.1 migration.
 	}
 }

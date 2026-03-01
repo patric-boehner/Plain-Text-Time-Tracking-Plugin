@@ -148,9 +148,145 @@
 	width: 65px;
 }
 
-.pltt-date-group .widefat th:nth-child(8),
-.pltt-date-group .widefat td:nth-child(8) { /* Amount */
+.pltt-date-group .widefat th.pltt-amount-col,
+.pltt-date-group .widefat td.pltt-amount-col { /* Amount */
 	width: 80px;
+}
+
+/* Invoiced column */
+.pltt-date-group .widefat th.pltt-invoiced-col,
+.pltt-date-group .widefat td.pltt-invoiced-col {
+	width: 50px;
+	/* text-align: center; */
+}
+
+/* Inline toggle buttons — shared base */
+.pltt-inline-toggle,
+.pltt-invoiced-toggle {
+	background: none;
+	border: none;
+	padding: 0;
+	cursor: pointer;
+	font-size: 15px;
+	font-weight: 600;
+	line-height: 1;
+	transition: opacity 0.1s;
+}
+
+.pltt-inline-toggle:focus,
+.pltt-invoiced-toggle:focus {
+	outline: 2px solid #2271b1;
+	outline-offset: 2px;
+	border-radius: 2px;
+}
+
+/* Saving state — subtle fade while request is in flight */
+.pltt-inline-toggle.pltt-saving,
+.pltt-invoiced-toggle.pltt-saving {
+	opacity: 0.4;
+	cursor: wait;
+}
+
+/* Invoiced toggle states */
+.pltt-invoiced-toggle.is-invoiced {
+	color: #2271b1;
+}
+
+.pltt-invoiced-toggle.not-invoiced {
+	color: #c3c4c7;
+}
+
+/* Tag cell in inline-edit mode */
+.pltt-tag-cell {
+	vertical-align: top;
+}
+
+/* Tag picker component (mirrors review.css for use on reports page) */
+.pltt-tag-input-wrap {
+	position: relative;
+	width: 100%;
+}
+
+#pltt-report-content .pltt-tag-pills {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 4px;
+	margin-bottom: 4px;
+}
+
+#pltt-report-content .pltt-tag-pills:empty {
+	margin-bottom: 0;
+}
+
+#pltt-report-content .pltt-tag-pill-trigger {
+	cursor: pointer;
+}
+
+.pltt-tag-picker-dropdown {
+	position: absolute;
+	top: 100%;
+	left: 0;
+	z-index: 9999;
+	background: #fff;
+	border: 1px solid #c3c4c7;
+	border-radius: 4px;
+	box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12);
+	min-width: 200px;
+	max-width: 260px;
+}
+
+.pltt-tag-search {
+	width: 100%;
+	padding: 8px 10px;
+	border: none;
+	border-bottom: 1px solid #dcdcde;
+	border-radius: 4px 4px 0 0;
+	box-sizing: border-box;
+}
+
+.pltt-tag-search:focus {
+	border-bottom-color: #2271b1;
+	outline: 2px solid #2271b1;
+	outline-offset: -2px;
+}
+
+.pltt-tag-checkbox-list {
+	max-height: 200px;
+	overflow-y: auto;
+	padding: 4px 0;
+}
+
+.pltt-tag-checkbox-item,
+.pltt-tag-add-new {
+	display: block;
+	padding: 6px 12px;
+	font-size: 13px;
+	cursor: pointer;
+}
+
+.pltt-tag-checkbox-item:hover,
+.pltt-tag-add-new:hover {
+	background: #f0f0f1;
+}
+
+.pltt-tag-checkbox-item input[type="checkbox"] {
+	margin: 0 8px 0 0;
+	vertical-align: middle;
+}
+
+.pltt-tag-add-new a {
+	color: #2271b1;
+	text-decoration: none;
+}
+
+.pltt-tag-empty {
+	padding: 8px 12px;
+	color: #646970;
+	font-size: 13px;
+}
+
+#pltt-report-content .button.button-secondary {
+	font-size: 13px;
 }
 
 /* Responsive */

@@ -208,6 +208,19 @@ class PLTT_Entries {
 
 		$client_id  = ! empty( $data['client_id'] ) ? absint( $data['client_id'] ) : null;
 		$project_id = ! empty( $data['project_id'] ) ? absint( $data['project_id'] ) : null;
+
+		// Determine billable default: explicit value wins; otherwise inherit from project; fall back to 1.
+		if ( array_key_exists( 'billable', $data ) ) {
+			$billable = ! empty( $data['billable'] ) ? 1 : 0;
+		} elseif ( null !== $project_id ) {
+			$projects_table = PLTT_Database::get_table_name( 'projects' );
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+			$project_default = $wpdb->get_var( $wpdb->prepare( "SELECT billability_default FROM {$projects_table} WHERE id = %d", $project_id ) );
+			$billable        = null !== $project_default ? (int) $project_default : 1;
+		} else {
+			$billable = 1;
+		}
+
 		$insert_data = array(
 			'entry_date'       => pltt_sanitize_date( $data['entry_date'] ?? '' ),
 			'start_time'       => sanitize_text_field( $data['start_time'] ?? '' ),
@@ -216,7 +229,7 @@ class PLTT_Entries {
 			'raw_text'         => sanitize_textarea_field( $data['raw_text'] ?? '' ),
 			'description'      => sanitize_textarea_field( $data['description'] ?? '' ),
 			'verified'         => ! empty( $data['verified'] ) ? 1 : 0,
-			'billable'         => array_key_exists( 'billable', $data ) ? ( ! empty( $data['billable'] ) ? 1 : 0 ) : 1,
+			'billable'         => $billable,
 		);
 
 		$formats = array( '%s', '%s', '%s', '%d', '%s', '%s', '%d', '%d' );
@@ -540,8 +553,8 @@ class PLTT_Entries {
 			COALESCE(SUM(CASE WHEN e.billable = 1 THEN e.duration_minutes ELSE 0 END), 0) AS billable_minutes,
 			SUM(CASE WHEN e.verified = 1 THEN 1 ELSE 0 END) AS verified_count,
 			COALESCE(SUM(CASE WHEN e.billable = 1 THEN COALESCE(e.billable_amount, ROUND(e.duration_minutes / 60.0 * COALESCE(p.hourly_rate, c.hourly_rate, 0), 2)) ELSE 0 END), 0) AS billable_amount,
-			COUNT(DISTINCT CASE WHEN e.billable = 1 AND (c.name IS NULL OR LOWER(c.name) != 'internal') THEN e.project_id END) AS active_projects,
-			COUNT(DISTINCT CASE WHEN e.billable = 1 AND (c.name IS NULL OR LOWER(c.name) != 'internal') THEN e.client_id END) AS active_clients
+			COUNT(DISTINCT CASE WHEN (c.name IS NULL OR LOWER(c.name) != 'internal') THEN e.project_id END) AS active_projects,
+			COUNT(DISTINCT CASE WHEN (c.name IS NULL OR LOWER(c.name) != 'internal') THEN e.client_id END) AS active_clients
 			FROM {$table} e
 			LEFT JOIN {$projects_table} p ON e.project_id = p.id
 			LEFT JOIN {$clients_table} c ON e.client_id = c.id";
@@ -660,6 +673,9 @@ class PLTT_Entries {
 				"SELECT
 					p.id AS project_id,
 					p.name AS project_name,
+					p.budget_hours,
+					p.recurring_period,
+					p.billability_default,
 					c.id AS client_id,
 					c.name AS client_name,
 					SUM(e.duration_minutes) AS total_minutes,
@@ -670,7 +686,7 @@ class PLTT_Entries {
 				LEFT JOIN {$projects_table} p ON e.project_id = p.id
 				LEFT JOIN {$clients_table} c ON e.client_id = c.id
 				WHERE {$where_sql}
-				GROUP BY p.id, p.name, c.id, c.name
+				GROUP BY p.id, p.name, p.budget_hours, p.recurring_period, p.billability_default, c.id, c.name
 				ORDER BY p.name ASC, c.name ASC",
 				$prepare
 			)

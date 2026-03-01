@@ -298,9 +298,16 @@ class PLTT_Admin {
 				$version
 			);
 			wp_enqueue_script(
+				'pltt-tag-picker',
+				PLTT_PLUGIN_URL . 'assets/js/tag-picker.js',
+				array(),
+				$version,
+				true
+			);
+			wp_enqueue_script(
 				'pltt-reports',
 				PLTT_PLUGIN_URL . 'assets/js/reports.js',
-				array( 'pltt-shared' ),
+				array( 'pltt-shared', 'pltt-tag-picker' ),
 				$version,
 				true
 			);

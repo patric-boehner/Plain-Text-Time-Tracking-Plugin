@@ -51,13 +51,17 @@ Processed entries appear in a structured table with time ranges, durations, clie
 Three-tier rate hierarchy: Project rate > Client rate > System default ($100/hr). Rates are snapshotted when entries are verified (historical accuracy preserved even if rates change later). Billable hours and amounts tracked in summary cards.
 
 ### Reports
-Filter by date range, client, project, tags, billable status. Summary and detailed views. Summary cards: Active Projects (with client count), Total Hours (with daily average), Billable Hours (with utilization %), Billable Amount (with period-over-period comparison), and Overall EHR (effective hourly rate vs. target). Pagination for large result sets.
+Filter by date range, client, project, tags, billable status. Summary and detailed views. Summary view defaults on load and shows totals grouped by project. Detailed view groups entries by day. Summary cards: Active Projects (with client count), Total Hours (with daily average), Billable Hours (with utilization %), Billable Amount (with period-over-period comparison), and Overall EHR (effective hourly rate vs. target). Pagination for large result sets.
+
+In the detailed view, Tags, Billable, and Invoiced are always editable inline — no mode toggle required. Changes save immediately via AJAX. Invoiced status is only available on billable entries.
 
 ### Daily Log & Log History
 Auto-saving notes persist across sessions. Log History screen provides chronological archive of all daily logs, filterable by month. Navigate to any past day to review or re-process.
 
 ### Inline Entry Editing
-Edit individual entries from the reports list via modal. Update date, description, times, duration, client, project, tags, or billing status without navigating away.
+Two levels of inline editing on Reports:
+- **Field toggles** — Tags, Billable, and Invoiced are always editable directly in the detailed view table. AJAX saves, no page reload.
+- **Full entry modal** — Click the Edit button on a day header to open a modal for editing date, time, description, client, project, tags, and billing status on any entry in that day.
 
 ---
 
@@ -91,17 +95,21 @@ All planned features are complete. Use the tool. See what's actually missing.
 
 These are loose notes that I have thought about for features or fixes. Whether or not they become features is to be decided.
 
-- **Individual Entry & Bulk Editing** - We tried addressing this before but I didn't like the results of having an Edit button on each entry or the experience of having the editor in a modal. It all felt like too much and didn't look good. When I am using the app and look at reports, the times I want to edit one more more entires is when I am either invoicing, or adding/adjusting a tag. This makes me think maybe we should limit the editing options to just those few elements and keep it all inline. SO if you hit Edit at the top of the day list. Instead of being taken to the day review screen it would turn on inline editing for that day. Maybe fields like Tags, Billable, Invoiced would show and become editable. Maybe a select filed would show up on the right with one at on the day label for selecting all the entires so that bulk updating could be applied. Maybe when you hit edit the edit button would be replaced by a save button and maybe another for Edit Full Day, which would take you to the day review screen (maybe not, just an idea).
+- **Bulk Editing** - Tags, Billable, and Invoiced are now always editable inline on the Reports detailed view. What's still missing: bulk selection across multiple entries to apply a change to all at once (e.g., mark an entire day's entries as invoiced in one click).
 - **Calendar View for Log History** - Not an immediate need by any stretch but it might be nice to visually be able to see when I was working in a calendar view. Its easier to spot when I am having a bad week in a monthly calendar view. Doesn't need to be anything fancy. Just a month view where you can see what days of the week were logged, maybe how many hours worked.
 - **Review Entires Screen Date/Time Editing** - This could be improved. Maybe by splitting date and time again into their own columns. Times could be inline fields and date could just be a button that opens a date picker (like Clockify does and like we do on tag selection).
 - **Clients and Project** - The model shouldn't have a delete button unless there is nothing assigned to it, and Clients should be archivable.
 - **Tag Select Dropdown** - The add new tag button should be moved out of the list items, that way its under the list but is static like the search filed. This could use a little style updating to provide a little spacing and division to make it look better. More importantly this is a pattern that we should turn into a component and used elsewhere like in the Clients and Projects dropdown (without the checkbox), and in reports for multi select filtering.
 - **Block/Stop Words** Expand the list of block and stop words.
 - **Local Storage** - It might be nice to explore using local storage to save the journal in addition to being saved tot he DB so it could be possible work offline.
-- **Project Types** - To help better track things and provide better metrics but keep the friction low I am considering adding project_type field on projects (client, growth, internal, r&d). All time entries would belong to a project, and the project type can determine categorization and default billable behavior (client = billable by default; others = non-billable by default, with override allowed). Internal business activity (e.g., admin) can then become internal projects rather than tags, while tags can remain focused on activity type (e.g., writing, email, development). Not every little things needs to be recorded, the goal is to generate meaningful reporting without increasing my work load. For this assigning a client would need to be optional.
+- **Project Billing** - Projects have a billing type field that defaults to hourly, with options for fixed budget and recurring — care plans default to monthly recurring. A separate default billability field on the project automatically sets whether entries are billable or non-billable on creation, with the entry-level flag still available for exceptions. Both patterns follow the standard cascade approach used across all major time tracking tools.
 - **Log History View** - I am thinking we should breakup and group the log history table by week like we do in reports.
-- **Log Flag** - Since this is a tool thats a combination of intersital journaling/logging and time tracking it might be nice to have a flag feature for a log. Just a way of quickly idenitfying and filtering a log you want to return to maybe because it has an important note or something you want to followup on. Easy to turn on and off like the billable feature.
+- **Log Flag** - Since this is a tool thats a combination of interstitial journaling/logging and time tracking it might be nice to have a flag feature for a log. Just a way of quickly identifying and filtering a log you want to return to maybe because it has an important note or something you want to followup on. Easy to turn on and off like the billable feature.
 - **Reports Time Card** - Change the time card to show hours and minutes by default, maybe with a hint text with the decimal numbers. Decimals are great for math but its easier for me to read just straight forward time.
+- **Client Report Cards** - On the clients list page i am thinking how we could add metrics that would be valuable. Since I tend to track meetings and emails I could have a card that lets me know which clients I haven't had contact with recently, that way I can make sure to get in touch and see how things are going. I don't really have a place in any of my tools to do that right now. If we add filtering to that page in the future we could show metrics like past project, open projects, value.
+- **Alerts** - When we implement tracking retainer projects it would be nice to implement an alert notice options, to have a noice set in the admin and maybe in the future an email when a certain performance is reached. That way I can respond proactively to client hours.
+- **Daily Log** - Maybe have a presistant message about when it was last saved? This  may not all that helpful but sometimes I notice it saves so quickly i'm not sure its saved. Or maybe some sort of status that its saving is running.
+
 
 ## Ideas & Wishlist
 

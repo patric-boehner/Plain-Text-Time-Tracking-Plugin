@@ -136,11 +136,15 @@ if ( ! empty( $clients ) ) {
 				<label for="pltt-client-rate"><?php esc_html_e( 'Hourly Rate (optional)', 'plain-language-time-tracker' ); ?></label>
 				<input type="number" id="pltt-client-rate" name="hourly_rate" step="0.01" min="0" class="widefat" placeholder="0.00">
 			</p>
-			<p class="pltt-modal-actions">
-				<button type="button" id="pltt-delete-client-btn" class="button button-link-delete pltt-modal-delete-btn"><?php esc_html_e( 'Delete', 'plain-language-time-tracker' ); ?></button>
-				<button type="submit" id="pltt-save-client-btn" class="button button-primary"><?php esc_html_e( 'Save', 'plain-language-time-tracker' ); ?></button>
-				<button type="button" class="pltt-modal-close button"><?php esc_html_e( 'Cancel', 'plain-language-time-tracker' ); ?></button>
-			</p>
+			<div class="pltt-modal-actions">
+				<div class="pltt-modal-actions-left">
+					<button type="button" id="pltt-delete-client-btn" class="button button-link-delete pltt-modal-delete-btn"><?php esc_html_e( 'Delete', 'plain-language-time-tracker' ); ?></button>
+				</div>
+				<div class="pltt-modal-actions-right">
+					<button type="button" class="pltt-modal-close button"><?php esc_html_e( 'Cancel', 'plain-language-time-tracker' ); ?></button>
+					<button type="submit" id="pltt-save-client-btn" class="button button-primary"><?php esc_html_e( 'Save', 'plain-language-time-tracker' ); ?></button>
+				</div>
+			</div>
 		</form>
 
 		<!-- Delete form (hidden, submitted via JS) -->

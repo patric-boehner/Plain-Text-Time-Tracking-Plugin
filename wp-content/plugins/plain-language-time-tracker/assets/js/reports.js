@@ -162,4 +162,190 @@
 			}
 		} );
 	} );
+
+	/**
+	 * Inline field editing — Billable, Invoiced, Tags.
+	 *
+	 * Saves each change immediately via AJAX. No page reload needed.
+	 */
+	( function() {
+		if ( typeof PlttTagPicker === 'undefined' || typeof plttAllTags === 'undefined' ) {
+			return;
+		}
+
+		/**
+		 * Send a field update and handle the response.
+		 *
+		 * @param {HTMLElement} btn     The toggle button.
+		 * @param {string}      field   Field name.
+		 * @param {string}      value   New value.
+		 * @param {Function}    onSuccess Called on AJAX success.
+		 * @param {Function}    onError   Called on AJAX error (revert).
+		 */
+		function saveField( btn, field, value, onSuccess, onError ) {
+			var entryId = btn.dataset.entryId;
+			btn.classList.add( 'pltt-saving' );
+			btn.disabled = true;
+
+			PLTT.ajax(
+				'pltt_update_entry_field',
+				{ entry_id: entryId, field: field, value: value },
+				function( response ) {
+					btn.classList.remove( 'pltt-saving' );
+					btn.disabled = false;
+					if ( response.success ) {
+						onSuccess();
+					} else {
+						onError();
+					}
+				}
+			);
+		}
+
+		/**
+		 * Billable toggle — click handler via delegation.
+		 */
+		document.addEventListener( 'click', function( e ) {
+			var btn = e.target.closest( '.pltt-billable-symbol.pltt-inline-toggle' );
+			if ( ! btn ) {
+				return;
+			}
+
+			var currentValue = btn.dataset.value === '1';
+			var newValue     = currentValue ? '0' : '1';
+			var isBillable   = ! currentValue;
+			var row          = btn.closest( 'tr' );
+
+			// Optimistic update.
+			btn.classList.toggle( 'is-billable', isBillable );
+			btn.classList.toggle( 'not-billable', ! isBillable );
+			btn.dataset.value = newValue;
+			var label = isBillable ? 'Billable \u2014 click to toggle' : 'Not billable \u2014 click to toggle';
+			btn.setAttribute( 'aria-label', label );
+			btn.setAttribute( 'title', label );
+
+			// Show/hide the Inv. toggle based on billable state.
+			// If turning off billable and entry is currently invoiced, clear it too.
+			if ( row ) {
+				var invoicedBtn = row.querySelector( '.pltt-invoiced-toggle' );
+				if ( invoicedBtn ) {
+					if ( isBillable ) {
+						invoicedBtn.style.visibility = '';
+					} else {
+						invoicedBtn.style.visibility = 'hidden';
+						if ( invoicedBtn.dataset.value === '1' ) {
+							// Clear invoiced state optimistically.
+							invoicedBtn.classList.remove( 'is-invoiced' );
+							invoicedBtn.classList.add( 'not-invoiced' );
+							invoicedBtn.dataset.value = '0';
+							invoicedBtn.textContent = '\u25cb';
+							row.classList.remove( 'pltt-billed' );
+							// Persist the cleared invoiced state.
+							PLTT.ajax( 'pltt_update_entry_field', {
+								entry_id: invoicedBtn.dataset.entryId,
+								field: 'billed',
+								value: '0'
+							}, function() {} );
+						}
+					}
+				}
+			}
+
+			saveField(
+				btn,
+				'billable',
+				newValue,
+				function() { /* already updated optimistically */ },
+				function() {
+					// Revert.
+					btn.classList.toggle( 'is-billable', currentValue );
+					btn.classList.toggle( 'not-billable', ! currentValue );
+					btn.dataset.value = currentValue ? '1' : '0';
+					var revertLabel = currentValue ? 'Billable \u2014 click to toggle' : 'Not billable \u2014 click to toggle';
+					btn.setAttribute( 'aria-label', revertLabel );
+					btn.setAttribute( 'title', revertLabel );
+					// Revert Inv. toggle visibility too.
+					if ( row ) {
+						var invoicedBtn = row.querySelector( '.pltt-invoiced-toggle' );
+						if ( invoicedBtn ) {
+							invoicedBtn.style.visibility = currentValue ? '' : 'hidden';
+						}
+					}
+				}
+			);
+		} );
+
+		/**
+		 * Invoiced toggle — click handler via delegation.
+		 */
+		document.addEventListener( 'click', function( e ) {
+			var btn = e.target.closest( '.pltt-invoiced-toggle' );
+			if ( ! btn ) {
+				return;
+			}
+
+			var currentValue = btn.dataset.value === '1';
+			var newValue     = currentValue ? '0' : '1';
+			var isInvoiced   = ! currentValue;
+			var row          = btn.closest( 'tr' );
+
+			// Optimistic update.
+			btn.classList.toggle( 'is-invoiced', isInvoiced );
+			btn.classList.toggle( 'not-invoiced', ! isInvoiced );
+			btn.dataset.value = newValue;
+			btn.textContent = isInvoiced ? '\u2713' : '\u25cb';
+			var label = isInvoiced ? 'Invoiced \u2014 click to toggle' : 'Not invoiced \u2014 click to toggle';
+			btn.setAttribute( 'aria-label', label );
+			btn.setAttribute( 'title', label );
+			if ( row ) {
+				row.classList.toggle( 'pltt-billed', isInvoiced );
+			}
+
+			saveField(
+				btn,
+				'billed',
+				newValue,
+				function() { /* already updated optimistically */ },
+				function() {
+					// Revert.
+					btn.classList.toggle( 'is-invoiced', currentValue );
+					btn.classList.toggle( 'not-invoiced', ! currentValue );
+					btn.dataset.value = currentValue ? '1' : '0';
+					btn.textContent = currentValue ? '\u2713' : '\u25cb';
+					var revertLabel = currentValue ? 'Invoiced \u2014 click to toggle' : 'Not invoiced \u2014 click to toggle';
+					btn.setAttribute( 'aria-label', revertLabel );
+					btn.setAttribute( 'title', revertLabel );
+					if ( row ) {
+						row.classList.toggle( 'pltt-billed', currentValue );
+					}
+				}
+			);
+		} );
+
+		/**
+		 * Initialize inline tag pickers on all .pltt-tag-input-wrap elements in the report table.
+		 */
+		document.querySelectorAll( '#pltt-report-content .pltt-tag-input-wrap' ).forEach( function( wrap ) {
+			var entryId = wrap.dataset.entryId;
+
+			new PlttTagPicker(
+				wrap,
+				( typeof plttAllTags !== 'undefined' ) ? plttAllTags : [],
+				null,
+				function( selectedTags, csvValue ) {
+					// onClose: save tags via AJAX.
+					PLTT.ajax(
+						'pltt_update_entry_field',
+						{ entry_id: entryId, field: 'tags', value: csvValue },
+						function( response ) {
+							if ( ! response.success ) {
+								// Silent failure — tags are still shown correctly in the picker.
+								// A future improvement could show an inline error.
+							}
+						}
+					);
+				}
+			);
+		} );
+	} )();
 } )();

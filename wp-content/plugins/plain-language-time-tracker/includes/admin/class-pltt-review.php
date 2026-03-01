@@ -250,7 +250,6 @@ class PLTT_Review {
 				'project_id'  => ! empty( $entry_data['project_id'] ) ? absint( $entry_data['project_id'] ) : null,
 				'tags'        => sanitize_text_field( $entry_data['tags'] ?? '' ),
 				'billable'    => ! empty( $entry_data['billable'] ) ? 1 : 0,
-				'billed'      => ! empty( $entry_data['billed'] ) ? 1 : 0,
 				'verified'    => 1,
 			);
 
