@@ -729,21 +729,21 @@ function pltt_render_allocation_bar( $alloc_mins, $budget_hours, $billing_type )
 	$pct         = $budget_hours > 0 ? ( $alloc_hours / $budget_hours ) * 100 : 0;
 	$is_over     = $pct >= 100;
 	$bar_width   = min( $pct, 100 );
-	$label_pct   = round( $pct );
-	$alloc_fmt   = pltt_format_hours( $alloc_mins );
-	$budget_fmt  = rtrim( rtrim( number_format( $budget_hours, 1 ), '0' ), '.' );
-	$suffix      = 'fixed' === $billing_type ? ' hrs est.' : ' hrs/mo';
+	if ( $is_over ) {
+		$delta_fmt = pltt_format_hours( ( $alloc_hours - $budget_hours ) * 60 );
+		$label     = $delta_fmt . ' ' . __( 'hrs over', 'plain-language-time-tracker' );
+	} else {
+		$delta_fmt = pltt_format_hours( ( $budget_hours - $alloc_hours ) * 60 );
+		$label     = $delta_fmt . ' ' . __( 'hrs left', 'plain-language-time-tracker' );
+	}
 	?>
 	<div class="pltt-alloc-cell">
 		<div class="pltt-alloc-bar-wrap">
 			<div class="pltt-alloc-bar<?php echo $is_over ? ' pltt-alloc-over' : ''; ?>"
 				 style="width:<?php echo esc_attr( $bar_width ); ?>%"></div>
 		</div>
-		<span class="pltt-alloc-label">
-			<?php echo esc_html( $alloc_fmt . ' of ' . $budget_fmt . $suffix ); ?>
-			&middot; <?php echo esc_html( $label_pct ); ?>%<?php if ( $is_over ) :
-				$over_fmt = pltt_format_hours( ( $alloc_hours - $budget_hours ) * 60 );
-				?> &middot; +<?php echo esc_html( $over_fmt ); ?> <?php esc_html_e( 'over', 'plain-language-time-tracker' ); ?><?php endif; ?>
+		<span class="pltt-alloc-label<?php echo $is_over ? ' pltt-alloc-over' : ''; ?>">
+			<?php echo esc_html( $label ); ?>
 		</span>
 	</div>
 	<?php

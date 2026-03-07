@@ -98,17 +98,20 @@ These are loose notes that I have thought about for features or fixes. Whether o
 - **Bulk Editing** - Tags, Billable, and Invoiced are now always editable inline on the Reports detailed view. What's still missing: bulk selection across multiple entries to apply a change to all at once (e.g., mark an entire day's entries as invoiced in one click).
 - **Calendar View for Log History** - Not an immediate need by any stretch but it might be nice to visually be able to see when I was working in a calendar view. Its easier to spot when I am having a bad week in a monthly calendar view. Doesn't need to be anything fancy. Just a month view where you can see what days of the week were logged, maybe how many hours worked.
 - **Review Entires Screen Date/Time Editing** - This could be improved. Maybe by splitting date and time again into their own columns. Times could be inline fields and date could just be a button that opens a date picker (like Clockify does and like we do on tag selection).
-- **Clients and Project** - The model shouldn't have a delete button unless there is nothing assigned to it, and Clients should be archivable.
 - **Tag Select Dropdown** - The add new tag button should be moved out of the list items, that way its under the list but is static like the search filed. This could use a little style updating to provide a little spacing and division to make it look better. More importantly this is a pattern that we should turn into a component and used elsewhere like in the Clients and Projects dropdown (without the checkbox), and in reports for multi select filtering.
 - **Block/Stop Words** Expand the list of block and stop words.
 - **Local Storage** - It might be nice to explore using local storage to save the journal in addition to being saved tot he DB so it could be possible work offline.
-- **Project Billing** - Projects have a billing type field that defaults to hourly, with options for fixed budget and recurring — care plans default to monthly recurring. A separate default billability field on the project automatically sets whether entries are billable or non-billable on creation, with the entry-level flag still available for exceptions. Both patterns follow the standard cascade approach used across all major time tracking tools.
+- **Project Defaults** - Project defaults around bilability don't carry through to the entry review screen. So you still have to manually set things. Its work going back through and understainf where those default states are and aren't being used.
 - **Log History View** - I am thinking we should breakup and group the log history table by week like we do in reports.
 - **Log Flag** - Since this is a tool thats a combination of interstitial journaling/logging and time tracking it might be nice to have a flag feature for a log. Just a way of quickly identifying and filtering a log you want to return to maybe because it has an important note or something you want to followup on. Easy to turn on and off like the billable feature.
 - **Reports Time Card** - Change the time card to show hours and minutes by default, maybe with a hint text with the decimal numbers. Decimals are great for math but its easier for me to read just straight forward time.
 - **Client Report Cards** - On the clients list page i am thinking how we could add metrics that would be valuable. Since I tend to track meetings and emails I could have a card that lets me know which clients I haven't had contact with recently, that way I can make sure to get in touch and see how things are going. I don't really have a place in any of my tools to do that right now. If we add filtering to that page in the future we could show metrics like past project, open projects, value.
 - **Alerts** - When we implement tracking retainer projects it would be nice to implement an alert notice options, to have a noice set in the admin and maybe in the future an email when a certain performance is reached. That way I can respond proactively to client hours.
-- **Daily Log** - Maybe have a presistant message about when it was last saved? This  may not all that helpful but sometimes I notice it saves so quickly i'm not sure its saved. Or maybe some sort of status that its saving is running.
+- **Daily Log** - Maybe have a presistent message about when it was last saved? This  may not all that helpful but sometimes I notice it saves so quickly i'm not sure its saved. Or maybe some sort of status that its saving is running.
+- **Reports Cards** - We maybe should remove the secondary information from the report cards. Unless its the end of the month, most of this information isn't useful. Not unless they are further refined and I'm not sure if thats useful. Example, billing period amount, unless its comparing the exact number of days (12 days into the month vs 12 days into last month), its just more confusing information. That breaks our framework for report, and anything on the reports page needs to be reflective of the current date filter.
+- Should the report cards, in details view update dynamically as you switch things to billable or not.
+- **Budget Bar** - Should the total under the graph represent only non billable hours or also include billable hours? Right now it only represents non-billable hours. If hours are marked as billable because they are over, they are subtracted from that count. It seems like it should include all hours?
+
 
 
 ## Ideas & Wishlist
@@ -155,6 +158,7 @@ These are backburnered. Only build if a genuine need emerges from actual use.
 - **Descriptive, not evaluative** - "You worked on 4 projects today" not "Good productivity!"
 - **If it creates pressure, it doesn't belong** - No goals, no scores, no "are you on track?"
 - **If you don't use it weekly, don't build it** - Stop building for theoretical future needs
+- **"What decisions does this enable?" is the filter** — The pattern keeps repeating: build something, realize it's doing too much, strip it back, and the simpler version is always better. If the answer to "what decisions does someone make when looking at this?" is none, the data doesn't belong there.
 
 See `design-philosophy.md` for the full philosophy document.
 

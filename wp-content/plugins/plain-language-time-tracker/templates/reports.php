@@ -344,20 +344,7 @@ $tab_base_url = add_query_arg( $filter_params, admin_url( 'admin.php' ) );
 				<div class="card-label"><?php esc_html_e( 'Billable Hours', 'plain-language-time-tracker' ); ?></div>
 				<div class="card-value"><?php echo esc_html( pltt_format_hours( $stats->billable_minutes ) ); ?></div>
 				<div class="card-secondary">
-					<?php
-					$util_class = ( $utilization >= 60 && $utilization <= 70 ) ? 'status-good' : 'status-warning';
-					$util_icon  = ( $utilization >= 60 && $utilization <= 70 ) ? '✓' : '⚠';
-					?>
-					<span class="<?php echo esc_attr( $util_class ); ?>">
-						<?php
-						printf(
-							'%s %s',
-							esc_html( number_format( $utilization, 1 ) . '%' ),
-							esc_html__( 'utilization', 'plain-language-time-tracker' )
-						);
-						echo ' ' . esc_html( $util_icon );
-						?>
-					</span>
+					<span><?php printf( '%s %s', esc_html( number_format( $utilization, 1 ) . '%' ), esc_html__( 'utilization', 'plain-language-time-tracker' ) ); ?></span>
 				</div>
 			</div>
 
@@ -441,11 +428,10 @@ $tab_base_url = add_query_arg( $filter_params, admin_url( 'admin.php' ) );
 					<thead>
 						<tr>
 							<th><?php esc_html_e( 'Project', 'plain-language-time-tracker' ); ?></th>
-							<th><?php esc_html_e( 'Client', 'plain-language-time-tracker' ); ?></th>
 							<th><?php esc_html_e( 'Type', 'plain-language-time-tracker' ); ?></th>
+							<th><?php esc_html_e( 'Client', 'plain-language-time-tracker' ); ?></th>
 							<th><?php esc_html_e( 'Hours', 'plain-language-time-tracker' ); ?></th>
-							<th><?php esc_html_e( 'Allocation / Budget', 'plain-language-time-tracker' ); ?></th>
-							<th><?php esc_html_e( 'Billable Hours', 'plain-language-time-tracker' ); ?></th>
+							<th><?php esc_html_e( 'Budget', 'plain-language-time-tracker' ); ?></th>
 							<th><?php esc_html_e( 'Amount', 'plain-language-time-tracker' ); ?></th>
 						</tr>
 					</thead>
@@ -474,7 +460,6 @@ $tab_base_url = add_query_arg( $filter_params, admin_url( 'admin.php' ) );
 										<a href="<?php echo esc_url( $detail_url ); ?>"><span class="pltt-empty">—</span></a>
 									<?php endif; ?>
 								</td>
-								<td><?php echo ! empty( $row->client_name ) ? esc_html( $row->client_name ) : '<span class="pltt-empty">—</span>'; ?></td>
 								<td>
 									<?php $billing_type = pltt_get_billing_type( $row ); ?>
 									<?php if ( 'none' === $billing_type ) : ?>
@@ -487,11 +472,15 @@ $tab_base_url = add_query_arg( $filter_params, admin_url( 'admin.php' ) );
 										<span class="pltt-badge pltt-badge-success"><?php esc_html_e( 'Hourly', 'plain-language-time-tracker' ); ?></span>
 									<?php endif; ?>
 								</td>
+								<td><?php echo ! empty( $row->client_name ) ? esc_html( $row->client_name ) : '<span class="pltt-empty">—</span>'; ?></td>
 								<?php
 								$has_alloc = ! empty( $row->budget_hours ) && ! empty( $row->project_id ) && isset( $alloc_stats[ $row->project_id ] );
 								if ( $has_alloc ) {
 									$sa_budget_hours = (float) $row->budget_hours;
-									$sa_used_mins    = (float) $alloc_stats[ $row->project_id ]->total_minutes;
+									// Recurring budgets track billable capacity; exclude non-billable hours.
+									$sa_used_mins = 'recurring' === $billing_type
+										? (float) $alloc_stats[ $row->project_id ]->billable_minutes
+										: (float) $alloc_stats[ $row->project_id ]->total_minutes;
 								}
 								?>
 								<td class="pltt-duration-cell">
@@ -504,7 +493,6 @@ $tab_base_url = add_query_arg( $filter_params, admin_url( 'admin.php' ) );
 										<span class="pltt-empty">—</span>
 									<?php endif; ?>
 								</td>
-								<td class="pltt-duration-cell"><?php echo esc_html( pltt_format_hours( $row->billable_minutes ) ); ?></td>
 								<td class="pltt-duration-cell"><?php echo (float) $row->billable_amount > 0 ? esc_html( pltt_format_currency( $row->billable_amount ) ) : '<span class="pltt-empty">—</span>'; ?></td>
 								</tr>
 						<?php endforeach; ?>

@@ -27,33 +27,6 @@ if ( ! empty( $projects ) ) {
 		$project_stats_by_id[ $project->id ] = $stats;
 	}
 }
-
-// Pre-fetch current-month and previous-month stats for recurring projects.
-// Current month is used for the allocation bar; previous month is a fallback when the month just started.
-$tz                        = wp_timezone();
-$current_month_from        = current_time( 'Y-m-01' );
-$current_month_to          = pltt_get_current_date();
-$prev_month_dt             = ( new DateTimeImmutable( 'now', $tz ) )->modify( 'first day of last month' );
-$prev_month_from           = $prev_month_dt->format( 'Y-m-01' );
-$prev_month_to             = $prev_month_dt->format( 'Y-m-t' );
-$project_month_stats_by_id = array();
-$project_prev_month_by_id  = array();
-if ( ! empty( $projects ) ) {
-	foreach ( $projects as $project ) {
-		if ( ! empty( $project->recurring_period ) && ! empty( $project->budget_hours ) ) {
-			$project_month_stats_by_id[ $project->id ] = PLTT_Entries::get_stats( array(
-				'project_id' => $project->id,
-				'date_from'  => $current_month_from,
-				'date_to'    => $current_month_to,
-			) );
-			$project_prev_month_by_id[ $project->id ] = PLTT_Entries::get_stats( array(
-				'project_id' => $project->id,
-				'date_from'  => $prev_month_from,
-				'date_to'    => $prev_month_to,
-			) );
-		}
-	}
-}
 ?>
 
 <div class="wrap pltt-wrap">
@@ -120,7 +93,6 @@ if ( ! empty( $projects ) ) {
 					<th><?php esc_html_e( 'Type', 'plain-language-time-tracker' ); ?></th>
 					<th><?php esc_html_e( 'Rate', 'plain-language-time-tracker' ); ?></th>
 					<th><?php esc_html_e( 'Hours', 'plain-language-time-tracker' ); ?></th>
-					<th><?php esc_html_e( 'Allocation / Budget', 'plain-language-time-tracker' ); ?></th>
 					<th><?php esc_html_e( 'Amount', 'plain-language-time-tracker' ); ?></th>
 					<th><?php esc_html_e( 'Status', 'plain-language-time-tracker' ); ?></th>
 				</tr>
@@ -162,35 +134,9 @@ if ( ! empty( $projects ) ) {
 						<td>
 						<?php echo null !== $project->hourly_rate ? esc_html( pltt_format_currency( $project->hourly_rate ) ) : '<span class="pltt-empty">—</span>'; ?>
 					</td>
-						<?php
-						// Hours column: always all-time total regardless of billing type.
-						// Allocation bar: current month for recurring (vs monthly allocation), all-time for fixed (vs estimate).
-						$total_mins = isset( $project_stats->total_minutes ) ? (float) $project_stats->total_minutes : 0;
-						$has_alloc  = ( 'recurring' === $billing_type || 'fixed' === $billing_type ) && ! empty( $project->budget_hours );
-						if ( $has_alloc ) {
-							$budget_hours = (float) $project->budget_hours;
-							if ( 'recurring' === $billing_type ) {
-								$month_stats = $project_month_stats_by_id[ $project->id ] ?? null;
-								$alloc_mins  = isset( $month_stats->total_minutes ) ? (float) $month_stats->total_minutes : 0;
-								// If no current-month entries yet, fall back to previous month so the bar isn't empty.
-								if ( 0.0 === $alloc_mins ) {
-									$prev_stats = $project_prev_month_by_id[ $project->id ] ?? null;
-									$alloc_mins = isset( $prev_stats->total_minutes ) ? (float) $prev_stats->total_minutes : 0;
-								}
-							} else {
-								$alloc_mins = $total_mins;
-							}
-						}
-						?>
+						<?php $total_mins = isset( $project_stats->total_minutes ) ? (float) $project_stats->total_minutes : 0; ?>
 						<td class="pltt-duration-cell">
 							<?php echo esc_html( pltt_format_hours( $total_mins ) ); ?>
-					</td>
-						<td class="pltt-duration-cell">
-						<?php if ( $has_alloc ) :
-							pltt_render_allocation_bar( $alloc_mins, $budget_hours, $billing_type );
-						else : ?>
-							<span class="pltt-empty">—</span>
-						<?php endif; ?>
 					</td>
 						<td><?php echo (float) ( $project_stats->billable_amount ?? 0 ) > 0 ? esc_html( pltt_format_currency( $project_stats->billable_amount ) ) : '<span class="pltt-empty">—</span>'; ?></td>
 						<td>
@@ -324,6 +270,24 @@ if ( ! empty( $projects ) ) {
 		}
 	};
 
+	function applyRecurringBudgetLock() {
+		var billingType = el('pltt-project-billing-type');
+		if ( ! billingType || billingType.value !== 'recurring') return;
+		var budgetHours      = el('pltt-project-budget-hours');
+		var nonBillable      = el('pltt-project-non-billable');
+		var nonBillableGroup = el('pltt-project-nonbillable-group');
+		var descEl           = el('pltt-nonbillable-description');
+		var hasBudget        = budgetHours && parseFloat(budgetHours.value) > 0;
+		if (hasBudget) {
+			nonBillable.checked = false;
+			nonBillableGroup.classList.add('pltt-field-disabled');
+			descEl.textContent = '<?php echo esc_js( __( 'Billable entries count toward the monthly allocation.', 'plain-language-time-tracker' ) ); ?>';
+		} else {
+			nonBillableGroup.classList.remove('pltt-field-disabled');
+			descEl.textContent = BILLING_DESCRIPTIONS.nonbillable.recurring;
+		}
+	}
+
 	function applyBillingTypeUI(type, setDefaults) {
 		var rateField        = el('pltt-project-rate');
 		var rateGroup        = el('pltt-project-rate-group');
@@ -367,6 +331,7 @@ if ( ! empty( $projects ) ) {
 			budgetLabel.firstChild.textContent = '<?php echo esc_js( __( 'Hour Allocation', 'plain-language-time-tracker' ) ); ?> ';
 			settingsDesc.textContent = '<?php echo esc_js( __( 'Hours included per period. Entries over the allocation remain non-billable unless manually marked otherwise.', 'plain-language-time-tracker' ) ); ?>';
 			if (setDefaults) { nonBillable.checked = true; recurringSelect.value = 'monthly'; }
+			applyRecurringBudgetLock();
 
 		} else if (type === 'none') {
 			settingsBox.classList.add('pltt-hidden');
@@ -415,6 +380,13 @@ if ( ! empty( $projects ) ) {
 		});
 	}
 
+	var budgetHoursInput = document.getElementById('pltt-project-budget-hours');
+	if (budgetHoursInput) {
+		budgetHoursInput.addEventListener('input', function() {
+			applyRecurringBudgetLock();
+		});
+	}
+
 	// Edit Project links (row-actions).
 	document.querySelectorAll('.pltt-edit-project').forEach(function(link) {
 		link.addEventListener('click', function(e) {
@@ -432,6 +404,7 @@ if ( ! empty( $projects ) ) {
 			document.getElementById('pltt-project-budget-hours').value = row.dataset.budgetHours || '';
 			applyBillingTypeUI(row.dataset.billingType || 'hourly', false);
 			document.getElementById('pltt-project-non-billable').checked = row.dataset.billabilityDefault === '0';
+			applyRecurringBudgetLock();
 
 			var archiveBtn = document.getElementById('pltt-archive-project-btn');
 			archiveBtn.classList.add('visible');

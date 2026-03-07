@@ -111,7 +111,7 @@ class PLTT_Projects {
 			? $args['orderby']
 			: 'name';
 		$order   = 'DESC' === strtoupper( $args['order'] ) ? 'DESC' : 'ASC';
-		$sql    .= " ORDER BY {$orderby} {$order}";
+		$sql    .= " ORDER BY CASE WHEN status = 'archived' THEN 1 ELSE 0 END ASC, {$orderby} {$order}";
 
 		// Limit.
 		if ( $args['limit'] > 0 ) {

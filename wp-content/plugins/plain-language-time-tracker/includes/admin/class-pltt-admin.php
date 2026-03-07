@@ -97,6 +97,7 @@ class PLTT_Admin {
 			'pltt-tags',
 			array( __CLASS__, 'render_tags_page' )
 		);
+
 	}
 
 	/**
@@ -346,7 +347,8 @@ class PLTT_Admin {
 			if ( 'pltt-tags' === $page ) {
 				return 'tags';
 			}
-		}
+
+			}
 
 		return 'daily-log';
 	}
