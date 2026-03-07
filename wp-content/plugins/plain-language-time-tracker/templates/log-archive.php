@@ -63,77 +63,101 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 	<div class="pltt-report-content">
 		<?php if ( ! empty( $logs ) ) : ?>
-			<table class="widefat striped">
-				<thead>
-					<tr>
-						<th><?php esc_html_e( 'Date', 'plain-language-time-tracker' ); ?></th>
-						<th><?php esc_html_e( 'Preview', 'plain-language-time-tracker' ); ?></th>
-						<th><?php esc_html_e( 'Entries', 'plain-language-time-tracker' ); ?></th>
-						<th><?php esc_html_e( 'Hours', 'plain-language-time-tracker' ); ?></th>
-						<th><?php esc_html_e( 'Status', 'plain-language-time-tracker' ); ?></th>
-					</tr>
-				</thead>
-				<tbody>
-					<?php foreach ( $logs as $log ) : ?>
-						<tr data-log-date="<?php echo esc_attr( $log->log_date ); ?>" data-entry-count="<?php echo esc_attr( $log->entry_count ); ?>">
-							<td>
-								<a href="<?php echo esc_url( pltt_get_admin_url( 'daily-log', array( 'date' => $log->log_date ) ) ); ?>">
-									<strong><?php echo esc_html( pltt_format_date( $log->log_date, 'D, M j, Y' ) ); ?></strong>
-								</a>
-								<div class="row-actions">
-									<a href="<?php echo esc_url( pltt_get_admin_url( 'daily-log', array( 'date' => $log->log_date ) ) ); ?>">
-									<?php esc_html_e( 'View Log', 'plain-language-time-tracker' ); ?>
-									</a>
-									<?php if ( (int) $log->entry_count > 0 ) : ?>
-										| <a href="<?php echo esc_url( pltt_get_admin_url( 'review', array( 'date' => $log->log_date ) ) ); ?>">
-											<?php esc_html_e( 'Review Entries', 'plain-language-time-tracker' ); ?>
+			<?php
+			// Group logs by week, respecting WordPress's configured week start day.
+			$start_of_week = (int) get_option( 'start_of_week', 0 );
+			$logs_by_week  = array();
+			foreach ( $logs as $log ) {
+				$date_obj = new DateTimeImmutable( $log->log_date, wp_timezone() );
+				$dow      = (int) $date_obj->format( 'w' );
+				$diff     = ( $dow - $start_of_week + 7 ) % 7;
+				$week_key = $date_obj->modify( "-{$diff} days" )->format( 'Y-m-d' );
+				$logs_by_week[ $week_key ][] = $log;
+			}
+			?>
+			<?php foreach ( $logs_by_week as $week_start_date => $week_logs ) : ?>
+				<?php
+				$week_start_obj = new DateTimeImmutable( $week_start_date, wp_timezone() );
+				$week_end_obj   = $week_start_obj->modify( '+6 days' );
+				$week_label     = $week_start_obj->format( 'M j' ) . '–' . $week_end_obj->format( 'M j, Y' );
+				?>
+				<div class="pltt-week-group">
+					<div class="pltt-week-group-header">
+						<span class="pltt-week-group-title"><?php echo esc_html( sprintf( __( 'Week of %s', 'plain-language-time-tracker' ), $week_label ) ); ?></span>
+					</div>
+					<table class="widefat striped">
+						<thead>
+							<tr>
+								<th><?php esc_html_e( 'Date', 'plain-language-time-tracker' ); ?></th>
+								<th><?php esc_html_e( 'Preview', 'plain-language-time-tracker' ); ?></th>
+								<th><?php esc_html_e( 'Entries', 'plain-language-time-tracker' ); ?></th>
+								<th><?php esc_html_e( 'Hours', 'plain-language-time-tracker' ); ?></th>
+								<th><?php esc_html_e( 'Status', 'plain-language-time-tracker' ); ?></th>
+							</tr>
+						</thead>
+						<tbody>
+							<?php foreach ( $week_logs as $log ) : ?>
+								<tr data-log-date="<?php echo esc_attr( $log->log_date ); ?>" data-entry-count="<?php echo esc_attr( $log->entry_count ); ?>">
+									<td>
+										<a href="<?php echo esc_url( pltt_get_admin_url( 'daily-log', array( 'date' => $log->log_date ) ) ); ?>">
+											<strong><?php echo esc_html( pltt_format_date( $log->log_date, 'D, M j, Y' ) ); ?></strong>
 										</a>
-									<?php endif; ?>
-									| <a href="#" class="pltt-delete-log submitdelete" role="button">
-										<?php esc_html_e( 'Delete', 'plain-language-time-tracker' ); ?>
-									</a>
-								</div>
-							</td>
-							<td class="pltt-log-preview">
-								<?php
-								if ( ! empty( $log->content ) ) {
-									$preview = wp_strip_all_tags( $log->content );
-									$preview = preg_replace( '/\s+/', ' ', $preview );
-									echo esc_html( mb_strimwidth( $preview, 0, 80, '...' ) );
-								} else {
-									echo '<span class="pltt-empty">' . esc_html__( 'Empty', 'plain-language-time-tracker' ) . '</span>';
-								}
-								?>
-							</td>
-							<td>
-								<?php if ( (int) $log->entry_count > 0 ) : ?>
-									<a href="<?php echo esc_url( pltt_get_admin_url( 'review', array( 'date' => $log->log_date ) ) ); ?>">
-										<?php echo esc_html( $log->entry_count ); ?>
-									</a>
-								<?php else : ?>
-									<span class="pltt-empty">0</span>
-								<?php endif; ?>
-							</td>
-							<td class="pltt-duration-cell">
-								<?php
-								if ( (int) $log->total_minutes > 0 ) {
-									echo esc_html( pltt_format_hours( $log->total_minutes ) );
-								} else {
-									echo '<span class="pltt-empty">—</span>';
-								}
-								?>
-							</td>
-							<td>
-								<?php if ( $log->processed ) : ?>
-									<span class="pltt-badge pltt-badge-success"><?php esc_html_e( 'Processed', 'plain-language-time-tracker' ); ?></span>
-								<?php else : ?>
-									<span class="pltt-badge pltt-badge-warning"><?php esc_html_e( 'Not processed', 'plain-language-time-tracker' ); ?></span>
-								<?php endif; ?>
-							</td>
-						</tr>
-					<?php endforeach; ?>
-				</tbody>
-			</table>
+										<div class="row-actions">
+											<a href="<?php echo esc_url( pltt_get_admin_url( 'daily-log', array( 'date' => $log->log_date ) ) ); ?>">
+											<?php esc_html_e( 'View Log', 'plain-language-time-tracker' ); ?>
+											</a>
+											<?php if ( (int) $log->entry_count > 0 ) : ?>
+												| <a href="<?php echo esc_url( pltt_get_admin_url( 'review', array( 'date' => $log->log_date ) ) ); ?>">
+													<?php esc_html_e( 'Review Entries', 'plain-language-time-tracker' ); ?>
+												</a>
+											<?php endif; ?>
+											| <a href="#" class="pltt-delete-log submitdelete" role="button">
+												<?php esc_html_e( 'Delete', 'plain-language-time-tracker' ); ?>
+											</a>
+										</div>
+									</td>
+									<td class="pltt-log-preview">
+										<?php
+										if ( ! empty( $log->content ) ) {
+											$preview = wp_strip_all_tags( $log->content );
+											$preview = preg_replace( '/\s+/', ' ', $preview );
+											echo esc_html( mb_strimwidth( $preview, 0, 80, '...' ) );
+										} else {
+											echo '<span class="pltt-empty">' . esc_html__( 'Empty', 'plain-language-time-tracker' ) . '</span>';
+										}
+										?>
+									</td>
+									<td>
+										<?php if ( (int) $log->entry_count > 0 ) : ?>
+											<a href="<?php echo esc_url( pltt_get_admin_url( 'review', array( 'date' => $log->log_date ) ) ); ?>">
+												<?php echo esc_html( $log->entry_count ); ?>
+											</a>
+										<?php else : ?>
+											<span class="pltt-empty">0</span>
+										<?php endif; ?>
+									</td>
+									<td class="pltt-duration-cell">
+										<?php
+										if ( (int) $log->total_minutes > 0 ) {
+											echo esc_html( pltt_format_hours( $log->total_minutes ) );
+										} else {
+											echo '<span class="pltt-empty">—</span>';
+										}
+										?>
+									</td>
+									<td>
+										<?php if ( $log->processed ) : ?>
+											<span class="pltt-badge pltt-badge-success"><?php esc_html_e( 'Processed', 'plain-language-time-tracker' ); ?></span>
+										<?php else : ?>
+											<span class="pltt-badge pltt-badge-warning"><?php esc_html_e( 'Not processed', 'plain-language-time-tracker' ); ?></span>
+										<?php endif; ?>
+									</td>
+								</tr>
+							<?php endforeach; // week_logs ?>
+						</tbody>
+					</table>
+				</div>
+			<?php endforeach; // logs_by_week ?>
 
 
 			<?php
