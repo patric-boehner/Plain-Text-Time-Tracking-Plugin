@@ -73,9 +73,9 @@ class PLTT_Reports {
 		// Working days for daily averages (Card 2).
 		$working_days = pltt_count_working_days( $date_from, $date_to );
 
-		// Utilization percentage (Card 3).
-		$utilization = $stats && $stats->total_minutes > 0
-			? ( $stats->billable_minutes / $stats->total_minutes ) * 100
+		// Utilization percentage (Card 3) — client-facing time only, excludes Internal client.
+		$utilization = $stats && $stats->client_total_minutes > 0
+			? ( $stats->client_billable_minutes / $stats->client_total_minutes ) * 100
 			: 0;
 
 		// Overall Effective Hourly Rate (Card 5).
@@ -99,16 +99,25 @@ class PLTT_Reports {
 			// Recurring: hours within the selected date range vs monthly allocation.
 			// Fixed budget: all-time hours vs estimate.
 			if ( ! empty( $summary ) ) {
+				// Recurring budgets reset each month, so only show the bar when the
+				// selected range falls within a single past-or-current calendar month.
+				$from_ym            = substr( $date_from, 0, 7 );
+				$to_ym              = substr( $date_to, 0, 7 );
+				$single_valid_month = ( $from_ym === $to_ym ) && ( $from_ym <= current_time( 'Y-m' ) );
+
 				foreach ( $summary as $row ) {
 					if ( empty( $row->project_id ) || empty( $row->budget_hours ) ) {
 						continue;
 					}
-					if ( ! empty( $row->recurring_period ) ) {
+					if ( ! empty( $row->recurring_period ) && $single_valid_month ) {
 						$alloc_stats[ $row->project_id ] = PLTT_Entries::get_stats( array(
 							'project_id' => (int) $row->project_id,
 							'date_from'  => $date_from,
 							'date_to'    => $date_to,
 						) );
+					} elseif ( ! empty( $row->recurring_period ) ) {
+						// Date range spans multiple months or is future — skip budget bar.
+						continue;
 					} else {
 						$alloc_stats[ $row->project_id ] = PLTT_Entries::get_stats( array(
 							'project_id' => (int) $row->project_id,

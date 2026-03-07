@@ -194,7 +194,7 @@
 					btn.classList.remove( 'pltt-saving' );
 					btn.disabled = false;
 					if ( response.success ) {
-						onSuccess();
+						onSuccess( response.data );
 					} else {
 						onError();
 					}
@@ -255,7 +255,18 @@
 				btn,
 				'billable',
 				newValue,
-				function() { /* already updated optimistically */ },
+				function( data ) {
+					// Update the Amount cell with the server-calculated value.
+					var amountCell = row && row.querySelector( '.pltt-amount-col' );
+					if ( amountCell ) {
+						var amount = data && parseFloat( data.billable_amount );
+						if ( amount > 0 ) {
+							amountCell.textContent = '$' + amount.toLocaleString( 'en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 } );
+						} else {
+							amountCell.innerHTML = '<span class="pltt-empty">—</span>';
+						}
+					}
+				},
 				function() {
 					// Revert.
 					btn.classList.toggle( 'is-billable', currentValue );

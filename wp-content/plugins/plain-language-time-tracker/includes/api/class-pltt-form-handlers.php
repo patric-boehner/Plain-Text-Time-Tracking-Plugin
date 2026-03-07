@@ -36,6 +36,7 @@ class PLTT_Form_Handlers {
 		add_action( 'admin_post_pltt_create_tag', array( __CLASS__, 'handle_create_tag' ) );
 		add_action( 'admin_post_pltt_rename_tag', array( __CLASS__, 'handle_rename_tag' ) );
 		add_action( 'admin_post_pltt_delete_tag', array( __CLASS__, 'handle_delete_tag' ) );
+
 	}
 
 	/**
@@ -366,5 +367,6 @@ class PLTT_Form_Handlers {
 			self::redirect_back( array( 'pltt_error' => 'save_failed' ) );
 		}
 	}
+
 }
 

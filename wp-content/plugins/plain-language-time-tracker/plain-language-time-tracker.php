@@ -33,6 +33,7 @@ define( 'PLTT_ENTRIES_PER_PAGE', 50 );
 define( 'PLTT_LOGS_PER_PAGE', 20 );
 define( 'PLTT_AUTOSAVE_DEBOUNCE_MS', 1500 );
 define( 'PLTT_DEFAULT_HOURLY_RATE', 100.00 );
+define( 'PLTT_INTERNAL_CLIENT_ID', 3 );
 
 /**
  * Load plugin dependencies.

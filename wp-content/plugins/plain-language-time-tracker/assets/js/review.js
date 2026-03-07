@@ -384,7 +384,9 @@
 					var label = isArchived
 						? PLTT.escapeHtml( project.name ) + ' (Archived)'
 						: PLTT.escapeHtml( project.name );
-					var dataAttr = isArchived ? ' data-archived="1"' : '';
+					var billDefault = project.billability_default ? '1' : '0';
+					var dataAttr = ' data-billability-default="' + billDefault + '"' +
+						( isArchived ? ' data-archived="1"' : '' );
 					html += '<option value="' + project.id + '"' + dataAttr + '>' +
 						label + '</option>';
 				} );
@@ -395,6 +397,21 @@
 				// Re-select the current project if it was in the list.
 				if ( currentProjectId ) {
 					projectSelect.value = currentProjectId;
+				}
+
+				// Auto-select most recent project if currentProjectId didn't match any option.
+				var matched = currentProjectId && projectSelect.value === String( currentProjectId );
+				if ( ! matched ) {
+					for ( var i = 0; i < projectSelect.options.length; i++ ) {
+						var opt = projectSelect.options[ i ];
+						if ( opt.value && opt.value !== 'new' && ! opt.dataset.archived ) {
+							projectSelect.value = opt.value;
+							break;
+						}
+					}
+					if ( projectSelect.value && projectSelect.value !== 'new' ) {
+						projectSelect.dispatchEvent( new Event( 'change' ) );
+					}
 				}
 			}
 		} );
@@ -440,6 +457,23 @@
 				document.getElementById( 'pltt-new-project-client-id' ).value = clientSelect.value;
 				PLTT.showModal( 'pltt-project-modal' );
 				this.value = '';
+			} else {
+				// Apply project's billability default to the billable checkbox.
+				var selectedOpt = this.options[ this.selectedIndex ];
+				if ( selectedOpt && selectedOpt.value ) {
+					var billDefault = selectedOpt.dataset.billabilityDefault;
+					if ( billDefault !== undefined ) {
+						var entryRow = this.closest( '.pltt-entry-row' );
+						var checkbox = entryRow && entryRow.querySelector( '.pltt-billable' );
+						if ( checkbox ) {
+							var shouldBeBillable = billDefault === '1';
+							if ( checkbox.checked !== shouldBeBillable ) {
+								checkbox.checked = shouldBeBillable;
+								checkbox.dispatchEvent( new Event( 'change' ) );
+							}
+						}
+					}
+				}
 			}
 		} );
 	} );
@@ -541,10 +575,12 @@
 						const option = document.createElement( 'option' );
 						option.value = project.id;
 						option.textContent = project.name;
+						option.dataset.billabilityDefault = project.billability_default ? '1' : '0';
 						option.selected = true;
 
 						const addNewOption = projectSelect.querySelector( 'option[value="new"]' );
 						projectSelect.insertBefore( option, addNewOption );
+						projectSelect.dispatchEvent( new Event( 'change' ) );
 					}
 
 					PLTT.hideModal( 'pltt-project-modal' );

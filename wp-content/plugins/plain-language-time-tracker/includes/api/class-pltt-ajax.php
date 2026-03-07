@@ -209,8 +209,57 @@ class PLTT_Ajax {
 			if ( false === $result ) {
 				wp_send_json_error( __( 'Failed to update tags.', 'plain-language-time-tracker' ) );
 			}
+		} elseif ( 'billable' === $field ) {
+			$int_value   = (int) $value;
+			$update_data = array( 'billable' => $int_value );
+			$formats     = array( '%d' );
+
+			if ( 1 === $int_value ) {
+				// Recalculate rate and amount when marking as billable.
+				$entry = PLTT_Entries::get( $entry_id );
+				if ( $entry && $entry->duration_minutes > 0 ) {
+					$hourly_rate = 0.0;
+					if ( ! empty( $entry->project_id ) ) {
+						$project = PLTT_Projects::get( (int) $entry->project_id );
+						if ( $project && (float) $project->hourly_rate > 0 ) {
+							$hourly_rate = (float) $project->hourly_rate;
+						}
+					}
+					if ( 0.0 === $hourly_rate && ! empty( $entry->client_id ) ) {
+						$client = PLTT_Clients::get( (int) $entry->client_id );
+						if ( $client && (float) $client->hourly_rate > 0 ) {
+							$hourly_rate = (float) $client->hourly_rate;
+						}
+					}
+					if ( 0.0 === $hourly_rate && defined( 'PLTT_DEFAULT_HOURLY_RATE' ) ) {
+						$hourly_rate = (float) PLTT_DEFAULT_HOURLY_RATE;
+					}
+					$update_data['billable_rate']   = $hourly_rate;
+					$update_data['billable_amount'] = round( ( $entry->duration_minutes / 60.0 ) * $hourly_rate, 2 );
+					$formats[]                      = '%f';
+					$formats[]                      = '%f';
+				}
+			} else {
+				// Reset rate and amount when marking as non-billable.
+				$update_data['billable_rate']   = 0.00;
+				$update_data['billable_amount'] = 0.00;
+				$formats[]                      = '%f';
+				$formats[]                      = '%f';
+			}
+
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+			$result = $wpdb->update( $table, $update_data, array( 'id' => $entry_id ), $formats, array( '%d' ) );
+			if ( false === $result ) {
+				wp_send_json_error( __( 'Failed to update entry.', 'plain-language-time-tracker' ) );
+			}
+
+			wp_send_json_success( array(
+				'message'         => __( 'Saved.', 'plain-language-time-tracker' ),
+				'billable_amount' => $update_data['billable_amount'] ?? 0.0,
+			) );
 		} else {
 			$int_value = (int) $value;
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
 			$result    = $wpdb->update(
 				$table,
 				array( $field => $int_value ),

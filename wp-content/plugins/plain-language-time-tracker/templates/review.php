@@ -224,6 +224,7 @@ $return_to = isset( $_GET['return_to'] ) ? esc_url_raw( wp_unslash( $_GET['retur
 											<option
 												value="<?php echo esc_attr( $project->id ); ?>"
 												<?php selected( $predicted_project, $project->id ); ?>
+												data-billability-default="<?php echo (int) $project->billability_default; ?>"
 												<?php if ( $is_archived ) : ?>
 													data-archived="1"
 												<?php endif; ?>

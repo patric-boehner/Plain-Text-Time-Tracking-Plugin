@@ -283,12 +283,14 @@ class PLTT_Review {
 				// Check if this is a newly verified entry or already verified.
 				$was_verified = $original && ! empty( $original->verified );
 
-				if ( ! $was_verified ) {
-					// Newly verified: resolve and snapshot the rate.
+				$rate_was_zero = $original && 0.0 === (float) $original->billable_rate;
+
+				if ( ! $was_verified || $rate_was_zero ) {
+					// Newly verified, or previously verified as non-billable (rate=0): resolve fresh.
 					$data['billable_rate']   = self::resolve_billable_rate( $data, $clients_cache, $projects_cache );
 					$data['billable_amount'] = round( ( $duration_minutes / 60.0 ) * $data['billable_rate'], 2 );
 				} else {
-					// Already verified: keep existing rate, recalculate amount if duration changed.
+					// Already verified with a real rate: keep it, recalculate amount if duration changed.
 					if ( null !== $original->billable_rate ) {
 						$data['billable_rate']   = $original->billable_rate;
 						$data['billable_amount'] = round( ( $duration_minutes / 60.0 ) * $original->billable_rate, 2 );
