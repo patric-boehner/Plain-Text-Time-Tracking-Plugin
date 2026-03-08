@@ -168,8 +168,10 @@ See `design-philosophy.md` for the full philosophy document.
 
 - **WordPress Plugin** - Standard WP admin screens, hooks, and conventions
 - **Vanilla JS + CSS** - No frameworks, no preprocessors
-- **Procedural PHP** - No classes (WordPress coding standards)
+- **PHP with static classes** - Each domain area (Entries, Clients, Projects, Tags, Aliases, etc.) is a static class; all public logic is procedural-style `Class::method()` calls; no instantiation or inheritance
 - **Rate snapshots** - Billable rate/amount locked at verification time for historical accuracy
 - **Transient caching** - Clients, projects, and aliases cached for performance
+- **Shared rate helper** - `pltt_resolve_billable_rate()` in `helpers.php` is the canonical billable rate resolver; use it everywhere instead of inline rate logic (project rate → client rate → default → 0)
+- **Bulk loaders** - Prefer `get_multiple($ids)` and `PLTT_Projects::get_for_clients($client_ids)` over per-record queries in any loop
 
 See `development-notes.md` for full development preferences and WordPress patterns.

@@ -15,6 +15,9 @@ if ( ! defined( 'ABSPATH' ) ) {
 /**
  * Format minutes as hours and minutes string.
  *
+ * OPT-L6 SYNC: Output format must match PLTT.formatDuration() in assets/js/shared.js.
+ * Update both if the format changes.
+ *
  * @param int $minutes Total minutes.
  * @return string Formatted duration (e.g., "2h 30m").
  */
@@ -532,6 +535,54 @@ function pltt_validate_hourly_rate( $rate ) {
 		return new WP_Error( 'invalid_rate', __( 'Hourly rate must be between $0 and $10,000.', 'plain-language-time-tracker' ) );
 	}
 	return true;
+}
+
+/**
+ * Resolve the billable hourly rate for an entry.
+ *
+ * Resolution order: project rate → client rate → PLTT_DEFAULT_HOURLY_RATE → $0.
+ *
+ * Accepts optional pre-loaded caches (id-keyed object maps) to avoid extra DB queries.
+ * If a cache is provided but the ID is not found in it, the DB is NOT queried as a fallback —
+ * pass empty arrays to have this function load from DB on-demand.
+ *
+ * OPT-M3: Consolidates duplicate rate logic from PLTT_Ajax::update_entry_field()
+ * and PLTT_Review::resolve_billable_rate() into a single canonical implementation.
+ * SYNC: The JS-side amount calculation in assets/js/reports.js must match this logic.
+ *
+ * @param int   $client_id      Client ID (0 if none).
+ * @param int   $project_id     Project ID (0 if none).
+ * @param array $clients_cache  Optional pre-loaded clients map (id => object).
+ * @param array $projects_cache Optional pre-loaded projects map (id => object).
+ * @return float Resolved hourly rate.
+ */
+function pltt_resolve_billable_rate( $client_id, $project_id, $clients_cache = array(), $projects_cache = array() ) {
+	$client_id  = (int) $client_id;
+	$project_id = (int) $project_id;
+
+	// 1. Check project rate.
+	if ( $project_id > 0 ) {
+		$project = isset( $projects_cache[ $project_id ] ) ? $projects_cache[ $project_id ] : PLTT_Projects::get( $project_id );
+		if ( $project && (float) $project->hourly_rate > 0 ) {
+			return (float) $project->hourly_rate;
+		}
+	}
+
+	// 2. Check client rate.
+	if ( $client_id > 0 ) {
+		$client = isset( $clients_cache[ $client_id ] ) ? $clients_cache[ $client_id ] : PLTT_Clients::get( $client_id );
+		if ( $client && (float) $client->hourly_rate > 0 ) {
+			return (float) $client->hourly_rate;
+		}
+	}
+
+	// 3. Use default rate.
+	if ( defined( 'PLTT_DEFAULT_HOURLY_RATE' ) ) {
+		return (float) PLTT_DEFAULT_HOURLY_RATE;
+	}
+
+	// 4. Fallback to $0.
+	return 0.00;
 }
 
 /**

@@ -160,23 +160,20 @@
 	}
 
 	/**
-	 * Initialize time input change handlers for duration auto-calculation.
+	 * OPT-L3: Use event delegation for time input change handlers instead of
+	 * adding one listener per row. Single listener handles all current and future rows.
 	 */
-	document.querySelectorAll( '.pltt-entry-row' ).forEach( function( row ) {
-		var startInput = row.querySelector( '.pltt-start-time' );
-		var endInput = row.querySelector( '.pltt-end-time' );
-
-		if ( startInput ) {
-			startInput.addEventListener( 'change', function() {
-				recalcDuration( row );
-			} );
-		}
-		if ( endInput ) {
-			endInput.addEventListener( 'change', function() {
-				recalcDuration( row );
-			} );
-		}
-	} );
+	var reviewForm = document.getElementById( 'pltt-review-form' );
+	if ( reviewForm ) {
+		reviewForm.addEventListener( 'change', function( e ) {
+			if ( e.target.classList.contains( 'pltt-start-time' ) || e.target.classList.contains( 'pltt-end-time' ) ) {
+				var row = e.target.closest( '.pltt-entry-row' );
+				if ( row ) {
+					recalcDuration( row );
+				}
+			}
+		} );
+	}
 
 	/**
 	 * Format a time string for display (e.g. "14:30" → "2:30pm").

@@ -30,23 +30,23 @@ class PLTT_Review {
 		// Collect project IDs referenced by entries, grouped by client.
 		// These may be archived but must appear in the entry's dropdown.
 		$extra_project_ids_by_client = array();
+		$unique_client_ids           = array();
 		foreach ( $entries as $entry ) {
 			$cid = $entry['predicted_client_id'] ?? 0;
 			$pid = $entry['predicted_project_id'] ?? 0;
-			if ( $cid > 0 && $pid > 0 ) {
-				$extra_project_ids_by_client[ $cid ][] = $pid;
+			if ( $cid > 0 ) {
+				$unique_client_ids[] = $cid;
+				if ( $pid > 0 ) {
+					$extra_project_ids_by_client[ $cid ][] = $pid;
+				}
 			}
 		}
 
-		// Pre-load projects for each client that appears in the entries.
-		$projects_by_client = array();
-		foreach ( $entries as $entry ) {
-			$cid = $entry['predicted_client_id'] ?? 0;
-			if ( $cid > 0 && ! isset( $projects_by_client[ $cid ] ) ) {
-				$extras = $extra_project_ids_by_client[ $cid ] ?? array();
-				$projects_by_client[ $cid ] = PLTT_Projects::get_by_client_recent_first( $cid, $extras );
-			}
-		}
+		// OPT-M1: Bulk-load projects for all clients in a single query instead of N+1.
+		$projects_by_client = PLTT_Projects::get_for_clients(
+			array_unique( $unique_client_ids ),
+			$extra_project_ids_by_client
+		);
 
 		// Load daily log for notes reference.
 		$log = PLTT_Daily_Log::get_log( $date );
@@ -207,29 +207,21 @@ class PLTT_Review {
 		$saved_count = 0;
 		$error_count = 0;
 
-		// Build caches for clients and projects to resolve rates.
-		$projects_cache = array();
-		$clients_cache  = array();
+		// OPT-M2: Bulk-load all referenced clients and projects in two queries instead of N+1.
+		$client_ids  = array_filter( array_unique( array_map(
+			function( $e ) { return ! empty( $e['client_id'] ) ? absint( $e['client_id'] ) : 0; },
+			$entries
+		) ) );
+		$project_ids = array_filter( array_unique( array_map(
+			function( $e ) { return ! empty( $e['project_id'] ) ? absint( $e['project_id'] ) : 0; },
+			$entries
+		) ) );
 
-		// Pre-load all referenced clients and projects.
-		foreach ( $entries as $entry_data ) {
-			$client_id  = ! empty( $entry_data['client_id'] ) ? absint( $entry_data['client_id'] ) : 0;
-			$project_id = ! empty( $entry_data['project_id'] ) ? absint( $entry_data['project_id'] ) : 0;
+		$clients_cache  = PLTT_Clients::get_multiple( $client_ids );
+		$projects_cache = PLTT_Projects::get_multiple( $project_ids );
 
-			if ( $client_id > 0 && ! isset( $clients_cache[ $client_id ] ) ) {
-				$client = PLTT_Clients::get( $client_id );
-				if ( $client ) {
-					$clients_cache[ $client_id ] = $client;
-				}
-			}
-
-			if ( $project_id > 0 && ! isset( $projects_cache[ $project_id ] ) ) {
-				$project = PLTT_Projects::get( $project_id );
-				if ( $project ) {
-					$projects_cache[ $project_id ] = $project;
-				}
-			}
-		}
+		// OPT-L7: Pre-load all tags once so learn_client_alias() doesn't re-query per entry.
+		$all_tag_names = array_column( PLTT_Tags::get_all(), 'name' );
 
 		foreach ( $entries as $entry_data ) {
 			$entry_id = ! empty( $entry_data['id'] ) ? absint( $entry_data['id'] ) : 0;
@@ -309,7 +301,7 @@ class PLTT_Review {
 
 				// Learn client aliases from user's selection.
 				if ( $original ) {
-					self::learn_client_alias( $original, $data );
+					self::learn_client_alias( $original, $data, $all_tag_names );
 				}
 			} else {
 				++$error_count;
@@ -338,40 +330,18 @@ class PLTT_Review {
 	/**
 	 * Resolve billable rate using hierarchy.
 	 *
-	 * Resolution order: Project rate → Client rate → Default rate → $0.
+	 * OPT-M3: Delegates to the shared pltt_resolve_billable_rate() helper in helpers.php.
+	 * Passes pre-loaded caches to avoid extra DB queries.
 	 *
 	 * @param array $entry_data      Entry data with client_id and project_id.
-	 * @param array $clients_cache   Cache of client objects.
-	 * @param array $projects_cache  Cache of project objects.
+	 * @param array $clients_cache   Cache of client objects (id => object).
+	 * @param array $projects_cache  Cache of project objects (id => object).
 	 * @return float Resolved hourly rate.
 	 */
 	private static function resolve_billable_rate( $entry_data, $clients_cache, $projects_cache ) {
 		$client_id  = ! empty( $entry_data['client_id'] ) ? (int) $entry_data['client_id'] : 0;
 		$project_id = ! empty( $entry_data['project_id'] ) ? (int) $entry_data['project_id'] : 0;
-
-		// 1. Check project rate.
-		if ( $project_id > 0 && isset( $projects_cache[ $project_id ] ) ) {
-			$project_rate = (float) ( $projects_cache[ $project_id ]->hourly_rate ?? 0 );
-			if ( $project_rate > 0 ) {
-				return $project_rate;
-			}
-		}
-
-		// 2. Check client rate.
-		if ( $client_id > 0 && isset( $clients_cache[ $client_id ] ) ) {
-			$client_rate = (float) ( $clients_cache[ $client_id ]->hourly_rate ?? 0 );
-			if ( $client_rate > 0 ) {
-				return $client_rate;
-			}
-		}
-
-		// 3. Use default rate.
-		if ( defined( 'PLTT_DEFAULT_HOURLY_RATE' ) ) {
-			return (float) PLTT_DEFAULT_HOURLY_RATE;
-		}
-
-		// 4. Fallback to $0.
-		return 0.00;
+		return pltt_resolve_billable_rate( $client_id, $project_id, $clients_cache, $projects_cache );
 	}
 
 	/**
@@ -381,18 +351,18 @@ class PLTT_Review {
 	 * update alias confidence. Also creates new aliases from text patterns
 	 * when the user selects a client.
 	 *
-	 * @param object $original Original entry from database (before save).
-	 * @param array  $saved    Saved data with user's selections.
+	 * @param object     $original   Original entry from database (before save).
+	 * @param array      $saved      Saved data with user's selections.
+	 * @param array|null $known_tags Pre-loaded tag names to pass to extract_potential() (OPT-L7).
 	 */
-	private static function learn_client_alias( $original, $saved ) {
+	private static function learn_client_alias( $original, $saved, $known_tags = null ) {
 		$text = trim( ( $original->description ?? '' ) . ' ' . ( $original->raw_text ?? '' ) );
 
 		if ( empty( $text ) ) {
 			return;
 		}
 
-		$saved_client    = ! empty( $saved['client_id'] ) ? (int) $saved['client_id'] : 0;
-		$original_client = ! empty( $original->client_id ) ? (int) $original->client_id : 0;
+		$saved_client = ! empty( $saved['client_id'] ) ? (int) $saved['client_id'] : 0;
 
 		// Re-derive the alias match to find which alias (if any) predicted the client.
 		$alias_match = PLTT_Aliases::get_best_client_match( $text );
@@ -405,7 +375,8 @@ class PLTT_Review {
 
 		// Create new client aliases from text patterns.
 		if ( $saved_client > 0 ) {
-			$potentials = PLTT_Aliases::extract_potential( $text );
+			// OPT-L7: Pass pre-loaded tag names to avoid a DB call per entry.
+			$potentials = PLTT_Aliases::extract_potential( $text, $known_tags );
 
 			foreach ( $potentials as $potential ) {
 				$existing = PLTT_Aliases::get_by_text( $potential );

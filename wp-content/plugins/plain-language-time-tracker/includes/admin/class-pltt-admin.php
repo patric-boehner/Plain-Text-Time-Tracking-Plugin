@@ -315,41 +315,4 @@ class PLTT_Admin {
 		}
 	}
 
-	/**
-	 * Get the current screen being displayed.
-	 *
-	 * @return string Screen name.
-	 */
-	public static function get_current_screen() {
-		if ( isset( $_GET['page'] ) ) {
-			$page = sanitize_text_field( wp_unslash( $_GET['page'] ) );
-
-			if ( 'pltt-time-tracker' === $page ) {
-				return isset( $_GET['screen'] ) ? sanitize_text_field( wp_unslash( $_GET['screen'] ) ) : 'daily-log';
-			}
-
-			if ( 'pltt-log-archive' === $page ) {
-				return 'log-archive';
-			}
-
-			if ( 'pltt-reports' === $page ) {
-				return 'reports';
-			}
-
-			if ( 'pltt-clients' === $page ) {
-				return 'clients';
-			}
-
-			if ( 'pltt-projects' === $page ) {
-				return 'projects';
-			}
-
-			if ( 'pltt-tags' === $page ) {
-				return 'tags';
-			}
-
-			}
-
-		return 'daily-log';
-	}
 }

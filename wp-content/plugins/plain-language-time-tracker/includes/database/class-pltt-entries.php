@@ -412,17 +412,19 @@ class PLTT_Entries {
 	 */
 	public static function delete_by_date( $date ) {
 		global $wpdb;
-		$table = PLTT_Database::get_table_name( 'time_entries' );
+		$table            = PLTT_Database::get_table_name( 'time_entries' );
+		$entry_tags_table = PLTT_Database::get_table_name( 'entry_tags' );
 
-		// Get IDs first so we can clean up junction rows.
+		// OPT-L2: Delete junction rows in a single DELETE JOIN instead of looping per entry.
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
-		$ids = $wpdb->get_col(
-			$wpdb->prepare( "SELECT id FROM {$table} WHERE entry_date = %s", $date )
+		$wpdb->query(
+			$wpdb->prepare(
+				"DELETE et FROM {$entry_tags_table} et
+				INNER JOIN {$table} e ON et.entry_id = e.id
+				WHERE e.entry_date = %s",
+				$date
+			)
 		);
-
-		foreach ( $ids as $id ) {
-			PLTT_Tags::delete_for_entry( (int) $id );
-		}
 
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
 		return $wpdb->delete(
@@ -547,7 +549,8 @@ class PLTT_Entries {
 			$prepare[] = $args['billed'] ? 1 : 0;
 		}
 
-		$internal_client_id = PLTT_INTERNAL_CLIENT_ID;
+		// SEC-L1: Cast to int explicitly so the interpolation is provably an integer literal, not user input.
+		$internal_client_id = (int) PLTT_INTERNAL_CLIENT_ID;
 		$exclude_clause     = $internal_client_id > 0
 			? "e.client_id != {$internal_client_id}"
 			: "LOWER(c.name) != 'internal'";
