@@ -107,7 +107,16 @@ if ( ! empty( $clients ) ) {
 								<?php endif; ?>
 							</div>
 						</td>
-						<td><?php echo null !== $client->hourly_rate ? esc_html( pltt_format_currency( $client->hourly_rate ) ) : '<span class="pltt-empty">—</span>'; ?></td>
+						<td><?php
+						if ( null !== $client->hourly_rate ) {
+							echo esc_html( pltt_format_currency( $client->hourly_rate ) );
+						} elseif ( defined( 'PLTT_DEFAULT_HOURLY_RATE' ) ) {
+							echo esc_html( pltt_format_currency( PLTT_DEFAULT_HOURLY_RATE ) );
+							echo '<span class="pltt-rate-source">' . esc_html__( 'default', 'plain-language-time-tracker' ) . '</span>';
+						} else {
+							echo '<span class="pltt-empty">—</span>';
+						}
+					?></td>
 						<td><?php echo esc_html( $client_proj_count ); ?></td>
 					</tr>
 				<?php endforeach; ?>

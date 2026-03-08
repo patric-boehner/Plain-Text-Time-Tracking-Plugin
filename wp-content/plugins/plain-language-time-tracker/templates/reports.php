@@ -424,13 +424,13 @@ $tab_base_url = add_query_arg( $filter_params, admin_url( 'admin.php' ) );
 		<?php if ( 'summary' === $view ) : ?>
 
 			<?php if ( ! empty( $summary ) ) : ?>
-				<table class="widefat striped">
+				<table class="widefat striped pltt-summary-table">
 					<thead>
 						<tr>
 							<th><?php esc_html_e( 'Project', 'plain-language-time-tracker' ); ?></th>
 							<th><?php esc_html_e( 'Type', 'plain-language-time-tracker' ); ?></th>
 							<th><?php esc_html_e( 'Hours', 'plain-language-time-tracker' ); ?></th>
-							<th><?php esc_html_e( 'Budget', 'plain-language-time-tracker' ); ?></th>
+							<th class="pltt-budget-col"><?php esc_html_e( 'Budget', 'plain-language-time-tracker' ); ?></th>
 							<th><?php esc_html_e( 'Amount', 'plain-language-time-tracker' ); ?></th>
 						</tr>
 					</thead>
@@ -450,11 +450,12 @@ $tab_base_url = add_query_arg( $filter_params, admin_url( 'admin.php' ) );
 						}
 						$detail_url = add_query_arg( $detail_args, admin_url( 'admin.php' ) );
 
+							$billing_type_pre = pltt_get_billing_type( $row );
 						?>
 							<tr>
-								<td class="pltt-entry-desc-cell">
+								<td class="pltt-entry-desc-cell<?php echo 'none' !== $billing_type_pre ? ' pltt-desc-billable' : ''; ?>">
 									<?php if ( ! empty( $row->project_name ) ) : ?>
-										<a href="<?php echo esc_url( $detail_url ); ?>"><?php echo esc_html( $row->project_name ); ?></a>
+										<a href="<?php echo esc_url( $detail_url ); ?>"><span class="pltt-entry-desc-text"><?php echo esc_html( $row->project_name ); ?></span></a>
 									<?php else : ?>
 										<a href="<?php echo esc_url( $detail_url ); ?>"><span class="pltt-empty">—</span></a>
 									<?php endif; ?>
@@ -490,7 +491,7 @@ $tab_base_url = add_query_arg( $filter_params, admin_url( 'admin.php' ) );
 								<td class="pltt-duration-cell<?php echo $is_over_budget ? ' pltt-alloc-over' : ''; ?>">
 									<?php echo esc_html( pltt_format_hours( $row->total_minutes ) ); ?>
 								</td>
-								<td class="pltt-duration-cell">
+								<td class="pltt-duration-cell pltt-budget-col">
 									<?php if ( $has_alloc ) :
 										pltt_render_allocation_bar( $sa_used_mins, $sa_budget_hours, $billing_type );
 									else : ?>
