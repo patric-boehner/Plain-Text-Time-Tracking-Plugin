@@ -55,6 +55,9 @@ const PLTT = {
 	/**
 	 * Format minutes as duration string.
 	 *
+	 * OPT-L6 SYNC: Output format must match pltt_format_duration() in includes/helpers.php.
+	 * Update both if the format changes.
+	 *
 	 * @param {number} minutes Total minutes.
 	 * @return {string} Formatted duration.
 	 */
@@ -117,7 +120,22 @@ const PLTT = {
 				firstElement.focus();
 			}
 
-			// Set up focus trap
+			// OPT-L4: Cache focusable elements at open time; re-use in keydown handler instead
+			// of re-querying on every Tab keypress. Refresh only when modal content mutates.
+			let trapFirst = firstElement;
+			let trapLast  = lastElement;
+
+			const focusTrapSelector = 'a[href]:not([disabled]), button:not([disabled]), textarea:not([disabled]), input:not([disabled]):not([type="hidden"]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
+			const refreshFocusTrap = function() {
+				const els = modal.querySelectorAll( focusTrapSelector );
+				trapFirst = els[0];
+				trapLast  = els[els.length - 1];
+			};
+
+			// Expose refresh so callers can call modal._refreshFocusTrap() if they mutate content.
+			modal._refreshFocusTrap = refreshFocusTrap;
+
 			if ( !modal.dataset.focusTrapBound ) {
 				modal.dataset.focusTrapBound = 'true';
 				modal.addEventListener( 'keydown', function( e ) {
@@ -127,28 +145,24 @@ const PLTT = {
 					}
 
 					if ( e.key === 'Tab' ) {
-						// Get current focusable elements (in case they've changed)
-						const currentFocusable = modal.querySelectorAll(
-							'a[href]:not([disabled]), button:not([disabled]), textarea:not([disabled]), input:not([disabled]):not([type="hidden"]), select:not([disabled]), [tabindex]:not([tabindex="-1"])'
-						);
-						const currentFirst = currentFocusable[0];
-						const currentLast = currentFocusable[currentFocusable.length - 1];
-
 						if ( e.shiftKey ) {
 							// Shift+Tab: moving backwards
-							if ( document.activeElement === currentFirst ) {
+							if ( document.activeElement === trapFirst ) {
 								e.preventDefault();
-								currentLast.focus();
+								if ( trapLast ) { trapLast.focus(); }
 							}
 						} else {
 							// Tab: moving forwards
-							if ( document.activeElement === currentLast ) {
+							if ( document.activeElement === trapLast ) {
 								e.preventDefault();
-								currentFirst.focus();
+								if ( trapFirst ) { trapFirst.focus(); }
 							}
 						}
 					}
 				} );
+			} else {
+				// Modal already had its trap bound on a previous open — refresh the cached list.
+				refreshFocusTrap();
 			}
 		}
 	},

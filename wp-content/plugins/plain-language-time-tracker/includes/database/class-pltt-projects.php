@@ -436,6 +436,72 @@ class PLTT_Projects {
 	}
 
 	/**
+	 * Get active projects for multiple clients in a single query, sorted by most recent usage.
+	 *
+	 * Same ordering as get_by_client_recent_first() but fetches all clients at once to avoid N+1.
+	 * Returns an array keyed by client_id, each containing an array of project objects.
+	 *
+	 * @param int[] $client_ids            Array of client IDs.
+	 * @param array $extra_ids_by_client   Map of client_id => array of extra project IDs to include even if archived.
+	 * @return array client_id => project[] map.
+	 */
+	public static function get_for_clients( $client_ids, $extra_ids_by_client = array() ) {
+		$client_ids = array_filter( array_map( 'absint', $client_ids ) );
+		if ( empty( $client_ids ) ) {
+			return array();
+		}
+
+		global $wpdb;
+		$projects_table = PLTT_Database::get_table_name( 'projects' );
+		$entries_table  = PLTT_Database::get_table_name( 'time_entries' );
+
+		// Collect all extra project IDs across all clients.
+		$all_extra_ids = array();
+		foreach ( $extra_ids_by_client as $extra_ids ) {
+			foreach ( $extra_ids as $pid ) {
+				$all_extra_ids[] = absint( $pid );
+			}
+		}
+		$all_extra_ids = array_filter( array_unique( $all_extra_ids ) );
+
+		$client_placeholders = implode( ',', array_fill( 0, count( $client_ids ), '%d' ) );
+
+		if ( ! empty( $all_extra_ids ) ) {
+			$extra_placeholders = implode( ',', array_fill( 0, count( $all_extra_ids ), '%d' ) );
+			$status_clause      = "AND ( p.status = 'active' OR p.id IN ({$extra_placeholders}) )";
+			$prepare_args       = array_merge( $client_ids, $all_extra_ids );
+		} else {
+			$status_clause = "AND p.status = 'active'";
+			$prepare_args  = $client_ids;
+		}
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.NotPrepared
+		$rows = $wpdb->get_results(
+			$wpdb->prepare(
+				"SELECT p.* FROM {$projects_table} p
+				LEFT JOIN {$entries_table} e ON p.id = e.project_id
+				WHERE p.client_id IN ({$client_placeholders})
+				{$status_clause}
+				GROUP BY p.id
+				ORDER BY p.client_id ASC, MAX(e.entry_date) DESC, p.name ASC",
+				$prepare_args
+			)
+		);
+
+		// Group results by client_id.
+		$grouped = array();
+		foreach ( $rows as $project ) {
+			$cid = (int) $project->client_id;
+			if ( ! isset( $grouped[ $cid ] ) ) {
+				$grouped[ $cid ] = array();
+			}
+			$grouped[ $cid ][] = $project;
+		}
+
+		return $grouped;
+	}
+
+	/**
 	 * Count projects, optionally by status.
 	 *
 	 * @param string $status Optional status filter.

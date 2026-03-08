@@ -120,12 +120,8 @@ class PLTT_Form_Handlers {
 		$result = PLTT_Clients::delete( $client_id );
 
 		if ( is_wp_error( $result ) ) {
-			self::redirect_back(
-				array(
-					'pltt_error'         => $result->get_error_code(),
-					'pltt_error_message' => $result->get_error_message(),
-				)
-			);
+			// SEC-M2: Use only the error code (not the raw message) in the redirect URL.
+			self::redirect_back( array( 'pltt_error' => $result->get_error_code() ) );
 		} elseif ( $result ) {
 			self::redirect_back( array( 'pltt_message' => 'client_deleted' ) );
 		} else {
@@ -166,7 +162,13 @@ class PLTT_Form_Handlers {
 			$data['hourly_rate'] = '' === $raw_rate ? '' : floatval( $raw_rate );
 		}
 		if ( isset( $_POST['recurring_period'] ) ) {
-			$data['recurring_period'] = sanitize_text_field( wp_unslash( $_POST['recurring_period'] ) );
+			$recurring_period    = sanitize_text_field( wp_unslash( $_POST['recurring_period'] ) );
+			$allowed_periods     = array( '', 'weekly', 'monthly', 'quarterly', 'yearly' );
+			if ( ! in_array( $recurring_period, $allowed_periods, true ) ) {
+				self::redirect_back( array( 'pltt_error' => 'invalid_recurring_period' ) );
+				return;
+			}
+			$data['recurring_period'] = $recurring_period;
 		}
 		if ( isset( $_POST['budget_hours'] ) ) {
 			$raw_hours = wp_unslash( $_POST['budget_hours'] );
@@ -205,12 +207,8 @@ class PLTT_Form_Handlers {
 		$result = PLTT_Projects::delete( $project_id );
 
 		if ( is_wp_error( $result ) ) {
-			self::redirect_back(
-				array(
-					'pltt_error'         => $result->get_error_code(),
-					'pltt_error_message' => $result->get_error_message(),
-				)
-			);
+			// SEC-M2: Use only the error code (not the raw message) in the redirect URL.
+			self::redirect_back( array( 'pltt_error' => $result->get_error_code() ) );
 		} elseif ( $result ) {
 			self::redirect_back( array( 'pltt_message' => 'project_deleted' ) );
 		} else {

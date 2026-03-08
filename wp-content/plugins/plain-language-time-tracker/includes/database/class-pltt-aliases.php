@@ -406,56 +406,81 @@ class PLTT_Aliases {
 	 *
 	 * Finds acronyms (2-5 uppercase letters) and capitalized words.
 	 *
-	 * @param string $text Text to analyze.
+	 * OPT-L7: Accepts optional $known_tags to avoid a DB call when processing multiple entries.
+	 * Pass pre-loaded tag names (array of strings) to skip the internal PLTT_Tags::get_all() call.
+	 *
+	 * @param string     $text       Text to analyze.
+	 * @param array|null $known_tags Optional pre-loaded tag names. If null, loads from DB.
 	 * @return array Array of potential alias strings.
 	 */
-	public static function extract_potential( $text ) {
-		$potentials = array();
+	public static function extract_potential( $text, $known_tags = null ) {
+		$potentials = self::_extract_acronyms( $text );
+		$potentials = array_merge( $potentials, self::_extract_capitalized_words( $text ) );
+		$potentials = array_unique( $potentials );
 
-		// Find acronyms (2-5 uppercase letters).
-		preg_match_all( '/\b([A-Z]{2,5})\b/', $text, $acronyms );
-		if ( ! empty( $acronyms[1] ) ) {
-			$potentials = array_merge( $potentials, $acronyms[1] );
+		// OPT-L7: Use provided tag list if available; otherwise load once from DB.
+		if ( null === $known_tags ) {
+			$known_tags = array_column( PLTT_Tags::get_all(), 'name' );
 		}
 
-		// Find capitalized words (excluding common words and sentence starts).
+		return self::_filter_stopwords_and_tags( $potentials, $known_tags );
+	}
+
+	/**
+	 * Extract acronyms (2-5 uppercase letters) from text.
+	 *
+	 * @param string $text Text to scan.
+	 * @return array Array of acronym strings.
+	 */
+	private static function _extract_acronyms( $text ) {
+		preg_match_all( '/\b([A-Z]{2,5})\b/', $text, $matches );
+		return ! empty( $matches[1] ) ? $matches[1] : array();
+	}
+
+	/**
+	 * Extract capitalized words (3+ chars, not common English words) from text.
+	 *
+	 * Strips timestamp patterns before scanning to avoid false positives.
+	 *
+	 * @param string $text Text to scan.
+	 * @return array Array of capitalized word strings.
+	 */
+	private static function _extract_capitalized_words( $text ) {
 		// Remove timestamp patterns first.
 		$cleaned = preg_replace( '/@\d{1,2}:\d{2}(am|pm)?/i', '', $text );
 
-		// Find words that start with uppercase.
-		preg_match_all( '/\b([A-Z][a-z]{2,})\b/', $cleaned, $words );
-		if ( ! empty( $words[1] ) ) {
-			// Filter out common words.
-			$common_words = array(
-				'The', 'And', 'For', 'With', 'From', 'This', 'That', 'Done', 'End', 'Finished',
-				'Having', 'Going', 'Working', 'Getting', 'Making', 'Taking', 'Doing',
-				'Also', 'Just', 'Still', 'Then', 'About', 'After', 'Before', 'Around',
-			);
-			$filtered     = array_diff( $words[1], $common_words );
-			$potentials   = array_merge( $potentials, $filtered );
+		preg_match_all( '/\b([A-Z][a-z]{2,})\b/', $cleaned, $matches );
+		if ( empty( $matches[1] ) ) {
+			return array();
 		}
 
-		$potentials = array_unique( $potentials );
-
-		// Filter out stopwords (generic activity words that span many clients).
-		$stopwords_lower = array_map( 'strtolower', self::STOPWORDS );
-		$potentials      = array_filter(
-			$potentials,
-			function ( $p ) use ( $stopwords_lower ) {
-				return ! in_array( strtolower( $p ), $stopwords_lower, true );
-			}
+		$common_words = array(
+			'The', 'And', 'For', 'With', 'From', 'This', 'That', 'Done', 'End', 'Finished',
+			'Having', 'Going', 'Working', 'Getting', 'Making', 'Taking', 'Doing',
+			'Also', 'Just', 'Still', 'Then', 'About', 'After', 'Before', 'Around',
 		);
 
-		// Filter out known tags (words already used as hashtags).
-		$known_tags = array_column( PLTT_Tags::get_all(), 'name' );
-		if ( ! empty( $known_tags ) ) {
-			$potentials = array_filter(
-				$potentials,
-				function ( $p ) use ( $known_tags ) {
-					return ! in_array( strtolower( $p ), $known_tags, true );
-				}
-			);
-		}
+		return array_values( array_diff( $matches[1], $common_words ) );
+	}
+
+	/**
+	 * Filter a list of potential aliases, removing stopwords and known tag names.
+	 *
+	 * @param array $potentials  Candidate alias strings.
+	 * @param array $known_tags  Tag names (lowercase) to exclude.
+	 * @return array Filtered alias strings (re-indexed).
+	 */
+	private static function _filter_stopwords_and_tags( $potentials, $known_tags ) {
+		$stopwords_lower = array_map( 'strtolower', self::STOPWORDS );
+
+		$potentials = array_filter(
+			$potentials,
+			function ( $p ) use ( $stopwords_lower, $known_tags ) {
+				$lower = strtolower( $p );
+				return ! in_array( $lower, $stopwords_lower, true )
+					&& ! in_array( $lower, $known_tags, true );
+			}
+		);
 
 		return array_values( $potentials );
 	}
