@@ -131,9 +131,19 @@ if ( ! empty( $projects ) ) {
 							<span class="pltt-badge pltt-badge-success"><?php esc_html_e( 'Hourly', 'plain-language-time-tracker' ); ?></span>
 						<?php endif; ?>
 					</td>
-						<td>
-						<?php echo null !== $project->hourly_rate ? esc_html( pltt_format_currency( $project->hourly_rate ) ) : '<span class="pltt-empty">—</span>'; ?>
-					</td>
+						<td><?php
+							if ( null !== $project->hourly_rate ) {
+								echo esc_html( pltt_format_currency( $project->hourly_rate ) );
+							} elseif ( $project_client && null !== $project_client->hourly_rate ) {
+								echo esc_html( pltt_format_currency( $project_client->hourly_rate ) );
+								echo '<span class="pltt-rate-source">' . esc_html__( 'client', 'plain-language-time-tracker' ) . '</span>';
+							} elseif ( defined( 'PLTT_DEFAULT_HOURLY_RATE' ) ) {
+								echo esc_html( pltt_format_currency( PLTT_DEFAULT_HOURLY_RATE ) );
+								echo '<span class="pltt-rate-source">' . esc_html__( 'default', 'plain-language-time-tracker' ) . '</span>';
+							} else {
+								echo '<span class="pltt-empty">—</span>';
+							}
+						?></td>
 						<?php $total_mins = isset( $project_stats->total_minutes ) ? (float) $project_stats->total_minutes : 0; ?>
 						<td class="pltt-duration-cell">
 							<?php echo esc_html( pltt_format_hours( $total_mins ) ); ?>

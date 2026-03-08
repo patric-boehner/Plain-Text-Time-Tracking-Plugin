@@ -607,11 +607,11 @@ function pltt_render_entry_table( $entries, $options = array() ) {
 				$is_billable  = ! empty( $entry->billable );
 				?>
 				<tr<?php echo $is_billed ? ' class="pltt-billed"' : ''; ?><?php echo $inline_edit ? ' data-entry-id="' . esc_attr( $entry->id ) . '"' : ''; ?>>
-					<td class="pltt-entry-desc-cell">
+					<td class="pltt-entry-desc-cell<?php echo $is_billable ? ' pltt-desc-billable' : ''; ?>">
 						<?php if ( $is_billed && ! $inline_edit ) : ?>
 							<span class="screen-reader-text"><?php esc_html_e( 'Invoiced:', 'plain-language-time-tracker' ); ?></span>
 						<?php endif; ?>
-						<?php echo esc_html( $entry->description ); ?>
+						<span class="pltt-entry-desc-text"><?php echo esc_html( $entry->description ); ?></span>
 						<?php
 						$meta_parts = array();
 						if ( $client )  {

@@ -613,4 +613,16 @@
 	display: inline-block;
 }
 
+/* Billable entry description */
+.pltt-entry-desc-cell.pltt-desc-billable .pltt-entry-desc-text {
+	font-weight: 600;
+}
+
+/* Inherited rate source label */
+.pltt-rate-source {
+	display: block;
+	font-size: 11px;
+	color: #8c8f94;
+}
+
 

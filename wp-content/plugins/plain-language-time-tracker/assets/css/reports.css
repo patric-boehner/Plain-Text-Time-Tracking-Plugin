@@ -118,7 +118,7 @@
 
 .pltt-date-group .widefat th:nth-child(2),
 .pltt-date-group .widefat td:nth-child(2) { /* Tags */
-	width: 130px;
+	width: 160px;
 }
 
 .pltt-date-group .widefat th:nth-child(3),
@@ -145,6 +145,23 @@
 .pltt-date-group .widefat th.pltt-amount-col,
 .pltt-date-group .widefat td.pltt-amount-col { /* Amount */
 	width: 80px;
+}
+
+/* Summary table column widths — Project column gets remaining space */
+.pltt-summary-table th:nth-child(2),
+.pltt-summary-table td:nth-child(2) { /* Type */
+	width: 110px;
+}
+.pltt-summary-table th:nth-child(3),
+.pltt-summary-table td:nth-child(3) { /* Hours */
+	width: 80px;
+}
+.pltt-summary-table .pltt-budget-col { /* Budget */
+	width: 180px;
+}
+.pltt-summary-table th:nth-child(5),
+.pltt-summary-table td:nth-child(5) { /* Amount */
+	width: 90px;
 }
 
 /* Over-budget duration cell in summary table */
@@ -313,6 +330,7 @@
 #pltt-report-content .button.button-secondary {
 	font-size: 13px;
 }
+
 
 /* Responsive */
 @media screen and (max-width: 782px) {
