@@ -429,7 +429,6 @@ $tab_base_url = add_query_arg( $filter_params, admin_url( 'admin.php' ) );
 						<tr>
 							<th><?php esc_html_e( 'Project', 'plain-language-time-tracker' ); ?></th>
 							<th><?php esc_html_e( 'Type', 'plain-language-time-tracker' ); ?></th>
-							<th><?php esc_html_e( 'Client', 'plain-language-time-tracker' ); ?></th>
 							<th><?php esc_html_e( 'Hours', 'plain-language-time-tracker' ); ?></th>
 							<th><?php esc_html_e( 'Budget', 'plain-language-time-tracker' ); ?></th>
 							<th><?php esc_html_e( 'Amount', 'plain-language-time-tracker' ); ?></th>
@@ -453,11 +452,16 @@ $tab_base_url = add_query_arg( $filter_params, admin_url( 'admin.php' ) );
 
 						?>
 							<tr>
-								<td>
+								<td class="pltt-entry-desc-cell">
 									<?php if ( ! empty( $row->project_name ) ) : ?>
 										<a href="<?php echo esc_url( $detail_url ); ?>"><?php echo esc_html( $row->project_name ); ?></a>
 									<?php else : ?>
 										<a href="<?php echo esc_url( $detail_url ); ?>"><span class="pltt-empty">—</span></a>
+									<?php endif; ?>
+									<?php if ( ! empty( $row->client_name ) ) : ?>
+										<div class="pltt-entry-meta">
+											<span class="pltt-entry-client"><?php echo esc_html( $row->client_name ); ?></span>
+										</div>
 									<?php endif; ?>
 								</td>
 								<td>
@@ -472,7 +476,6 @@ $tab_base_url = add_query_arg( $filter_params, admin_url( 'admin.php' ) );
 										<span class="pltt-badge pltt-badge-success"><?php esc_html_e( 'Hourly', 'plain-language-time-tracker' ); ?></span>
 									<?php endif; ?>
 								</td>
-								<td><?php echo ! empty( $row->client_name ) ? esc_html( $row->client_name ) : '<span class="pltt-empty">—</span>'; ?></td>
 								<?php
 								$has_alloc = ! empty( $row->budget_hours ) && ! empty( $row->project_id ) && isset( $alloc_stats[ $row->project_id ] );
 								if ( $has_alloc ) {
@@ -483,7 +486,8 @@ $tab_base_url = add_query_arg( $filter_params, admin_url( 'admin.php' ) );
 										: (float) $alloc_stats[ $row->project_id ]->total_minutes;
 								}
 								?>
-								<td class="pltt-duration-cell">
+								<?php $is_over_budget = $has_alloc && ( $sa_used_mins / 60 ) >= $sa_budget_hours; ?>
+								<td class="pltt-duration-cell<?php echo $is_over_budget ? ' pltt-alloc-over' : ''; ?>">
 									<?php echo esc_html( pltt_format_hours( $row->total_minutes ) ); ?>
 								</td>
 								<td class="pltt-duration-cell">

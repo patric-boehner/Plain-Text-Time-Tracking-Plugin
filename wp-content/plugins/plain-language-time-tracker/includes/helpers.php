@@ -585,8 +585,6 @@ function pltt_render_entry_table( $entries, $options = array() ) {
 		<thead>
 			<tr>
 				<th><?php esc_html_e( 'Description', 'plain-language-time-tracker' ); ?></th>
-				<th><?php esc_html_e( 'Client', 'plain-language-time-tracker' ); ?></th>
-				<th><?php esc_html_e( 'Project', 'plain-language-time-tracker' ); ?></th>
 				<th><?php esc_html_e( 'Tags', 'plain-language-time-tracker' ); ?></th>
 				<th><?php esc_html_e( 'Time', 'plain-language-time-tracker' ); ?></th>
 				<th><?php esc_html_e( 'Duration', 'plain-language-time-tracker' ); ?></th>
@@ -609,14 +607,27 @@ function pltt_render_entry_table( $entries, $options = array() ) {
 				$is_billable  = ! empty( $entry->billable );
 				?>
 				<tr<?php echo $is_billed ? ' class="pltt-billed"' : ''; ?><?php echo $inline_edit ? ' data-entry-id="' . esc_attr( $entry->id ) . '"' : ''; ?>>
-					<td>
+					<td class="pltt-entry-desc-cell">
 						<?php if ( $is_billed && ! $inline_edit ) : ?>
 							<span class="screen-reader-text"><?php esc_html_e( 'Invoiced:', 'plain-language-time-tracker' ); ?></span>
 						<?php endif; ?>
 						<?php echo esc_html( $entry->description ); ?>
+						<?php
+						$meta_parts = array();
+						if ( $client )  {
+							$meta_parts[] = '<span class="pltt-entry-client">' . esc_html( $client->name ) . '</span>';
+						}
+						if ( $project ) {
+							$meta_parts[] = '<span class="pltt-entry-project">' . esc_html( $project->name ) . '</span>';
+						}
+						$meta_html = implode( '<span class="pltt-entry-meta-sep"> · </span>', $meta_parts );
+						if ( $meta_html ) :
+						?>
+							<div class="pltt-entry-meta">
+								<?php echo $meta_html; // phpcs:ignore WordPress.Security.EscapeOutput -- already escaped above ?>
+							</div>
+						<?php endif; ?>
 					</td>
-					<td><?php echo $client ? esc_html( $client->name ) : '<span class="pltt-empty">—</span>'; ?></td>
-					<td><?php echo $project ? esc_html( $project->name ) : '<span class="pltt-empty">—</span>'; ?></td>
 					<td class="pltt-tag-cell">
 						<?php if ( $inline_edit ) : ?>
 							<div class="pltt-tag-input-wrap" data-entry-id="<?php echo esc_attr( $entry->id ); ?>">
@@ -729,12 +740,13 @@ function pltt_render_allocation_bar( $alloc_mins, $budget_hours, $billing_type )
 	$pct         = $budget_hours > 0 ? ( $alloc_hours / $budget_hours ) * 100 : 0;
 	$is_over     = $pct >= 100;
 	$bar_width   = min( $pct, 100 );
+	$pct_display = round( $pct );
 	if ( $is_over ) {
 		$delta_fmt = pltt_format_hours( ( $alloc_hours - $budget_hours ) * 60 );
-		$label     = $delta_fmt . ' ' . __( 'hrs over', 'plain-language-time-tracker' );
+		$label     = $delta_fmt . ' ' . __( 'hrs over', 'plain-language-time-tracker' ) . ' · ' . $pct_display . '%';
 	} else {
 		$delta_fmt = pltt_format_hours( ( $budget_hours - $alloc_hours ) * 60 );
-		$label     = $delta_fmt . ' ' . __( 'hrs left', 'plain-language-time-tracker' );
+		$label     = $delta_fmt . ' ' . __( 'hrs left', 'plain-language-time-tracker' ) . ' · ' . $pct_display . '%';
 	}
 	?>
 	<div class="pltt-alloc-cell">
