@@ -111,41 +111,35 @@
 }
 
 .pltt-date-group .widefat th:nth-child(1),
-.pltt-date-group .widefat td:nth-child(1) { /* Description */
+.pltt-date-group .widefat td:nth-child(1) { /* Description (merged with client, project) */
 	width: auto;
 	overflow: hidden;
-	text-overflow: ellipsis;
 }
 
 .pltt-date-group .widefat th:nth-child(2),
-.pltt-date-group .widefat td:nth-child(2),
-.pltt-date-group .widefat th:nth-child(3),
-.pltt-date-group .widefat td:nth-child(3) { /* Client, Project */
-	width: 120px;
-	white-space: nowrap;
-	overflow: hidden;
-	text-overflow: ellipsis;
-}
-
-.pltt-date-group .widefat th:nth-child(4),
-.pltt-date-group .widefat td:nth-child(4) { /* Tags */
+.pltt-date-group .widefat td:nth-child(2) { /* Tags */
 	width: 130px;
 }
 
-.pltt-date-group .widefat th:nth-child(5),
-.pltt-date-group .widefat td:nth-child(5) { /* Time */
+.pltt-date-group .widefat th:nth-child(3),
+.pltt-date-group .widefat td:nth-child(3) { /* Time */
 	width: 115px;
 	white-space: nowrap;
 }
 
-.pltt-date-group .widefat th:nth-child(6),
-.pltt-date-group .widefat td:nth-child(6) { /* Duration */
+.pltt-date-group .widefat th:nth-child(4),
+.pltt-date-group .widefat td:nth-child(4) { /* Duration */
 	width: 75px;
 }
 
-.pltt-date-group .widefat th:nth-child(7),
-.pltt-date-group .widefat td:nth-child(7) { /* Billable */
+.pltt-date-group .widefat th:nth-child(5),
+.pltt-date-group .widefat td:nth-child(5) { /* Billable */
 	width: 65px;
+}
+
+.pltt-date-group .widefat th.pltt-invoiced-col,
+.pltt-date-group .widefat td.pltt-invoiced-col { /* Inv. */
+	width: 50px;
 }
 
 .pltt-date-group .widefat th.pltt-amount-col,
@@ -153,11 +147,42 @@
 	width: 80px;
 }
 
-/* Invoiced column */
-.pltt-date-group .widefat th.pltt-invoiced-col,
-.pltt-date-group .widefat td.pltt-invoiced-col {
-	width: 50px;
-	/* text-align: center; */
+/* Over-budget duration cell in summary table */
+.pltt-report-content td.pltt-alloc-over {
+	color: #d63638;
+	font-weight: 600;
+}
+
+/* Entry description cell — two-line layout */
+.pltt-entry-desc-cell {
+	font-size: 13px;
+	font-weight: normal;
+}
+
+.pltt-entry-meta {
+	margin-top: 5px;
+	color: #646970;
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 6px;
+}
+
+
+.pltt-date-group .pltt-entry-meta .pltt-entry-client {
+	color: #2271b1;
+}
+
+.pltt-entry-meta-sep {
+	color: #c3c4c7;
+}
+
+.pltt-entry-meta .pltt-tag-pills {
+	display: contents; /* dissolve wrapper so pills are direct flex items */
+}
+
+.pltt-entry-meta .pltt-tag-input-wrap {
+	flex: 0 0 auto;
 }
 
 /* Inline toggle buttons — shared base */
@@ -196,7 +221,7 @@
 	color: #c3c4c7;
 }
 
-/* Tag cell in inline-edit mode */
+/* Tag cell */
 .pltt-tag-cell {
 	vertical-align: top;
 }
