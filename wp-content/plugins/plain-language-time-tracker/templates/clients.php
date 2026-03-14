@@ -77,7 +77,7 @@ if ( ! empty( $clients ) ) {
 	<?php if ( empty( $clients ) ) : ?>
 		<p class="description"><?php esc_html_e( 'No clients yet. Add your first client to get started.', 'plain-language-time-tracker' ); ?></p>
 	<?php else : ?>
-		<table class="widefat striped">
+		<table class="widefat">
 			<thead>
 				<tr>
 					<th><?php esc_html_e( 'Name', 'plain-language-time-tracker' ); ?></th>

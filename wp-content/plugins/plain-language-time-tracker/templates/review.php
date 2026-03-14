@@ -109,9 +109,6 @@ $return_to = isset( $_GET['return_to'] ) ? esc_url_raw( wp_unslash( $_GET['retur
 						<th class="pltt-col-project"><?php esc_html_e( 'Project', 'plain-language-time-tracker' ); ?></th>
 						<th class="pltt-col-tags"><?php esc_html_e( 'Tags', 'plain-language-time-tracker' ); ?></th>
 						<th class="pltt-col-billable"><?php esc_html_e( 'Billable', 'plain-language-time-tracker' ); ?></th>
-						<?php if ( $has_saved_entries ) : ?>
-							<th class="pltt-col-billed"><?php esc_html_e( 'Inv.', 'plain-language-time-tracker' ); ?></th>
-						<?php endif; ?>
 					</tr>
 				</thead>
 				<tbody>
@@ -193,9 +190,11 @@ $return_to = isset( $_GET['return_to'] ) ? esc_url_raw( wp_unslash( $_GET['retur
 								<select name="entries[<?php echo esc_attr( $index ); ?>][client_id]" class="pltt-client-select">
 									<option value=""><?php esc_html_e( 'Select client...', 'plain-language-time-tracker' ); ?></option>
 									<?php foreach ( $clients as $client ) : ?>
-										<option value="<?php echo esc_attr( $client->id ); ?>" <?php selected( $predicted_client, $client->id ); ?>>
-											<?php echo esc_html( $client->name ); ?>
-										</option>
+										<option
+											value="<?php echo esc_attr( $client->id ); ?>"
+											<?php if ( (int) $client->id === PLTT_INTERNAL_CLIENT_ID ) : ?>data-is-internal="1"<?php endif; ?>
+											<?php selected( $predicted_client, $client->id ); ?>
+										><?php echo esc_html( $client->name ); ?></option>
 									<?php endforeach; ?>
 									<option value="new">+ <?php esc_html_e( 'Add new client...', 'plain-language-time-tracker' ); ?></option>
 								</select>
@@ -256,23 +255,6 @@ $return_to = isset( $_GET['return_to'] ) ? esc_url_raw( wp_unslash( $_GET['retur
 									<?php checked( ! empty( $entry['billable'] ) ); ?>
 								>
 							</td>
-							<?php if ( $has_saved_entries ) :
-							$is_entry_billed   = ! empty( $entry['billed'] );
-							$is_entry_billable = ! empty( $entry['billable'] );
-							?>
-								<td class="pltt-col-billed">
-									<button type="button"
-										class="pltt-invoiced-toggle <?php echo $is_entry_billed ? 'is-invoiced' : 'not-invoiced'; ?>"
-										data-entry-id="<?php echo esc_attr( $entry['id'] ); ?>"
-										data-field="billed"
-										data-value="<?php echo $is_entry_billed ? '1' : '0'; ?>"
-										aria-label="<?php echo $is_entry_billed ? esc_attr__( 'Invoiced — click to toggle', 'plain-language-time-tracker' ) : esc_attr__( 'Not invoiced — click to toggle', 'plain-language-time-tracker' ); ?>"
-										title="<?php echo $is_entry_billed ? esc_attr__( 'Invoiced — click to toggle', 'plain-language-time-tracker' ) : esc_attr__( 'Not invoiced — click to toggle', 'plain-language-time-tracker' ); ?>"
-										<?php echo ! $is_entry_billable ? 'style="visibility:hidden"' : ''; ?>>
-										<?php echo $is_entry_billed ? '✓' : '○'; ?>
-									</button>
-								</td>
-							<?php endif; ?>
 						</tr>
 					<?php endforeach; ?>
 				</tbody>

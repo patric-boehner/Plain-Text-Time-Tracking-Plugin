@@ -26,8 +26,9 @@ function pltt_format_duration( $minutes ) {
 		return '0m';
 	}
 
-	$hours = floor( $minutes / 60 );
-	$mins  = $minutes % 60;
+	$minutes = (int) round( $minutes );
+	$hours   = (int) floor( $minutes / 60 );
+	$mins    = $minutes % 60;
 
 	if ( $hours > 0 && $mins > 0 ) {
 		return sprintf( '%dh %dm', $hours, $mins );
@@ -632,7 +633,7 @@ function pltt_render_entry_table( $entries, $options = array() ) {
 	$entry_ids     = array_map( fn( $e ) => (int) $e->id, $entries );
 	$tags_by_entry = PLTT_Tags::get_for_entries( $entry_ids );
 	?>
-	<table class="widefat striped<?php echo esc_attr( $table_class ); ?>">
+	<table class="widefat<?php echo esc_attr( $table_class ); ?>">
 		<thead>
 			<tr>
 				<th><?php esc_html_e( 'Description', 'plain-language-time-tracker' ); ?></th>
@@ -768,7 +769,7 @@ function pltt_render_entry_table( $entries, $options = array() ) {
 function pltt_get_billing_type( $project ) {
 	if ( ! empty( $project->recurring_period ) ) {
 		return 'recurring';
-	} elseif ( ! empty( $project->budget_hours ) ) {
+	} elseif ( ! empty( $project->budget_hours ) || ! empty( $project->budget_fee ) ) {
 		return 'fixed';
 	} elseif ( empty( $project->billability_default ) ) {
 		return 'none';
@@ -780,27 +781,41 @@ function pltt_get_billing_type( $project ) {
  * Render the allocation bar HTML for a project.
  *
  * Outputs a progress bar showing how much of the budget/allocation has been used.
- * For recurring projects the suffix is "hrs/mo"; for fixed budgets "hrs est.".
+ * Labels use plain-language duration ("67h 48m left · 11%"); a title tooltip shows
+ * decimal hours. For fee-based fixed budgets, pass $fee_args with 'spent_dollars' and
+ * 'budget_dollars' keys — the bar still displays hours (caller pre-computes budget_hours
+ * from budget_fee ÷ rate), and the tooltip adds the dollar breakdown.
  *
- * @param float  $alloc_mins   Minutes logged in the relevant allocation period.
- * @param float  $budget_hours Allocation budget in hours.
- * @param string $billing_type 'recurring' or 'fixed'.
+ * @param float       $alloc_mins   Minutes logged in the relevant allocation period.
+ * @param float       $budget_hours Allocation budget in hours.
+ * @param string      $billing_type 'recurring' or 'fixed'.
+ * @param array|null  $fee_args     Optional. Keys: 'spent_dollars' (float), 'budget_dollars' (float).
  */
-function pltt_render_allocation_bar( $alloc_mins, $budget_hours, $billing_type ) {
+function pltt_render_allocation_bar( $alloc_mins, $budget_hours, $billing_type, $fee_args = null ) {
 	$alloc_hours = $alloc_mins / 60;
 	$pct         = $budget_hours > 0 ? ( $alloc_hours / $budget_hours ) * 100 : 0;
 	$is_over     = $pct >= 100;
 	$bar_width   = min( $pct, 100 );
 	$pct_display = round( $pct );
+
 	if ( $is_over ) {
-		$delta_fmt = pltt_format_hours( ( $alloc_hours - $budget_hours ) * 60 );
-		$label     = $delta_fmt . ' ' . __( 'hrs over', 'plain-language-time-tracker' ) . ' · ' . $pct_display . '%';
+		$delta_fmt = pltt_format_duration( ( $alloc_hours - $budget_hours ) * 60 );
+		$label     = $delta_fmt . ' ' . __( 'over', 'plain-language-time-tracker' ) . ' · ' . $pct_display . '%';
 	} else {
-		$delta_fmt = pltt_format_hours( ( $budget_hours - $alloc_hours ) * 60 );
-		$label     = $delta_fmt . ' ' . __( 'hrs left', 'plain-language-time-tracker' ) . ' · ' . $pct_display . '%';
+		$delta_fmt = pltt_format_duration( ( $budget_hours - $alloc_hours ) * 60 );
+		$label     = $delta_fmt . ' ' . __( 'left', 'plain-language-time-tracker' ) . ' · ' . $pct_display . '%';
+	}
+
+	if ( null !== $fee_args ) {
+		$tooltip = pltt_format_hours( $alloc_mins ) . ' ' . __( 'hrs', 'plain-language-time-tracker' )
+			. ' · ' . __( 'Spent:', 'plain-language-time-tracker' ) . ' ' . pltt_format_currency( $fee_args['spent_dollars'] )
+			. ' · ' . __( 'Budget:', 'plain-language-time-tracker' ) . ' ' . pltt_format_currency( $fee_args['budget_dollars'] );
+	} else {
+		$tooltip = pltt_format_hours( $alloc_mins ) . ' ' . __( 'hrs', 'plain-language-time-tracker' )
+			. ' · ' . __( 'Budget:', 'plain-language-time-tracker' ) . ' ' . pltt_format_hours( $budget_hours * 60 ) . ' ' . __( 'hrs', 'plain-language-time-tracker' );
 	}
 	?>
-	<div class="pltt-alloc-cell">
+	<div class="pltt-alloc-cell" title="<?php echo esc_attr( $tooltip ); ?>">
 		<div class="pltt-alloc-bar-wrap">
 			<div class="pltt-alloc-bar<?php echo $is_over ? ' pltt-alloc-over' : ''; ?>"
 				 style="width:<?php echo esc_attr( $bar_width ); ?>%"></div>

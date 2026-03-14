@@ -106,7 +106,9 @@ class PLTT_Reports {
 				$single_valid_month = ( $from_ym === $to_ym ) && ( $from_ym <= current_time( 'Y-m' ) );
 
 				foreach ( $summary as $row ) {
-					if ( empty( $row->project_id ) || empty( $row->budget_hours ) ) {
+					$has_hours_budget = ! empty( $row->budget_hours );
+					$has_fee_budget   = ! empty( $row->budget_fee );
+					if ( empty( $row->project_id ) || ( ! $has_hours_budget && ! $has_fee_budget ) ) {
 						continue;
 					}
 					if ( ! empty( $row->recurring_period ) && $single_valid_month ) {

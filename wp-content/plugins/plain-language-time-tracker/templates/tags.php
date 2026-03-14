@@ -54,7 +54,7 @@ $all_tags = PLTT_Tags::get_all_with_counts();
 	<?php if ( empty( $all_tags ) ) : ?>
 		<p class="description"><?php esc_html_e( 'No tags yet. Tags will appear here once you add them to time entries or create them manually.', 'plain-language-time-tracker' ); ?></p>
 	<?php else : ?>
-		<table class="widefat striped">
+		<table class="widefat">
 			<thead>
 				<tr>
 					<th><?php esc_html_e( 'Tag', 'plain-language-time-tracker' ); ?></th>

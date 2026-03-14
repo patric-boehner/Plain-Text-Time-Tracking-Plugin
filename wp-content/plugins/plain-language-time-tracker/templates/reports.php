@@ -424,7 +424,7 @@ $tab_base_url = add_query_arg( $filter_params, admin_url( 'admin.php' ) );
 		<?php if ( 'summary' === $view ) : ?>
 
 			<?php if ( ! empty( $summary ) ) : ?>
-				<table class="widefat striped pltt-summary-table">
+				<table class="widefat pltt-summary-table">
 					<thead>
 						<tr>
 							<th><?php esc_html_e( 'Project', 'plain-language-time-tracker' ); ?></th>
@@ -478,8 +478,10 @@ $tab_base_url = add_query_arg( $filter_params, admin_url( 'admin.php' ) );
 									<?php endif; ?>
 								</td>
 								<?php
-								$has_alloc = ! empty( $row->budget_hours ) && ! empty( $row->project_id ) && isset( $alloc_stats[ $row->project_id ] );
-								if ( $has_alloc ) {
+								$has_hours_alloc = ! empty( $row->budget_hours ) && ! empty( $row->project_id ) && isset( $alloc_stats[ $row->project_id ] );
+								$has_fee_alloc   = ! empty( $row->budget_fee ) && ! empty( $row->project_id ) && isset( $alloc_stats[ $row->project_id ] );
+								$has_alloc       = $has_hours_alloc || $has_fee_alloc;
+								if ( $has_hours_alloc ) {
 									$sa_budget_hours = (float) $row->budget_hours;
 									// Recurring budgets track billable capacity; exclude non-billable hours.
 									$sa_used_mins = 'recurring' === $billing_type
@@ -487,13 +489,26 @@ $tab_base_url = add_query_arg( $filter_params, admin_url( 'admin.php' ) );
 										: (float) $alloc_stats[ $row->project_id ]->total_minutes;
 								}
 								?>
-								<?php $is_over_budget = $has_alloc && ( $sa_used_mins / 60 ) >= $sa_budget_hours; ?>
-								<td class="pltt-duration-cell<?php echo $is_over_budget ? ' pltt-alloc-over' : ''; ?>">
-									<?php echo esc_html( pltt_format_hours( $row->total_minutes ) ); ?>
+								<?php $is_over_budget = ( $has_hours_alloc && ( $sa_used_mins / 60 ) >= $sa_budget_hours )
+									|| ( $has_fee_alloc && (float) $alloc_stats[ $row->project_id ]->billable_amount >= (float) $row->budget_fee ); ?>
+								<td class="pltt-duration-cell<?php echo $is_over_budget ? ' pltt-alloc-over' : ''; ?>" title="<?php echo esc_attr( pltt_format_hours( $row->total_minutes ) . ' ' . __( 'hrs', 'plain-language-time-tracker' ) ); ?>">
+									<?php echo esc_html( pltt_format_duration( $row->total_minutes ) ); ?>
 								</td>
 								<td class="pltt-duration-cell pltt-budget-col">
-									<?php if ( $has_alloc ) :
+									<?php if ( $has_hours_alloc ) :
 										pltt_render_allocation_bar( $sa_used_mins, $sa_budget_hours, $billing_type );
+									elseif ( $has_fee_alloc ) :
+										$fee_rate            = pltt_resolve_billable_rate( (int) $row->client_id, (int) $row->project_id );
+										$budget_hrs_from_fee = $fee_rate > 0 ? ( (float) $row->budget_fee / $fee_rate ) : 0;
+										pltt_render_allocation_bar(
+											(float) $alloc_stats[ $row->project_id ]->total_minutes,
+											$budget_hrs_from_fee,
+											$billing_type,
+											array(
+												'spent_dollars'  => (float) $alloc_stats[ $row->project_id ]->billable_amount,
+												'budget_dollars' => (float) $row->budget_fee,
+											)
+										);
 									else : ?>
 										<span class="pltt-empty">—</span>
 									<?php endif; ?>

@@ -62,36 +62,6 @@
 	user-select: none;
 }
 
-.pltt-col-billed {
-	width: 50px;
-	text-align: center;
-}
-
-.pltt-col-billed .pltt-invoiced-toggle {
-	background: none;
-	border: none;
-	padding: 0;
-	cursor: pointer;
-	font-size: 15px;
-	font-weight: 600;
-	line-height: 1;
-	user-select: none;
-}
-
-.pltt-col-billed .pltt-invoiced-toggle.is-invoiced {
-	color: #2271b1;
-}
-
-.pltt-col-billed .pltt-invoiced-toggle.not-invoiced {
-	color: #c3c4c7;
-}
-
-.pltt-col-billed .pltt-invoiced-toggle:focus {
-	outline: 2px solid #2271b1;
-	outline-offset: 2px;
-	border-radius: 2px;
-}
-
 /* Time cell - click to edit */
 .pltt-review-table .pltt-time-cell {
 	font-size: 13px;

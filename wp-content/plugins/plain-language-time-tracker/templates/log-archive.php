@@ -85,7 +85,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 					<div class="pltt-week-group-header">
 						<span class="pltt-week-group-title"><?php echo esc_html( sprintf( __( 'Week of %s', 'plain-language-time-tracker' ), $week_label ) ); ?></span>
 					</div>
-					<table class="widefat striped">
+					<table class="widefat">
 						<thead>
 							<tr>
 								<th><?php esc_html_e( 'Date', 'plain-language-time-tracker' ); ?></th>

@@ -220,10 +220,11 @@ class PLTT_Admin {
 			'pltt-shared',
 			'plttData',
 			array(
-				'ajaxUrl' => admin_url( 'admin-ajax.php' ),
-				'nonce'   => wp_create_nonce( 'pltt_ajax_nonce' ),
+				'ajaxUrl'          => admin_url( 'admin-ajax.php' ),
+				'nonce'            => wp_create_nonce( 'pltt_ajax_nonce' ),
 				'autosaveDebounceMs' => PLTT_AUTOSAVE_DEBOUNCE_MS,
-			'i18n'    => array(
+				'internalClientId' => PLTT_INTERNAL_CLIENT_ID,
+				'i18n'             => array(
 					'saving'     => __( 'Saving...', 'plain-language-time-tracker' ),
 					'saved'      => __( 'Saved', 'plain-language-time-tracker' ),
 					'error'      => __( 'Error', 'plain-language-time-tracker' ),
