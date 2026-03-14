@@ -162,9 +162,8 @@ class PLTT_Form_Handlers {
 			$data['hourly_rate'] = '' === $raw_rate ? '' : floatval( $raw_rate );
 		}
 		if ( isset( $_POST['recurring_period'] ) ) {
-			$recurring_period    = sanitize_text_field( wp_unslash( $_POST['recurring_period'] ) );
-			$allowed_periods     = array( '', 'weekly', 'monthly', 'quarterly', 'yearly' );
-			if ( ! in_array( $recurring_period, $allowed_periods, true ) ) {
+			$recurring_period = sanitize_text_field( wp_unslash( $_POST['recurring_period'] ) );
+			if ( ! in_array( $recurring_period, PLTT_ALLOWED_RECURRING_PERIODS, true ) ) {
 				self::redirect_back( array( 'pltt_error' => 'invalid_recurring_period' ) );
 				return;
 			}

@@ -48,7 +48,7 @@ $return_to = isset( $_GET['return_to'] ) ? esc_url_raw( wp_unslash( $_GET['retur
 	</div>
 
 	<?php if ( empty( $entries ) ) : ?>
-		<p class="description" style="padding: 20px; text-align: center; background: #fff3cd; border-left: 4px solid #ffc107;">
+		<p class="description pltt-review-no-entries">
 			<?php esc_html_e( 'No time entries found for this date. Go back and add some notes with timestamps.', 'plain-language-time-tracker' ); ?>
 		</p>
 	<?php else : ?>
@@ -192,7 +192,7 @@ $return_to = isset( $_GET['return_to'] ) ? esc_url_raw( wp_unslash( $_GET['retur
 									<?php foreach ( $clients as $client ) : ?>
 										<option
 											value="<?php echo esc_attr( $client->id ); ?>"
-											<?php if ( (int) $client->id === PLTT_INTERNAL_CLIENT_ID ) : ?>data-is-internal="1"<?php endif; ?>
+											<?php if ( (int) $client->id === pltt_get_internal_client_id() ) : ?>data-is-internal="1"<?php endif; ?>
 											<?php selected( $predicted_client, $client->id ); ?>
 										><?php echo esc_html( $client->name ); ?></option>
 									<?php endforeach; ?>
@@ -278,7 +278,7 @@ $return_to = isset( $_GET['return_to'] ) ? esc_url_raw( wp_unslash( $_GET['retur
 	<?php endif; ?>
 </div>
 
-<script>var plttAllTags = <?php echo wp_json_encode( $all_tags ); ?>;</script>
+<?php wp_add_inline_script( 'pltt-review', 'var plttAllTags = ' . wp_json_encode( $all_tags ) . ';', 'before' ); ?>
 
 <!-- New Client Modal -->
 <div id="pltt-client-modal" class="pltt-modal pltt-hidden" role="dialog" aria-modal="true" aria-labelledby="pltt-review-client-modal-title">

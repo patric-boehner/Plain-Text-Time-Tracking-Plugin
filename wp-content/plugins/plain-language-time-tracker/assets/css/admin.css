@@ -2,6 +2,72 @@
  * Plain Language Time Tracker - Shared Admin Styles
  */
 
+/**
+ * Design tokens — all colors and shadow values live here.
+ * Every CSS file in this plugin depends on admin.css, so these variables
+ * are available site-wide on all plugin pages.
+ */
+:root {
+	/* Text */
+	--pltt-text-dark:        #1d2327; /* WP heading / primary text */
+	--pltt-text-base:        #2c3338; /* WP body text */
+	--pltt-text-muted:       #646970; /* Labels, secondary text */
+	--pltt-text-subtle:      #50575e; /* Slightly lighter than muted */
+	--pltt-text-faint:       #8c8f94; /* Confidence indicators, rate source */
+	--pltt-text-placeholder: #a7aaad; /* Placeholder, empty states */
+
+	/* Borders */
+	--pltt-border:       #c3c4c7; /* Standard WP border */
+	--pltt-border-light: #dcdcde; /* Dividers, separator lines */
+	--pltt-border-faint: #f0f0f1; /* Very light row separators */
+
+	/* Backgrounds */
+	--pltt-bg-white:  #fff;
+	--pltt-bg-light:  #f0f0f1; /* Light gray: badge bg, code, button bg */
+	--pltt-bg-subtle: #f6f7f7; /* Hover bg on white surfaces */
+	--pltt-bg-faint:  #f9f9f9; /* Near-white alternating rows */
+	--pltt-bg-hover:  #e0e0e0; /* Button hover, allocation bar track */
+
+	/* Brand / Primary */
+	--pltt-primary: #2271b1; /* WP admin blue */
+
+	/* Status */
+	--pltt-success:     #00a32a;
+	--pltt-warning:     #dba617;
+	--pltt-danger:      #d63638;
+	--pltt-danger-dark: #b32d2e; /* Delete link color */
+
+	/* Badges */
+	--pltt-badge-bg:           #f0f0f1;
+	--pltt-badge-text:         #50575e;
+	--pltt-badge-success-bg:   #d4edda;
+	--pltt-badge-success-text: #155724;
+	--pltt-badge-info-bg:      #d1ecf1;
+	--pltt-badge-info-text:    #0c5460;
+	--pltt-badge-warning-bg:   #fff3cd;
+	--pltt-badge-warning-text: #856404;
+	--pltt-badge-tag-bg:       #e1eef9;
+	--pltt-badge-tag-text:     #36658c;
+	--pltt-badge-purple-bg:    #f0e6ff;
+	--pltt-badge-purple-text:  #6e3fa3;
+
+	/* Billed row highlight */
+	--pltt-billed-bg:     #f0f6fc;
+	--pltt-billed-border: #d0e4f5;
+
+	/* Tag pill hover */
+	--pltt-tag-pill-hover: #c9dff0;
+
+	/* Negate-active filter button */
+	--pltt-negate-active-bg: #fcf0f0;
+
+	/* Overlays and shadows */
+	--pltt-overlay:               rgba(0, 0, 0, 0.5);
+	--pltt-shadow-modal:          0 5px 15px rgba(0, 0, 0, 0.3);
+	--pltt-shadow-dropdown:       0 2px 6px rgba(0, 0, 0, 0.15);
+	--pltt-shadow-dropdown-light: 0 2px 6px rgba(0, 0, 0, 0.12);
+}
+
 /* Layout containers */
 .pltt-wrap {
 	max-width: 1350px;
@@ -69,54 +135,54 @@
 .card-value {
 	font-size: 28px;
 	font-weight: 600;
-	color: #1d2327;
+	color: var(--pltt-text-dark);
 	line-height: 1.2;
 }
 
 .card-label {
 	font-size: 13px;
-	color: #646970;
+	color: var(--pltt-text-muted);
 	margin-bottom: 4px;
 }
 
 /* Card secondary metrics */
 .card-secondary {
 	font-size: 12px;
-	color: #50575e;
+	color: var(--pltt-text-subtle);
 	margin-top: 8px;
 	padding-top: 8px;
-	border-top: 1px solid #dcdcde;
+	border-top: 1px solid var(--pltt-border-light);
 	line-height: 1.5;
 }
 
 .card-detail {
 	font-size: 11px;
-	color: #646970;
+	color: var(--pltt-text-muted);
 }
 
 /* Status indicators */
 .status-good {
-	color: #00a32a;
+	color: var(--pltt-success);
 	font-weight: 500;
 }
 
 .status-warning {
-	color: #dba617;
+	color: var(--pltt-warning);
 	font-weight: 500;
 }
 
 .status-neutral {
-	color: #646970;
+	color: var(--pltt-text-muted);
 	font-weight: 500;
 }
 
 .status-increase {
-	color: #00a32a;
+	color: var(--pltt-success);
 	font-weight: 500;
 }
 
 .status-decrease {
-	color: #d63638;
+	color: var(--pltt-danger);
 	font-weight: 500;
 }
 
@@ -127,33 +193,33 @@
 	border-radius: 3px;
 	font-size: 13px;
 	font-weight: 500;
-	background: #f0f0f1;
-	color: #50575e;
+	background: var(--pltt-badge-bg);
+	color: var(--pltt-badge-text);
 }
 
 .pltt-badge-success {
-	background: #d4edda;
-	color: #155724;
+	background: var(--pltt-badge-success-bg);
+	color: var(--pltt-badge-success-text);
 }
 
 .pltt-badge-info {
-	background: #d1ecf1;
-	color: #0c5460;
+	background: var(--pltt-badge-info-bg);
+	color: var(--pltt-badge-info-text);
 }
 
 .pltt-badge-warning {
-	background: #fff3cd;
-	color: #856404;
+	background: var(--pltt-badge-warning-bg);
+	color: var(--pltt-badge-warning-text);
 }
 
 .pltt-badge-tag {
-	background: #e1eef9;
-	color: #36658c;
+	background: var(--pltt-badge-tag-bg);
+	color: var(--pltt-badge-tag-text);
 }
 
 .pltt-badge-purple {
-	background: #f0e6ff;
-	color: #6e3fa3;
+	background: var(--pltt-badge-purple-bg);
+	color: var(--pltt-badge-purple-text);
 }
 
 /* Allocation progress indicators */
@@ -162,17 +228,17 @@
 }
 
 .pltt-alloc-ok {
-	color: #00a32a;
+	color: var(--pltt-success);
 	font-weight: 600;
 }
 
 .pltt-alloc-warn {
-	color: #dba617;
+	color: var(--pltt-warning);
 	font-weight: 600;
 }
 
 .pltt-alloc-over {
-	color: #d63638;
+	color: var(--pltt-danger);
 	font-weight: 600;
 }
 
@@ -180,7 +246,7 @@
 	width: 100%;
 	max-width: 120px;
 	height: 5px;
-	background: #e0e0e0;
+	background: var(--pltt-bg-hover);
 	border-radius: 2px;
 	margin: 3px 0 2px;
 	overflow: hidden;
@@ -189,17 +255,17 @@
 .pltt-alloc-bar {
 	height: 100%;
 	border-radius: 2px;
-	background: #2271b1;
+	background: var(--pltt-primary);
 	max-width: 100%;
 }
 
 .pltt-alloc-bar.pltt-alloc-over {
-	background: #2271b1;
+	background: var(--pltt-primary);
 }
 
 .pltt-alloc-label {
 	font-size: 11px;
-	color: #50575e;
+	color: var(--pltt-text-subtle);
 	white-space: nowrap;
 }
 
@@ -207,7 +273,7 @@
 .pltt-wrap .widefat .row-actions {
 	visibility: hidden;
 	font-size: 13px;
-	color: #646970;
+	color: var(--pltt-text-muted);
 	padding: 2px 0 0;
 }
 
@@ -222,7 +288,7 @@
 
 .widefat tbody td,
 .widefat tbody th {
-	border-bottom: 1px solid #f0f0f1;
+	border-bottom: 1px solid var(--pltt-border-faint);
 }
 
 .widefat tbody tr:last-child td,
@@ -240,11 +306,11 @@
 }
 
 .pltt-wrap .widefat .row-actions a.submitdelete {
-	color: #b32d2e;
+	color: var(--pltt-danger-dark);
 }
 
 .pltt-wrap .widefat .row-actions a.submitdelete:hover {
-	color: #d63638;
+	color: var(--pltt-danger);
 }
 
 /* Tables */
@@ -255,16 +321,16 @@
 
 .pltt-duration-cell {
 	font-weight: 600;
-	color: #2271b1;
+	color: var(--pltt-primary);
 	white-space: nowrap;
 }
 
 .pltt-empty {
-	color: #a7aaad;
+	color: var(--pltt-text-placeholder);
 }
 
 .pltt-no-duration {
-	color: #dba617;
+	color: var(--pltt-warning);
 }
 
 /* Notices — uses WordPress .notice classes, only override p margin */
@@ -291,7 +357,7 @@
 	left: 0;
 	right: 0;
 	bottom: 0;
-	background: rgba(0, 0, 0, 0.5);
+	background: var(--pltt-overlay);
 	z-index: 100000;
 	display: flex;
 	align-items: center;
@@ -299,12 +365,12 @@
 }
 
 .pltt-modal-content {
-	background: #fff;
+	background: var(--pltt-bg-white);
 	padding: 25px;
 	border-radius: 4px;
 	min-width: 350px;
 	max-width: 400px;
-	box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+	box-shadow: var(--pltt-shadow-modal);
 }
 
 .pltt-modal-content h3 {
@@ -342,7 +408,7 @@
 	align-items: center;
 	margin-top: 25px;
 	/* padding-top: 20px; */
-	/* border-top: 1px solid #c3c4c7; */
+	/* border-top: 1px solid var(--pltt-border); */
 }
 
 .pltt-form-actions-left,
@@ -354,29 +420,29 @@
 
 /* Status indicators */
 .pltt-status-saved {
-	color: #00a32a;
+	color: var(--pltt-success);
 }
 
 .pltt-status-saving {
-	color: #dba617;
+	color: var(--pltt-warning);
 }
 
 .pltt-status-error {
-	color: #d63638;
+	color: var(--pltt-danger);
 }
 
 .pltt-status-verified {
-	color: #00a32a;
+	color: var(--pltt-success);
 	font-weight: 500;
 }
 
 .pltt-status-draft {
-	color: #dba617;
+	color: var(--pltt-warning);
 	font-weight: 500;
 }
 
 .pltt-status-billable {
-	color: #2271b1;
+	color: var(--pltt-primary);
 	font-weight: 500;
 }
 
@@ -388,11 +454,11 @@
 }
 
 .pltt-billable-symbol.is-billable {
-	color: #2271b1;
+	color: var(--pltt-primary);
 }
 
 .pltt-billable-symbol.not-billable {
-	color: #a7aaad;
+	color: var(--pltt-text-placeholder);
 }
 
 .pltt-billable-indicator {
@@ -401,19 +467,19 @@
 
 /* Billed (invoiced) entry row highlight */
 .widefat tr.pltt-billed td {
-	background-color: #f0f6fc;
-	border-left-color: #2271b1;
-	border-bottom-color: #d0e4f5;
+	background-color: var(--pltt-billed-bg);
+	border-left-color: var(--pltt-primary);
+	border-bottom-color: var(--pltt-billed-border);
 }
 
 .widefat tr.pltt-billed td:first-child {
-	border-left: 3px solid #2271b1;
+	border-left: 3px solid var(--pltt-primary);
 }
 
 /* Report filters */
 .pltt-report-filters {
-	background: #fff;
-	border: 1px solid #c3c4c7;
+	background: var(--pltt-bg-white);
+	border: 1px solid var(--pltt-border);
 	border-radius: 4px;
 	padding: 20px;
 	margin-bottom: 25px;
@@ -444,10 +510,10 @@
 }
 
 .pltt-negate-toggle {
-	background: #f0f0f1;
-	border: 1px solid #c3c4c7;
+	background: var(--pltt-bg-light);
+	border: 1px solid var(--pltt-border);
 	border-radius: 3px;
-	color: #50575e;
+	color: var(--pltt-text-subtle);
 	cursor: pointer;
 	font-weight: 500;
 	line-height: 1;
@@ -458,14 +524,14 @@
 }
 
 .pltt-negate-toggle:hover {
-	background: #e0e0e0;
-	border-color: #8c8f94;
+	background: var(--pltt-bg-hover);
+	border-color: var(--pltt-text-faint);
 }
 
 .pltt-negate-toggle.pltt-negate-active {
-	background: #fcf0f0;
-	border-color: #d63638;
-	color: #d63638;
+	background: var(--pltt-negate-active-bg);
+	border-color: var(--pltt-danger);
+	color: var(--pltt-danger);
 }
 
 .pltt-filter-row-date {
@@ -491,8 +557,8 @@
 }
 
 .pltt-section {
-	background: #fff;
-	border: 1px solid #c3c4c7;
+	background: var(--pltt-bg-white);
+	border: 1px solid var(--pltt-border);
 	border-radius: 4px;
 	padding: 20px;
 }
@@ -503,7 +569,7 @@
 	align-items: center;
 	margin-bottom: 15px;
 	padding-bottom: 10px;
-	border-bottom: 1px solid #dcdcde;
+	border-bottom: 1px solid var(--pltt-border-light);
 }
 
 .pltt-section-header h2 {
@@ -574,7 +640,7 @@
 
 /* Billing type settings box */
 .pltt-billing-settings {
-	border: 1px solid #c3c4c7;
+	border: 1px solid var(--pltt-border);
 	border-radius: 3px;
 	padding: 12px 14px 14px;
 	margin-top: 8px;
@@ -587,7 +653,7 @@
 	font-weight: 600;
 	letter-spacing: 0.08em;
 	text-transform: uppercase;
-	color: #646970;
+	color: var(--pltt-text-muted);
 	margin: 0 0 10px;
 }
 
@@ -605,14 +671,14 @@
 /* Form section separator */
 .pltt-form-separator {
 	border: none;
-	border-top: 1px solid #dcdcde;
+	border-top: 1px solid var(--pltt-border-light);
 	margin: 16px 0;
 }
 
 /* "(optional)" label suffix */
 .pltt-optional {
 	font-weight: 400;
-	color: #646970;
+	color: var(--pltt-text-muted);
 }
 
 /* Modal delete/archive buttons — hidden until edit mode activates them */
@@ -633,7 +699,7 @@
 .pltt-rate-source {
 	display: block;
 	font-size: 11px;
-	color: #8c8f94;
+	color: var(--pltt-text-faint);
 }
 
 /* Projects page: active/archived grouping */
@@ -650,8 +716,8 @@
 	justify-content: space-between;
 	align-items: center;
 	padding: 10px 14px;
-	background: #fff;
-	border: 1px solid #c3c4c7;
+	background: var(--pltt-bg-white);
+	border: 1px solid var(--pltt-border);
 	border-bottom: none;
 	border-radius: 4px 4px 0 0;
 }
@@ -659,7 +725,7 @@
 .pltt-project-group-title {
 	font-weight: 600;
 	font-size: 14px;
-	color: #1d2327;
+	color: var(--pltt-text-dark);
 }
 
 .pltt-project-group table.widefat {

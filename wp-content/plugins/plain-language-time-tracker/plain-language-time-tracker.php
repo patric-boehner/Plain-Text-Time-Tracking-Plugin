@@ -34,6 +34,7 @@ define( 'PLTT_LOGS_PER_PAGE', 20 );
 define( 'PLTT_AUTOSAVE_DEBOUNCE_MS', 1500 );
 define( 'PLTT_DEFAULT_HOURLY_RATE', 100.00 );
 define( 'PLTT_INTERNAL_CLIENT_ID', 3 );
+define( 'PLTT_ALLOWED_RECURRING_PERIODS', array( '', 'weekly', 'monthly', 'quarterly', 'yearly' ) );
 
 /**
  * Load plugin dependencies.

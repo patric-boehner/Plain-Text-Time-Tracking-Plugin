@@ -81,63 +81,15 @@ class PLTT_Entries {
 			$prepare[] = $args['date_to'];
 		}
 
-		// Client filter.
-		if ( $args['client_id'] > 0 ) {
-			if ( ! empty( $args['client_negate'] ) ) {
-				$where[]   = '(client_id IS NULL OR client_id != %d)';
-				$prepare[] = $args['client_id'];
-			} else {
-				$where[]   = 'client_id = %d';
-				$prepare[] = $args['client_id'];
-			}
-		}
-
-		// Project filter.
-		if ( 'without_project' === $args['project_id'] ) {
-			// Special filter: entries without projects.
-			$where[] = 'project_id IS NULL';
-		} elseif ( $args['project_id'] > 0 ) {
-			if ( ! empty( $args['project_negate'] ) ) {
-				$where[]   = '(project_id IS NULL OR project_id != %d)';
-				$prepare[] = $args['project_id'];
-			} else {
-				$where[]   = 'project_id = %d';
-				$prepare[] = $args['project_id'];
-			}
-		}
+		// Shared filters: client, project, tag, billable, billed.
+		$common  = self::build_filter_clauses( $args, '', $table );
+		$where   = array_merge( $where, $common['where'] );
+		$prepare = array_merge( $prepare, $common['prepare'] );
 
 		// Verified filter.
 		if ( null !== $args['verified'] ) {
 			$where[]   = 'verified = %d';
 			$prepare[] = $args['verified'] ? 1 : 0;
-		}
-
-		// Tag filter (junction table).
-		$entry_tags_table = PLTT_Database::get_table_name( 'entry_tags' );
-		$tags_table       = PLTT_Database::get_table_name( 'tags' );
-		if ( 'without_tag' === $args['tag'] ) {
-			// Special filter: entries without any tags.
-			$where[] = "NOT EXISTS (SELECT 1 FROM {$entry_tags_table} WHERE entry_id = {$table}.id)";
-		} elseif ( ! empty( $args['tag'] ) ) {
-			if ( ! empty( $args['tag_negate'] ) ) {
-				$where[]   = "NOT EXISTS (SELECT 1 FROM {$entry_tags_table} et JOIN {$tags_table} t ON et.tag_id = t.id WHERE et.entry_id = {$table}.id AND t.name = %s)";
-				$prepare[] = $args['tag'];
-			} else {
-				$where[]   = "EXISTS (SELECT 1 FROM {$entry_tags_table} et JOIN {$tags_table} t ON et.tag_id = t.id WHERE et.entry_id = {$table}.id AND t.name = %s)";
-				$prepare[] = $args['tag'];
-			}
-		}
-
-		// Billable filter.
-		if ( null !== $args['billable'] ) {
-			$where[]   = 'billable = %d';
-			$prepare[] = $args['billable'] ? 1 : 0;
-		}
-
-		// Billed filter (invoiced status).
-		if ( null !== $args['billed'] ) {
-			$where[]   = 'billed = %d';
-			$prepare[] = $args['billed'] ? 1 : 0;
 		}
 
 		$sql = "SELECT * FROM {$table}";
@@ -506,51 +458,15 @@ class PLTT_Entries {
 			$prepare[] = $args['date_to'];
 		}
 
-		if ( ! empty( $args['client_id'] ) ) {
-			if ( ! empty( $args['client_negate'] ) ) {
-				$where[]   = '(e.client_id IS NULL OR e.client_id != %d)';
-				$prepare[] = absint( $args['client_id'] );
-			} else {
-				$where[]   = 'e.client_id = %d';
-				$prepare[] = absint( $args['client_id'] );
-			}
-		}
+		// Shared filters: client, project, tag, billable, billed.
+		$common  = self::build_filter_clauses( $args, 'e.', 'e' );
+		$where   = array_merge( $where, $common['where'] );
+		$prepare = array_merge( $prepare, $common['prepare'] );
 
-		if ( ! empty( $args['project_id'] ) ) {
-			if ( ! empty( $args['project_negate'] ) ) {
-				$where[]   = '(e.project_id IS NULL OR e.project_id != %d)';
-				$prepare[] = absint( $args['project_id'] );
-			} else {
-				$where[]   = 'e.project_id = %d';
-				$prepare[] = absint( $args['project_id'] );
-			}
-		}
-
-		if ( ! empty( $args['tag'] ) ) {
-			$entry_tags_table = PLTT_Database::get_table_name( 'entry_tags' );
-			$tags_table       = PLTT_Database::get_table_name( 'tags' );
-			if ( ! empty( $args['tag_negate'] ) ) {
-				$where[]   = "NOT EXISTS (SELECT 1 FROM {$entry_tags_table} et JOIN {$tags_table} t ON et.tag_id = t.id WHERE et.entry_id = e.id AND t.name = %s)";
-				$prepare[] = $args['tag'];
-			} else {
-				$where[]   = "EXISTS (SELECT 1 FROM {$entry_tags_table} et JOIN {$tags_table} t ON et.tag_id = t.id WHERE et.entry_id = e.id AND t.name = %s)";
-				$prepare[] = $args['tag'];
-			}
-		}
-
-		if ( isset( $args['billable'] ) && null !== $args['billable'] ) {
-			$where[]   = 'e.billable = %d';
-			$prepare[] = $args['billable'] ? 1 : 0;
-		}
-
-		// Billed filter (invoiced status).
-		if ( isset( $args['billed'] ) && null !== $args['billed'] ) {
-			$where[]   = 'e.billed = %d';
-			$prepare[] = $args['billed'] ? 1 : 0;
-		}
-
-		// SEC-L1: Cast to int explicitly so the interpolation is provably an integer literal, not user input.
-		$internal_client_id = (int) PLTT_INTERNAL_CLIENT_ID;
+		// SEC-L1: Resolve via is_internal flag (DB 1.9.3+) rather than hardcoded ID.
+		// pltt_get_internal_client_id() is request-cached; the fallback handles fresh installs
+		// where the migration has not yet run.
+		$internal_client_id = pltt_get_internal_client_id();
 		$exclude_clause     = $internal_client_id > 0
 			? "e.client_id != {$internal_client_id}"
 			: "LOWER(c.name) != 'internal'";
@@ -632,48 +548,10 @@ class PLTT_Entries {
 		$where   = array( 'e.entry_date >= %s', 'e.entry_date <= %s', 'e.verified = 1' );
 		$prepare = array( $date_from, $date_to );
 
-		if ( ! empty( $args['client_id'] ) ) {
-			if ( ! empty( $args['client_negate'] ) ) {
-				$where[]   = '(e.client_id IS NULL OR e.client_id != %d)';
-				$prepare[] = absint( $args['client_id'] );
-			} else {
-				$where[]   = 'e.client_id = %d';
-				$prepare[] = absint( $args['client_id'] );
-			}
-		}
-
-		if ( ! empty( $args['project_id'] ) ) {
-			if ( ! empty( $args['project_negate'] ) ) {
-				$where[]   = '(e.project_id IS NULL OR e.project_id != %d)';
-				$prepare[] = absint( $args['project_id'] );
-			} else {
-				$where[]   = 'e.project_id = %d';
-				$prepare[] = absint( $args['project_id'] );
-			}
-		}
-
-		if ( ! empty( $args['tag'] ) ) {
-			$entry_tags_table = PLTT_Database::get_table_name( 'entry_tags' );
-			$tags_table       = PLTT_Database::get_table_name( 'tags' );
-			if ( ! empty( $args['tag_negate'] ) ) {
-				$where[]   = "NOT EXISTS (SELECT 1 FROM {$entry_tags_table} et JOIN {$tags_table} t ON et.tag_id = t.id WHERE et.entry_id = e.id AND t.name = %s)";
-				$prepare[] = $args['tag'];
-			} else {
-				$where[]   = "EXISTS (SELECT 1 FROM {$entry_tags_table} et JOIN {$tags_table} t ON et.tag_id = t.id WHERE et.entry_id = e.id AND t.name = %s)";
-				$prepare[] = $args['tag'];
-			}
-		}
-
-		if ( isset( $args['billable'] ) && null !== $args['billable'] ) {
-			$where[]   = 'e.billable = %d';
-			$prepare[] = $args['billable'] ? 1 : 0;
-		}
-
-		// Billed filter.
-		if ( isset( $args['billed'] ) && null !== $args['billed'] ) {
-			$where[]   = 'e.billed = %d';
-			$prepare[] = $args['billed'] ? 1 : 0;
-		}
+		// Shared filters: client, project, tag, billable, billed.
+		$common  = self::build_filter_clauses( $args, 'e.', 'e' );
+		$where   = array_merge( $where, $common['where'] );
+		$prepare = array_merge( $prepare, $common['prepare'] );
 
 		$where_sql = implode( ' AND ', $where );
 
@@ -731,6 +609,84 @@ class PLTT_Entries {
 				$date_from,
 				$date_to
 			)
+		);
+	}
+
+	/**
+	 * Build shared WHERE clause array for common entry filters.
+	 *
+	 * Centralises the client, project, tag, billable, and billed filter
+	 * logic that is otherwise duplicated across get_all(), get_stats(),
+	 * and get_summary_by_project().
+	 *
+	 * @param array  $args       Query arguments (client_id, client_negate, project_id,
+	 *                           project_negate, tag, tag_negate, billable, billed).
+	 * @param string $col_prefix Column prefix, '' for bare columns or 'e.' for aliased.
+	 * @param string $entry_ref  Table alias or name used in tag subquery entry_id reference.
+	 * @return array{ where: string[], prepare: mixed[] }
+	 */
+	private static function build_filter_clauses( array $args, $col_prefix = '', $entry_ref = '' ) {
+		$where   = array();
+		$prepare = array();
+
+		// Client filter.
+		if ( ! empty( $args['client_id'] ) && (int) $args['client_id'] > 0 ) {
+			$col = $col_prefix . 'client_id';
+			if ( ! empty( $args['client_negate'] ) ) {
+				$where[]   = "({$col} IS NULL OR {$col} != %d)";
+				$prepare[] = absint( $args['client_id'] );
+			} else {
+				$where[]   = "{$col} = %d";
+				$prepare[] = absint( $args['client_id'] );
+			}
+		}
+
+		// Project filter.
+		$p_col = $col_prefix . 'project_id';
+		if ( 'without_project' === ( isset( $args['project_id'] ) ? $args['project_id'] : '' ) ) {
+			$where[] = "{$p_col} IS NULL";
+		} elseif ( ! empty( $args['project_id'] ) && (int) $args['project_id'] > 0 ) {
+			if ( ! empty( $args['project_negate'] ) ) {
+				$where[]   = "({$p_col} IS NULL OR {$p_col} != %d)";
+				$prepare[] = absint( $args['project_id'] );
+			} else {
+				$where[]   = "{$p_col} = %d";
+				$prepare[] = absint( $args['project_id'] );
+			}
+		}
+
+		// Tag filter (junction table).
+		$entry_tags_table = PLTT_Database::get_table_name( 'entry_tags' );
+		$tags_table       = PLTT_Database::get_table_name( 'tags' );
+		$entry_id_col     = $entry_ref ? "{$entry_ref}.id" : 'id';
+		$tag_val          = isset( $args['tag'] ) ? $args['tag'] : '';
+		if ( 'without_tag' === $tag_val ) {
+			$where[] = "NOT EXISTS (SELECT 1 FROM {$entry_tags_table} WHERE entry_id = {$entry_id_col})";
+		} elseif ( ! empty( $tag_val ) ) {
+			if ( ! empty( $args['tag_negate'] ) ) {
+				$where[]   = "NOT EXISTS (SELECT 1 FROM {$entry_tags_table} et JOIN {$tags_table} t ON et.tag_id = t.id WHERE et.entry_id = {$entry_id_col} AND t.name = %s)";
+				$prepare[] = $tag_val;
+			} else {
+				$where[]   = "EXISTS (SELECT 1 FROM {$entry_tags_table} et JOIN {$tags_table} t ON et.tag_id = t.id WHERE et.entry_id = {$entry_id_col} AND t.name = %s)";
+				$prepare[] = $tag_val;
+			}
+		}
+
+		// Billable filter.
+		if ( isset( $args['billable'] ) && null !== $args['billable'] ) {
+			$where[]   = $col_prefix . 'billable = %d';
+			$prepare[] = $args['billable'] ? 1 : 0;
+		}
+
+		// Billed filter (invoiced status).
+		if ( isset( $args['billed'] ) && null !== $args['billed'] ) {
+			$where[]   = $col_prefix . 'billed = %d';
+			$prepare[] = $args['billed'] ? 1 : 0;
+		}
+
+		return array(
+			'where'   => $where,
+			'prepare' => $prepare,
 		);
 	}
 }

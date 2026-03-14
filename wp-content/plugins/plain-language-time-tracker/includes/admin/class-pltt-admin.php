@@ -223,7 +223,7 @@ class PLTT_Admin {
 				'ajaxUrl'          => admin_url( 'admin-ajax.php' ),
 				'nonce'            => wp_create_nonce( 'pltt_ajax_nonce' ),
 				'autosaveDebounceMs' => PLTT_AUTOSAVE_DEBOUNCE_MS,
-				'internalClientId' => PLTT_INTERNAL_CLIENT_ID,
+				'internalClientId' => pltt_get_internal_client_id(),
 				'i18n'             => array(
 					'saving'     => __( 'Saving...', 'plain-language-time-tracker' ),
 					'saved'      => __( 'Saved', 'plain-language-time-tracker' ),
@@ -240,9 +240,15 @@ class PLTT_Admin {
 
 			if ( 'review' === $screen ) {
 				wp_enqueue_style(
+					'pltt-tag-picker',
+					PLTT_PLUGIN_URL . 'assets/css/tag-picker.css',
+					array( 'pltt-admin' ),
+					$version
+				);
+				wp_enqueue_style(
 					'pltt-review',
 					PLTT_PLUGIN_URL . 'assets/css/review.css',
-					array( 'pltt-admin' ),
+					array( 'pltt-admin', 'pltt-tag-picker' ),
 					$version
 				);
 				wp_enqueue_script(
@@ -294,9 +300,15 @@ class PLTT_Admin {
 
 		if ( 'time-tracker_page_pltt-reports' === $hook ) {
 			wp_enqueue_style(
+				'pltt-tag-picker',
+				PLTT_PLUGIN_URL . 'assets/css/tag-picker.css',
+				array( 'pltt-admin' ),
+				$version
+			);
+			wp_enqueue_style(
 				'pltt-reports',
 				PLTT_PLUGIN_URL . 'assets/css/reports.css',
-				array( 'pltt-admin' ),
+				array( 'pltt-admin', 'pltt-tag-picker' ),
 				$version
 			);
 			wp_enqueue_script(

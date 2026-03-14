@@ -191,8 +191,8 @@ class PLTT_Projects {
 
 		// Nullable: recurring_period is NULL when not set.
 		if ( isset( $data['recurring_period'] ) && '' !== $data['recurring_period'] ) {
-			$allowed_periods = array( 'monthly' );
-			if ( in_array( $data['recurring_period'], $allowed_periods, true ) ) {
+			$non_empty_periods = array_filter( PLTT_ALLOWED_RECURRING_PERIODS );
+			if ( in_array( $data['recurring_period'], $non_empty_periods, true ) ) {
 				$insert_data['recurring_period'] = $data['recurring_period'];
 				$formats[]                       = '%s';
 			}
@@ -303,8 +303,8 @@ class PLTT_Projects {
 
 		if ( array_key_exists( 'recurring_period', $data ) ) {
 			if ( '' !== $data['recurring_period'] && null !== $data['recurring_period'] ) {
-				$allowed_periods = array( 'monthly' );
-				if ( in_array( $data['recurring_period'], $allowed_periods, true ) ) {
+				$non_empty_periods = array_filter( PLTT_ALLOWED_RECURRING_PERIODS );
+				if ( in_array( $data['recurring_period'], $non_empty_periods, true ) ) {
 					$update_data['recurring_period'] = $data['recurring_period'];
 					$formats[]                       = '%s';
 				}

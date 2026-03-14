@@ -216,6 +216,27 @@ function pltt_user_can_access() {
 }
 
 /**
+ * Return the ID of the internal (non-billable) client.
+ *
+ * Looks up the client with is_internal = 1, added in DB version 1.9.3.
+ * Result is cached in a static for the lifetime of the request.
+ * Returns 0 if no internal client exists (safe to use in comparisons).
+ *
+ * @return int Client ID, or 0 if not found.
+ */
+function pltt_get_internal_client_id() {
+	static $id = null;
+	if ( null === $id ) {
+		global $wpdb;
+		$table = PLTT_Database::get_table_name( 'clients' );
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+		$result = $wpdb->get_var( "SELECT id FROM {$table} WHERE is_internal = 1 LIMIT 1" );
+		$id     = $result ? (int) $result : 0;
+	}
+	return $id;
+}
+
+/**
  * Get the admin page URL for a specific screen.
  *
  * @param string $screen Screen slug (daily-log, review, reports).
@@ -731,16 +752,11 @@ function pltt_render_entry_table( $entries, $options = array() ) {
 						$billable_amount = 0.0;
 						if ( $is_billable && $entry->duration_minutes > 0 ) {
 							if ( null !== $entry->billable_amount ) {
+								// Prefer the amount frozen at verification time.
 								$billable_amount = (float) $entry->billable_amount;
 							} else {
-								$hourly_rate = 0.0;
-								if ( $project && $project->hourly_rate > 0 ) {
-									$hourly_rate = (float) $project->hourly_rate;
-								} elseif ( $client && $client->hourly_rate > 0 ) {
-									$hourly_rate = (float) $client->hourly_rate;
-								} elseif ( defined( 'PLTT_DEFAULT_HOURLY_RATE' ) ) {
-									$hourly_rate = (float) PLTT_DEFAULT_HOURLY_RATE;
-								}
+								// Fallback: resolve rate on-the-fly using the canonical helper.
+								$hourly_rate     = pltt_resolve_billable_rate( (int) $entry->client_id, (int) $entry->project_id, $clients_cache, $projects_cache );
 								$billable_amount = round( ( $entry->duration_minutes / 60.0 ) * $hourly_rate, 2 );
 							}
 						}

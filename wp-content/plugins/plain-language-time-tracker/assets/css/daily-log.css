@@ -3,8 +3,8 @@
  */
 
 .pltt-log-container {
-	background: #fff;
-	border: 1px solid #c3c4c7;
+	background: var(--pltt-bg-white);
+	border: 1px solid var(--pltt-border);
 	border-radius: 4px;
 	padding: 20px;
 }
@@ -29,12 +29,12 @@
 }
 
 .pltt-log-textarea:focus-visible {
-	outline: 2px solid #2271b1;
+	outline: 2px solid var(--pltt-primary);
 	outline-offset: -2px;
 }
 
 .pltt-log-textarea::placeholder {
-	color: #a7aaad;
+	color: var(--pltt-text-placeholder);
 	font-style: italic;
 }
 
@@ -44,13 +44,13 @@
 	align-items: center;
 	margin-top: 15px;
 	padding-top: 15px;
-	border-top: 1px solid #dcdcde;
+	border-top: 1px solid var(--pltt-border-light);
 	flex-wrap: wrap;
 	gap: 15px;
 }
 
 .pltt-log-hint {
-	color: #646970;
+	color: var(--pltt-text-muted);
 	font-size: 13px;
 }
 
@@ -59,7 +59,7 @@
 }
 
 .pltt-log-hint code {
-	background: #f0f0f1;
+	background: var(--pltt-bg-light);
 	padding: 2px 6px;
 	border-radius: 3px;
 	font-size: 12px;
@@ -78,22 +78,22 @@
 }
 
 .pltt-save-indicator.saving {
-	color: #dba617;
+	color: var(--pltt-warning);
 }
 
 .pltt-save-indicator.saved {
-	color: #00a32a;
+	color: var(--pltt-success);
 }
 
 .pltt-save-indicator.error {
-	color: #d63638;
+	color: var(--pltt-danger);
 }
 
 /* Existing entries section */
 .pltt-existing-entries {
 	margin-top: 30px;
 	padding-top: 20px;
-	border-top: 1px solid #c3c4c7;
+	border-top: 1px solid var(--pltt-border);
 }
 
 .pltt-existing-entries h3 {
