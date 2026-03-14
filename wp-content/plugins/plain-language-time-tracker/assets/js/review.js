@@ -41,39 +41,7 @@
 		} );
 	} );
 
-	// Invoiced toggle — AJAX immediate save (same pattern as Reports page).
-	document.querySelectorAll( '.pltt-invoiced-toggle' ).forEach( function( btn ) {
-		btn.addEventListener( 'click', function() {
-			var currentValue = this.dataset.value === '1';
-			var newValue     = currentValue ? '0' : '1';
-			var isInvoiced   = ! currentValue;
-			var self         = this;
-
-			// Optimistic update.
-			this.classList.toggle( 'is-invoiced', isInvoiced );
-			this.classList.toggle( 'not-invoiced', ! isInvoiced );
-			this.dataset.value = newValue;
-			this.textContent   = isInvoiced ? '\u2713' : '\u25cb';
-
-			this.disabled = true;
-			PLTT.ajax(
-				'pltt_update_entry_field',
-				{ entry_id: this.dataset.entryId, field: 'billed', value: newValue },
-				function( response ) {
-					self.disabled = false;
-					if ( ! response.success ) {
-						// Revert.
-						self.classList.toggle( 'is-invoiced', currentValue );
-						self.classList.toggle( 'not-invoiced', ! currentValue );
-						self.dataset.value = currentValue ? '1' : '0';
-						self.textContent   = currentValue ? '\u2713' : '\u25cb';
-					}
-				}
-			);
-		} );
-	} );
-
-	// Billable checkbox change — update $ symbol and sync invoiced toggle visibility.
+	// Billable checkbox change — update $ symbol.
 	document.querySelectorAll( '.pltt-billable' ).forEach( function( checkbox ) {
 		checkbox.addEventListener( 'change', function() {
 			var cell = this.closest( 'td' );
@@ -81,28 +49,6 @@
 			if ( symbol ) {
 				symbol.classList.toggle( 'is-billable', this.checked );
 				symbol.classList.toggle( 'not-billable', ! this.checked );
-			}
-
-			// If unchecking billable, hide the invoiced toggle and clear its state via AJAX.
-			var row = this.closest( '.pltt-entry-row' );
-			var invoicedBtn = row.querySelector( '.pltt-invoiced-toggle' );
-			if ( invoicedBtn ) {
-				if ( ! this.checked ) {
-					invoicedBtn.style.visibility = 'hidden';
-					if ( invoicedBtn.dataset.value === '1' ) {
-						invoicedBtn.classList.remove( 'is-invoiced' );
-						invoicedBtn.classList.add( 'not-invoiced' );
-						invoicedBtn.dataset.value = '0';
-						invoicedBtn.textContent = '\u25cb';
-						PLTT.ajax( 'pltt_update_entry_field', {
-							entry_id: invoicedBtn.dataset.entryId,
-							field: 'billed',
-							value: '0'
-						}, function() {} );
-					}
-				} else {
-					invoicedBtn.style.visibility = '';
-				}
 			}
 		} );
 	} );
@@ -381,7 +327,7 @@
 					var label = isArchived
 						? PLTT.escapeHtml( project.name ) + ' (Archived)'
 						: PLTT.escapeHtml( project.name );
-					var billDefault = project.billability_default ? '1' : '0';
+					var billDefault = parseInt( project.billability_default, 10 ) === 1 ? '1' : '0';
 					var dataAttr = ' data-billability-default="' + billDefault + '"' +
 						( isArchived ? ' data-archived="1"' : '' );
 					html += '<option value="' + project.id + '"' + dataAttr + '>' +
@@ -430,6 +376,12 @@
 				return;
 			}
 
+			// If the internal client is selected, mark the entry as non-billable.
+			var selectedClientOpt = this.options[ this.selectedIndex ];
+			if ( selectedClientOpt && selectedClientOpt.dataset.isInternal === '1' ) {
+				setBillableVisual( row, false );
+			}
+
 			var originalProjectId = row.dataset.originalProjectId || '';
 			loadProjects( this, projectSelect, originalProjectId );
 		} );
@@ -473,6 +425,47 @@
 				}
 			}
 		} );
+	} );
+
+	/**
+	 * Helper: update billable checkbox and $ symbol visually without side-effects.
+	 * Does NOT dispatch 'change' (which would trigger AJAX to clear billed status).
+	 *
+	 * @param {HTMLElement} row         The .pltt-entry-row element.
+	 * @param {boolean}     isBillable  True to mark billable, false for non-billable.
+	 */
+	function setBillableVisual( row, isBillable ) {
+		var checkbox = row.querySelector( '.pltt-billable' );
+		if ( ! checkbox || checkbox.checked === isBillable ) {
+			return;
+		}
+		checkbox.checked = isBillable;
+		var cell = checkbox.closest( 'td' );
+		var symbol = cell && cell.querySelector( '.pltt-billable-symbol' );
+		if ( symbol ) {
+			symbol.classList.toggle( 'is-billable', isBillable );
+			symbol.classList.toggle( 'not-billable', ! isBillable );
+		}
+	}
+
+	/**
+	 * On page load: apply internal-client non-billable rule for rows already on the page.
+	 * Handles entries that already have the internal client assigned (change handler only
+	 * fires on user interaction, not on initial render).
+	 */
+	document.querySelectorAll( '.pltt-entry-row' ).forEach( function( row ) {
+		var clientSelect  = row.querySelector( '.pltt-client-select' );
+		var projectSelect = row.querySelector( '.pltt-project-select' );
+		if ( ! clientSelect || ! projectSelect ) {
+			return;
+		}
+
+		var selectedClientOpt = clientSelect.options[ clientSelect.selectedIndex ];
+		var hasProject = projectSelect.value && projectSelect.value !== 'new';
+
+		if ( selectedClientOpt && selectedClientOpt.dataset.isInternal === '1' && ! hasProject ) {
+			setBillableVisual( row, false );
+		}
 	} );
 
 	/**
@@ -572,7 +565,7 @@
 						const option = document.createElement( 'option' );
 						option.value = project.id;
 						option.textContent = project.name;
-						option.dataset.billabilityDefault = project.billability_default ? '1' : '0';
+						option.dataset.billabilityDefault = parseInt( project.billability_default, 10 ) === 1 ? '1' : '0';
 						option.selected = true;
 
 						const addNewOption = projectSelect.querySelector( 'option[value="new"]' );

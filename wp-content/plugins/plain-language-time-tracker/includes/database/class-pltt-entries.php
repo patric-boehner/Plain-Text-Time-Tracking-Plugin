@@ -684,6 +684,7 @@ class PLTT_Entries {
 					p.id AS project_id,
 					p.name AS project_name,
 					p.budget_hours,
+					p.budget_fee,
 					p.recurring_period,
 					p.billability_default,
 					c.id AS client_id,
@@ -696,7 +697,7 @@ class PLTT_Entries {
 				LEFT JOIN {$projects_table} p ON e.project_id = p.id
 				LEFT JOIN {$clients_table} c ON e.client_id = c.id
 				WHERE {$where_sql}
-				GROUP BY p.id, p.name, p.budget_hours, p.recurring_period, p.billability_default, c.id, c.name
+				GROUP BY p.id, p.name, p.budget_hours, p.budget_fee, p.recurring_period, p.billability_default, c.id, c.name
 				ORDER BY p.name ASC, c.name ASC",
 				$prepare
 			)

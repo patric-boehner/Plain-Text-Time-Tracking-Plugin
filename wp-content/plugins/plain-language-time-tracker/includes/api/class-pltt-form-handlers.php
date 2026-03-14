@@ -174,6 +174,17 @@ class PLTT_Form_Handlers {
 			$raw_hours = wp_unslash( $_POST['budget_hours'] );
 			$data['budget_hours'] = '' === $raw_hours ? '' : floatval( $raw_hours );
 		}
+		if ( isset( $_POST['budget_fee'] ) ) {
+			$raw_fee = wp_unslash( $_POST['budget_fee'] );
+			$data['budget_fee'] = '' === $raw_fee ? '' : floatval( $raw_fee );
+		}
+		// Mutual exclusion: if fee is set to a real value, clear hours and vice versa.
+		if ( ! empty( $data['budget_fee'] ) ) {
+			$data['budget_hours'] = '';
+		}
+		if ( ! empty( $data['budget_hours'] ) ) {
+			$data['budget_fee'] = '';
+		}
 		// Non-billable checkbox: present means non-billable (billability_default=0); absent means billable (billability_default=1).
 		// Gate on 'name' being in the payload so archive-only submits don't clobber this field.
 		if ( isset( $_POST['name'] ) ) {

@@ -20,7 +20,7 @@ class PLTT_Database {
 	 *
 	 * @var string
 	 */
-	const DB_VERSION = '1.9.1';
+	const DB_VERSION = '1.9.2';
 
 	/**
 	 * Get the full table name with WordPress prefix.
@@ -69,6 +69,7 @@ class PLTT_Database {
 			billability_default tinyint(1) NOT NULL DEFAULT 1,
 			recurring_period varchar(20) DEFAULT NULL,
 			budget_hours decimal(8,2) DEFAULT NULL,
+		budget_fee decimal(10,2) DEFAULT NULL,
 			created_at datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
 			updated_at datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
 			PRIMARY KEY (id),
@@ -330,6 +331,14 @@ class PLTT_Database {
 
 			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.SchemaChange
 			$wpdb->query( "ALTER TABLE {$projects_table} ADD COLUMN IF NOT EXISTS budget_hours decimal(8,2) DEFAULT NULL" );
+		}
+
+		// 1.9.2: Add budget_fee to projects.
+		if ( version_compare( $from_version, '1.9.2', '<' ) ) {
+			$projects_table = self::get_table_name( 'projects' );
+
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.SchemaChange
+			$wpdb->query( "ALTER TABLE {$projects_table} ADD COLUMN IF NOT EXISTS budget_fee decimal(10,2) DEFAULT NULL" );
 		}
 	}
 

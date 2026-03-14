@@ -391,6 +391,7 @@ class PLTT_Ajax {
 		$hourly_rate         = isset( $_POST['hourly_rate'] ) ? wp_unslash( $_POST['hourly_rate'] ) : '';
 		$recurring_period    = isset( $_POST['recurring_period'] ) ? sanitize_text_field( wp_unslash( $_POST['recurring_period'] ) ) : '';
 		$budget_hours        = isset( $_POST['budget_hours'] ) ? wp_unslash( $_POST['budget_hours'] ) : '';
+		$budget_fee          = isset( $_POST['budget_fee'] ) ? wp_unslash( $_POST['budget_fee'] ) : '';
 		// non_billable=1 means the checkbox was checked → billability_default=0; absent = billable by default.
 		$billability_default = isset( $_POST['non_billable'] ) && '1' === $_POST['non_billable'] ? 0 : 1;
 
@@ -425,6 +426,10 @@ class PLTT_Ajax {
 		}
 		if ( '' !== $budget_hours ) {
 			$project_data['budget_hours'] = floatval( $budget_hours );
+		}
+		if ( '' !== $budget_fee ) {
+			$project_data['budget_fee'] = floatval( $budget_fee );
+			unset( $project_data['budget_hours'] ); // mutual exclusion: fee overrides hours
 		}
 
 		$project_id = PLTT_Projects::create( $project_data );

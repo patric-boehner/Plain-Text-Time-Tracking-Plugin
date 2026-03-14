@@ -207,6 +207,15 @@ class PLTT_Projects {
 			}
 		}
 
+		// Nullable: budget_fee is NULL when not set.
+		if ( isset( $data['budget_fee'] ) && '' !== $data['budget_fee'] ) {
+			$fee = floatval( $data['budget_fee'] );
+			if ( $fee >= 0 ) {
+				$insert_data['budget_fee'] = $fee;
+				$formats[]                 = '%f';
+			}
+		}
+
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
 		$result = $wpdb->insert(
 			$table,
@@ -313,6 +322,18 @@ class PLTT_Projects {
 				}
 			} else {
 				$null_fields[] = 'budget_hours';
+			}
+		}
+
+		if ( array_key_exists( 'budget_fee', $data ) ) {
+			if ( '' !== $data['budget_fee'] && null !== $data['budget_fee'] ) {
+				$fee = floatval( $data['budget_fee'] );
+				if ( $fee >= 0 ) {
+					$update_data['budget_fee'] = $fee;
+					$formats[]                 = '%f';
+				}
+			} else {
+				$null_fields[] = 'budget_fee';
 			}
 		}
 

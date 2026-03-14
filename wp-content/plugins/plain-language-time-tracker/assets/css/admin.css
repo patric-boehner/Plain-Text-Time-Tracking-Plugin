@@ -194,7 +194,7 @@
 }
 
 .pltt-alloc-bar.pltt-alloc-over {
-	background: #d63638;
+	background: #2271b1;
 }
 
 .pltt-alloc-label {
@@ -216,8 +216,18 @@
 	visibility: visible;
 }
 
-.widefat.striped {
+.widefat {
 	border-radius: 4px;
+}
+
+.widefat tbody td,
+.widefat tbody th {
+	border-bottom: 1px solid #f0f0f1;
+}
+
+.widefat tbody tr:last-child td,
+.widefat tbody tr:last-child th {
+	border-bottom: none;
 }
 
 .widefat th,
@@ -293,7 +303,7 @@
 	padding: 25px;
 	border-radius: 4px;
 	min-width: 350px;
-	max-width: 500px;
+	max-width: 400px;
 	box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
 }
 
@@ -393,6 +403,7 @@
 .widefat tr.pltt-billed td {
 	background-color: #f0f6fc;
 	border-left-color: #2271b1;
+	border-bottom-color: #d0e4f5;
 }
 
 .widefat tr.pltt-billed td:first-child {
@@ -623,6 +634,36 @@
 	display: block;
 	font-size: 11px;
 	color: #8c8f94;
+}
+
+/* Projects page: active/archived grouping */
+.pltt-project-group {
+	margin-bottom: 28px;
+}
+
+.pltt-project-group:last-child {
+	margin-bottom: 0;
+}
+
+.pltt-project-group-header {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	padding: 10px 14px;
+	background: #fff;
+	border: 1px solid #c3c4c7;
+	border-bottom: none;
+	border-radius: 4px 4px 0 0;
+}
+
+.pltt-project-group-title {
+	font-weight: 600;
+	font-size: 14px;
+	color: #1d2327;
+}
+
+.pltt-project-group table.widefat {
+	border-radius: 0 0 4px 4px;
 }
 
 

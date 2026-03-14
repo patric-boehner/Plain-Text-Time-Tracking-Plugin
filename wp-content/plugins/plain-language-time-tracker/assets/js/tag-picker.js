@@ -12,6 +12,9 @@
 var PlttTagPicker = ( function() {
 	'use strict';
 
+	// Registry of all instances — used to close other open pickers when one opens.
+	var _instances = [];
+
 	/**
 	 * Create a tag picker instance.
 	 *
@@ -27,6 +30,8 @@ var PlttTagPicker = ( function() {
 		this.selectedTags = [];
 		this.onAddNew = onAddNew || null;
 		this.onClose = onClose || null;
+
+		_instances.push( this );
 
 		this._buildDOM();
 		this._loadInitial();
@@ -310,6 +315,14 @@ var PlttTagPicker = ( function() {
 	 * Open the dropdown.
 	 */
 	PlttTagPicker.prototype._openDropdown = function() {
+		// Close any other open picker first.
+		var self = this;
+		_instances.forEach( function( instance ) {
+			if ( instance !== self && instance.dropdown.style.display !== 'none' ) {
+				instance._closeDropdown();
+			}
+		} );
+
 		this._renderCheckboxes();
 		this.dropdown.style.display = 'block';
 		this.searchInput.value = '';
