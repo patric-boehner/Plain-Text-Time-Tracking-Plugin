@@ -20,7 +20,7 @@ class PLTT_Database {
 	 *
 	 * @var string
 	 */
-	const DB_VERSION = '1.9.2';
+	const DB_VERSION = '1.9.3';
 
 	/**
 	 * Get the full table name with WordPress prefix.
@@ -50,10 +50,12 @@ class PLTT_Database {
 			name varchar(255) NOT NULL,
 			description text,
 			hourly_rate decimal(10,2) DEFAULT NULL,
+			is_internal tinyint(1) NOT NULL DEFAULT 0,
 			created_at datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
 			updated_at datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
 			PRIMARY KEY (id),
-			KEY name (name(191))
+			KEY name (name(191)),
+			KEY is_internal (is_internal)
 		) {$charset_collate};";
 		dbDelta( $sql_clients );
 
@@ -339,6 +341,22 @@ class PLTT_Database {
 
 			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.SchemaChange
 			$wpdb->query( "ALTER TABLE {$projects_table} ADD COLUMN IF NOT EXISTS budget_fee decimal(10,2) DEFAULT NULL" );
+		}
+
+		// 1.9.3: Add is_internal flag to clients so the internal client is identified
+		// by a column rather than a hardcoded ID constant.
+		if ( version_compare( $from_version, '1.9.3', '<' ) ) {
+			$clients_table = self::get_table_name( 'clients' );
+
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.SchemaChange
+			$wpdb->query( "ALTER TABLE {$clients_table} ADD COLUMN IF NOT EXISTS is_internal tinyint(1) NOT NULL DEFAULT 0" );
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.SchemaChange
+			$wpdb->query( "ALTER TABLE {$clients_table} ADD INDEX IF NOT EXISTS is_internal (is_internal)" );
+
+			// Mark the pre-existing internal client (seeded at ID 3 during initial setup).
+			// After this migration, pltt_get_internal_client_id() uses the flag — not the ID.
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+			$wpdb->query( $wpdb->prepare( "UPDATE {$clients_table} SET is_internal = 1 WHERE id = %d", 3 ) );
 		}
 	}
 

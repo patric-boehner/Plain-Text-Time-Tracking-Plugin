@@ -298,11 +298,15 @@ $tab_base_url = add_query_arg( $filter_params, admin_url( 'admin.php' ) );
 		</div>
 	</form>
 
-	<script>
-		var plttProjectsByClient = <?php echo wp_json_encode( $projects_by_client ); ?>;
-		var plttClientNames = <?php echo wp_json_encode( $client_names ); ?>;
-		var plttAllTags = <?php echo wp_json_encode( $all_tags ); ?>;
-	</script>
+	<?php
+	wp_add_inline_script(
+		'pltt-reports',
+		'var plttProjectsByClient = ' . wp_json_encode( $projects_by_client ) . ';' .
+		'var plttClientNames = ' . wp_json_encode( $client_names ) . ';' .
+		'var plttAllTags = ' . wp_json_encode( $all_tags ) . ';',
+		'before'
+	);
+	?>
 
 	<?php if ( $total_entries > 0 ) : ?>
 		<div class="pltt-summary-cards">
@@ -389,32 +393,6 @@ $tab_base_url = add_query_arg( $filter_params, admin_url( 'admin.php' ) );
 			<?php endif; ?>
 
 
-			<?php // EHR card hidden — needs full billing context to be useful. Re-enable when ready. ?>
-			<?php if ( false ) : // phpcs:ignore ?>
-			<!-- Card 5: Overall EHR -->
-			<?php if ( $overall_ehr > 0 ) : ?>
-				<div class="card">
-					<div class="card-label"><?php esc_html_e( 'Overall EHR', 'plain-language-time-tracker' ); ?></div>
-					<div class="card-value"><?php echo esc_html( pltt_format_currency( $overall_ehr ) . '/hr' ); ?></div>
-					<div class="card-secondary">
-						<?php
-						$ehr_target = PLTT_DEFAULT_HOURLY_RATE;
-						$ehr_class  = ( $overall_ehr >= $ehr_target ) ? 'status-good' : 'status-warning';
-						$ehr_icon   = ( $overall_ehr >= $ehr_target ) ? '✓' : '⚠';
-						?>
-						<span class="<?php echo esc_attr( $ehr_class ); ?>">
-							<?php
-							printf(
-								esc_html__( 'Target: %s+/hr', 'plain-language-time-tracker' ),
-								esc_html( pltt_format_currency( $ehr_target ) )
-							);
-							echo ' ' . esc_html( $ehr_icon );
-							?>
-						</span>
-					</div>
-				</div>
-			<?php endif; ?>
-			<?php endif; ?>
 
 		</div>
 	<?php endif; ?>

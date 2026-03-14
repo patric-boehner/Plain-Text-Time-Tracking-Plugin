@@ -406,8 +406,7 @@ class PLTT_Ajax {
 		}
 
 		// SEC-H4: Validate recurring_period against allowlist.
-		$allowed_periods = array( '', 'weekly', 'monthly', 'quarterly', 'yearly' );
-		if ( ! in_array( $recurring_period, $allowed_periods, true ) ) {
+		if ( ! in_array( $recurring_period, PLTT_ALLOWED_RECURRING_PERIODS, true ) ) {
 			wp_send_json_error( __( 'Invalid recurring period.', 'plain-language-time-tracker' ) );
 			return;
 		}

@@ -3,7 +3,7 @@
  */
 
 .pltt-log-preview {
-	color: #646970;
+	color: var(--pltt-text-muted);
 	max-width: 300px;
 	white-space: nowrap;
 	overflow: hidden;
@@ -30,8 +30,8 @@
 	justify-content: space-between;
 	align-items: center;
 	padding: 10px 14px;
-	background: #fff;
-	border: 1px solid #c3c4c7;
+	background: var(--pltt-bg-white);
+	border: 1px solid var(--pltt-border);
 	border-bottom: none;
 	border-radius: 4px 4px 0 0;
 }
@@ -39,7 +39,7 @@
 .pltt-week-group-title {
 	font-weight: 600;
 	font-size: 14px;
-	color: #1d2327;
+	color: var(--pltt-text-dark);
 }
 
 .pltt-week-group table.widefat {
