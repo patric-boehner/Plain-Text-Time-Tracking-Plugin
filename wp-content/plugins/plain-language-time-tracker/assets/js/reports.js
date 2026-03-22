@@ -8,43 +8,253 @@
 ( function() {
 	'use strict';
 
-	const dateStart = document.getElementById( 'pltt-date-start' );
-	const dateEnd = document.getElementById( 'pltt-date-end' );
-
-	if ( ! dateStart || ! dateEnd ) {
-		return;
-	}
-
 	/**
-	 * Date validation - ensure start date is not after end date.
+	 * Date Navigator widget.
+	 *
+	 * Handles preset selection, custom range input, and prev/next navigation.
+	 * The widget uses hidden <input name="from"> and <input name="to"> so the
+	 * form submits the same way as before — no other form code changes needed.
 	 */
-	dateStart.addEventListener( 'change', function() {
-		if ( dateEnd.value && this.value > dateEnd.value ) {
-			dateEnd.value = this.value;
+	( function initDateNav() {
+		var widget = document.querySelector( '.pltt-date-nav' );
+		if ( ! widget ) {
+			return;
 		}
-	} );
 
-	dateEnd.addEventListener( 'change', function() {
-		if ( dateStart.value && this.value < dateStart.value ) {
-			dateStart.value = this.value;
+		var fromInput   = document.getElementById( 'pltt-date-from' );
+		var toInput     = document.getElementById( 'pltt-date-to' );
+		var trigger     = document.getElementById( 'pltt-date-nav-trigger' );
+		var dropdown    = widget.querySelector( '.pltt-date-nav-dropdown' );
+		var prevBtn     = widget.querySelector( '.pltt-date-nav-prev' );
+		var nextBtn     = widget.querySelector( '.pltt-date-nav-next' );
+		var customInputs = widget.querySelector( '.pltt-date-nav-custom-inputs' );
+		var customFrom  = document.getElementById( 'pltt-date-custom-from' );
+		var customTo    = document.getElementById( 'pltt-date-custom-to' );
+		var applyBtn    = widget.querySelector( '.pltt-date-nav-custom-apply' );
+		var weekStart   = parseInt( widget.dataset.weekStart || '0', 10 );
+
+		// ── Helpers ─────────────────────────────────────────────────────────
+
+		/**
+		 * Parse a YYYY-MM-DD string into a local Date (no timezone shift).
+		 */
+		function parseDate( str ) {
+			var parts = str.split( '-' );
+			return new Date( parseInt( parts[0], 10 ), parseInt( parts[1], 10 ) - 1, parseInt( parts[2], 10 ) );
 		}
-	} );
 
-	/**
-	 * Date preset selection - populate date fields and submit.
-	 */
-	const presetSelect = document.getElementById( 'pltt-date-preset' );
-	if ( presetSelect ) {
-		presetSelect.addEventListener( 'change', function() {
-			if ( ! this.value ) {
-				return;
+		/**
+		 * Format a Date as YYYY-MM-DD.
+		 */
+		function fmtDate( d ) {
+			var y  = d.getFullYear();
+			var m  = String( d.getMonth() + 1 ).padStart( 2, '0' );
+			var dy = String( d.getDate() ).padStart( 2, '0' );
+			return y + '-' + m + '-' + dy;
+		}
+
+		/**
+		 * Detect the step unit for navigation based on the current range.
+		 * Returns { unit: 'month'|'week'|'year'|'days', days: N }
+		 */
+		function detectStep( from, to ) {
+			var f = parseDate( from );
+			var t = parseDate( to );
+			var diffMs   = t - f;
+			var totalDays = Math.round( diffMs / 86400000 ) + 1;
+
+			// Full or partial month: starts on 1st of a month.
+			if ( f.getDate() === 1 ) {
+				return { unit: 'month' };
 			}
-			var parts = this.value.split( '|' );
-			dateStart.value = parts[0];
-			dateEnd.value = parts[1];
-			this.form.submit();
+
+			// Full week: exactly 7 days starting on the configured week-start day.
+			if ( totalDays === 7 && f.getDay() === weekStart ) {
+				return { unit: 'week' };
+			}
+
+			// Full year: Jan 1 → Dec 31.
+			if ( f.getMonth() === 0 && f.getDate() === 1 && t.getMonth() === 11 && t.getDate() === 31 ) {
+				return { unit: 'year' };
+			}
+
+			return { unit: 'days', days: totalDays };
+		}
+
+		/**
+		 * Shift a date range by one step in the given direction (+1 or -1).
+		 * Returns { from: 'YYYY-MM-DD', to: 'YYYY-MM-DD' }.
+		 */
+		function shiftRange( from, to, direction ) {
+			var step = detectStep( from, to );
+			var f    = parseDate( from );
+			var t    = parseDate( to );
+
+			if ( step.unit === 'month' ) {
+				// Shift by 1 month; result is always a full month.
+				var newMonth = f.getMonth() + direction;
+				var newYear  = f.getFullYear();
+				if ( newMonth < 0 ) { newMonth = 11; newYear--; }
+				if ( newMonth > 11 ) { newMonth = 0; newYear++; }
+				var newFrom = new Date( newYear, newMonth, 1 );
+				var newTo   = new Date( newYear, newMonth + 1, 0 ); // last day of new month
+				return { from: fmtDate( newFrom ), to: fmtDate( newTo ) };
+			}
+
+			if ( step.unit === 'week' ) {
+				var offset = direction * 7;
+				var wFrom  = new Date( f.getFullYear(), f.getMonth(), f.getDate() + offset );
+				var wTo    = new Date( t.getFullYear(), t.getMonth(), t.getDate() + offset );
+				return { from: fmtDate( wFrom ), to: fmtDate( wTo ) };
+			}
+
+			if ( step.unit === 'year' ) {
+				var yFrom = new Date( f.getFullYear() + direction, 0, 1 );
+				var yTo   = new Date( f.getFullYear() + direction, 11, 31 );
+				return { from: fmtDate( yFrom ), to: fmtDate( yTo ) };
+			}
+
+			// Arbitrary range: shift by full range duration.
+			var dOffset = direction * step.days;
+			var dFrom   = new Date( f.getFullYear(), f.getMonth(), f.getDate() + dOffset );
+			var dTo     = new Date( t.getFullYear(), t.getMonth(), t.getDate() + dOffset );
+			return { from: fmtDate( dFrom ), to: fmtDate( dTo ) };
+		}
+
+		/**
+		 * Apply a new date range: update hidden inputs, label, and submit.
+		 */
+		function applyRange( from, to ) {
+			fromInput.value = from;
+			toInput.value   = to;
+			closeDropdown();
+			fromInput.form.submit();
+		}
+
+		// ── Dropdown open / close ────────────────────────────────────────────
+
+		function openDropdown() {
+			dropdown.hidden = false;
+			trigger.setAttribute( 'aria-expanded', 'true' );
+			// Focus the selected option or the first option.
+			var selected = dropdown.querySelector( '.pltt-date-nav-option[aria-selected="true"]' )
+				|| dropdown.querySelector( '.pltt-date-nav-option' );
+			if ( selected ) {
+				selected.focus();
+			}
+		}
+
+		function closeDropdown() {
+			dropdown.hidden = true;
+			trigger.setAttribute( 'aria-expanded', 'false' );
+		}
+
+		trigger.addEventListener( 'click', function() {
+			if ( dropdown.hidden ) {
+				openDropdown();
+			} else {
+				closeDropdown();
+			}
 		} );
-	}
+
+		trigger.addEventListener( 'keydown', function( e ) {
+			if ( e.key === 'Enter' || e.key === ' ' ) {
+				e.preventDefault();
+				openDropdown();
+			}
+		} );
+
+		// Close on Escape or outside click.
+		document.addEventListener( 'keydown', function( e ) {
+			if ( e.key === 'Escape' && ! dropdown.hidden ) {
+				closeDropdown();
+				trigger.focus();
+			}
+		} );
+
+		document.addEventListener( 'click', function( e ) {
+			if ( ! widget.contains( e.target ) && ! dropdown.hidden ) {
+				closeDropdown();
+			}
+		} );
+
+		// ── Option keyboard navigation ───────────────────────────────────────
+
+		dropdown.addEventListener( 'keydown', function( e ) {
+			var options = Array.from( dropdown.querySelectorAll( '.pltt-date-nav-option' ) );
+			var focused = document.activeElement;
+			var idx     = options.indexOf( focused );
+
+			if ( e.key === 'ArrowDown' ) {
+				e.preventDefault();
+				var next = options[ idx + 1 ] || options[0];
+				next.focus();
+			} else if ( e.key === 'ArrowUp' ) {
+				e.preventDefault();
+				var prev = options[ idx - 1 ] || options[ options.length - 1 ];
+				prev.focus();
+			} else if ( e.key === 'Enter' || e.key === ' ' ) {
+				e.preventDefault();
+				if ( focused && options.includes( focused ) ) {
+					focused.click();
+				}
+			} else if ( e.key === 'Tab' ) {
+				// Allow Tab to move naturally; close dropdown if focus leaves widget.
+				setTimeout( function() {
+					if ( ! widget.contains( document.activeElement ) ) {
+						closeDropdown();
+					}
+				}, 0 );
+			}
+		} );
+
+		// ── Preset option click ──────────────────────────────────────────────
+
+		dropdown.querySelectorAll( '.pltt-date-nav-option[data-from]' ).forEach( function( opt ) {
+			opt.addEventListener( 'click', function() {
+				applyRange( this.dataset.from, this.dataset.to );
+			} );
+		} );
+
+		// Custom date validation.
+		if ( customFrom && customTo ) {
+			customFrom.addEventListener( 'change', function() {
+				if ( customTo.value && this.value > customTo.value ) {
+					customTo.value = this.value;
+				}
+			} );
+			customTo.addEventListener( 'change', function() {
+				if ( customFrom.value && this.value < customFrom.value ) {
+					customFrom.value = this.value;
+				}
+			} );
+		}
+
+		// Apply button.
+		if ( applyBtn ) {
+			applyBtn.addEventListener( 'click', function() {
+				if ( customFrom && customTo && customFrom.value && customTo.value ) {
+					applyRange( customFrom.value, customTo.value );
+				}
+			} );
+		}
+
+		// ── Prev / Next navigation ───────────────────────────────────────────
+
+		if ( prevBtn ) {
+			prevBtn.addEventListener( 'click', function() {
+				var range = shiftRange( fromInput.value, toInput.value, -1 );
+				applyRange( range.from, range.to );
+			} );
+		}
+
+		if ( nextBtn ) {
+			nextBtn.addEventListener( 'click', function() {
+				var range = shiftRange( fromInput.value, toInput.value, 1 );
+				applyRange( range.from, range.to );
+			} );
+		}
+	} )();
 
 	/**
 	 * Client -> Project cascade filter.

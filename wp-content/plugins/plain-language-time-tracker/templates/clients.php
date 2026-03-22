@@ -111,8 +111,7 @@ if ( ! empty( $clients ) ) {
 						if ( null !== $client->hourly_rate ) {
 							echo esc_html( pltt_format_currency( $client->hourly_rate ) );
 						} elseif ( defined( 'PLTT_DEFAULT_HOURLY_RATE' ) ) {
-							echo esc_html( pltt_format_currency( PLTT_DEFAULT_HOURLY_RATE ) );
-							echo '<span class="pltt-rate-source">' . esc_html__( 'default', 'plain-language-time-tracker' ) . '</span>';
+							echo esc_html( pltt_format_currency( PLTT_DEFAULT_HOURLY_RATE ) . ' / ' . __( 'default', 'plain-language-time-tracker' ) );
 						} else {
 							echo '<span class="pltt-empty">—</span>';
 						}
@@ -143,7 +142,10 @@ if ( ! empty( $clients ) ) {
 			</p>
 			<p>
 				<label for="pltt-client-rate"><?php esc_html_e( 'Hourly Rate (optional)', 'plain-language-time-tracker' ); ?></label>
-				<input type="number" id="pltt-client-rate" name="hourly_rate" step="0.01" min="0" class="widefat" placeholder="0.00">
+				<div class="pltt-input-adornment-wrap">
+				<span class="pltt-adornment pltt-adornment-prefix">$</span>
+				<input type="text" inputmode="decimal" id="pltt-client-rate" name="hourly_rate" class="widefat pltt-currency-input" placeholder="0.00">
+			</div>
 			</p>
 			<div class="pltt-modal-actions">
 				<div class="pltt-modal-actions-left">

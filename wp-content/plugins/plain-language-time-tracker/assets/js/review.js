@@ -477,7 +477,7 @@
 			const nameInput = document.getElementById( 'pltt-new-client-name' );
 			const rateInput = document.getElementById( 'pltt-new-client-rate' );
 			const name = nameInput.value.trim();
-			const rate = rateInput.value.trim();
+			const rate = PLTT.parseCurrencyValue( rateInput.value );
 
 			if ( ! name ) {
 				alert( 'Please enter a client name.' );
@@ -489,7 +489,7 @@
 
 			PLTT.ajax( 'pltt_create_client', {
 				name: name,
-				hourly_rate: rate || null
+				hourly_rate: rate
 			}, function( response ) {
 				saveClientBtn.disabled = false;
 
@@ -538,7 +538,7 @@
 			const rateInput = document.getElementById( 'pltt-new-project-rate' );
 			const name = nameInput.value.trim();
 			const clientId = clientIdInput.value;
-			const rate = rateInput.value.trim();
+			const rate = PLTT.parseCurrencyValue( rateInput.value );
 
 			if ( ! name ) {
 				alert( 'Please enter a project name.' );
@@ -551,7 +551,7 @@
 			PLTT.ajax( 'pltt_create_project', {
 				name: name,
 				client_id: clientId,
-				hourly_rate: rate || null
+				hourly_rate: rate
 			}, function( response ) {
 				saveProjectBtn.disabled = false;
 

@@ -27,20 +27,32 @@ $has_entries      = ! empty( $existing_entries );
 <div class="wrap pltt-wrap">
 	<div class="pltt-header">
 		<h1><?php esc_html_e( 'Daily Log', 'plain-language-time-tracker' ); ?></h1>
-		<div class="pltt-date-nav">
-			<?php if ( $previous_date ) : ?>
-				<a href="<?php echo esc_url( pltt_get_admin_url( 'daily-log', array( 'date' => $previous_date ) ) ); ?>" class="button">
-					&larr; <?php esc_html_e( 'Previous', 'plain-language-time-tracker' ); ?>
-				</a>
-			<?php endif; ?>
+		<div class="pltt-daily-log-nav">
+			<div class="pltt-date-nav pltt-date-nav-single"
+				role="group"
+				aria-label="<?php esc_attr_e( 'Date navigation', 'plain-language-time-tracker' ); ?>">
 
-			<input type="date" id="pltt-log-date" value="<?php echo esc_attr( $date ); ?>" max="<?php echo esc_attr( $today ); ?>">
+				<?php if ( $previous_date ) : ?>
+					<a href="<?php echo esc_url( pltt_get_admin_url( 'daily-log', array( 'date' => $previous_date ) ) ); ?>"
+						class="pltt-date-nav-step pltt-date-nav-prev"
+						aria-label="<?php esc_attr_e( 'Previous day', 'plain-language-time-tracker' ); ?>">&#8249;</a>
+				<?php endif; ?>
 
-			<?php if ( $next_date && $next_date <= $today ) : ?>
-				<a href="<?php echo esc_url( pltt_get_admin_url( 'daily-log', array( 'date' => $next_date ) ) ); ?>" class="button">
-					<?php esc_html_e( 'Next', 'plain-language-time-tracker' ); ?> &rarr;
-				</a>
-			<?php endif; ?>
+				<div class="pltt-date-nav-picker">
+					<button type="button" class="pltt-date-nav-label" id="pltt-date-nav-trigger"
+						aria-label="<?php esc_attr_e( 'Pick a date', 'plain-language-time-tracker' ); ?>">
+						<span class="pltt-date-nav-label-main"><?php echo esc_html( pltt_format_date( $date ) ); ?></span>
+						<span class="pltt-date-nav-chevron" aria-hidden="true"></span>
+					</button>
+					<input type="date" id="pltt-log-date" value="<?php echo esc_attr( $date ); ?>" max="<?php echo esc_attr( $today ); ?>" class="pltt-date-nav-hidden-input">
+				</div>
+
+				<?php if ( $next_date && $next_date <= $today ) : ?>
+					<a href="<?php echo esc_url( pltt_get_admin_url( 'daily-log', array( 'date' => $next_date ) ) ); ?>"
+						class="pltt-date-nav-step pltt-date-nav-next"
+						aria-label="<?php esc_attr_e( 'Next day', 'plain-language-time-tracker' ); ?>">&#8250;</a>
+				<?php endif; ?>
+			</div>
 
 			<?php if ( $date !== $today ) : ?>
 				<a href="<?php echo esc_url( pltt_get_admin_url( 'daily-log' ) ); ?>" class="button button-secondary">
