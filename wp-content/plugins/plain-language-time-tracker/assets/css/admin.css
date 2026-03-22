@@ -109,7 +109,7 @@
 .pltt-date-nav {
 	display: flex;
 	align-items: center;
-	gap: 10px;
+	/* gap: 10px; */
 }
 
 .pltt-date-nav input[type="date"] {
@@ -388,6 +388,50 @@
 	width: 100%;
 }
 
+/* Input adornments ($ prefix, hr suffix) */
+.pltt-input-adornment-wrap {
+	display: flex;
+	border: 1px solid var(--pltt-border);
+	border-radius: 4px;
+	overflow: hidden;
+	background: #fff;
+}
+
+.pltt-input-adornment-wrap:focus-within {
+	border-color: #2271b1;
+	box-shadow: 0 0 0 1px #2271b1;
+	outline: none;
+}
+
+.pltt-input-adornment-wrap input {
+	border: none !important;
+	box-shadow: none !important;
+	outline: none !important;
+	flex: 1;
+	min-width: 0;
+	border-radius: 0 !important;
+}
+
+.pltt-adornment {
+	display: flex;
+	align-items: center;
+	padding: 0 9px;
+	background: var(--pltt-bg-light);
+	color: var(--pltt-text-muted);
+	font-size: 13px;
+	white-space: nowrap;
+	user-select: none;
+	pointer-events: none;
+}
+
+.pltt-adornment-prefix {
+	border-right: 1px solid var(--pltt-border);
+}
+
+.pltt-adornment-suffix {
+	border-left: 1px solid var(--pltt-border);
+}
+
 .pltt-modal-actions {
 	display: flex;
 	align-items: center;
@@ -450,7 +494,6 @@
 .pltt-billable-symbol {
 	font-weight: 600;
 	font-size: 15px;
-	cursor: pointer;
 }
 
 .pltt-billable-symbol.is-billable {
@@ -534,9 +577,177 @@
 	color: var(--pltt-danger);
 }
 
-.pltt-filter-row-date {
+/* Date navigator widget — replaces the old separate preset/from/to filter row */
+.pltt-date-nav-row {
+	display: flex;
 	justify-content: flex-end;
-	margin-bottom: 50px;
+	margin-bottom: 20px;
+}
+
+.pltt-date-nav {
+	display: inline-flex;
+	align-items: stretch;
+}
+
+/* Shared border/background for every segment in the group */
+.pltt-date-nav-step,
+.pltt-date-nav-picker {
+	background: var(--pltt-bg-white);
+	border: 1px solid var(--pltt-border);
+	cursor: pointer;
+	margin-left: -1px;
+	position: relative;
+	text-decoration: none;
+	transition: background-color 0.1s, border-color 0.1s;
+}
+
+.pltt-date-nav-step:hover,
+.pltt-date-nav-picker:hover {
+	background: var(--pltt-bg-subtle);
+	border-color: var(--pltt-text-faint);
+	z-index: 1;
+}
+
+.pltt-date-nav-picker:has([aria-expanded="true"]) {
+	border-color: var(--pltt-primary);
+	z-index: 1;
+}
+
+/* ‹ prev — left-rounded, no left-margin (it's the first element) */
+.pltt-date-nav-prev {
+	border-radius: 3px 0 0 3px;
+	color: var(--pltt-text-muted);
+	font-size: 20px;
+	line-height: 1;
+	margin-left: 0;
+	padding: 5px 13px 6px;
+}
+
+/* Picker div wraps the label button; the label fills it entirely */
+.pltt-date-nav-picker {
+	display: flex;
+}
+
+/* The label button inside the picker: fills the picker, no border of its own */
+.pltt-date-nav-label {
+	align-items: center;
+	background: transparent;
+	border: none;
+	border-radius: 0;
+	color: var(--pltt-text-base);
+	cursor: pointer;
+	display: flex;
+	justify-content: space-between;
+	font-size: 13px;
+	gap: 8px;
+	min-width: 200px;
+	outline: none;
+	padding: 10px 18px 10px 17px;
+	white-space: nowrap;
+	width: 100%;
+}
+
+.pltt-date-nav-label-main {
+	font-weight: 600;
+}
+
+.pltt-date-nav-label-sub {
+	color: var(--pltt-text-muted);
+	font-weight: 400;
+}
+
+.pltt-date-nav-chevron {
+	border-bottom: 2px solid currentColor;
+	border-right: 2px solid currentColor;
+	color: var(--pltt-text-muted);
+	display: inline-block;
+	flex-shrink: 0;
+	height: 6px;
+	margin-left: 12px;
+	transform: rotate(45deg) translateY(-3px);
+	width: 6px;
+}
+
+/* › next — right-rounded by default; flat when clear button is shown */
+.pltt-date-nav-next {
+	border-radius: 0 3px 3px 0;
+	color: var(--pltt-text-muted);
+	font-size: 20px;
+	line-height: 1;
+	padding: 5px 13px 6px;
+}
+
+/* Dropdown panel */
+.pltt-date-nav-dropdown {
+	background: var(--pltt-bg-white);
+	border: 1px solid var(--pltt-border);
+	border-radius: 4px;
+	box-shadow: var(--pltt-shadow-dropdown);
+	min-width: 210px;
+	padding: 4px 0;
+	position: absolute;
+	top: calc(100% + 4px);
+	left: 0;
+	z-index: 100;
+}
+
+.pltt-date-nav-option {
+	color: var(--pltt-text-base);
+	cursor: pointer;
+	font-size: 13px;
+	padding: 9px 14px;
+}
+
+.pltt-date-nav-option:hover,
+.pltt-date-nav-option:focus {
+	background: var(--pltt-bg-subtle);
+	outline: none;
+}
+
+.pltt-date-nav-option[aria-selected="true"] {
+	background: var(--pltt-bg-subtle);
+	font-weight: 600;
+}
+
+.pltt-date-nav-separator {
+	border-top: 1px solid var(--pltt-border-light);
+	margin: 4px 0;
+}
+
+/* "Custom Range" label — section heading, not a selectable option */
+.pltt-date-nav-custom-heading {
+	color: var(--pltt-text-faint);
+	font-size: 11px;
+	font-weight: 600;
+	letter-spacing: 0.04em;
+	padding: 8px 14px 10px;
+	text-transform: uppercase;
+}
+
+.pltt-date-nav-custom-inputs {
+	border-top: 1px solid var(--pltt-border-light);
+	display: flex;
+	flex-direction: column;
+	gap: 5px;
+	padding: 10px 14px 12px;
+}
+
+.pltt-date-nav-custom-inputs .button {
+	margin-top: 5px;
+}
+
+.pltt-date-nav-custom-inputs label {
+	font-size: 12px;
+	font-weight: 600;
+	margin-bottom: 0;
+}
+
+.pltt-date-nav-custom-inputs input[type="date"] {
+	width: 100%;
+}
+
+.pltt-date-nav-custom-apply {
+	margin-top: 10px;
 }
 
 .pltt-filter-actions {

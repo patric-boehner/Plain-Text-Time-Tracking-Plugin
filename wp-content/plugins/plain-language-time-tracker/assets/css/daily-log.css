@@ -113,9 +113,48 @@
 	font-variant-numeric: tabular-nums;
 }
 
+.pltt-daily-log-entries .pltt-tag-pills {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 4px;
+}
+
 .pltt-existing-entries-footer {
 	margin-top: 15px;
 	text-align: right;
+}
+
+/* Wrapper: pill + standalone Today button side by side in the header */
+.pltt-daily-log-nav {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+}
+
+/* Single-date pill navigator */
+.pltt-date-nav-single .pltt-date-nav-label {
+	min-width: 0;
+}
+
+.pltt-date-nav-single .pltt-date-nav-picker:first-child {
+	border-radius: 3px 0 0 3px;
+}
+
+.pltt-date-nav-single .pltt-date-nav-picker:last-child {
+	border-radius: 0 3px 3px 0;
+}
+
+/* Visually hidden date input — rendered so showPicker() works */
+.pltt-date-nav-hidden-input {
+	position: absolute;
+	top: 0;
+	left: 0;
+	opacity: 0;
+	pointer-events: none;
+	width: 1px;
+	height: 1px;
+	padding: 0;
+	border: 0;
 }
 
 /* Responsive */

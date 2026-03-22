@@ -116,8 +116,7 @@ if ( ! empty( $projects ) ) {
 							<th><?php esc_html_e( 'Client', 'plain-language-time-tracker' ); ?></th>
 							<th><?php esc_html_e( 'Type', 'plain-language-time-tracker' ); ?></th>
 							<th><?php esc_html_e( 'Rate', 'plain-language-time-tracker' ); ?></th>
-							<th><?php esc_html_e( 'Hours', 'plain-language-time-tracker' ); ?></th>
-							<th><?php esc_html_e( 'Amount', 'plain-language-time-tracker' ); ?></th>
+							<th><?php esc_html_e( 'Budget', 'plain-language-time-tracker' ); ?></th>
 						</tr>
 					</thead>
 					<tbody<?php echo $group['tbody_id'] ? ' id="' . esc_attr( $group['tbody_id'] ) . '"' : ''; ?>>
@@ -142,8 +141,11 @@ if ( ! empty( $projects ) ) {
 									<?php endif; ?>
 								</div>
 							</td>
-							<td><?php echo $project_client ? esc_html( $project_client->name ) : '—'; ?></td>
 							<td>
+								<?php echo $project_client ? esc_html( $project_client->name ) : '—'; ?>
+							</td>
+							<td>
+							<span class="pltt-billable-symbol <?php echo 'none' !== $billing_type && (int) ( $project->billability_default ?? 1 ) === 1 ? 'is-billable' : 'not-billable'; ?>">$</span>
 							<?php if ( 'none' === $billing_type ) : ?>
 								<span class="pltt-badge"><?php esc_html_e( 'Internal', 'plain-language-time-tracker' ); ?></span>
 							<?php elseif ( 'recurring' === $billing_type ) : ?>
@@ -155,23 +157,31 @@ if ( ! empty( $projects ) ) {
 							<?php endif; ?>
 							</td>
 							<td><?php
-								if ( null !== $project->hourly_rate ) {
+								if ( 'none' === $billing_type ) {
+									echo '<span class="pltt-empty">—</span>';
+								} elseif ( null !== $project->hourly_rate ) {
 									echo esc_html( pltt_format_currency( $project->hourly_rate ) );
 								} elseif ( $project_client && null !== $project_client->hourly_rate ) {
-									echo esc_html( pltt_format_currency( $project_client->hourly_rate ) );
-									echo '<span class="pltt-rate-source">' . esc_html__( 'client', 'plain-language-time-tracker' ) . '</span>';
+									echo esc_html( pltt_format_currency( $project_client->hourly_rate ) . ' / ' . __( 'client', 'plain-language-time-tracker' ) );
 								} elseif ( defined( 'PLTT_DEFAULT_HOURLY_RATE' ) ) {
-									echo esc_html( pltt_format_currency( PLTT_DEFAULT_HOURLY_RATE ) );
-									echo '<span class="pltt-rate-source">' . esc_html__( 'default', 'plain-language-time-tracker' ) . '</span>';
+									echo esc_html( pltt_format_currency( PLTT_DEFAULT_HOURLY_RATE ) . ' / ' . __( 'default', 'plain-language-time-tracker' ) );
 								} else {
 									echo '<span class="pltt-empty">—</span>';
 								}
 							?></td>
-							<?php $total_mins = isset( $project_stats->total_minutes ) ? (float) $project_stats->total_minutes : 0; ?>
-							<td class="pltt-duration-cell">
-								<?php echo esc_html( pltt_format_hours( $total_mins ) ); ?>
-							</td>
-							<td><?php echo (float) ( $project_stats->billable_amount ?? 0 ) > 0 ? esc_html( pltt_format_currency( $project_stats->billable_amount ) ) : '<span class="pltt-empty">—</span>'; ?></td>
+							<td><?php
+								$period_abbr = array( 'weekly' => 'wk', 'monthly' => 'mo', 'quarterly' => 'qtr', 'yearly' => 'yr' );
+								if ( 'recurring' === $billing_type && ! empty( $project->budget_hours ) ) {
+									$abbr = $period_abbr[ $project->recurring_period ] ?? $project->recurring_period;
+									echo esc_html( number_format( (float) $project->budget_hours, 0 ) . ' hrs / ' . $abbr );
+								} elseif ( 'fixed' === $billing_type && ! empty( $project->budget_fee ) ) {
+									echo esc_html( pltt_format_currency( $project->budget_fee ) );
+								} elseif ( 'fixed' === $billing_type && ! empty( $project->budget_hours ) ) {
+									echo esc_html( number_format( (float) $project->budget_hours, 0 ) . ' hrs' );
+								} else {
+									echo '<span class="pltt-empty">—</span>';
+								}
+							?></td>
 						</tr>
 						<?php endforeach; ?>
 					</tbody>
@@ -233,11 +243,17 @@ if ( ! empty( $projects ) ) {
 					<div id="pltt-project-budget-value-group">
 						<div id="pltt-budget-hours-wrap">
 							<label id="pltt-project-budget-label" for="pltt-project-budget-hours"><?php esc_html_e( 'Hour Budget', 'plain-language-time-tracker' ); ?> <span class="pltt-optional"><?php esc_html_e( '(optional)', 'plain-language-time-tracker' ); ?></span></label>
+							<div class="pltt-input-adornment-wrap">
 							<input type="number" id="pltt-project-budget-hours" name="budget_hours" step="0.5" min="0" class="widefat" placeholder="0">
+							<span class="pltt-adornment pltt-adornment-suffix">hr</span>
+						</div>
 						</div>
 						<div id="pltt-budget-fee-wrap" class="pltt-hidden">
 							<label for="pltt-project-budget-fee"><?php esc_html_e( 'Total Fee ($)', 'plain-language-time-tracker' ); ?> <span class="pltt-optional"><?php esc_html_e( '(optional)', 'plain-language-time-tracker' ); ?></span></label>
-							<input type="number" id="pltt-project-budget-fee" name="budget_fee" step="0.01" min="0" class="widefat" placeholder="0.00">
+							<div class="pltt-input-adornment-wrap">
+							<span class="pltt-adornment pltt-adornment-prefix">$</span>
+							<input type="text" inputmode="decimal" id="pltt-project-budget-fee" name="budget_fee" class="widefat pltt-currency-input" placeholder="0.00">
+						</div>
 						</div>
 					</div>
 				</div>
@@ -248,7 +264,10 @@ if ( ! empty( $projects ) ) {
 
 			<p id="pltt-project-rate-group">
 				<label for="pltt-project-rate"><?php esc_html_e( 'Hourly Rate', 'plain-language-time-tracker' ); ?> <span class="pltt-optional"><?php esc_html_e( '(optional)', 'plain-language-time-tracker' ); ?></span></label>
-				<input type="number" id="pltt-project-rate" name="hourly_rate" step="0.01" min="0" class="widefat" placeholder="0.00">
+				<div class="pltt-input-adornment-wrap">
+				<span class="pltt-adornment pltt-adornment-prefix">$</span>
+				<input type="text" inputmode="decimal" id="pltt-project-rate" name="hourly_rate" class="widefat pltt-currency-input" placeholder="0.00">
+			</div>
 				<small class="description" id="pltt-rate-description"><?php esc_html_e( 'Leave blank to use client rate.', 'plain-language-time-tracker' ); ?></small>
 			</p>
 			<p id="pltt-project-nonbillable-group">

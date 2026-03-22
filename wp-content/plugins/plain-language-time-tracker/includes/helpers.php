@@ -319,6 +319,55 @@ function pltt_get_previous_period( $date_from, $date_to ) {
 }
 
 /**
+ * Format a date range as a human-readable label.
+ *
+ * Mirrors the JS label logic in reports.js so the server-side initial render
+ * matches what JS would produce after navigation.
+ *
+ * @param string $from Start date (Y-m-d).
+ * @param string $to   End date (Y-m-d).
+ * @return string Human-readable label.
+ */
+function pltt_format_date_range( $from, $to ) {
+	$tz       = wp_timezone();
+	$from_dt  = new DateTimeImmutable( $from, $tz );
+	$to_dt    = new DateTimeImmutable( $to, $tz );
+
+	$from_y  = $from_dt->format( 'Y' );
+	$to_y    = $to_dt->format( 'Y' );
+	$from_m  = $from_dt->format( 'n' );
+	$to_m    = $to_dt->format( 'n' );
+	$from_d  = $from_dt->format( 'j' );
+	$to_d    = $to_dt->format( 'j' );
+
+	// Full calendar year: Jan 1 – Dec 31 of the same year.
+	if ( $from_y === $to_y && '1' === $from_m && '1' === $from_d && '12' === $to_dt->format( 'n' ) && '31' === $to_dt->format( 'j' ) ) {
+		return $from_y;
+	}
+
+	// Full calendar month: 1st → last day of the same month.
+	if ( $from_y === $to_y && $from_m === $to_m && '1' === $from_d ) {
+		$last_day = $from_dt->format( 't' );
+		if ( $to_d === $last_day ) {
+			return $from_dt->format( 'F Y' );
+		}
+	}
+
+	// Same month and year: "Mar 1–21, 2026".
+	if ( $from_y === $to_y && $from_m === $to_m ) {
+		return $from_dt->format( 'M j' ) . '–' . $to_d . ', ' . $from_y;
+	}
+
+	// Same year, different month: "Mar 12 – Apr 30, 2026".
+	if ( $from_y === $to_y ) {
+		return $from_dt->format( 'M j' ) . ' – ' . $to_dt->format( 'M j' ) . ', ' . $from_y;
+	}
+
+	// Cross-year: "Dec 15, 2025 – Jan 15, 2026".
+	return $from_dt->format( 'M j, Y' ) . ' – ' . $to_dt->format( 'M j, Y' );
+}
+
+/**
  * Get cached clients list.
  *
  * @return array Array of client objects.

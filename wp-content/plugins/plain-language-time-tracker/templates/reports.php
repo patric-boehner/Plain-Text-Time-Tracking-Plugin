@@ -141,41 +141,77 @@ $tab_base_url = add_query_arg( $filter_params, admin_url( 'admin.php' ) );
 		<input type="hidden" name="page" value="pltt-reports">
 		<input type="hidden" name="view" value="<?php echo esc_attr( $view ); ?>">
 
-		<div class="pltt-filter-row pltt-filter-row-date">
-				<?php
-				$active_preset = '';
-				foreach ( $presets as $preset ) {
-					if ( $date_from === $preset['from'] && $date_to === $preset['to'] ) {
-						$active_preset = $preset['label'];
-						break;
-					}
+		<?php
+			$active_preset = '';
+			foreach ( $presets as $preset ) {
+				if ( $date_from === $preset['from'] && $date_to === $preset['to'] ) {
+					$active_preset = $preset['label'];
+					break;
 				}
-				?>
-				<div class="pltt-filter-group">
-					<label for="pltt-date-preset"><?php esc_html_e( 'Range', 'plain-language-time-tracker' ); ?></label>
-					<select id="pltt-date-preset">
-						<option value=""><?php echo $active_preset ? '—' : esc_html__( 'Custom', 'plain-language-time-tracker' ); ?></option>
-						<?php foreach ( $presets as $preset ) :
-							$selected = ( $date_from === $preset['from'] && $date_to === $preset['to'] );
-							?>
-							<option value="<?php echo esc_attr( $preset['from'] . '|' . $preset['to'] ); ?>"
-								<?php selected( $selected ); ?>>
-								<?php echo esc_html( $preset['label'] ); ?>
-							</option>
-						<?php endforeach; ?>
-					</select>
-				</div>
+			}
+			$range_label      = pltt_format_date_range( $date_from, $date_to );
+			?>
+		<div class="pltt-date-nav-row">
+		<div class="pltt-date-nav"
+			role="group"
+			aria-label="<?php esc_attr_e( 'Date range', 'plain-language-time-tracker' ); ?>"
+			data-week-start="<?php echo esc_attr( $week_start ); ?>">
 
-				<div class="pltt-filter-group">
-					<label for="pltt-date-start"><?php esc_html_e( 'From', 'plain-language-time-tracker' ); ?></label>
-					<input type="date" name="from" id="pltt-date-start" value="<?php echo esc_attr( $date_from ); ?>">
-				</div>
+			<input type="hidden" name="from" id="pltt-date-from" value="<?php echo esc_attr( $date_from ); ?>">
+			<input type="hidden" name="to"   id="pltt-date-to"   value="<?php echo esc_attr( $date_to ); ?>">
 
-				<div class="pltt-filter-group">
-					<label for="pltt-date-end"><?php esc_html_e( 'To', 'plain-language-time-tracker' ); ?></label>
-					<input type="date" name="to" id="pltt-date-end" value="<?php echo esc_attr( $date_to ); ?>">
+			<button type="button" class="pltt-date-nav-step pltt-date-nav-prev"
+				aria-label="<?php esc_attr_e( 'Previous period', 'plain-language-time-tracker' ); ?>">&#8249;</button>
+
+			<div class="pltt-date-nav-picker">
+				<button type="button" class="pltt-date-nav-label"
+					aria-haspopup="listbox" aria-expanded="false"
+					id="pltt-date-nav-trigger">
+					<span class="pltt-date-nav-label-main"><?php echo esc_html( $active_preset ?: $range_label ); ?></span>
+					<?php if ( $active_preset ) : ?>
+						<span class="pltt-date-nav-label-sub"><?php echo esc_html( $range_label ); ?></span>
+					<?php endif; ?>
+					<span class="pltt-date-nav-chevron" aria-hidden="true"></span>
+				</button>
+
+				<div class="pltt-date-nav-dropdown" role="listbox"
+					aria-labelledby="pltt-date-nav-trigger" hidden>
+
+					<?php foreach ( $presets as $preset ) :
+						$sel = ( $date_from === $preset['from'] && $date_to === $preset['to'] );
+						?>
+						<div role="option"
+							class="pltt-date-nav-option"
+							data-from="<?php echo esc_attr( $preset['from'] ); ?>"
+							data-to="<?php echo esc_attr( $preset['to'] ); ?>"
+							aria-selected="<?php echo $sel ? 'true' : 'false'; ?>"
+							tabindex="-1">
+							<?php echo esc_html( $preset['label'] ); ?>
+						</div>
+					<?php endforeach; ?>
+
+					<div class="pltt-date-nav-separator" role="separator"></div>
+
+					<div class="pltt-date-nav-custom-heading" aria-hidden="true">
+						<?php esc_html_e( 'Custom Range', 'plain-language-time-tracker' ); ?>
+					</div>
+
+					<div class="pltt-date-nav-custom-inputs">
+						<label for="pltt-date-custom-from"><?php esc_html_e( 'From', 'plain-language-time-tracker' ); ?></label>
+						<input type="date" id="pltt-date-custom-from" value="<?php echo esc_attr( $date_from ); ?>">
+						<label for="pltt-date-custom-to"><?php esc_html_e( 'To', 'plain-language-time-tracker' ); ?></label>
+						<input type="date" id="pltt-date-custom-to" value="<?php echo esc_attr( $date_to ); ?>">
+						<button type="button" class="button button-primary pltt-date-nav-custom-apply">
+							<?php esc_html_e( 'Apply', 'plain-language-time-tracker' ); ?>
+						</button>
+					</div>
 				</div>
 			</div>
+
+			<button type="button" class="pltt-date-nav-step pltt-date-nav-next"
+				aria-label="<?php esc_attr_e( 'Next period', 'plain-language-time-tracker' ); ?>">&#8250;</button>
+		</div>
+		</div>
 
 		<div class="pltt-report-filters">
 			<div class="pltt-filter-row">

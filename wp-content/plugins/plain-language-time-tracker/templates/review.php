@@ -290,7 +290,10 @@ $return_to = isset( $_GET['return_to'] ) ? esc_url_raw( wp_unslash( $_GET['retur
 		</p>
 		<p>
 			<label for="pltt-new-client-rate"><?php esc_html_e( 'Hourly Rate (Optional)', 'plain-language-time-tracker' ); ?></label>
-			<input type="number" id="pltt-new-client-rate" step="0.01" min="0" placeholder="<?php echo esc_attr( PLTT_DEFAULT_HOURLY_RATE ); ?>" class="regular-text">
+			<div class="pltt-input-adornment-wrap">
+				<span class="pltt-adornment pltt-adornment-prefix">$</span>
+				<input type="text" inputmode="decimal" id="pltt-new-client-rate" placeholder="<?php echo esc_attr( PLTT_DEFAULT_HOURLY_RATE ); ?>" class="regular-text pltt-currency-input">
+			</div>
 		</p>
 		<p class="pltt-modal-actions">
 			<button type="button" id="pltt-save-client" class="button button-primary"><?php esc_html_e( 'Create Client', 'plain-language-time-tracker' ); ?></button>
@@ -325,7 +328,10 @@ $return_to = isset( $_GET['return_to'] ) ? esc_url_raw( wp_unslash( $_GET['retur
 		</p>
 		<p>
 			<label for="pltt-new-project-rate"><?php esc_html_e( 'Hourly Rate (Optional)', 'plain-language-time-tracker' ); ?></label>
-			<input type="number" id="pltt-new-project-rate" step="0.01" min="0" placeholder="<?php esc_attr_e( 'Inherits from client', 'plain-language-time-tracker' ); ?>" class="regular-text">
+			<div class="pltt-input-adornment-wrap">
+				<span class="pltt-adornment pltt-adornment-prefix">$</span>
+				<input type="text" inputmode="decimal" id="pltt-new-project-rate" placeholder="<?php esc_attr_e( 'Inherits from client', 'plain-language-time-tracker' ); ?>" class="regular-text pltt-currency-input">
+			</div>
 		</p>
 		<p class="pltt-modal-actions">
 			<button type="button" id="pltt-save-project" class="button button-primary"><?php esc_html_e( 'Create Project', 'plain-language-time-tracker' ); ?></button>

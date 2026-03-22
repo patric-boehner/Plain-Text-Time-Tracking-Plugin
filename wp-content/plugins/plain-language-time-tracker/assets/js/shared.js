@@ -193,6 +193,52 @@ const PLTT = {
 	},
 
 	/**
+	 * Strip commas from a currency string and return a clean numeric string.
+	 *
+	 * @param {string} str Raw input value (e.g. "1,500.00").
+	 * @return {string} Clean value (e.g. "1500.00"), or empty string.
+	 */
+	parseCurrencyValue: function( str ) {
+		return str.replace( /,/g, '' ).trim();
+	},
+
+	/**
+	 * Initialize currency inputs (.pltt-currency-input).
+	 *
+	 * - Filters out characters that aren't digits, '.', or ','.
+	 * - Strips commas on form submit so POST values are clean floats.
+	 *
+	 * @param {Element|Document} context Root element to search within.
+	 */
+	initCurrencyInputs: function( context ) {
+		context.querySelectorAll( '.pltt-currency-input' ).forEach( function( input ) {
+			// Block non-numeric characters (allow digits, dot, comma, control keys).
+			input.addEventListener( 'keydown', function( e ) {
+				if (
+					e.ctrlKey || e.metaKey || e.altKey ||
+					[ 'Backspace', 'Delete', 'Tab', 'Escape', 'Enter', 'ArrowLeft', 'ArrowRight', 'Home', 'End' ].includes( e.key )
+				) {
+					return;
+				}
+				if ( ! /^[\d.,]$/.test( e.key ) ) {
+					e.preventDefault();
+				}
+			} );
+
+			// Strip commas before the parent form is submitted (traditional POST).
+			const form = input.closest( 'form' );
+			if ( form && ! form.dataset.plttCurrencyBound ) {
+				form.dataset.plttCurrencyBound = 'true';
+				form.addEventListener( 'submit', function() {
+					form.querySelectorAll( '.pltt-currency-input' ).forEach( function( field ) {
+						field.value = PLTT.parseCurrencyValue( field.value );
+					} );
+				} );
+			}
+		} );
+	},
+
+	/**
 	 * Get current time formatted for display.
 	 *
 	 * @return {string} Formatted time (e.g., "9:15am").
@@ -214,6 +260,9 @@ const PLTT = {
 
 // Initialize modal close buttons.
 document.addEventListener( 'DOMContentLoaded', function() {
+	// Initialize currency inputs.
+	PLTT.initCurrencyInputs( document );
+
 	// Close modals on button click.
 	document.querySelectorAll( '.pltt-modal-close' ).forEach( function( btn ) {
 		btn.addEventListener( 'click', function() {

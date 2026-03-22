@@ -89,6 +89,20 @@
 	textarea.addEventListener( 'input', autoSave );
 
 	/**
+	 * Open native date picker when the label button is clicked.
+	 */
+	const dateNavTrigger = document.getElementById( 'pltt-date-nav-trigger' );
+	if ( dateNavTrigger ) {
+		dateNavTrigger.addEventListener( 'click', function() {
+			try {
+				dateInput.showPicker();
+			} catch ( e ) {
+				dateInput.click();
+			}
+		} );
+	}
+
+	/**
 	 * Handle date change.
 	 */
 	dateInput.addEventListener( 'change', function() {
