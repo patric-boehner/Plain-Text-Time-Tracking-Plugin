@@ -4,12 +4,20 @@
  *
  * @package PlainLanguageTimeTracker
  *
- * @var array  $logs        Paginated log objects.
- * @var array  $months      Available months (YYYY-MM strings).
- * @var string $month       Current month filter.
- * @var int    $total_logs  Total log count.
- * @var int    $total_pages Total pages.
- * @var int    $paged       Current page number.
+ * @var array  $logs            Paginated log objects.
+ * @var string $today           Today's date (YYYY-MM-DD).
+ * @var string $date_from       Start date (YYYY-MM-DD).
+ * @var string $date_to         End date (YYYY-MM-DD).
+ * @var string $nav_label       Formatted nav label (e.g. "March 2026").
+ * @var string $active_year     4-digit year string for the active month.
+ * @var bool   $multi_year      Whether data spans more than one year.
+ * @var array  $months_by_year  Map of year => array of YYYY-MM strings (newest first).
+ * @var string $prev_url        URL for the previous month.
+ * @var string $next_url        URL for the next month (empty string if none).
+ * @var bool   $has_next        Whether a next month exists.
+ * @var int    $total_logs      Total log count.
+ * @var int    $total_pages     Total pages.
+ * @var int    $paged           Current page number.
  */
 
 // Prevent direct access.
@@ -23,34 +31,87 @@ if ( ! defined( 'ABSPATH' ) ) {
 		<h1><?php esc_html_e( 'Log History', 'plain-language-time-tracker' ); ?></h1>
 	</div>
 
-	<?php if ( ! empty( $months ) ) : ?>
-		<div class="pltt-report-filters">
-			<form method="get" action="">
-				<input type="hidden" name="page" value="pltt-log-archive">
+	<form method="get" action="" class="pltt-report-filters-form">
+		<input type="hidden" name="page" value="pltt-log-archive">
+		<input type="hidden" name="from" id="pltt-date-from" value="<?php echo esc_attr( $date_from ); ?>">
+		<input type="hidden" name="to"   id="pltt-date-to"   value="<?php echo esc_attr( $date_to ); ?>">
 
-				<div class="pltt-filter-row">
-					<div class="pltt-filter-group">
-						<label for="pltt-month-filter"><?php esc_html_e( 'Month', 'plain-language-time-tracker' ); ?></label>
-						<select name="month" id="pltt-month-filter">
-							<option value=""><?php esc_html_e( 'All months', 'plain-language-time-tracker' ); ?></option>
-							<?php foreach ( $months as $m ) : ?>
-								<option value="<?php echo esc_attr( $m ); ?>" <?php selected( $month, $m ); ?>>
-									<?php echo esc_html( pltt_format_date( $m . '-01', 'F Y' ) ); ?>
-								</option>
-							<?php endforeach; ?>
-						</select>
-					</div>
+		<div class="pltt-date-nav-row">
+			<div class="pltt-date-nav" role="group"
+				aria-label="<?php esc_attr_e( 'Month navigation', 'plain-language-time-tracker' ); ?>">
 
-					<div class="pltt-filter-group pltt-filter-actions">
-						<button type="submit" class="button button-primary"><?php esc_html_e( 'Filter', 'plain-language-time-tracker' ); ?></button>
-						<?php if ( ! empty( $month ) ) : ?>
-							<a href="<?php echo esc_url( admin_url( 'admin.php?page=pltt-log-archive' ) ); ?>" class="button"><?php esc_html_e( 'Clear', 'plain-language-time-tracker' ); ?></a>
+				<a href="<?php echo esc_url( $prev_url ); ?>"
+					class="pltt-date-nav-step pltt-date-nav-prev"
+					aria-label="<?php esc_attr_e( 'Previous month', 'plain-language-time-tracker' ); ?>">&#8249;</a>
+
+				<div class="pltt-date-nav-picker">
+					<button type="button" class="pltt-date-nav-label"
+						aria-haspopup="listbox" aria-expanded="false"
+						id="pltt-date-nav-trigger">
+						<span class="pltt-date-nav-label-main"><?php echo esc_html( $nav_label ); ?></span>
+						<span class="pltt-date-nav-chevron" aria-hidden="true"></span>
+					</button>
+
+					<div class="pltt-date-nav-dropdown" role="listbox"
+						aria-labelledby="pltt-date-nav-trigger" hidden>
+
+						<?php if ( $multi_year ) : ?>
+							<div class="pltt-date-nav-year-switcher" data-year="<?php echo esc_attr( $active_year ); ?>">
+								<button type="button" class="pltt-date-nav-year-prev"
+									aria-label="<?php esc_attr_e( 'Previous year', 'plain-language-time-tracker' ); ?>">&#8249;</button>
+								<span class="pltt-date-nav-year-label"><?php echo esc_html( $active_year ); ?></span>
+								<button type="button" class="pltt-date-nav-year-next"
+									aria-label="<?php esc_attr_e( 'Next year', 'plain-language-time-tracker' ); ?>">&#8250;</button>
+							</div>
+							<div class="pltt-date-nav-separator" role="separator"></div>
 						<?php endif; ?>
+
+						<?php foreach ( $months_by_year as $year => $year_months ) : ?>
+							<div class="pltt-date-nav-year-months"
+								data-year="<?php echo esc_attr( $year ); ?>"
+								<?php if ( (string) $year !== (string) $active_year ) : ?>hidden<?php endif; ?>>
+								<?php foreach ( $year_months as $ym ) :
+									$ym_dt   = new DateTimeImmutable( $ym . '-01', wp_timezone() );
+									$ym_from = $ym_dt->format( 'Y-m-d' );
+									$ym_to   = ( $ym === substr( pltt_get_current_date(), 0, 7 ) )
+										? pltt_get_current_date()
+										: $ym_dt->format( 'Y-m-t' );
+									$is_active = ( $ym_from === $date_from );
+									?>
+									<div role="option"
+										class="pltt-date-nav-option"
+										data-from="<?php echo esc_attr( $ym_from ); ?>"
+										data-to="<?php echo esc_attr( $ym_to ); ?>"
+										aria-selected="<?php echo $is_active ? 'true' : 'false'; ?>"
+										tabindex="-1">
+										<?php echo esc_html( $ym_dt->format( 'F' ) ); ?>
+									</div>
+								<?php endforeach; ?>
+							</div>
+						<?php endforeach; ?>
+
 					</div>
 				</div>
-			</form>
+
+				<?php if ( $has_next ) : ?>
+					<a href="<?php echo esc_url( $next_url ); ?>"
+						class="pltt-date-nav-step pltt-date-nav-next"
+						aria-label="<?php esc_attr_e( 'Next month', 'plain-language-time-tracker' ); ?>">&#8250;</a>
+				<?php else : ?>
+					<span class="pltt-date-nav-step pltt-date-nav-next pltt-date-nav-step-disabled"
+						aria-disabled="true">&#8250;</span>
+				<?php endif; ?>
+
+			</div>
+
+			<?php if ( substr( $date_from, 0, 7 ) !== substr( $today, 0, 7 ) ) : ?>
+				<a href="<?php echo esc_url( admin_url( 'admin.php?page=pltt-log-archive' ) ); ?>"
+					class="button button-secondary">
+					<?php esc_html_e( 'This Month', 'plain-language-time-tracker' ); ?>
+				</a>
+			<?php endif; ?>
 		</div>
-	<?php endif; ?>
+	</form>
 
 	<?php if ( $total_logs > 0 ) : ?>
 		<div class="pltt-summary-cards">
@@ -161,24 +222,14 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 
 			<?php
-			$base_url = admin_url( 'admin.php?page=pltt-log-archive' );
-			if ( ! empty( $month ) ) {
-				$base_url = add_query_arg( 'month', $month, $base_url );
-			}
+			$base_url = add_query_arg( array( 'from' => $date_from, 'to' => $date_to ), admin_url( 'admin.php?page=pltt-log-archive' ) );
 			pltt_render_pagination( $paged, $total_pages, $total_logs, $base_url, 'log', 'logs' );
 			?>
 
 
 		<?php else : ?>
 			<p class="description" style="padding: 20px; text-align: center;">
-				<?php if ( ! empty( $month ) ) : ?>
-					<?php esc_html_e( 'No logs found for the selected month.', 'plain-language-time-tracker' ); ?>
-				<?php else : ?>
-					<?php esc_html_e( 'No daily logs yet. Start by writing your first daily log!', 'plain-language-time-tracker' ); ?>
-					<a href="<?php echo esc_url( pltt_get_admin_url( 'daily-log' ) ); ?>">
-						<?php esc_html_e( 'Go to Daily Log', 'plain-language-time-tracker' ); ?> &rarr;
-					</a>
-				<?php endif; ?>
+				<?php esc_html_e( 'No logs found for the selected month.', 'plain-language-time-tracker' ); ?>
 			</p>
 		<?php endif; ?>
 	</div>

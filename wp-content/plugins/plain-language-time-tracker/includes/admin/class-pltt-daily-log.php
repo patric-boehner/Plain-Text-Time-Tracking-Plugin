@@ -151,6 +151,10 @@ class PLTT_Daily_Log {
 		if ( ! empty( $args['month'] ) ) {
 			$where    = 'WHERE dl.log_date LIKE %s';
 			$values[] = $args['month'] . '%';
+		} elseif ( ! empty( $args['date_from'] ) && ! empty( $args['date_to'] ) ) {
+			$where    = 'WHERE dl.log_date BETWEEN %s AND %s';
+			$values[] = $args['date_from'];
+			$values[] = $args['date_to'];
 		}
 
 		$limit  = isset( $args['limit'] ) ? absint( $args['limit'] ) : 20;
@@ -193,6 +197,10 @@ class PLTT_Daily_Log {
 		if ( ! empty( $args['month'] ) ) {
 			$where    = 'WHERE log_date LIKE %s';
 			$values[] = $args['month'] . '%';
+		} elseif ( ! empty( $args['date_from'] ) && ! empty( $args['date_to'] ) ) {
+			$where    = 'WHERE log_date BETWEEN %s AND %s';
+			$values[] = $args['date_from'];
+			$values[] = $args['date_to'];
 		}
 
 		$sql = "SELECT COUNT(*) FROM {$table} {$where}";
