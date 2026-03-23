@@ -137,7 +137,7 @@
 			dropdown.hidden = false;
 			trigger.setAttribute( 'aria-expanded', 'true' );
 			// Focus the selected option or the first option.
-			var selected = dropdown.querySelector( '.pltt-date-nav-option[aria-selected="true"]' )
+			var selected = dropdown.querySelector( '.pltt-date-nav-option[aria-current="true"]' )
 				|| dropdown.querySelector( '.pltt-date-nav-option' );
 			if ( selected ) {
 				selected.focus();
@@ -187,16 +187,23 @@
 
 			if ( e.key === 'ArrowDown' ) {
 				e.preventDefault();
-				var next = options[ idx + 1 ] || options[0];
-				next.focus();
+				if ( idx < options.length - 1 ) {
+					options[ idx + 1 ].focus();
+				}
 			} else if ( e.key === 'ArrowUp' ) {
 				e.preventDefault();
-				var prev = options[ idx - 1 ] || options[ options.length - 1 ];
-				prev.focus();
-			} else if ( e.key === 'Enter' || e.key === ' ' ) {
+				if ( idx > 0 ) {
+					options[ idx - 1 ].focus();
+				}
+			} else if ( e.key === 'Home' ) {
 				e.preventDefault();
-				if ( focused && options.includes( focused ) ) {
-					focused.click();
+				if ( options[0] ) {
+					options[0].focus();
+				}
+			} else if ( e.key === 'End' ) {
+				e.preventDefault();
+				if ( options[ options.length - 1 ] ) {
+					options[ options.length - 1 ].focus();
 				}
 			} else if ( e.key === 'Tab' ) {
 				// Allow Tab to move naturally; close dropdown if focus leaves widget.

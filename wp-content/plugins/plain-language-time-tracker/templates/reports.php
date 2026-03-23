@@ -165,7 +165,7 @@ $tab_base_url = add_query_arg( $filter_params, admin_url( 'admin.php' ) );
 
 			<div class="pltt-date-nav-picker">
 				<button type="button" class="pltt-date-nav-label"
-					aria-haspopup="listbox" aria-expanded="false"
+					aria-expanded="false"
 					id="pltt-date-nav-trigger">
 					<span class="pltt-date-nav-label-main"><?php echo esc_html( $active_preset ?: $range_label ); ?></span>
 					<?php if ( $active_preset ) : ?>
@@ -174,29 +174,26 @@ $tab_base_url = add_query_arg( $filter_params, admin_url( 'admin.php' ) );
 					<span class="pltt-date-nav-chevron" aria-hidden="true"></span>
 				</button>
 
-				<div class="pltt-date-nav-dropdown" role="listbox"
-					aria-labelledby="pltt-date-nav-trigger" hidden>
+				<div class="pltt-date-nav-dropdown" hidden>
 
+					<ul class="pltt-date-nav-options">
 					<?php foreach ( $presets as $preset ) :
 						$sel = ( $date_from === $preset['from'] && $date_to === $preset['to'] );
 						?>
-						<div role="option"
+						<li><button type="button"
 							class="pltt-date-nav-option"
 							data-from="<?php echo esc_attr( $preset['from'] ); ?>"
 							data-to="<?php echo esc_attr( $preset['to'] ); ?>"
-							aria-selected="<?php echo $sel ? 'true' : 'false'; ?>"
-							tabindex="-1">
+							<?php if ( $sel ) : ?>aria-current="true"<?php endif; ?>>
 							<?php echo esc_html( $preset['label'] ); ?>
-						</div>
+						</button></li>
 					<?php endforeach; ?>
+					</ul>
 
-					<div class="pltt-date-nav-separator" role="separator"></div>
+					<hr class="pltt-date-nav-separator">
 
-					<div class="pltt-date-nav-custom-heading" aria-hidden="true">
-						<?php esc_html_e( 'Custom Range', 'plain-language-time-tracker' ); ?>
-					</div>
-
-					<div class="pltt-date-nav-custom-inputs">
+					<fieldset class="pltt-date-nav-custom-inputs">
+						<legend><?php esc_html_e( 'Custom Range', 'plain-language-time-tracker' ); ?></legend>
 						<label for="pltt-date-custom-from"><?php esc_html_e( 'From', 'plain-language-time-tracker' ); ?></label>
 						<input type="date" id="pltt-date-custom-from" value="<?php echo esc_attr( $date_from ); ?>">
 						<label for="pltt-date-custom-to"><?php esc_html_e( 'To', 'plain-language-time-tracker' ); ?></label>
@@ -204,7 +201,7 @@ $tab_base_url = add_query_arg( $filter_params, admin_url( 'admin.php' ) );
 						<button type="button" class="button button-primary pltt-date-nav-custom-apply">
 							<?php esc_html_e( 'Apply', 'plain-language-time-tracker' ); ?>
 						</button>
-					</div>
+					</fieldset>
 				</div>
 			</div>
 
