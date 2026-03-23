@@ -44,7 +44,7 @@ $has_entries      = ! empty( $existing_entries );
 						<span class="pltt-date-nav-label-main"><?php echo esc_html( pltt_format_date( $date ) ); ?></span>
 						<span class="pltt-date-nav-chevron" aria-hidden="true"></span>
 					</button>
-					<input type="date" id="pltt-log-date" value="<?php echo esc_attr( $date ); ?>" max="<?php echo esc_attr( $today ); ?>" class="pltt-date-nav-hidden-input">
+					<input type="date" id="pltt-log-date" value="<?php echo esc_attr( $date ); ?>" max="<?php echo esc_attr( $today ); ?>" class="pltt-date-nav-hidden-input" tabindex="-1">
 				</div>
 
 				<?php if ( $next_date && $next_date <= $today ) : ?>

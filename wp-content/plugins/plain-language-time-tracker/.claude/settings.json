@@ -3,7 +3,8 @@
     "allow": [
       "Read(//Users/patrickb/Local Development/plain-text-time-tracker/templates/**)",
       "Read(//Users/patrickb/Local\\\\ Development/plain-text-time-tracker/app/public/wp-content/plugins/plain-language-time-tracker/templates/**)",
-      "Read(//Users/patrickb/Local\\\\ Development/plain-text-time-tracker/app/public/wp-content/plugins/plain-language-time-tracker/assets/js/**)"
+      "Read(//Users/patrickb/Local\\\\ Development/plain-text-time-tracker/app/public/wp-content/plugins/plain-language-time-tracker/assets/js/**)",
+      "WebSearch"
     ]
   }
 }

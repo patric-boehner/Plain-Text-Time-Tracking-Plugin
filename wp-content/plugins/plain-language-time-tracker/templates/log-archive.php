@@ -29,31 +29,30 @@ if ( ! defined( 'ABSPATH' ) ) {
 <div class="wrap pltt-wrap">
 	<div class="pltt-header">
 		<h1><?php esc_html_e( 'Log History', 'plain-language-time-tracker' ); ?></h1>
-	</div>
-
-	<form method="get" action="" class="pltt-report-filters-form">
+		<form method="get" action="" class="pltt-report-filters-form">
 		<input type="hidden" name="page" value="pltt-log-archive">
 		<input type="hidden" name="from" id="pltt-date-from" value="<?php echo esc_attr( $date_from ); ?>">
 		<input type="hidden" name="to"   id="pltt-date-to"   value="<?php echo esc_attr( $date_to ); ?>">
 
 		<div class="pltt-date-nav-row">
-			<div class="pltt-date-nav" role="group"
+			<nav class="pltt-date-nav"
 				aria-label="<?php esc_attr_e( 'Month navigation', 'plain-language-time-tracker' ); ?>">
 
+				<?php if ( $prev_url ) : ?>
 				<a href="<?php echo esc_url( $prev_url ); ?>"
 					class="pltt-date-nav-step pltt-date-nav-prev"
 					aria-label="<?php esc_attr_e( 'Previous month', 'plain-language-time-tracker' ); ?>">&#8249;</a>
+				<?php endif; ?>
 
 				<div class="pltt-date-nav-picker">
 					<button type="button" class="pltt-date-nav-label"
-						aria-haspopup="listbox" aria-expanded="false"
+						aria-expanded="false"
 						id="pltt-date-nav-trigger">
 						<span class="pltt-date-nav-label-main"><?php echo esc_html( $nav_label ); ?></span>
 						<span class="pltt-date-nav-chevron" aria-hidden="true"></span>
 					</button>
 
-					<div class="pltt-date-nav-dropdown" role="listbox"
-						aria-labelledby="pltt-date-nav-trigger" hidden>
+					<div class="pltt-date-nav-dropdown" hidden>
 
 						<?php if ( $multi_year ) : ?>
 							<div class="pltt-date-nav-year-switcher" data-year="<?php echo esc_attr( $active_year ); ?>">
@@ -63,13 +62,14 @@ if ( ! defined( 'ABSPATH' ) ) {
 								<button type="button" class="pltt-date-nav-year-next"
 									aria-label="<?php esc_attr_e( 'Next year', 'plain-language-time-tracker' ); ?>">&#8250;</button>
 							</div>
-							<div class="pltt-date-nav-separator" role="separator"></div>
+							<hr class="pltt-date-nav-separator">
 						<?php endif; ?>
 
 						<?php foreach ( $months_by_year as $year => $year_months ) : ?>
 							<div class="pltt-date-nav-year-months"
 								data-year="<?php echo esc_attr( $year ); ?>"
 								<?php if ( (string) $year !== (string) $active_year ) : ?>hidden<?php endif; ?>>
+								<ul class="pltt-date-nav-options">
 								<?php foreach ( $year_months as $ym ) :
 									$ym_dt   = new DateTimeImmutable( $ym . '-01', wp_timezone() );
 									$ym_from = $ym_dt->format( 'Y-m-d' );
@@ -78,15 +78,15 @@ if ( ! defined( 'ABSPATH' ) ) {
 										: $ym_dt->format( 'Y-m-t' );
 									$is_active = ( $ym_from === $date_from );
 									?>
-									<div role="option"
+									<li><button type="button"
 										class="pltt-date-nav-option"
 										data-from="<?php echo esc_attr( $ym_from ); ?>"
 										data-to="<?php echo esc_attr( $ym_to ); ?>"
-										aria-selected="<?php echo $is_active ? 'true' : 'false'; ?>"
-										tabindex="-1">
+										<?php if ( $is_active ) : ?>aria-current="true"<?php endif; ?>>
 										<?php echo esc_html( $ym_dt->format( 'F' ) ); ?>
-									</div>
+									</button></li>
 								<?php endforeach; ?>
+								</ul>
 							</div>
 						<?php endforeach; ?>
 
@@ -97,12 +97,9 @@ if ( ! defined( 'ABSPATH' ) ) {
 					<a href="<?php echo esc_url( $next_url ); ?>"
 						class="pltt-date-nav-step pltt-date-nav-next"
 						aria-label="<?php esc_attr_e( 'Next month', 'plain-language-time-tracker' ); ?>">&#8250;</a>
-				<?php else : ?>
-					<span class="pltt-date-nav-step pltt-date-nav-next pltt-date-nav-step-disabled"
-						aria-disabled="true">&#8250;</span>
 				<?php endif; ?>
 
-			</div>
+			</nav>
 
 			<?php if ( substr( $date_from, 0, 7 ) !== substr( $today, 0, 7 ) ) : ?>
 				<a href="<?php echo esc_url( admin_url( 'admin.php?page=pltt-log-archive' ) ); ?>"
@@ -111,7 +108,8 @@ if ( ! defined( 'ABSPATH' ) ) {
 				</a>
 			<?php endif; ?>
 		</div>
-	</form>
+		</form>
+	</div>
 
 	<?php if ( $total_logs > 0 ) : ?>
 		<div class="pltt-summary-cards">

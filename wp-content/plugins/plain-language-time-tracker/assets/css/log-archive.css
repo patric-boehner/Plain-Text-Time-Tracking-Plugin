@@ -78,12 +78,6 @@
 	cursor: default;
 }
 
-/* Disabled next-month step (current month reached) */
-.pltt-date-nav-step-disabled {
-	opacity: 0.3;
-	cursor: default;
-	pointer-events: none;
-}
 
 /* Responsive */
 @media screen and (max-width: 782px) {

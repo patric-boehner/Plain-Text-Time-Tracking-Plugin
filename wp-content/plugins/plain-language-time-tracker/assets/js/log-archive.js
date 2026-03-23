@@ -39,7 +39,7 @@
 		function openDropdown() {
 			dropdown.hidden = false;
 			trigger.setAttribute( 'aria-expanded', 'true' );
-			var selected = dropdown.querySelector( '.pltt-date-nav-option[aria-selected="true"]' )
+			var selected = dropdown.querySelector( '.pltt-date-nav-option[aria-current="true"]' )
 				|| ( getOptions()[0] || null );
 			if ( selected ) {
 				selected.focus();
@@ -88,14 +88,23 @@
 
 			if ( e.key === 'ArrowDown' ) {
 				e.preventDefault();
-				( options[ idx + 1 ] || options[0] ).focus();
+				if ( idx < options.length - 1 ) {
+					options[ idx + 1 ].focus();
+				}
 			} else if ( e.key === 'ArrowUp' ) {
 				e.preventDefault();
-				( options[ idx - 1 ] || options[ options.length - 1 ] ).focus();
-			} else if ( e.key === 'Enter' || e.key === ' ' ) {
+				if ( idx > 0 ) {
+					options[ idx - 1 ].focus();
+				}
+			} else if ( e.key === 'Home' ) {
 				e.preventDefault();
-				if ( focused && options.includes( focused ) ) {
-					focused.click();
+				if ( options[0] ) {
+					options[0].focus();
+				}
+			} else if ( e.key === 'End' ) {
+				e.preventDefault();
+				if ( options[ options.length - 1 ] ) {
+					options[ options.length - 1 ].focus();
 				}
 			} else if ( e.key === 'Tab' ) {
 				setTimeout( function() {
@@ -147,6 +156,8 @@
 				var idx     = yearGroups.indexOf( current );
 				if ( idx < yearGroups.length - 1 ) {
 					showYear( yearGroups[ idx + 1 ] );
+					var first = getOptions()[0];
+					if ( first ) { first.focus(); }
 				}
 			} );
 
@@ -155,6 +166,8 @@
 				var idx     = yearGroups.indexOf( current );
 				if ( idx > 0 ) {
 					showYear( yearGroups[ idx - 1 ] );
+					var first = getOptions()[0];
+					if ( first ) { first.focus(); }
 				}
 			} );
 

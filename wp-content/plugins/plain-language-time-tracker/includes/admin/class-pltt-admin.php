@@ -21,7 +21,6 @@ class PLTT_Admin {
 	public static function init() {
 		add_action( 'admin_menu', array( __CLASS__, 'add_admin_menu' ) );
 		add_action( 'admin_enqueue_scripts', array( __CLASS__, 'enqueue_assets' ) );
-		PLTT_Help::init();
 	}
 
 	/**
