@@ -46,6 +46,45 @@
 	border-radius: 0 0 4px 4px;
 }
 
+/* Year switcher inside the month nav dropdown */
+.pltt-date-nav-year-switcher {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	padding: 6px 12px;
+	font-weight: 600;
+	font-size: 13px;
+}
+
+.pltt-date-nav-year-prev,
+.pltt-date-nav-year-next {
+	background: none;
+	border: none;
+	cursor: pointer;
+	font-size: 18px;
+	line-height: 1;
+	color: var(--pltt-text-muted);
+	padding: 0 4px;
+}
+
+.pltt-date-nav-year-prev:hover,
+.pltt-date-nav-year-next:hover {
+	color: var(--pltt-text-base);
+}
+
+.pltt-date-nav-year-prev:disabled,
+.pltt-date-nav-year-next:disabled {
+	opacity: 0.3;
+	cursor: default;
+}
+
+/* Disabled next-month step (current month reached) */
+.pltt-date-nav-step-disabled {
+	opacity: 0.3;
+	cursor: default;
+	pointer-events: none;
+}
+
 /* Responsive */
 @media screen and (max-width: 782px) {
 	.pltt-log-preview {

@@ -1,13 +1,167 @@
 /**
  * Log Archive Screen JavaScript.
  *
- * Handles daily log deletion.
+ * Handles month navigation dropdown and daily log deletion.
  */
 
 /* global plttData, PLTT */
 
 ( function() {
 	'use strict';
+
+	/**
+	 * Month navigator widget.
+	 *
+	 * Handles the .pltt-date-nav dropdown: open/close, keyboard navigation,
+	 * month option selection, and year switcher (when data spans multiple years).
+	 */
+	( function initMonthNav() {
+		var widget   = document.querySelector( '.pltt-date-nav' );
+		if ( ! widget ) {
+			return;
+		}
+
+		var fromInput = document.getElementById( 'pltt-date-from' );
+		var toInput   = document.getElementById( 'pltt-date-to' );
+		var trigger   = document.getElementById( 'pltt-date-nav-trigger' );
+		var dropdown  = widget.querySelector( '.pltt-date-nav-dropdown' );
+		var switcher  = widget.querySelector( '.pltt-date-nav-year-switcher' );
+
+		// ── Dropdown open / close ────────────────────────────────────────────
+
+		function getOptions() {
+			// Only options in the currently visible year group.
+			var visibleGroup = dropdown.querySelector( '.pltt-date-nav-year-months:not([hidden])' );
+			var scope        = visibleGroup || dropdown;
+			return Array.from( scope.querySelectorAll( '.pltt-date-nav-option' ) );
+		}
+
+		function openDropdown() {
+			dropdown.hidden = false;
+			trigger.setAttribute( 'aria-expanded', 'true' );
+			var selected = dropdown.querySelector( '.pltt-date-nav-option[aria-selected="true"]' )
+				|| ( getOptions()[0] || null );
+			if ( selected ) {
+				selected.focus();
+			}
+		}
+
+		function closeDropdown() {
+			dropdown.hidden = true;
+			trigger.setAttribute( 'aria-expanded', 'false' );
+		}
+
+		trigger.addEventListener( 'click', function() {
+			if ( dropdown.hidden ) {
+				openDropdown();
+			} else {
+				closeDropdown();
+			}
+		} );
+
+		trigger.addEventListener( 'keydown', function( e ) {
+			if ( e.key === 'Enter' || e.key === ' ' ) {
+				e.preventDefault();
+				openDropdown();
+			}
+		} );
+
+		document.addEventListener( 'keydown', function( e ) {
+			if ( e.key === 'Escape' && ! dropdown.hidden ) {
+				closeDropdown();
+				trigger.focus();
+			}
+		} );
+
+		document.addEventListener( 'click', function( e ) {
+			if ( ! widget.contains( e.target ) && ! dropdown.hidden ) {
+				closeDropdown();
+			}
+		} );
+
+		// ── Option keyboard navigation ───────────────────────────────────────
+
+		dropdown.addEventListener( 'keydown', function( e ) {
+			var options = getOptions();
+			var focused = document.activeElement;
+			var idx     = options.indexOf( focused );
+
+			if ( e.key === 'ArrowDown' ) {
+				e.preventDefault();
+				( options[ idx + 1 ] || options[0] ).focus();
+			} else if ( e.key === 'ArrowUp' ) {
+				e.preventDefault();
+				( options[ idx - 1 ] || options[ options.length - 1 ] ).focus();
+			} else if ( e.key === 'Enter' || e.key === ' ' ) {
+				e.preventDefault();
+				if ( focused && options.includes( focused ) ) {
+					focused.click();
+				}
+			} else if ( e.key === 'Tab' ) {
+				setTimeout( function() {
+					if ( ! widget.contains( document.activeElement ) ) {
+						closeDropdown();
+					}
+				}, 0 );
+			}
+		} );
+
+		// ── Month option click ───────────────────────────────────────────────
+
+		dropdown.querySelectorAll( '.pltt-date-nav-option[data-from]' ).forEach( function( opt ) {
+			opt.addEventListener( 'click', function() {
+				fromInput.value = this.dataset.from;
+				toInput.value   = this.dataset.to;
+				closeDropdown();
+				fromInput.form.submit();
+			} );
+		} );
+
+		// ── Year switcher ────────────────────────────────────────────────────
+
+		if ( switcher ) {
+			var yearGroups = Array.from( dropdown.querySelectorAll( '.pltt-date-nav-year-months' ) );
+			var yearLabel  = switcher.querySelector( '.pltt-date-nav-year-label' );
+			var prevYearBtn = switcher.querySelector( '.pltt-date-nav-year-prev' );
+			var nextYearBtn = switcher.querySelector( '.pltt-date-nav-year-next' );
+
+			function getActiveGroup() {
+				return dropdown.querySelector( '.pltt-date-nav-year-months:not([hidden])' );
+			}
+
+			function showYear( targetGroup ) {
+				yearGroups.forEach( function( g ) { g.hidden = true; } );
+				targetGroup.hidden = false;
+				yearLabel.textContent = targetGroup.dataset.year;
+				switcher.dataset.year = targetGroup.dataset.year;
+
+				// Update year arrow visibility.
+				var idx = yearGroups.indexOf( targetGroup );
+				// yearGroups are ordered newest-first (matching PHP output).
+				prevYearBtn.disabled = ( idx >= yearGroups.length - 1 );
+				nextYearBtn.disabled = ( idx <= 0 );
+			}
+
+			prevYearBtn.addEventListener( 'click', function() {
+				var current = getActiveGroup();
+				var idx     = yearGroups.indexOf( current );
+				if ( idx < yearGroups.length - 1 ) {
+					showYear( yearGroups[ idx + 1 ] );
+				}
+			} );
+
+			nextYearBtn.addEventListener( 'click', function() {
+				var current = getActiveGroup();
+				var idx     = yearGroups.indexOf( current );
+				if ( idx > 0 ) {
+					showYear( yearGroups[ idx - 1 ] );
+				}
+			} );
+
+			// Set initial arrow state.
+			showYear( getActiveGroup() );
+		}
+	} )();
 
 	/**
 	 * Delete log button handler (event delegation).
