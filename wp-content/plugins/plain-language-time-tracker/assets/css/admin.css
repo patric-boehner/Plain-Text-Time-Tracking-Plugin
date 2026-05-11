@@ -186,6 +186,69 @@
 	font-weight: 500;
 }
 
+/* Client context card — shown on Reports when a single client is selected.
+   Inherits background/border/padding/radius from .pltt-summary-cards .card. */
+.pltt-summary-cards .card.pltt-client-context-card {
+	flex: 0 1 340px;
+	max-width: 340px;
+	align-self: flex-start;
+	margin-left: auto;
+	order: 99;
+}
+
+.pltt-client-context-card .pltt-context-header {
+	display: flex;
+	justify-content: space-between;
+	align-items: baseline;
+	margin-bottom: 12px;
+	gap: 16px;
+}
+
+.pltt-client-context-card .pltt-context-header h2 {
+	margin: 0;
+	font-size: 18px;
+	font-weight: 600;
+	color: var(--pltt-text-dark);
+}
+
+.pltt-client-context-card .pltt-context-link {
+	font-size: 13px;
+	text-decoration: none;
+}
+
+.pltt-client-context-card .pltt-context-empty {
+	margin: 0;
+	font-size: 13px;
+	color: var(--pltt-text-muted);
+}
+
+.pltt-client-context-card .pltt-context-projects {
+	display: grid;
+	gap: 8px;
+}
+
+.pltt-client-context-card .pltt-context-project {
+	padding: 8px 0;
+	border-top: 1px solid var(--pltt-border-faint);
+}
+
+.pltt-client-context-card .pltt-context-project:first-child {
+	border-top: none;
+	padding-top: 0;
+}
+
+.pltt-client-context-card .pltt-context-project-name {
+	font-weight: 600;
+	color: var(--pltt-text-dark);
+	font-size: 13px;
+}
+
+.pltt-client-context-card .pltt-context-project-meta {
+	color: var(--pltt-text-muted);
+	font-size: 12px;
+	margin-top: 2px;
+}
+
 /* Badges */
 .pltt-badge {
 	display: inline-block;

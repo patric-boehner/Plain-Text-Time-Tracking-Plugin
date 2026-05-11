@@ -73,8 +73,9 @@
 
 .pltt-save-indicator {
 	font-size: 13px;
-	min-width: 60px;
+	min-width: 130px;
 	text-align: right;
+	white-space: nowrap;
 }
 
 .pltt-save-indicator.saving {
@@ -87,6 +88,10 @@
 
 .pltt-save-indicator.error {
 	color: var(--pltt-danger);
+}
+
+.pltt-save-indicator.unsaved {
+	color: var(--pltt-text-muted);
 }
 
 /* Existing entries section */

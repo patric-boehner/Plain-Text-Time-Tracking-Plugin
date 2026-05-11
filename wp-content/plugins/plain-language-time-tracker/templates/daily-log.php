@@ -122,7 +122,10 @@ $has_entries      = ! empty( $existing_entries );
 						<?php esc_html_e( 'Process Entries', 'plain-language-time-tracker' ); ?>
 					</button>
 				<?php else : ?>
-					<!-- Unprocessed: show only Process button -->
+					<!-- Unprocessed: Save (secondary) + Process (primary) -->
+					<button type="button" id="pltt-save-btn" class="button button-secondary">
+						<?php esc_html_e( 'Save', 'plain-language-time-tracker' ); ?>
+					</button>
 					<button type="button" id="pltt-process-btn" class="button button-primary button-large">
 						<?php esc_html_e( 'Process Time Entries', 'plain-language-time-tracker' ); ?> &rarr;
 					</button>

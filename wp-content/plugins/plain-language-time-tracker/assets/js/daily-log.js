@@ -7,23 +7,54 @@
 ( function() {
 	'use strict';
 
-	const textarea = document.getElementById( 'pltt-log-textarea' );
+	const textarea      = document.getElementById( 'pltt-log-textarea' );
 	const saveIndicator = document.getElementById( 'pltt-save-indicator' );
-	const dateInput = document.getElementById( 'pltt-log-date' );
-	const processBtn = document.getElementById( 'pltt-process-btn' );
+	const dateInput     = document.getElementById( 'pltt-log-date' );
+	const processBtn    = document.getElementById( 'pltt-process-btn' );
 
 	if ( ! textarea || ! dateInput ) {
 		return;
+	}
+
+	// Capture the date this page was loaded for. Must not be read from dateInput.value
+	// later because the date picker's change event mutates dateInput.value to the new
+	// destination date before beforeunload fires, causing saves to go to the wrong date.
+	const pageDate = dateInput.value;
+
+	// Track save state.
+	let isDirty        = false;
+	let navigatingAway = false;
+
+	/**
+	 * Mark the log as saved — persistent timestamp, clears dirty flag.
+	 */
+	function markSaved() {
+		saveIndicator.textContent = plttData.i18n.savedAt.replace( '%s', PLTT.getCurrentTime() );
+		saveIndicator.className   = 'pltt-save-indicator saved';
+		isDirty = false;
+	}
+
+	/**
+	 * Mark the log as having unsaved changes.
+	 * No-op if already dirty so repeated keystrokes don't thrash the DOM.
+	 */
+	function markDirty() {
+		if ( isDirty ) {
+			return;
+		}
+		isDirty = true;
+		saveIndicator.textContent = plttData.i18n.unsaved;
+		saveIndicator.className   = 'pltt-save-indicator unsaved';
 	}
 
 	/**
 	 * Insert timestamp at cursor position.
 	 */
 	function insertTimestamp() {
-		const time = PLTT.getCurrentTime();
-		const pos = textarea.selectionStart;
+		const time   = PLTT.getCurrentTime();
+		const pos    = textarea.selectionStart;
 		const before = textarea.value.substring( 0, pos );
-		const after = textarea.value.substring( pos );
+		const after  = textarea.value.substring( pos );
 
 		// Add newline if not at start and previous char isn't newline.
 		let prefix = '';
@@ -40,6 +71,7 @@
 		textarea.focus();
 
 		// Trigger auto-save.
+		markDirty();
 		autoSave();
 	}
 
@@ -58,35 +90,38 @@
 	 * Auto-save with debounce.
 	 */
 	const autoSave = PLTT.debounce( function() {
+		if ( ! textarea.value.trim() ) {
+			return; // Don't overwrite real content with an empty save.
+		}
+		if ( navigatingAway ) {
+			return; // Navigation has started; beforeunload handles the final save.
+		}
+
 		saveIndicator.textContent = plttData.i18n.saving;
-		saveIndicator.className = 'pltt-save-indicator saving';
+		saveIndicator.className   = 'pltt-save-indicator saving';
 
 		// Detect if log is processed (check if update notes button exists).
 		const isProcessed = document.getElementById( 'pltt-update-notes-btn' ) !== null;
-		const action = isProcessed ? 'pltt_update_daily_log' : 'pltt_save_daily_log';
+		const action      = isProcessed ? 'pltt_update_daily_log' : 'pltt_save_daily_log';
 
 		PLTT.ajax( action, {
-			date: dateInput.value,
-			content: textarea.value
+			date:    pageDate,
+			content: textarea.value,
 		}, function( response ) {
 			if ( response.success ) {
-				saveIndicator.textContent = plttData.i18n.saved;
-				saveIndicator.className = 'pltt-save-indicator saved';
+				markSaved();
 			} else {
 				saveIndicator.textContent = plttData.i18n.error;
-				saveIndicator.className = 'pltt-save-indicator error';
+				saveIndicator.className   = 'pltt-save-indicator error';
 			}
-
-			// Clear indicator after 2 seconds.
-			setTimeout( function() {
-				saveIndicator.textContent = '';
-				saveIndicator.className = 'pltt-save-indicator';
-			}, 2000 );
 		} );
 	}, plttData.autosaveDebounceMs || 1500 );
 
-	// Auto-save on input.
-	textarea.addEventListener( 'input', autoSave );
+	// Mark dirty and auto-save on input.
+	textarea.addEventListener( 'input', function() {
+		markDirty();
+		autoSave();
+	} );
 
 	/**
 	 * Open native date picker when the label button is clicked.
@@ -106,6 +141,9 @@
 	 * Handle date change.
 	 */
 	dateInput.addEventListener( 'change', function() {
+		// Flag navigation so any pending debounced auto-save does not fire.
+		navigatingAway = true;
+
 		// Navigate to the new date.
 		const url = new URL( window.location.href );
 		url.searchParams.set( 'date', this.value );
@@ -139,12 +177,12 @@
 				}
 			}
 
-			processBtn.disabled = true;
+			processBtn.disabled    = true;
 			processBtn.textContent = plttData.i18n.processing;
 
 			PLTT.ajax( 'pltt_process_log', {
-				date: dateInput.value,
-				content: content
+				date:    dateInput.value,
+				content: content,
 			}, function( response ) {
 				if ( response.success && response.data.redirect ) {
 					try {
@@ -157,9 +195,42 @@
 					}
 				} else {
 					alert( response.data || 'Error processing entries.' );
-					processBtn.disabled = false;
+					processBtn.disabled    = false;
 					processBtn.textContent = 'Process Time Entries →';
 				}
+			} );
+		} );
+	}
+
+	/**
+	 * Handle save button (unprocessed logs only).
+	 */
+	const saveBtn = document.getElementById( 'pltt-save-btn' );
+	if ( saveBtn ) {
+		saveBtn.addEventListener( 'click', function() {
+			if ( ! textarea.value.trim() ) {
+				return;
+			}
+
+			saveBtn.disabled    = true;
+			const originalText  = saveBtn.textContent;
+			saveBtn.textContent = plttData.i18n.saving;
+
+			saveIndicator.textContent = plttData.i18n.saving;
+			saveIndicator.className   = 'pltt-save-indicator saving';
+
+			PLTT.ajax( 'pltt_save_daily_log', {
+				date:    pageDate,
+				content: textarea.value,
+			}, function( response ) {
+				if ( response.success ) {
+					markSaved();
+				} else {
+					saveIndicator.textContent = plttData.i18n.error;
+					saveIndicator.className   = 'pltt-save-indicator error';
+				}
+				saveBtn.disabled    = false;
+				saveBtn.textContent = originalText;
 			} );
 		} );
 	}
@@ -172,27 +243,20 @@
 		updateNotesBtn.addEventListener( 'click', function() {
 			const content = textarea.value.trim();
 
-			updateNotesBtn.disabled = true;
-			const originalText = updateNotesBtn.textContent;
+			updateNotesBtn.disabled    = true;
+			const originalText         = updateNotesBtn.textContent;
 			updateNotesBtn.textContent = plttData.i18n.saving;
 
 			PLTT.ajax( 'pltt_update_daily_log', {
-				date: dateInput.value,
-				content: content
+				date:    pageDate,
+				content: content,
 			}, function( response ) {
 				if ( response.success ) {
-					saveIndicator.textContent = plttData.i18n.saved;
-					saveIndicator.className = 'pltt-save-indicator saved';
-
-					setTimeout( function() {
-						saveIndicator.textContent = '';
-						saveIndicator.className = 'pltt-save-indicator';
-					}, 2000 );
+					markSaved();
 				} else {
 					alert( response.data || 'Error updating notes.' );
 				}
-
-				updateNotesBtn.disabled = false;
+				updateNotesBtn.disabled    = false;
 				updateNotesBtn.textContent = originalText;
 			} );
 		} );
@@ -203,11 +267,14 @@
 	 */
 	window.addEventListener( 'beforeunload', function() {
 		if ( textarea.value.trim() ) {
-			// Synchronous save attempt.
-			const formData = new FormData();
-			formData.append( 'action', 'pltt_save_daily_log' );
+			// Use pageDate (not dateInput.value) — the date picker's change event mutates
+			// dateInput.value to the destination date before this handler fires.
+			const isProcessed = document.getElementById( 'pltt-update-notes-btn' ) !== null;
+			const action      = isProcessed ? 'pltt_update_daily_log' : 'pltt_save_daily_log';
+			const formData    = new FormData();
+			formData.append( 'action', action );
 			formData.append( 'nonce', plttData.nonce );
-			formData.append( 'date', dateInput.value );
+			formData.append( 'date', pageDate );
 			formData.append( 'content', textarea.value );
 
 			// Use sendBeacon for reliable save on page unload.
