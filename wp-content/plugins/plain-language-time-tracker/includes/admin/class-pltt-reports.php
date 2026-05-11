@@ -57,6 +57,25 @@ class PLTT_Reports {
 			'tag_negate'     => $tag_negate,
 		);
 
+		// Client context card data: loaded only when a single client is selected.
+		$context_client   = null;
+		$context_projects = array();
+
+		if ( $client_id > 0 ) {
+			$context_client = PLTT_Clients::get( $client_id );
+
+			if ( $context_client ) {
+				if ( is_numeric( $project_id ) && (int) $project_id > 0 ) {
+					$single = PLTT_Projects::get( (int) $project_id );
+					if ( $single && (int) $single->client_id === (int) $client_id ) {
+						$context_projects = array( $single );
+					}
+				} else {
+					$context_projects = PLTT_Projects::get_by_client( $client_id, true );
+				}
+			}
+		}
+
 		// Get summary stats in one query (independent of view/pagination).
 		$stats = PLTT_Entries::get_stats( $filter_args );
 

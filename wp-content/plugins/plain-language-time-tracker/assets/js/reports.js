@@ -264,66 +264,51 @@
 	} )();
 
 	/**
-	 * Client -> Project cascade filter.
+	 * Filter pickers — custom dropdowns for Client and Project filters.
 	 *
-	 * When the client dropdown changes, rebuild the project dropdown
-	 * to show only that client's projects (or all projects if "All Clients").
+	 * The client picker drives the project picker via setClientId() so that
+	 * selecting a client narrows the project list to that client's projects.
 	 */
-	const clientSelect = document.getElementById( 'pltt-filter-client' );
-	const projectSelect = document.getElementById( 'pltt-filter-project' );
+	const clientPickerContainer = document.getElementById( 'pltt-filter-client-picker' );
+	const projectPickerContainer = document.getElementById( 'pltt-filter-project-picker' );
+	let projectPicker = null;
+	let clientPicker = null;
 
-	if ( clientSelect && projectSelect && typeof plttProjectsByClient !== 'undefined' ) {
-		clientSelect.addEventListener( 'change', function() {
-			const clientId = this.value;
+	if ( projectPickerContainer && typeof plttProjectsByClient !== 'undefined' && typeof PlttProjectPicker !== 'undefined' ) {
+		const projectNegateBtn = document.querySelector( '[data-target="project_negate"]' );
 
-			// Remember current project selection (will be cleared if not valid).
-			const currentProject = projectSelect.value;
-
-			// Clear current project options.
-			projectSelect.innerHTML = '';
-
-			// Add default "All Projects" option.
-			const defaultOpt = document.createElement( 'option' );
-			defaultOpt.value = '';
-			defaultOpt.textContent = 'All Projects';
-			projectSelect.appendChild( defaultOpt );
-
-			var foundCurrent = false;
-
-			if ( clientId === '' ) {
-				// No client selected: show all projects grouped by client.
-				Object.keys( plttProjectsByClient ).forEach( function( cid ) {
-					var group = document.createElement( 'optgroup' );
-					group.label = ( typeof plttClientNames !== 'undefined' && plttClientNames[ cid ] )
-						? plttClientNames[ cid ]
-						: 'Client ' + cid;
-					plttProjectsByClient[ cid ].forEach( function( proj ) {
-						var opt = document.createElement( 'option' );
-						opt.value = proj.id;
-						opt.textContent = proj.name;
-						if ( String( proj.id ) === currentProject ) {
-							foundCurrent = true;
-						}
-						group.appendChild( opt );
-					} );
-					projectSelect.appendChild( group );
-				} );
-			} else {
-				// Single client selected: flat list.
-				var projects = plttProjectsByClient[ clientId ] || [];
-				projects.forEach( function( proj ) {
-					var opt = document.createElement( 'option' );
-					opt.value = proj.id;
-					opt.textContent = proj.name;
-					if ( String( proj.id ) === currentProject ) {
-						foundCurrent = true;
-					}
-					projectSelect.appendChild( opt );
-				} );
+		projectPicker = new PlttProjectPicker( {
+			container: projectPickerContainer,
+			projectsByClient: plttProjectsByClient,
+			clientNames: ( typeof plttClientNames !== 'undefined' ) ? plttClientNames : {},
+			onSelect: function( value ) {
+				if ( projectNegateBtn ) {
+					projectNegateBtn.style.display = value ? '' : 'none';
+				}
 			}
+		} );
 
-			// Restore previous selection if still valid, otherwise reset.
-			projectSelect.value = foundCurrent ? currentProject : '';
+		// Seed initial client context from the hidden client_id input.
+		const initialClientInput = document.getElementById( 'pltt-filter-client' );
+		if ( initialClientInput ) {
+			projectPicker.clientId = initialClientInput.value || '';
+		}
+	}
+
+	if ( clientPickerContainer && typeof plttClients !== 'undefined' && typeof PlttClientPicker !== 'undefined' ) {
+		const clientNegateBtn = document.querySelector( '[data-target="client_negate"]' );
+
+		clientPicker = new PlttClientPicker( {
+			container: clientPickerContainer,
+			clients: plttClients,
+			onSelect: function( value ) {
+				if ( clientNegateBtn ) {
+					clientNegateBtn.style.display = value ? '' : 'none';
+				}
+				if ( projectPicker ) {
+					projectPicker.setClientId( value );
+				}
+			}
 		} );
 	}
 

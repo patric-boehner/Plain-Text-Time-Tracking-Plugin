@@ -1,0 +1,174 @@
+/**
+ * Picker Component Styles
+ *
+ * Shared by the project picker (with Active/Archived sections) and the
+ * client picker (flat list) on the Reports page.
+ */
+
+.pltt-picker {
+	position: relative;
+	display: inline-block;
+	min-width: 180px;
+}
+
+.pltt-picker-trigger {
+	width: 100%;
+	min-height: 30px;
+	padding: 4px 28px 4px 10px;
+	background: var(--pltt-bg-white, #fff);
+	border: 1px solid var(--pltt-border, #c3c4c7);
+	border-radius: 4px;
+	font-size: 13px;
+	text-align: left;
+	cursor: pointer;
+	position: relative;
+}
+
+.pltt-picker-trigger:hover {
+	border-color: var(--pltt-primary, #2271b1);
+}
+
+.pltt-picker-trigger:focus {
+	outline: 2px solid var(--pltt-primary, #2271b1);
+	outline-offset: -1px;
+}
+
+.pltt-picker-trigger-label {
+	display: inline-block;
+	max-width: 100%;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	vertical-align: middle;
+}
+
+.pltt-picker-caret {
+	position: absolute;
+	right: 8px;
+	top: 50%;
+	transform: translateY( -50% );
+	font-size: 11px;
+	color: var(--pltt-text-muted, #646970);
+	pointer-events: none;
+}
+
+.pltt-picker-dropdown {
+	position: absolute;
+	top: 100%;
+	left: 0;
+	z-index: 9999;
+	min-width: 260px;
+	max-width: 340px;
+	margin-top: 4px;
+	background: var(--pltt-bg-white, #fff);
+	border: 1px solid var(--pltt-border, #c3c4c7);
+	border-radius: 4px;
+	box-shadow: var(--pltt-shadow-dropdown-light, 0 2px 8px rgba(0, 0, 0, 0.12));
+}
+
+.pltt-picker-search {
+	width: 100%;
+	padding: 8px 10px;
+	border: none;
+	border-bottom: 1px solid var(--pltt-border-light, #dcdcde);
+	border-radius: 4px 4px 0 0;
+	font-size: 13px;
+	box-sizing: border-box;
+}
+
+.pltt-picker-search:focus {
+	outline: 2px solid var(--pltt-primary, #2271b1);
+	outline-offset: -2px;
+}
+
+.pltt-picker-options {
+	max-height: 320px;
+	overflow-y: auto;
+	padding: 4px 0;
+}
+
+.pltt-picker-option {
+	display: block;
+	width: 100%;
+	padding: 6px 12px;
+	background: transparent;
+	border: none;
+	text-align: left;
+	font-size: 13px;
+	color: var(--pltt-text-dark, #1d2327);
+	cursor: pointer;
+}
+
+.pltt-picker-option:hover,
+.pltt-picker-option--focus {
+	background: var(--pltt-bg-light, #f0f0f1);
+	outline: none;
+}
+
+.pltt-picker-option--meta {
+	color: var(--pltt-text-muted, #646970);
+}
+
+.pltt-picker-option--nested {
+	padding-left: 24px;
+}
+
+.pltt-picker-option--selected {
+	font-weight: 600;
+	color: var(--pltt-primary, #2271b1);
+}
+
+.pltt-picker-section {
+	margin-top: 4px;
+}
+
+.pltt-section-toggle {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	width: 100%;
+	padding: 6px 12px;
+	background: var(--pltt-bg-light, #f0f0f1);
+	border: none;
+	border-top: 1px solid var(--pltt-border-faint, #f0f0f1);
+	border-bottom: 1px solid var(--pltt-border-faint, #f0f0f1);
+	font-size: 11px;
+	font-weight: 600;
+	text-transform: uppercase;
+	letter-spacing: 0.4px;
+	color: var(--pltt-text-muted, #646970);
+	cursor: pointer;
+	text-align: left;
+}
+
+.pltt-section-toggle:hover {
+	background: var(--pltt-bg-medium, #e8e8ea);
+	color: var(--pltt-text-dark, #1d2327);
+}
+
+.pltt-section-chevron {
+	display: inline-block;
+	width: 10px;
+	font-size: 10px;
+	transition: transform 0.15s ease;
+}
+
+.pltt-section-toggle[aria-expanded="false"] .pltt-section-chevron {
+	transform: rotate( -90deg );
+}
+
+.pltt-section-count {
+	font-weight: 400;
+	color: var(--pltt-text-muted, #646970);
+}
+
+.pltt-section-body[hidden] {
+	display: none;
+}
+
+.pltt-picker-subheading {
+	padding: 4px 12px 2px;
+	font-size: 11px;
+	font-weight: 600;
+	color: var(--pltt-text-muted, #646970);
+}

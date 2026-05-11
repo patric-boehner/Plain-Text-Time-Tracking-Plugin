@@ -227,6 +227,8 @@ class PLTT_Admin {
 				'i18n'             => array(
 					'saving'     => __( 'Saving...', 'plain-language-time-tracker' ),
 					'saved'      => __( 'Saved', 'plain-language-time-tracker' ),
+					'savedAt'    => __( 'Saved %s', 'plain-language-time-tracker' ),
+					'unsaved'    => __( 'Unsaved changes', 'plain-language-time-tracker' ),
 					'error'      => __( 'Error', 'plain-language-time-tracker' ),
 					'confirm'    => __( 'Are you sure?', 'plain-language-time-tracker' ),
 					'processing' => __( 'Processing...', 'plain-language-time-tracker' ),
@@ -306,9 +308,15 @@ class PLTT_Admin {
 				$version
 			);
 			wp_enqueue_style(
+				'pltt-project-picker',
+				PLTT_PLUGIN_URL . 'assets/css/project-picker.css',
+				array( 'pltt-admin' ),
+				$version
+			);
+			wp_enqueue_style(
 				'pltt-reports',
 				PLTT_PLUGIN_URL . 'assets/css/reports.css',
-				array( 'pltt-admin', 'pltt-tag-picker' ),
+				array( 'pltt-admin', 'pltt-tag-picker', 'pltt-project-picker' ),
 				$version
 			);
 			wp_enqueue_script(
@@ -319,9 +327,23 @@ class PLTT_Admin {
 				true
 			);
 			wp_enqueue_script(
+				'pltt-project-picker',
+				PLTT_PLUGIN_URL . 'assets/js/project-picker.js',
+				array(),
+				$version,
+				true
+			);
+			wp_enqueue_script(
+				'pltt-client-picker',
+				PLTT_PLUGIN_URL . 'assets/js/client-picker.js',
+				array(),
+				$version,
+				true
+			);
+			wp_enqueue_script(
 				'pltt-reports',
 				PLTT_PLUGIN_URL . 'assets/js/reports.js',
-				array( 'pltt-shared', 'pltt-tag-picker' ),
+				array( 'pltt-shared', 'pltt-tag-picker', 'pltt-project-picker', 'pltt-client-picker' ),
 				$version,
 				true
 			);
