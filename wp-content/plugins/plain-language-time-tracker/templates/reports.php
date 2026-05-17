@@ -77,36 +77,8 @@ foreach ( $all_projects as $proj ) {
 		$projects_by_client[ $cid ] = array();
 	}
 	$projects_by_client[ $cid ][] = array(
-		'id'     => (int) $proj->id,
-		'name'   => $proj->name,
-		'status' => $proj->status,
-	);
-}
-
-// Resolve initial trigger label for the project picker.
-$project_picker_label = __( 'All Projects', 'plain-language-time-tracker' );
-if ( $project_id > 0 ) {
-	$selected_project = PLTT_Projects::get( $project_id );
-	if ( $selected_project ) {
-		$project_picker_label = $selected_project->name;
-	}
-}
-
-// Resolve initial trigger label for the client picker.
-$client_picker_label = __( 'All Clients', 'plain-language-time-tracker' );
-if ( $client_id > 0 ) {
-	$selected_client = PLTT_Clients::get( $client_id );
-	if ( $selected_client ) {
-		$client_picker_label = $selected_client->name;
-	}
-}
-
-// Build flat clients array for the client picker JS.
-$client_picker_data = array();
-foreach ( $all_clients as $c ) {
-	$client_picker_data[] = array(
-		'id'   => (int) $c->id,
-		'name' => $c->name,
+		'id'   => (int) $proj->id,
+		'name' => $proj->name,
 	);
 }
 
@@ -251,14 +223,14 @@ $tab_base_url = add_query_arg( $filter_params, admin_url( 'admin.php' ) );
 							<?php echo $client_negate ? esc_html__( 'not', 'plain-language-time-tracker' ) : esc_html__( 'is', 'plain-language-time-tracker' ); ?>
 						</button>
 						<input type="hidden" name="client_negate" value="<?php echo esc_attr( $client_negate ); ?>">
-						<div class="pltt-picker pltt-client-picker"
-							id="pltt-filter-client-picker"
-							data-all-label="<?php esc_attr_e( 'All Clients', 'plain-language-time-tracker' ); ?>"
-							data-search-placeholder="<?php esc_attr_e( 'Search clients…', 'plain-language-time-tracker' ); ?>"
-							data-initial-label="<?php echo esc_attr( $client_picker_label ); ?>">
-							<input type="hidden" name="client_id" id="pltt-filter-client"
-								value="<?php echo esc_attr( $client_id ); ?>">
-						</div>
+						<select name="client_id" id="pltt-filter-client">
+							<option value=""><?php esc_html_e( 'All Clients', 'plain-language-time-tracker' ); ?></option>
+							<?php foreach ( $all_clients as $c ) : ?>
+								<option value="<?php echo esc_attr( $c->id ); ?>" <?php selected( $client_id, (int) $c->id ); ?>>
+									<?php echo esc_html( $c->name ); ?>
+								</option>
+							<?php endforeach; ?>
+						</select>
 					</div>
 				</div>
 
@@ -273,17 +245,40 @@ $tab_base_url = add_query_arg( $filter_params, admin_url( 'admin.php' ) );
 							<?php echo $project_negate ? esc_html__( 'not', 'plain-language-time-tracker' ) : esc_html__( 'is', 'plain-language-time-tracker' ); ?>
 						</button>
 						<input type="hidden" name="project_negate" value="<?php echo esc_attr( $project_negate ); ?>">
-						<div class="pltt-picker pltt-project-picker"
-							id="pltt-filter-project-picker"
-							data-all-label="<?php esc_attr_e( 'All Projects', 'plain-language-time-tracker' ); ?>"
-							data-without-project-label="<?php esc_attr_e( '— Without Projects —', 'plain-language-time-tracker' ); ?>"
-							data-active-label="<?php esc_attr_e( 'Active', 'plain-language-time-tracker' ); ?>"
-							data-archived-label="<?php esc_attr_e( 'Archived', 'plain-language-time-tracker' ); ?>"
-							data-search-placeholder="<?php esc_attr_e( 'Search projects…', 'plain-language-time-tracker' ); ?>"
-							data-initial-label="<?php echo esc_attr( $project_picker_label ); ?>">
-							<input type="hidden" name="project_id" id="pltt-filter-project"
-								value="<?php echo esc_attr( $project_id ); ?>">
-						</div>
+						<select name="project_id" id="pltt-filter-project">
+							<option value=""><?php esc_html_e( 'All Projects', 'plain-language-time-tracker' ); ?></option>
+							<option value="without_project" <?php selected( $project_id, 'without_project' ); ?>><?php esc_html_e( '— Without Projects —', 'plain-language-time-tracker' ); ?></option>
+							<?php
+							if ( $client_id > 0 ) {
+								// Single client selected: flat list (one client, grouping adds nothing).
+								$visible_projects = $projects_by_client[ (string) $client_id ] ?? array();
+								foreach ( $visible_projects as $p ) :
+									$pid   = is_array( $p ) ? $p['id'] : (int) $p->id;
+									$pname = is_array( $p ) ? $p['name'] : $p->name;
+									?>
+									<option value="<?php echo esc_attr( $pid ); ?>" <?php selected( $project_id, $pid ); ?>>
+										<?php echo esc_html( $pname ); ?>
+									</option>
+								<?php endforeach;
+							} else {
+								// All clients: group projects under client optgroup labels.
+								foreach ( $projects_by_client as $cid => $cprojects ) :
+									$cname = $client_names[ $cid ] ?? __( 'Unknown Client', 'plain-language-time-tracker' );
+									?>
+									<optgroup label="<?php echo esc_attr( $cname ); ?>">
+										<?php foreach ( $cprojects as $p ) :
+											$pid   = is_array( $p ) ? $p['id'] : (int) $p->id;
+											$pname = is_array( $p ) ? $p['name'] : $p->name;
+											?>
+											<option value="<?php echo esc_attr( $pid ); ?>" <?php selected( $project_id, $pid ); ?>>
+												<?php echo esc_html( $pname ); ?>
+											</option>
+										<?php endforeach; ?>
+									</optgroup>
+								<?php endforeach;
+							}
+							?>
+						</select>
 					</div>
 				</div>
 
@@ -341,7 +336,6 @@ $tab_base_url = add_query_arg( $filter_params, admin_url( 'admin.php' ) );
 		'pltt-reports',
 		'var plttProjectsByClient = ' . wp_json_encode( $projects_by_client ) . ';' .
 		'var plttClientNames = ' . wp_json_encode( $client_names ) . ';' .
-		'var plttClients = ' . wp_json_encode( $client_picker_data ) . ';' .
 		'var plttAllTags = ' . wp_json_encode( $all_tags ) . ';',
 		'before'
 	);

@@ -308,15 +308,9 @@ class PLTT_Admin {
 				$version
 			);
 			wp_enqueue_style(
-				'pltt-project-picker',
-				PLTT_PLUGIN_URL . 'assets/css/project-picker.css',
-				array( 'pltt-admin' ),
-				$version
-			);
-			wp_enqueue_style(
 				'pltt-reports',
 				PLTT_PLUGIN_URL . 'assets/css/reports.css',
-				array( 'pltt-admin', 'pltt-tag-picker', 'pltt-project-picker' ),
+				array( 'pltt-admin', 'pltt-tag-picker' ),
 				$version
 			);
 			wp_enqueue_script(
@@ -327,23 +321,9 @@ class PLTT_Admin {
 				true
 			);
 			wp_enqueue_script(
-				'pltt-project-picker',
-				PLTT_PLUGIN_URL . 'assets/js/project-picker.js',
-				array(),
-				$version,
-				true
-			);
-			wp_enqueue_script(
-				'pltt-client-picker',
-				PLTT_PLUGIN_URL . 'assets/js/client-picker.js',
-				array(),
-				$version,
-				true
-			);
-			wp_enqueue_script(
 				'pltt-reports',
 				PLTT_PLUGIN_URL . 'assets/js/reports.js',
-				array( 'pltt-shared', 'pltt-tag-picker', 'pltt-project-picker', 'pltt-client-picker' ),
+				array( 'pltt-shared', 'pltt-tag-picker' ),
 				$version,
 				true
 			);
