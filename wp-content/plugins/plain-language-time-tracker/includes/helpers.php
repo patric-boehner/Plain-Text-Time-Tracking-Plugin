@@ -207,6 +207,133 @@ function pltt_remove_tags( $text ) {
 }
 
 /**
+ * Determine which half of the day an entry's raw text indicates.
+ *
+ * Returns 'am' if only am tokens are present, 'pm' if only pm tokens are
+ * present, 'mixed' if both, or null if neither. Used by the Review screen
+ * to detect AM/PM mix-ups across adjacent entries.
+ *
+ * @param string $raw_text Original log line.
+ * @return string|null 'am', 'pm', 'mixed', or null.
+ */
+function pltt_entry_ampm_side( $raw_text ) {
+	if ( empty( $raw_text ) ) {
+		return null;
+	}
+	$has_am = (bool) preg_match( '/\bam\b/i', $raw_text );
+	$has_pm = (bool) preg_match( '/\bpm\b/i', $raw_text );
+	if ( $has_am && $has_pm ) {
+		return 'mixed';
+	}
+	if ( $has_am ) {
+		return 'am';
+	}
+	if ( $has_pm ) {
+		return 'pm';
+	}
+	return null;
+}
+
+/**
+ * Check whether any time token in raw_text omits am/pm.
+ *
+ * Mirrors the time regex in PLTT_Time_Parser::parse_line(). Returns true
+ * if at least one numeric time-like token in the line has no am/pm suffix
+ * — the condition under which PHP silently defaults the time to AM.
+ *
+ * @param string $raw_text Original log line.
+ * @return bool True if at least one time token lacks am/pm.
+ */
+function pltt_raw_text_has_ambiguous_time( $raw_text ) {
+	if ( empty( $raw_text ) ) {
+		return false;
+	}
+	if ( ! preg_match_all( '/\b\d{1,2}(?::\d{2})?\s*(am|pm)?\b/i', $raw_text, $matches ) ) {
+		return false;
+	}
+	foreach ( $matches[1] as $ampm ) {
+		if ( '' === $ampm ) {
+			return true;
+		}
+	}
+	return false;
+}
+
+/**
+ * Compute per-entry warning flags for the Review screen.
+ *
+ * Expects entries sorted by start_time ASC (the order PLTT_Review uses).
+ * Returns a map of entry_id => warning reasons. Three independent checks:
+ *
+ *   - 'long_duration': duration > 6h. Catches the common case where an
+ *     inflated duration comes from a filtered `Done` end marker whose
+ *     own AM/PM was mistyped — that raw text is gone by render time,
+ *     so duration is the only remaining signal.
+ *   - 'island': raw text's am/pm side disagrees with both neighbors AND duration > 3h.
+ *   - 'backwards': parse-order rank (id ASC) ≠ chronological rank AND duration > 3h.
+ *
+ * @param array $entries Formatted entries with id, start_time, duration_minutes, raw_text.
+ * @return array Map: entry_id => array of reason flags.
+ */
+function pltt_compute_entry_warnings( array $entries ) {
+	$warnings = array();
+	if ( empty( $entries ) ) {
+		return $warnings;
+	}
+
+	// Within a date, entry IDs are assigned in parse/line order
+	// (PLTT_Ajax::process_log deletes and recreates in order).
+	$by_id = $entries;
+	usort(
+		$by_id,
+		function ( $a, $b ) {
+			return ( (int) ( $a['id'] ?? 0 ) ) <=> ( (int) ( $b['id'] ?? 0 ) );
+		}
+	);
+	$id_rank = array();
+	foreach ( $by_id as $rank => $e ) {
+		if ( ! empty( $e['id'] ) ) {
+			$id_rank[ (int) $e['id'] ] = $rank;
+		}
+	}
+
+	foreach ( $entries as $time_rank => $entry ) {
+		$id       = isset( $entry['id'] ) ? (int) $entry['id'] : 0;
+		$duration = (int) ( $entry['duration_minutes'] ?? 0 );
+		$raw      = $entry['raw_text'] ?? '';
+		if ( $id <= 0 ) {
+			continue;
+		}
+
+		if ( $duration > 360 ) {
+			$warnings[ $id ]['long_duration'] = true;
+		}
+
+		if ( $duration > 180 ) {
+			$side      = pltt_entry_ampm_side( $raw );
+			$prev      = $entries[ $time_rank - 1 ] ?? null;
+			$next      = $entries[ $time_rank + 1 ] ?? null;
+			$prev_side = $prev ? pltt_entry_ampm_side( $prev['raw_text'] ?? '' ) : null;
+			$next_side = $next ? pltt_entry_ampm_side( $next['raw_text'] ?? '' ) : null;
+			if (
+				in_array( $side, array( 'am', 'pm' ), true )
+				&& ( $prev_side || $next_side )
+				&& ( null === $prev_side || $prev_side !== $side )
+				&& ( null === $next_side || $next_side !== $side )
+			) {
+				$warnings[ $id ]['island'] = true;
+			}
+		}
+
+		if ( $duration > 180 && isset( $id_rank[ $id ] ) && $id_rank[ $id ] !== $time_rank ) {
+			$warnings[ $id ]['backwards'] = true;
+		}
+	}
+
+	return $warnings;
+}
+
+/**
  * Check if current user can access the time tracker.
  *
  * @return bool True if user has access.

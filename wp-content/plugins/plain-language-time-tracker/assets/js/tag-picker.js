@@ -22,14 +22,17 @@ var PlttTagPicker = ( function() {
 	 * @param {Array}         allTags   Array of all known tag strings.
 	 * @param {Function|null} onAddNew  Optional callback when "Add new tag…" is clicked; receives picker instance.
 	 * @param {Function|null} onClose   Optional callback when the dropdown closes; receives (selectedTags, csvValue).
+	 * @param {Object|null}   tagGroups Optional map of tag name => group name; when provided, the
+	 *                                  checkbox list is rendered with labeled group sections.
 	 */
-	function PlttTagPicker( container, allTags, onAddNew, onClose ) {
+	function PlttTagPicker( container, allTags, onAddNew, onClose, tagGroups ) {
 		this.container = container;
 		this.hiddenInput = container.querySelector( '.pltt-tags' );
 		this.allTags = allTags || [];
 		this.selectedTags = [];
 		this.onAddNew = onAddNew || null;
 		this.onClose = onClose || null;
+		this.tagGroups = tagGroups || {};
 
 		_instances.push( this );
 
@@ -118,7 +121,35 @@ var PlttTagPicker = ( function() {
 	};
 
 	/**
-	 * Render the checkbox list from allTags, with selected tags sorted to top.
+	 * Append a single tag checkbox row to a container.
+	 *
+	 * @param {HTMLElement} target Container to append into.
+	 * @param {string}      tag    Tag name.
+	 */
+	PlttTagPicker.prototype._renderCheckboxItem = function( target, tag ) {
+		var self = this;
+		var label = document.createElement( 'label' );
+		label.className = 'pltt-tag-checkbox-item';
+
+		var checkbox = document.createElement( 'input' );
+		checkbox.type = 'checkbox';
+		checkbox.value = tag;
+		checkbox.checked = self.selectedTags.indexOf( tag ) !== -1;
+
+		checkbox.addEventListener( 'change', function() {
+			self._onCheckboxChange( tag, this.checked );
+		} );
+
+		var text = document.createTextNode( ' ' + tag.charAt( 0 ).toUpperCase() + tag.slice( 1 ) );
+
+		label.appendChild( checkbox );
+		label.appendChild( text );
+		target.appendChild( label );
+	};
+
+	/**
+	 * Render the checkbox list from allTags. When tagGroups is non-empty,
+	 * render labeled sections per group with ungrouped tags at the bottom.
 	 */
 	PlttTagPicker.prototype._renderCheckboxes = function() {
 		var self = this;
@@ -130,34 +161,65 @@ var PlttTagPicker = ( function() {
 			empty.textContent = 'No tags available';
 			this.checkboxList.appendChild( empty );
 		} else {
-			// Sort: selected tags first, then the rest alphabetically.
-			var sorted = this.allTags.slice().sort( function( a, b ) {
-				var aSelected = self.selectedTags.indexOf( a ) !== -1;
-				var bSelected = self.selectedTags.indexOf( b ) !== -1;
-				if ( aSelected && ! bSelected ) return -1;
-				if ( ! aSelected && bSelected ) return 1;
-				return a.localeCompare( b );
-			} );
+			var hasGroups = this.tagGroups && Object.keys( this.tagGroups ).length > 0;
 
-			sorted.forEach( function( tag ) {
-				var label = document.createElement( 'label' );
-				label.className = 'pltt-tag-checkbox-item';
-
-				var checkbox = document.createElement( 'input' );
-				checkbox.type = 'checkbox';
-				checkbox.value = tag;
-				checkbox.checked = self.selectedTags.indexOf( tag ) !== -1;
-
-				checkbox.addEventListener( 'change', function() {
-					self._onCheckboxChange( tag, this.checked );
+			if ( hasGroups ) {
+				// Group tags by their group_name, with ungrouped collected separately.
+				var byGroup = {};
+				var ungrouped = [];
+				this.allTags.forEach( function( tag ) {
+					var g = self.tagGroups[ tag ];
+					if ( g ) {
+						if ( ! byGroup[ g ] ) {
+							byGroup[ g ] = [];
+						}
+						byGroup[ g ].push( tag );
+					} else {
+						ungrouped.push( tag );
+					}
 				} );
 
-				var text = document.createTextNode( ' ' + tag.charAt( 0 ).toUpperCase() + tag.slice( 1 ) );
+				var groupNames = Object.keys( byGroup ).sort( function( a, b ) {
+					return a.localeCompare( b );
+				} );
 
-				label.appendChild( checkbox );
-				label.appendChild( text );
-				self.checkboxList.appendChild( label );
-			} );
+				groupNames.forEach( function( g ) {
+					var header = document.createElement( 'div' );
+					header.className = 'pltt-tag-group-header';
+					header.textContent = g;
+					header.dataset.groupName = g;
+					self.checkboxList.appendChild( header );
+
+					byGroup[ g ].sort( function( a, b ) {
+						return a.localeCompare( b );
+					} );
+					byGroup[ g ].forEach( function( tag ) {
+						self._renderCheckboxItem( self.checkboxList, tag );
+					} );
+				} );
+
+				if ( ungrouped.length > 0 ) {
+					ungrouped.sort( function( a, b ) {
+						return a.localeCompare( b );
+					} );
+					ungrouped.forEach( function( tag ) {
+						self._renderCheckboxItem( self.checkboxList, tag );
+					} );
+				}
+			} else {
+				// No groups: keep the legacy "selected first, then alphabetical" sort.
+				var sorted = this.allTags.slice().sort( function( a, b ) {
+					var aSelected = self.selectedTags.indexOf( a ) !== -1;
+					var bSelected = self.selectedTags.indexOf( b ) !== -1;
+					if ( aSelected && ! bSelected ) return -1;
+					if ( ! aSelected && bSelected ) return 1;
+					return a.localeCompare( b );
+				} );
+
+				sorted.forEach( function( tag ) {
+					self._renderCheckboxItem( self.checkboxList, tag );
+				} );
+			}
 		}
 
 		// "Add new tag…" link — only shown when a callback is provided.
@@ -355,6 +417,19 @@ var PlttTagPicker = ( function() {
 			} else {
 				item.style.display = 'none';
 			}
+		} );
+
+		// Hide group headers whose following section has zero visible items.
+		this.checkboxList.querySelectorAll( '.pltt-tag-group-header' ).forEach( function( header ) {
+			var visible = 0;
+			var sibling = header.nextElementSibling;
+			while ( sibling && ! sibling.classList.contains( 'pltt-tag-group-header' ) ) {
+				if ( sibling.classList.contains( 'pltt-tag-checkbox-item' ) && sibling.style.display !== 'none' ) {
+					visible++;
+				}
+				sibling = sibling.nextElementSibling;
+			}
+			header.style.display = visible > 0 ? '' : 'none';
 		} );
 	};
 

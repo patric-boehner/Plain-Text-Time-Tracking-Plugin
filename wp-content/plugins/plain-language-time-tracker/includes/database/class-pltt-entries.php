@@ -437,7 +437,7 @@ class PLTT_Entries {
 	 * in a single query so the reports page doesn't need to load all rows.
 	 *
 	 * @param array $args Query arguments (date_from, date_to, client_id, project_id, tag, billable).
-	 * @return object Stats with total_count, total_minutes, billable_minutes, verified_count.
+	 * @return object Stats with total_count, total_minutes, billable_minutes, unbilled_billable_minutes, verified_count, first_entry_date, last_entry_date.
 	 */
 	public static function get_stats( $args = array() ) {
 		global $wpdb;
@@ -475,12 +475,15 @@ class PLTT_Entries {
 			COUNT(*) AS total_count,
 			COALESCE(SUM(e.duration_minutes), 0) AS total_minutes,
 			COALESCE(SUM(CASE WHEN e.billable = 1 THEN e.duration_minutes ELSE 0 END), 0) AS billable_minutes,
+			COALESCE(SUM(CASE WHEN e.billable = 1 AND COALESCE(e.billed, 0) = 0 THEN e.duration_minutes ELSE 0 END), 0) AS unbilled_billable_minutes,
 			COALESCE(SUM(CASE WHEN ({$exclude_clause}) THEN e.duration_minutes ELSE 0 END), 0) AS client_total_minutes,
 			COALESCE(SUM(CASE WHEN ({$exclude_clause}) AND e.billable = 1 THEN e.duration_minutes ELSE 0 END), 0) AS client_billable_minutes,
 			SUM(CASE WHEN e.verified = 1 THEN 1 ELSE 0 END) AS verified_count,
 			COALESCE(SUM(CASE WHEN e.billable = 1 THEN COALESCE(e.billable_amount, ROUND(e.duration_minutes / 60.0 * COALESCE(p.hourly_rate, c.hourly_rate, 0), 2)) ELSE 0 END), 0) AS billable_amount,
 			COUNT(DISTINCT CASE WHEN ({$exclude_clause}) THEN e.project_id END) AS active_projects,
-			COUNT(DISTINCT CASE WHEN ({$exclude_clause}) THEN e.client_id END) AS active_clients
+			COUNT(DISTINCT CASE WHEN ({$exclude_clause}) THEN e.client_id END) AS active_clients,
+			MIN(e.entry_date) AS first_entry_date,
+			MAX(e.entry_date) AS last_entry_date
 			FROM {$table} e
 			LEFT JOIN {$projects_table} p ON e.project_id = p.id
 			LEFT JOIN {$clients_table} c ON e.client_id = c.id";
@@ -561,6 +564,7 @@ class PLTT_Entries {
 				"SELECT
 					p.id AS project_id,
 					p.name AS project_name,
+					p.status AS project_status,
 					p.budget_hours,
 					p.budget_fee,
 					p.recurring_period,
@@ -575,7 +579,7 @@ class PLTT_Entries {
 				LEFT JOIN {$projects_table} p ON e.project_id = p.id
 				LEFT JOIN {$clients_table} c ON e.client_id = c.id
 				WHERE {$where_sql}
-				GROUP BY p.id, p.name, p.budget_hours, p.budget_fee, p.recurring_period, p.billability_default, c.id, c.name
+				GROUP BY p.id, p.name, p.status, p.budget_hours, p.budget_fee, p.recurring_period, p.billability_default, c.id, c.name
 				ORDER BY p.name ASC, c.name ASC",
 				$prepare
 			)
