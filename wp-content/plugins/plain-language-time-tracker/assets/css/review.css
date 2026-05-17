@@ -26,6 +26,11 @@
 }
 
 /* Column widths */
+.pltt-col-warning {
+	width: 22px;
+	text-align: center;
+}
+
 .pltt-col-time {
 	min-width: 130px;
 }
@@ -164,6 +169,21 @@
 	color: var(--pltt-text-faint);
 	margin-top: 4px;
 	cursor: help;
+}
+
+/* AM/PM mix-up warning indicator (its own column on the review table). */
+.pltt-warning-cell {
+	vertical-align: middle;
+	text-align: center;
+}
+
+.pltt-warning-indicator {
+	color: var(--pltt-warning);
+	cursor: help;
+}
+
+.pltt-entry-row-warning td {
+	background: rgba(219, 166, 23, 0.04);
 }
 
 /* Entry row being deleted */

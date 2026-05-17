@@ -82,12 +82,30 @@ class PLTT_Tags {
 	}
 
 	/**
+	 * Normalize a group name. Empty/whitespace becomes NULL.
+	 *
+	 * @param string|null $group_name Raw group name.
+	 * @return string|null Trimmed string clamped to 100 chars, or null.
+	 */
+	private static function normalize_group_name( $group_name ) {
+		if ( null === $group_name ) {
+			return null;
+		}
+		$group_name = trim( (string) $group_name );
+		if ( '' === $group_name ) {
+			return null;
+		}
+		return mb_substr( $group_name, 0, 100 );
+	}
+
+	/**
 	 * Create a new tag.
 	 *
-	 * @param string $name Tag name.
+	 * @param string      $name       Tag name.
+	 * @param string|null $group_name Optional group name (NULL or '' means ungrouped).
 	 * @return int|false Insert ID or false on failure (including duplicate).
 	 */
-	public static function create( $name ) {
+	public static function create( $name, $group_name = null ) {
 		global $wpdb;
 		$table = PLTT_Database::get_table_name( 'tags' );
 		$name  = strtolower( trim( $name ) );
@@ -96,12 +114,17 @@ class PLTT_Tags {
 			return false;
 		}
 
+		$group_name = self::normalize_group_name( $group_name );
+
+		$data    = array( 'name' => $name );
+		$formats = array( '%s' );
+		if ( null !== $group_name ) {
+			$data['group_name'] = $group_name;
+			$formats[]          = '%s';
+		}
+
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
-		$result = $wpdb->insert(
-			$table,
-			array( 'name' => $name ),
-			array( '%s' )
-		);
+		$result = $wpdb->insert( $table, $data, $formats );
 
 		if ( $result ) {
 			pltt_flush_tag_cache();
@@ -112,13 +135,17 @@ class PLTT_Tags {
 	}
 
 	/**
-	 * Rename a tag.
+	 * Rename a tag. Optionally update the group at the same time.
 	 *
-	 * @param int    $id       Tag ID.
-	 * @param string $new_name New tag name.
+	 * Pass `false` for $group_name to leave the existing group untouched.
+	 * Pass `null` or empty string to clear the group.
+	 *
+	 * @param int              $id         Tag ID.
+	 * @param string           $new_name   New tag name.
+	 * @param string|null|bool $group_name Group name, '' / null to clear, or false to leave unchanged.
 	 * @return bool True on success.
 	 */
-	public static function rename( $id, $new_name ) {
+	public static function rename( $id, $new_name, $group_name = false ) {
 		global $wpdb;
 		$table    = PLTT_Database::get_table_name( 'tags' );
 		$new_name = strtolower( trim( $new_name ) );
@@ -127,21 +154,168 @@ class PLTT_Tags {
 			return false;
 		}
 
+		$data    = array( 'name' => $new_name );
+		$formats = array( '%s' );
+		if ( false !== $group_name ) {
+			// Caller wants to set/clear the group. set_group() handles NULL writes
+			// (wpdb->update can't write NULL via the value array).
+			$normalized = self::normalize_group_name( $group_name );
+			if ( null === $normalized ) {
+				// Defer the NULL write to a separate call after the name update.
+				$clear_group = true;
+			} else {
+				$data['group_name'] = $normalized;
+				$formats[]          = '%s';
+				$clear_group        = false;
+			}
+		} else {
+			$clear_group = false;
+		}
+
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
 		$result = $wpdb->update(
 			$table,
-			array( 'name' => $new_name ),
+			$data,
 			array( 'id' => $id ),
-			array( '%s' ),
+			$formats,
 			array( '%d' )
 		);
 
-		if ( false !== $result ) {
-			pltt_flush_tag_cache();
-			return true;
+		if ( false === $result ) {
+			return false;
 		}
 
-		return false;
+		if ( $clear_group ) {
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.NotPrepared
+			$wpdb->query( $wpdb->prepare( "UPDATE {$table} SET group_name = NULL WHERE id = %d", $id ) );
+		}
+
+		pltt_flush_tag_cache();
+		return true;
+	}
+
+	/**
+	 * Set the group for a single tag. Pass null or '' to clear.
+	 *
+	 * @param int         $id         Tag ID.
+	 * @param string|null $group_name Group name, or null/empty to clear.
+	 * @return bool True on success.
+	 */
+	public static function set_group( $id, $group_name ) {
+		global $wpdb;
+		$table      = PLTT_Database::get_table_name( 'tags' );
+		$normalized = self::normalize_group_name( $group_name );
+
+		if ( null === $normalized ) {
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.NotPrepared
+			$result = $wpdb->query( $wpdb->prepare( "UPDATE {$table} SET group_name = NULL WHERE id = %d", $id ) );
+		} else {
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+			$result = $wpdb->update(
+				$table,
+				array( 'group_name' => $normalized ),
+				array( 'id' => $id ),
+				array( '%s' ),
+				array( '%d' )
+			);
+		}
+
+		if ( false === $result ) {
+			return false;
+		}
+
+		pltt_flush_tag_cache();
+		return true;
+	}
+
+	/**
+	 * Assign a group to many tags in one statement. Pass null/empty to remove from group.
+	 *
+	 * @param int[]       $tag_ids    Array of tag IDs.
+	 * @param string|null $group_name Group name, or null/empty to clear.
+	 * @return int Number of rows affected.
+	 */
+	public static function bulk_set_group( array $tag_ids, $group_name ) {
+		global $wpdb;
+
+		$tag_ids = array_filter( array_map( 'intval', $tag_ids ) );
+		if ( empty( $tag_ids ) ) {
+			return 0;
+		}
+
+		$table        = PLTT_Database::get_table_name( 'tags' );
+		$placeholders = implode( ',', array_fill( 0, count( $tag_ids ), '%d' ) );
+		$normalized   = self::normalize_group_name( $group_name );
+
+		if ( null === $normalized ) {
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.NotPrepared
+			$result = $wpdb->query(
+				$wpdb->prepare(
+					// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+					"UPDATE {$table} SET group_name = NULL WHERE id IN ({$placeholders})",
+					$tag_ids
+				)
+			);
+		} else {
+			$params = array_merge( array( $normalized ), $tag_ids );
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.NotPrepared
+			$result = $wpdb->query(
+				$wpdb->prepare(
+					// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+					"UPDATE {$table} SET group_name = %s WHERE id IN ({$placeholders})",
+					$params
+				)
+			);
+		}
+
+		if ( false === $result ) {
+			return 0;
+		}
+
+		pltt_flush_tag_cache();
+		return (int) $result;
+	}
+
+	/**
+	 * Get all distinct, non-empty group names in alphabetical order.
+	 *
+	 * @return string[] Array of group name strings.
+	 */
+	public static function get_all_groups() {
+		global $wpdb;
+		$table = PLTT_Database::get_table_name( 'tags' );
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+		$rows = $wpdb->get_col(
+			"SELECT DISTINCT group_name FROM {$table} WHERE group_name IS NOT NULL AND group_name <> '' ORDER BY group_name ASC"
+		);
+
+		return is_array( $rows ) ? $rows : array();
+	}
+
+	/**
+	 * Build a map of tag name => group name for tags that have a group assigned.
+	 *
+	 * Used by the picker to render labeled sections.
+	 *
+	 * @return array Map of tag_name => group_name.
+	 */
+	public static function get_name_to_group_map() {
+		global $wpdb;
+		$table = PLTT_Database::get_table_name( 'tags' );
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+		$rows = $wpdb->get_results(
+			"SELECT name, group_name FROM {$table} WHERE group_name IS NOT NULL AND group_name <> ''"
+		);
+
+		$map = array();
+		if ( $rows ) {
+			foreach ( $rows as $row ) {
+				$map[ $row->name ] = $row->group_name;
+			}
+		}
+		return $map;
 	}
 
 	/**

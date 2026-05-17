@@ -572,7 +572,8 @@
 							}
 						}
 					);
-				}
+				},
+				( typeof plttTagGroups !== 'undefined' ) ? plttTagGroups : {}
 			);
 		} );
 	} )();

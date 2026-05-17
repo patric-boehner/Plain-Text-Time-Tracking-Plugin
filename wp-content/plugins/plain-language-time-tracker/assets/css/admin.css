@@ -285,6 +285,11 @@
 	color: var(--pltt-badge-purple-text);
 }
 
+.pltt-badge-archived {
+	margin-left: 6px;
+	vertical-align: middle;
+}
+
 /* Allocation progress indicators */
 .pltt-alloc-cell {
 	line-height: 1.3;
@@ -580,6 +585,15 @@
 
 .widefat tr.pltt-billed td:first-child {
 	border-left: 3px solid var(--pltt-primary);
+}
+
+/* Archived row highlight (reports summary, projects list when not grouped by status). */
+.widefat tr.pltt-row-archived td {
+	background-color: rgba(0, 0, 0, 0.02);
+}
+
+.widefat tr.pltt-row-archived td:first-child {
+	border-left: 3px solid var(--pltt-border);
 }
 
 /* Report filters */
@@ -1008,16 +1022,19 @@ fieldset.pltt-date-nav-custom-inputs input[type="date"] {
 	color: var(--pltt-text-faint);
 }
 
-/* Projects page: active/archived grouping */
-.pltt-project-group {
+/* Projects page: active/archived grouping. Tags page reuses the same section pattern. */
+.pltt-project-group,
+.pltt-tag-group {
 	margin-bottom: 28px;
 }
 
-.pltt-project-group:last-child {
+.pltt-project-group:last-child,
+.pltt-tag-group:last-child {
 	margin-bottom: 0;
 }
 
-.pltt-project-group-header {
+.pltt-project-group-header,
+.pltt-tag-group-header-row {
 	display: flex;
 	justify-content: space-between;
 	align-items: center;
@@ -1028,7 +1045,12 @@ fieldset.pltt-date-nav-custom-inputs input[type="date"] {
 	border-radius: 4px 4px 0 0;
 }
 
-.pltt-project-group-title {
+.pltt-tag-group table.widefat {
+	border-radius: 0 0 4px 4px;
+}
+
+.pltt-project-group-title,
+.pltt-tag-group-title {
 	font-weight: 600;
 	font-size: 14px;
 	color: var(--pltt-text-dark);
@@ -1036,6 +1058,34 @@ fieldset.pltt-date-nav-custom-inputs input[type="date"] {
 
 .pltt-project-group table.widefat {
 	border-radius: 0 0 4px 4px;
+	table-layout: fixed;
+	width: 100%;
+}
+
+/* Lock column widths so multiple grouped tables line up for vertical scanning. */
+.pltt-project-group table.widefat th:nth-child(1) { width: auto; }    /* Name */
+.pltt-project-group table.widefat th:nth-child(2) { width: 18%; }     /* Client */
+.pltt-project-group table.widefat th:nth-child(3) { width: 140px; }   /* Type */
+.pltt-project-group table.widefat th:nth-child(4) { width: 140px; }   /* Rate */
+.pltt-project-group table.widefat th:nth-child(5) { width: 140px; }   /* Budget */
+.pltt-project-group table.widefat th:nth-child(6) { width: 80px; }    /* Billable */
+
+.pltt-project-group table.widefat td {
+	overflow-wrap: anywhere;
+}
+
+.pltt-projects-toolbar,
+.pltt-tags-toolbar {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	margin-bottom: 12px;
+}
+
+.pltt-projects-toolbar label,
+.pltt-tags-toolbar label {
+	font-size: 13px;
+	color: var(--pltt-text-faint);
 }
 
 

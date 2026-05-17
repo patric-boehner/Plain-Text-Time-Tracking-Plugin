@@ -102,6 +102,7 @@ $return_to = isset( $_GET['return_to'] ) ? esc_url_raw( wp_unslash( $_GET['retur
 			<table class="pltt-review-table widefat">
 				<thead>
 					<tr>
+						<th class="pltt-col-warning" scope="col"><span class="screen-reader-text"><?php esc_html_e( 'Status', 'plain-language-time-tracker' ); ?></span></th>
 						<th class="pltt-col-time"><?php esc_html_e( 'Date / Time', 'plain-language-time-tracker' ); ?></th>
 						<th class="pltt-col-duration"><?php esc_html_e( 'Duration', 'plain-language-time-tracker' ); ?></th>
 						<th class="pltt-col-description"><?php esc_html_e( 'Description', 'plain-language-time-tracker' ); ?></th>
@@ -119,10 +120,35 @@ $return_to = isset( $_GET['return_to'] ) ? esc_url_raw( wp_unslash( $_GET['retur
 						$predicted_project  = $entry['predicted_project_id'] ?? 0;
 						$client_confidence  = $entry['client_confidence'] ?? 0;
 						$has_prediction     = $predicted_client > 0;
+						$entry_warnings     = ! empty( $entry['warnings'] ) ? $entry['warnings'] : array();
+						$has_warning        = ! empty( $entry_warnings );
 
 						$row_classes = array( 'pltt-entry-row' );
+						if ( $has_warning ) {
+							$row_classes[] = 'pltt-entry-row-warning';
+						}
+
+						$warning_tooltip = '';
+						if ( $has_warning ) {
+							$reasons = array();
+							if ( ! empty( $entry_warnings['long_duration'] ) ) {
+								$reasons[] = __( 'Duration is over 6 hours — check whether AM/PM is correct.', 'plain-language-time-tracker' );
+							}
+							if ( ! empty( $entry_warnings['island'] ) ) {
+								$reasons[] = __( 'AM/PM differs from the surrounding entries.', 'plain-language-time-tracker' );
+							}
+							if ( ! empty( $entry_warnings['backwards'] ) ) {
+								$reasons[] = __( 'This entry was typed out of order — check whether AM/PM is correct.', 'plain-language-time-tracker' );
+							}
+							$warning_tooltip = implode( ' ', $reasons );
+						}
 						?>
 						<tr class="<?php echo esc_attr( implode( ' ', $row_classes ) ); ?>" data-entry-id="<?php echo esc_attr( $entry_id ); ?>" data-index="<?php echo esc_attr( $index ); ?>" data-original-project-id="<?php echo esc_attr( $predicted_project ); ?>">
+							<td class="pltt-warning-cell">
+								<?php if ( $has_warning ) : ?>
+									<span class="pltt-warning-indicator dashicons dashicons-warning" role="img" aria-label="<?php echo esc_attr( $warning_tooltip ); ?>" title="<?php echo esc_attr( $warning_tooltip ); ?>"></span>
+								<?php endif; ?>
+							</td>
 							<td class="pltt-time-cell">
 								<div class="pltt-time-display">
 									<span class="pltt-date-text"><?php echo esc_html( pltt_format_date( $entry['entry_date'] ?? $date, 'M j, Y' ) ); ?></span> <span class="pltt-time-separator">&middot;</span>
@@ -278,7 +304,7 @@ $return_to = isset( $_GET['return_to'] ) ? esc_url_raw( wp_unslash( $_GET['retur
 	<?php endif; ?>
 </div>
 
-<?php wp_add_inline_script( 'pltt-review', 'var plttAllTags = ' . wp_json_encode( $all_tags ) . ';', 'before' ); ?>
+<?php wp_add_inline_script( 'pltt-review', 'var plttAllTags = ' . wp_json_encode( $all_tags ) . ';var plttTagGroups = ' . wp_json_encode( PLTT_Tags::get_name_to_group_map() ) . ';', 'before' ); ?>
 
 <!-- New Client Modal -->
 <div id="pltt-client-modal" class="pltt-modal pltt-hidden" role="dialog" aria-modal="true" aria-labelledby="pltt-review-client-modal-title">

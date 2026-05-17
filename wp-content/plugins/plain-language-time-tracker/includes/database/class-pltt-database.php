@@ -20,7 +20,7 @@ class PLTT_Database {
 	 *
 	 * @var string
 	 */
-	const DB_VERSION = '1.9.3';
+	const DB_VERSION = '1.9.4';
 
 	/**
 	 * Get the full table name with WordPress prefix.
@@ -153,9 +153,11 @@ class PLTT_Database {
 		$sql_tags   = "CREATE TABLE {$table_tags} (
 			id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
 			name varchar(100) NOT NULL,
+			group_name varchar(100) DEFAULT NULL,
 			created_at datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
 			PRIMARY KEY (id),
-			UNIQUE KEY name (name)
+			UNIQUE KEY name (name),
+			KEY group_name (group_name)
 		) {$charset_collate};";
 		dbDelta( $sql_tags );
 
@@ -357,6 +359,16 @@ class PLTT_Database {
 			// After this migration, pltt_get_internal_client_id() uses the flag — not the ID.
 			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
 			$wpdb->query( $wpdb->prepare( "UPDATE {$clients_table} SET is_internal = 1 WHERE id = %d", 3 ) );
+		}
+
+		// 1.9.4: Add optional group_name to tags for grouped picker display.
+		if ( version_compare( $from_version, '1.9.4', '<' ) ) {
+			$tags_table = self::get_table_name( 'tags' );
+
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.SchemaChange
+			$wpdb->query( "ALTER TABLE {$tags_table} ADD COLUMN IF NOT EXISTS group_name varchar(100) DEFAULT NULL" );
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.SchemaChange
+			$wpdb->query( "ALTER TABLE {$tags_table} ADD INDEX IF NOT EXISTS group_name (group_name)" );
 		}
 	}
 

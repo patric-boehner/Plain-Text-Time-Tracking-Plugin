@@ -66,6 +66,19 @@
 	padding: 4px 0;
 }
 
+.pltt-tag-group-header {
+	font-size: 11px;
+	font-weight: 600;
+	text-transform: uppercase;
+	color: var(--pltt-text-faint);
+	padding: 8px 12px 2px;
+	letter-spacing: 0.04em;
+}
+
+.pltt-tag-group-header:first-child {
+	padding-top: 4px;
+}
+
 .pltt-tag-checkbox-item,
 .pltt-tag-add-new {
 	display: block;

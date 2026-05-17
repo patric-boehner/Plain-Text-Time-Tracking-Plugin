@@ -296,7 +296,31 @@ $tab_base_url = add_query_arg( $filter_params, admin_url( 'admin.php' ) );
 						<select name="tag" id="pltt-filter-tag">
 							<option value=""><?php esc_html_e( 'All Tags', 'plain-language-time-tracker' ); ?></option>
 							<option value="without_tag" <?php selected( $tag, 'without_tag' ); ?>><?php esc_html_e( '— Without Tag —', 'plain-language-time-tracker' ); ?></option>
-							<?php foreach ( $all_tags as $t ) : ?>
+							<?php
+							// Group tags under <optgroup> sections; ungrouped tags fall into an unlabeled section at the end.
+							$tag_group_map = PLTT_Tags::get_name_to_group_map();
+							$tags_by_group = array();
+							$ungrouped_tags = array();
+							foreach ( $all_tags as $t ) {
+								if ( ! empty( $tag_group_map[ $t ] ) ) {
+									$tags_by_group[ $tag_group_map[ $t ] ][] = $t;
+								} else {
+									$ungrouped_tags[] = $t;
+								}
+							}
+							ksort( $tags_by_group );
+							foreach ( $tags_by_group as $group_label => $group_tags ) :
+								sort( $group_tags );
+								?>
+								<optgroup label="<?php echo esc_attr( $group_label ); ?>">
+									<?php foreach ( $group_tags as $t ) : ?>
+										<option value="<?php echo esc_attr( $t ); ?>" <?php selected( $tag, $t ); ?>>
+											<?php echo esc_html( ucwords( $t ) ); ?>
+										</option>
+									<?php endforeach; ?>
+								</optgroup>
+							<?php endforeach; ?>
+							<?php foreach ( $ungrouped_tags as $t ) : ?>
 								<option value="<?php echo esc_attr( $t ); ?>" <?php selected( $tag, $t ); ?>>
 									<?php echo esc_html( ucwords( $t ) ); ?>
 								</option>
@@ -336,7 +360,8 @@ $tab_base_url = add_query_arg( $filter_params, admin_url( 'admin.php' ) );
 		'pltt-reports',
 		'var plttProjectsByClient = ' . wp_json_encode( $projects_by_client ) . ';' .
 		'var plttClientNames = ' . wp_json_encode( $client_names ) . ';' .
-		'var plttAllTags = ' . wp_json_encode( $all_tags ) . ';',
+		'var plttAllTags = ' . wp_json_encode( $all_tags ) . ';' .
+		'var plttTagGroups = ' . wp_json_encode( PLTT_Tags::get_name_to_group_map() ) . ';',
 		'before'
 	);
 	?>
@@ -468,13 +493,17 @@ $tab_base_url = add_query_arg( $filter_params, admin_url( 'admin.php' ) );
 						$detail_url = add_query_arg( $detail_args, admin_url( 'admin.php' ) );
 
 							$billing_type_pre = pltt_get_billing_type( $row );
+							$is_archived_row  = ! empty( $row->project_status ) && 'archived' === $row->project_status;
 						?>
-							<tr>
+							<tr<?php echo $is_archived_row ? ' class="pltt-row-archived"' : ''; ?>>
 								<td class="pltt-entry-desc-cell<?php echo 'none' !== $billing_type_pre ? ' pltt-desc-billable' : ''; ?>">
 									<?php if ( ! empty( $row->project_name ) ) : ?>
 										<a href="<?php echo esc_url( $detail_url ); ?>"><span class="pltt-entry-desc-text"><?php echo esc_html( $row->project_name ); ?></span></a>
 									<?php else : ?>
 										<a href="<?php echo esc_url( $detail_url ); ?>"><span class="pltt-empty">—</span></a>
+									<?php endif; ?>
+									<?php if ( $is_archived_row ) : ?>
+										<span class="pltt-badge pltt-badge-archived"><?php esc_html_e( 'Archived', 'plain-language-time-tracker' ); ?></span>
 									<?php endif; ?>
 									<?php if ( ! empty( $row->client_name ) ) : ?>
 										<div class="pltt-entry-meta">

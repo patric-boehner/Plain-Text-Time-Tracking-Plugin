@@ -186,6 +186,13 @@ class PLTT_Review {
 			);
 		}
 
+		// Attach AM/PM mix-up warnings (computed across the full sorted list).
+		$entry_warnings = pltt_compute_entry_warnings( $formatted );
+		foreach ( $formatted as &$entry_ref ) {
+			$entry_ref['warnings'] = $entry_warnings[ (int) $entry_ref['id'] ] ?? array();
+		}
+		unset( $entry_ref );
+
 		return array(
 			'entries' => $formatted,
 			'summary' => $summary,

@@ -22,12 +22,14 @@ foreach ( $projects as $project ) {
 	$projects_by_client[ $project->client_id ][] = $project;
 }
 
-// Pre-fetch entry counts per client to determine if delete is safe.
+// Pre-fetch entry stats per client (entry count for delete-safety, date span for the View link).
 $entry_counts_by_client = array();
+$client_stats_by_id     = array();
 if ( ! empty( $clients ) ) {
 	foreach ( $clients as $client ) {
 		$stats = PLTT_Entries::get_stats( array( 'client_id' => $client->id ) );
 		$entry_counts_by_client[ $client->id ] = isset( $stats->total_count ) ? (int) $stats->total_count : 0;
+		$client_stats_by_id[ $client->id ]     = $stats;
 	}
 }
 ?>
@@ -93,6 +95,21 @@ if ( ! empty( $clients ) ) {
 					$client_proj_count  = count( $client_projects );
 					$client_entry_count = $entry_counts_by_client[ $client->id ] ?? 0;
 					$client_deletable   = 0 === $client_proj_count && 0 === $client_entry_count;
+					$client_stats       = $client_stats_by_id[ $client->id ] ?? null;
+
+					$view_args = array(
+						'page'      => 'pltt-reports',
+						'view'      => 'summary',
+						'client_id' => $client->id,
+					);
+					if ( $client_stats && ! empty( $client_stats->first_entry_date ) ) {
+						$view_args['from'] = $client_stats->first_entry_date;
+					}
+					if ( $client_stats && ! empty( $client_stats->last_entry_date ) ) {
+						$today_ymd       = pltt_get_current_date();
+						$view_args['to'] = $client_stats->last_entry_date > $today_ymd ? $today_ymd : $client_stats->last_entry_date;
+					}
+					$view_url = add_query_arg( $view_args, admin_url( 'admin.php' ) );
 					?>
 					<tr data-client-id="<?php echo esc_attr( $client->id ); ?>" data-name="<?php echo esc_attr( $client->name ); ?>" data-description="<?php echo esc_attr( $client->description ); ?>" data-rate="<?php echo esc_attr( $client->hourly_rate ?? '' ); ?>" data-projects-count="<?php echo esc_attr( $client_proj_count ); ?>" data-entry-count="<?php echo esc_attr( $client_entry_count ); ?>">
 						<td>
@@ -101,10 +118,11 @@ if ( ! empty( $clients ) ) {
 								<br><small class="description"><?php echo esc_html( $client->description ); ?></small>
 							<?php endif; ?>
 							<div class="row-actions">
-								<span class="edit"><a href="#edit" class="pltt-edit-client" role="button"><?php esc_html_e( 'Edit', 'plain-language-time-tracker' ); ?></a><?php if ( $client_deletable ) : ?> | <?php endif; ?></span>
+								<span class="edit"><a href="#edit" class="pltt-edit-client" role="button"><?php esc_html_e( 'Edit', 'plain-language-time-tracker' ); ?></a> | </span>
 								<?php if ( $client_deletable ) : ?>
-									<span class="trash"><a href="#delete" class="pltt-delete-client submitdelete" role="button"><?php esc_html_e( 'Delete', 'plain-language-time-tracker' ); ?></a></span>
+									<span class="trash"><a href="#delete" class="pltt-delete-client submitdelete" role="button"><?php esc_html_e( 'Delete', 'plain-language-time-tracker' ); ?></a> | </span>
 								<?php endif; ?>
+								<span class="view"><a href="<?php echo esc_url( $view_url ); ?>"><?php esc_html_e( 'View', 'plain-language-time-tracker' ); ?></a></span>
 							</div>
 						</td>
 						<td><?php

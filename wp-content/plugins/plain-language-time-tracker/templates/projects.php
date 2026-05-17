@@ -86,24 +86,62 @@ if ( ! empty( $projects ) ) {
 		<p class="description"><?php esc_html_e( 'No projects yet. Add your first project to get started.', 'plain-language-time-tracker' ); ?></p>
 	<?php else : ?>
 		<?php
-		$active_projects   = array_filter( $projects, fn( $p ) => 'archived' !== $p->status );
-		$archived_projects = array_filter( $projects, fn( $p ) => 'archived' === $p->status );
+		$group_mode = isset( $_GET['group'] ) ? sanitize_key( wp_unslash( $_GET['group'] ) ) : 'status';
+		if ( ! in_array( $group_mode, array( 'status', 'type' ), true ) ) {
+			$group_mode = 'status';
+		}
 
-		$project_groups = array(
-			array(
+		$project_groups = array();
+
+		if ( 'type' === $group_mode ) {
+			// Group all projects by billing type (archived blend into their type).
+			$by_type = array();
+			foreach ( $projects as $project ) {
+				$by_type[ pltt_get_billing_type( $project ) ][] = $project;
+			}
+			$type_labels = array(
+				'hourly'    => __( 'Hourly', 'plain-language-time-tracker' ),
+				'recurring' => __( 'Monthly', 'plain-language-time-tracker' ),
+				'fixed'     => __( 'Fixed Budget', 'plain-language-time-tracker' ),
+				'none'      => __( 'Internal', 'plain-language-time-tracker' ),
+			);
+			foreach ( $type_labels as $type_key => $type_label ) {
+				if ( empty( $by_type[ $type_key ] ) ) {
+					continue;
+				}
+				$project_groups[] = array(
+					'label'    => $type_label,
+					'projects' => $by_type[ $type_key ],
+					'tbody_id' => '',
+				);
+			}
+		} else {
+			// 'status' — default grouping: Active + Archived as separate buckets.
+			$active_projects   = array_filter( $projects, fn( $p ) => 'archived' !== $p->status );
+			$archived_projects = array_filter( $projects, fn( $p ) => 'archived' === $p->status );
+
+			$project_groups[] = array(
 				'label'    => __( 'Active', 'plain-language-time-tracker' ),
 				'projects' => $active_projects,
 				'tbody_id' => 'pltt-projects-list',
-			),
-		);
-		if ( ! empty( $archived_projects ) ) {
-			$project_groups[] = array(
-				'label'    => __( 'Archived', 'plain-language-time-tracker' ),
-				'projects' => $archived_projects,
-				'tbody_id' => '',
 			);
+			if ( ! empty( $archived_projects ) ) {
+				$project_groups[] = array(
+					'label'    => __( 'Archived', 'plain-language-time-tracker' ),
+					'projects' => $archived_projects,
+					'tbody_id' => '',
+				);
+			}
 		}
 		?>
+		<form method="get" action="" class="pltt-projects-toolbar">
+			<input type="hidden" name="page" value="pltt-projects">
+			<label for="pltt-group-by"><?php esc_html_e( 'Group by:', 'plain-language-time-tracker' ); ?></label>
+			<select name="group" id="pltt-group-by" onchange="this.form.submit()">
+				<option value="status" <?php selected( $group_mode, 'status' ); ?>><?php esc_html_e( 'Status', 'plain-language-time-tracker' ); ?></option>
+				<option value="type" <?php selected( $group_mode, 'type' ); ?>><?php esc_html_e( 'Type', 'plain-language-time-tracker' ); ?></option>
+			</select>
+		</form>
 		<?php foreach ( $project_groups as $group ) : ?>
 			<div class="pltt-project-group">
 				<div class="pltt-project-group-header">
@@ -117,6 +155,7 @@ if ( ! empty( $projects ) ) {
 							<th><?php esc_html_e( 'Type', 'plain-language-time-tracker' ); ?></th>
 							<th><?php esc_html_e( 'Rate', 'plain-language-time-tracker' ); ?></th>
 							<th><?php esc_html_e( 'Budget', 'plain-language-time-tracker' ); ?></th>
+							<th class="pltt-col-billable"><?php esc_html_e( 'Billable', 'plain-language-time-tracker' ); ?></th>
 						</tr>
 					</thead>
 					<tbody<?php echo $group['tbody_id'] ? ' id="' . esc_attr( $group['tbody_id'] ) . '"' : ''; ?>>
@@ -128,24 +167,45 @@ if ( ! empty( $projects ) ) {
 
 							$billing_type = pltt_get_billing_type( $project );
 							?>
-							<?php $project_entry_count = isset( $project_stats->total_count ) ? (int) $project_stats->total_count : 0; ?>
-						<tr data-project-id="<?php echo esc_attr( $project->id ); ?>" data-name="<?php echo esc_attr( $project->name ); ?>" data-client-id="<?php echo esc_attr( $project->client_id ); ?>" data-status="<?php echo esc_attr( $project->status ); ?>" data-rate="<?php echo esc_attr( $project->hourly_rate ?? '' ); ?>" data-billability-default="<?php echo esc_attr( $project->billability_default ?? '1' ); ?>" data-recurring-period="<?php echo esc_attr( $project->recurring_period ?? '' ); ?>" data-billing-type="<?php echo esc_attr( $billing_type ); ?>" data-budget-hours="<?php echo esc_attr( $project->budget_hours ?? '' ); ?>" data-budget-fee="<?php echo esc_attr( $project->budget_fee ?? '' ); ?>" data-entry-count="<?php echo esc_attr( $project_entry_count ); ?>">
+							<?php
+						$project_entry_count        = isset( $project_stats->total_count ) ? (int) $project_stats->total_count : 0;
+						$project_unbilled_minutes   = isset( $project_stats->unbilled_billable_minutes ) ? (int) $project_stats->unbilled_billable_minutes : 0;
+						$row_class                  = ( 'archived' === $project->status && 'status' !== $group_mode ) ? 'pltt-row-archived' : '';
+
+						$view_args = array(
+							'page'       => 'pltt-reports',
+							'view'       => 'summary',
+							'project_id' => $project->id,
+						);
+						if ( ! empty( $project_stats->first_entry_date ) ) {
+							$view_args['from'] = $project_stats->first_entry_date;
+						}
+						if ( ! empty( $project_stats->last_entry_date ) ) {
+							$today_ymd       = pltt_get_current_date();
+							$view_args['to'] = $project_stats->last_entry_date > $today_ymd ? $today_ymd : $project_stats->last_entry_date;
+						}
+						$view_url = add_query_arg( $view_args, admin_url( 'admin.php' ) );
+						?>
+						<tr<?php echo $row_class ? ' class="' . esc_attr( $row_class ) . '"' : ''; ?> data-project-id="<?php echo esc_attr( $project->id ); ?>" data-unbilled-minutes="<?php echo esc_attr( $project_unbilled_minutes ); ?>" data-name="<?php echo esc_attr( $project->name ); ?>" data-client-id="<?php echo esc_attr( $project->client_id ); ?>" data-status="<?php echo esc_attr( $project->status ); ?>" data-rate="<?php echo esc_attr( $project->hourly_rate ?? '' ); ?>" data-billability-default="<?php echo esc_attr( $project->billability_default ?? '1' ); ?>" data-recurring-period="<?php echo esc_attr( $project->recurring_period ?? '' ); ?>" data-billing-type="<?php echo esc_attr( $billing_type ); ?>" data-budget-hours="<?php echo esc_attr( $project->budget_hours ?? '' ); ?>" data-budget-fee="<?php echo esc_attr( $project->budget_fee ?? '' ); ?>" data-entry-count="<?php echo esc_attr( $project_entry_count ); ?>">
 							<td>
 								<strong><?php echo esc_html( $project->name ); ?></strong>
+								<?php if ( 'archived' === $project->status && 'status' !== $group_mode ) : ?>
+									<span class="pltt-badge pltt-badge-archived"><?php esc_html_e( 'Archived', 'plain-language-time-tracker' ); ?></span>
+								<?php endif; ?>
 								<div class="row-actions">
 									<span class="edit"><a href="#edit" class="pltt-edit-project" role="button"><?php esc_html_e( 'Edit', 'plain-language-time-tracker' ); ?></a> | </span>
 									<?php if ( 'archived' === $project->status ) : ?>
-										<span><a href="#restore" class="pltt-archive-project" data-new-status="active" role="button"><?php esc_html_e( 'Restore', 'plain-language-time-tracker' ); ?></a></span>
+										<span><a href="#restore" class="pltt-archive-project" data-new-status="active" role="button"><?php esc_html_e( 'Restore', 'plain-language-time-tracker' ); ?></a> | </span>
 									<?php else : ?>
-										<span class="trash"><a href="#archive" class="pltt-archive-project submitdelete" data-new-status="archived" role="button"><?php esc_html_e( 'Archive', 'plain-language-time-tracker' ); ?></a></span>
+										<span class="trash"><a href="#archive" class="pltt-archive-project submitdelete" data-new-status="archived" role="button"><?php esc_html_e( 'Archive', 'plain-language-time-tracker' ); ?></a> | </span>
 									<?php endif; ?>
+									<span class="view"><a href="<?php echo esc_url( $view_url ); ?>"><?php esc_html_e( 'View', 'plain-language-time-tracker' ); ?></a></span>
 								</div>
 							</td>
 							<td>
 								<?php echo $project_client ? esc_html( $project_client->name ) : '—'; ?>
 							</td>
 							<td>
-							<span class="pltt-billable-symbol <?php echo 'none' !== $billing_type && (int) ( $project->billability_default ?? 1 ) === 1 ? 'is-billable' : 'not-billable'; ?>">$</span>
 							<?php if ( 'none' === $billing_type ) : ?>
 								<span class="pltt-badge"><?php esc_html_e( 'Internal', 'plain-language-time-tracker' ); ?></span>
 							<?php elseif ( 'recurring' === $billing_type ) : ?>
@@ -182,6 +242,9 @@ if ( ! empty( $projects ) ) {
 									echo '<span class="pltt-empty">—</span>';
 								}
 							?></td>
+							<td class="pltt-col-billable">
+								<span class="pltt-billable-symbol <?php echo 'none' !== $billing_type && (int) ( $project->billability_default ?? 1 ) === 1 ? 'is-billable' : 'not-billable'; ?>">$</span>
+							</td>
 						</tr>
 						<?php endforeach; ?>
 					</tbody>
@@ -549,13 +612,29 @@ if ( ! empty( $projects ) ) {
 		});
 	});
 
+	// Confirm archive when the project still has unbilled billable time.
+	// Returns true if the user confirms (or if no confirmation is needed).
+	function confirmArchiveIfUnbilled(newStatus, unbilledMinutes) {
+		if (newStatus !== 'archived' || !unbilledMinutes || unbilledMinutes <= 0) {
+			return true;
+		}
+		var formatted = (window.PLTT && PLTT.formatDuration) ? PLTT.formatDuration(unbilledMinutes) : (unbilledMinutes + 'm');
+		var msg = '<?php echo esc_js( __( 'This project has %s of billable time that hasn\'t been invoiced. Archive anyway?', 'plain-language-time-tracker' ) ); ?>'.replace('%s', formatted);
+		return window.confirm(msg);
+	}
+
 	// Archive/Restore Project links (row-actions).
 	document.querySelectorAll('.pltt-archive-project').forEach(function(link) {
 		link.addEventListener('click', function(e) {
 			e.preventDefault();
 			var row = this.closest('tr');
+			var newStatus = this.dataset.newStatus;
+			var unbilled = parseInt(row.dataset.unbilledMinutes || '0', 10);
+			if (!confirmArchiveIfUnbilled(newStatus, unbilled)) {
+				return;
+			}
 			document.getElementById('pltt-archive-project-id').value = row.dataset.projectId;
-			document.getElementById('pltt-archive-project-status').value = this.dataset.newStatus;
+			document.getElementById('pltt-archive-project-status').value = newStatus;
 			document.getElementById('pltt-archive-project-form').submit();
 		});
 	});
@@ -588,6 +667,11 @@ if ( ! empty( $projects ) ) {
 	document.getElementById('pltt-archive-project-btn').addEventListener('click', function() {
 		var id = document.getElementById('pltt-edit-project-id').value;
 		var newStatus = this.dataset.newStatus;
+		var row = document.querySelector('tr[data-project-id="' + id + '"]');
+		var unbilled = row ? parseInt(row.dataset.unbilledMinutes || '0', 10) : 0;
+		if (!confirmArchiveIfUnbilled(newStatus, unbilled)) {
+			return;
+		}
 		document.getElementById('pltt-archive-project-id').value = id;
 		document.getElementById('pltt-archive-project-status').value = newStatus;
 		document.getElementById('pltt-archive-project-form').submit();

@@ -36,6 +36,7 @@ class PLTT_Form_Handlers {
 		add_action( 'admin_post_pltt_create_tag', array( __CLASS__, 'handle_create_tag' ) );
 		add_action( 'admin_post_pltt_rename_tag', array( __CLASS__, 'handle_rename_tag' ) );
 		add_action( 'admin_post_pltt_delete_tag', array( __CLASS__, 'handle_delete_tag' ) );
+		add_action( 'admin_post_pltt_bulk_assign_group', array( __CLASS__, 'handle_bulk_assign_group' ) );
 
 	}
 
@@ -238,6 +239,8 @@ class PLTT_Form_Handlers {
 		$tag_name = isset( $_POST['tag_name'] ) ? sanitize_text_field( wp_unslash( $_POST['tag_name'] ) ) : '';
 		$tag_name = strtolower( trim( $tag_name ) );
 
+		$group_name = isset( $_POST['group_name'] ) ? sanitize_text_field( wp_unslash( $_POST['group_name'] ) ) : '';
+
 		$redirect_url = admin_url( 'admin.php?page=pltt-tags' );
 
 		if ( empty( $tag_name ) ) {
@@ -251,7 +254,7 @@ class PLTT_Form_Handlers {
 			exit;
 		}
 
-		$result = PLTT_Tags::create( $tag_name );
+		$result = PLTT_Tags::create( $tag_name, $group_name );
 
 		if ( $result ) {
 			wp_safe_redirect( add_query_arg( 'pltt_message', 'tag_created', $redirect_url ) );
@@ -274,6 +277,12 @@ class PLTT_Form_Handlers {
 		$new_tag = isset( $_POST['tag_name'] ) ? sanitize_text_field( wp_unslash( $_POST['tag_name'] ) ) : '';
 		$new_tag = strtolower( trim( $new_tag ) );
 
+		// The group field is always present on submit from the modal — accept '' (clear).
+		// If it's not present at all in the POST body, leave the group untouched.
+		$group_arg = array_key_exists( 'group_name', $_POST )
+			? sanitize_text_field( wp_unslash( $_POST['group_name'] ) )
+			: false;
+
 		$redirect_url = admin_url( 'admin.php?page=pltt-tags' );
 
 		if ( ! $tag_id || empty( $new_tag ) ) {
@@ -288,7 +297,7 @@ class PLTT_Form_Handlers {
 			exit;
 		}
 
-		$success = PLTT_Tags::rename( $tag_id, $new_tag );
+		$success = PLTT_Tags::rename( $tag_id, $new_tag, $group_arg );
 
 		if ( $success ) {
 			wp_safe_redirect( add_query_arg( 'pltt_message', 'tag_renamed', $redirect_url ) );
@@ -323,6 +332,36 @@ class PLTT_Form_Handlers {
 		} else {
 			wp_safe_redirect( add_query_arg( 'pltt_error', 'tag_delete_failed', $redirect_url ) );
 		}
+		exit;
+	}
+
+	/**
+	 * Handle bulk-assigning (or clearing) a group on multiple tags.
+	 */
+	public static function handle_bulk_assign_group() {
+		if ( ! pltt_user_can_access() ) {
+			wp_die( esc_html__( 'Unauthorized', 'plain-language-time-tracker' ), '', array( 'response' => 403 ) );
+		}
+		self::verify_nonce( 'pltt_bulk_tag_group' );
+
+		$redirect_url = admin_url( 'admin.php?page=pltt-tags' );
+
+		$raw_ids = isset( $_POST['tag_ids'] ) && is_array( $_POST['tag_ids'] )
+			? wp_unslash( $_POST['tag_ids'] )
+			: array();
+		$tag_ids = array_filter( array_map( 'absint', $raw_ids ) );
+
+		if ( empty( $tag_ids ) ) {
+			wp_safe_redirect( add_query_arg( 'pltt_error', 'no_tags_selected', $redirect_url ) );
+			exit;
+		}
+
+		// Empty/missing group_name => remove from group.
+		$group_name = isset( $_POST['group_name'] ) ? sanitize_text_field( wp_unslash( $_POST['group_name'] ) ) : '';
+
+		PLTT_Tags::bulk_set_group( $tag_ids, $group_name );
+
+		wp_safe_redirect( add_query_arg( 'pltt_message', 'tags_grouped', $redirect_url ) );
 		exit;
 	}
 

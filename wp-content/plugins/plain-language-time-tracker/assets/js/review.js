@@ -2,7 +2,7 @@
  * Review & Verify Screen JavaScript
  */
 
-/* global PLTT, plttData, PlttTagPicker, plttAllTags */
+/* global PLTT, plttData, PlttTagPicker, plttAllTags, plttTagGroups */
 
 ( function() {
 	'use strict';
@@ -18,14 +18,21 @@
 
 	// Initialize tag picker dropdowns.
 	var tagSuggestions = ( typeof plttAllTags !== 'undefined' ) ? plttAllTags : [];
+	var tagGroups = ( typeof plttTagGroups !== 'undefined' ) ? plttTagGroups : {};
 	var allTagPickers = [];
 	var activeTagPicker = null;
 
 	document.querySelectorAll( '.pltt-tag-input-wrap' ).forEach( function( container ) {
-		var picker = new PlttTagPicker( container, tagSuggestions, function( p ) {
-			activeTagPicker = p;
-			PLTT.showModal( 'pltt-tag-modal' );
-		} );
+		var picker = new PlttTagPicker(
+			container,
+			tagSuggestions,
+			function( p ) {
+				activeTagPicker = p;
+				PLTT.showModal( 'pltt-tag-modal' );
+			},
+			null,
+			tagGroups
+		);
 		allTagPickers.push( picker );
 	} );
 
