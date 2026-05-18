@@ -300,7 +300,10 @@
 					plttProjectsByClient[ cid ].forEach( function( proj ) {
 						var opt = document.createElement( 'option' );
 						opt.value = proj.id;
-						opt.textContent = proj.name;
+						opt.textContent = proj.archived ? proj.name + ' (Archived)' : proj.name;
+						if ( proj.archived ) {
+							opt.className = 'pltt-project-archived';
+						}
 						if ( String( proj.id ) === currentProject ) {
 							foundCurrent = true;
 						}
@@ -314,7 +317,10 @@
 				projects.forEach( function( proj ) {
 					var opt = document.createElement( 'option' );
 					opt.value = proj.id;
-					opt.textContent = proj.name;
+					opt.textContent = proj.archived ? proj.name + ' (Archived)' : proj.name;
+					if ( proj.archived ) {
+						opt.className = 'pltt-project-archived';
+					}
 					if ( String( proj.id ) === currentProject ) {
 						foundCurrent = true;
 					}

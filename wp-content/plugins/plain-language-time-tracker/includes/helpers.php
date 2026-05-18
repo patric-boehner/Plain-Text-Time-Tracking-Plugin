@@ -495,6 +495,119 @@ function pltt_format_date_range( $from, $to ) {
 }
 
 /**
+ * Pick a bucket size (day/week/month) for the reports chart based on range length.
+ *
+ * @param string $date_from Start date (Y-m-d).
+ * @param string $date_to   End date (Y-m-d).
+ * @return string 'day' | 'week' | 'month'
+ */
+function pltt_resolve_bucket_size( $date_from, $date_to ) {
+	$start = new DateTimeImmutable( $date_from, wp_timezone() );
+	$end   = new DateTimeImmutable( $date_to, wp_timezone() );
+	$days  = (int) $start->diff( $end )->format( '%a' ) + 1;
+
+	if ( $days <= 31 ) {
+		return 'day';
+	}
+	if ( $days <= 92 ) {
+		return 'week';
+	}
+	return 'month';
+}
+
+/**
+ * Build chart bucket descriptors for a date range.
+ *
+ * Returns one entry per bucket between $date_from and $date_to (inclusive),
+ * each with start/end dates, a key for matching against daily rows, and
+ * short/long labels for the visual bar and the screen-reader data table.
+ *
+ * Weekly buckets respect the WP `start_of_week` option so they align with
+ * the user's expected week boundaries.
+ *
+ * @param string $date_from   Start date (Y-m-d).
+ * @param string $date_to     End date (Y-m-d).
+ * @param string $bucket_size 'day' | 'week' | 'month'.
+ * @return array<int, array{key:string, start:string, end:string, short:string, long:string}>
+ */
+function pltt_build_chart_buckets( $date_from, $date_to, $bucket_size ) {
+	$tz    = wp_timezone();
+	$start = new DateTimeImmutable( $date_from, $tz );
+	$end   = new DateTimeImmutable( $date_to, $tz );
+
+	$cross_year = $start->format( 'Y' ) !== $end->format( 'Y' );
+
+	if ( 'day' === $bucket_size ) {
+		$buckets = array();
+		$cursor  = $start;
+		while ( $cursor <= $end ) {
+			$ymd       = $cursor->format( 'Y-m-d' );
+			$dow       = (int) $cursor->format( 'N' ); // 1=Mon..7=Sun
+			$buckets[] = array(
+				'key'         => $ymd,
+				'start'       => $ymd,
+				'end'         => $ymd,
+				'short_top'   => $cursor->format( 'D' ), // Short day-of-week, e.g. "Mon".
+				'short'       => $cursor->format( 'n/j' ), // Numeric date, e.g. "5/4".
+				'long'        => $cursor->format( 'F j, Y' ),
+				'is_weekend'  => ( $dow >= 6 ),
+			);
+			$cursor = $cursor->modify( '+1 day' );
+		}
+		return $buckets;
+	}
+
+	if ( 'month' === $bucket_size ) {
+		$buckets = array();
+		$cursor  = $start->modify( 'first day of this month' );
+		$last    = $end->modify( 'first day of this month' );
+		while ( $cursor <= $last ) {
+			$month_start = $cursor->format( 'Y-m-01' );
+			$month_end   = $cursor->format( 'Y-m-t' );
+			// Clip to the requested range edges for the screen-reader cell.
+			$clipped_start = max( $month_start, $date_from );
+			$clipped_end   = min( $month_end, $date_to );
+			$buckets[]     = array(
+				'key'   => $cursor->format( 'Y-m' ),
+				'start' => $clipped_start,
+				'end'   => $clipped_end,
+				'short' => $cross_year ? $cursor->format( "M 'y" ) : $cursor->format( 'M' ),
+				'long'  => $cursor->format( 'F Y' ),
+			);
+			$cursor = $cursor->modify( '+1 month' );
+		}
+		return $buckets;
+	}
+
+	// Weekly buckets, aligned to start_of_week.
+	$week_start_dow = (int) get_option( 'start_of_week', 0 ); // 0=Sun..6=Sat
+	$start_dow      = (int) $start->format( 'w' );
+	$shift          = ( $start_dow - $week_start_dow + 7 ) % 7;
+	$cursor         = $start->modify( "-{$shift} days" );
+
+	$buckets = array();
+	while ( $cursor <= $end ) {
+		$week_start = $cursor;
+		$week_end   = $cursor->modify( '+6 days' );
+
+		// Clip to the requested range edges for the screen-reader cell.
+		$clipped_start = max( $week_start->format( 'Y-m-d' ), $date_from );
+		$clipped_end   = min( $week_end->format( 'Y-m-d' ), $date_to );
+
+		$buckets[] = array(
+			'key'   => $week_start->format( 'Y-m-d' ),
+			'start' => $clipped_start,
+			'end'   => $clipped_end,
+			'short' => $cross_year ? $week_start->format( "M j 'y" ) : $week_start->format( 'M j' ),
+			/* translators: %s: human-readable week start date, e.g. "May 4, 2026". */
+			'long'  => sprintf( __( 'Week of %s', 'plain-language-time-tracker' ), $week_start->format( 'F j, Y' ) ),
+		);
+		$cursor = $cursor->modify( '+7 days' );
+	}
+	return $buckets;
+}
+
+/**
  * Get cached clients list.
  *
  * @return array Array of client objects.

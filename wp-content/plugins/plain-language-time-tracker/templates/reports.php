@@ -70,6 +70,8 @@ $all_tags     = array_column( PLTT_Tags::get_all(), 'name' );
 sort( $all_tags );
 
 // Build projects grouped by client for JS cascade.
+// Archived projects stay inline with their client but sort to the bottom of each group,
+// and carry their status so the dropdown can render them dimmed.
 $projects_by_client = array();
 foreach ( $all_projects as $proj ) {
 	$cid = (string) $proj->client_id;
@@ -77,8 +79,21 @@ foreach ( $all_projects as $proj ) {
 		$projects_by_client[ $cid ] = array();
 	}
 	$projects_by_client[ $cid ][] = array(
-		'id'   => (int) $proj->id,
-		'name' => $proj->name,
+		'id'       => (int) $proj->id,
+		'name'     => $proj->name,
+		'archived' => ( 'archived' === $proj->status ) ? 1 : 0,
+	);
+}
+// Sort each client's projects: active first (alphabetical), archived last (alphabetical).
+foreach ( $projects_by_client as $cid => $cprojects ) {
+	usort(
+		$projects_by_client[ $cid ],
+		function ( $a, $b ) {
+			if ( $a['archived'] !== $b['archived'] ) {
+				return $a['archived'] <=> $b['archived'];
+			}
+			return strcasecmp( $a['name'], $b['name'] );
+		}
 	);
 }
 
@@ -253,11 +268,13 @@ $tab_base_url = add_query_arg( $filter_params, admin_url( 'admin.php' ) );
 								// Single client selected: flat list (one client, grouping adds nothing).
 								$visible_projects = $projects_by_client[ (string) $client_id ] ?? array();
 								foreach ( $visible_projects as $p ) :
-									$pid   = is_array( $p ) ? $p['id'] : (int) $p->id;
-									$pname = is_array( $p ) ? $p['name'] : $p->name;
+									$pid       = is_array( $p ) ? $p['id'] : (int) $p->id;
+									$pname     = is_array( $p ) ? $p['name'] : $p->name;
+									$parchived = is_array( $p ) && ! empty( $p['archived'] );
+									$plabel    = $parchived ? $pname . ' ' . __( '(Archived)', 'plain-language-time-tracker' ) : $pname;
 									?>
-									<option value="<?php echo esc_attr( $pid ); ?>" <?php selected( $project_id, $pid ); ?>>
-										<?php echo esc_html( $pname ); ?>
+									<option value="<?php echo esc_attr( $pid ); ?>" <?php selected( $project_id, $pid ); ?><?php echo $parchived ? ' class="pltt-project-archived"' : ''; ?>>
+										<?php echo esc_html( $plabel ); ?>
 									</option>
 								<?php endforeach;
 							} else {
@@ -267,11 +284,13 @@ $tab_base_url = add_query_arg( $filter_params, admin_url( 'admin.php' ) );
 									?>
 									<optgroup label="<?php echo esc_attr( $cname ); ?>">
 										<?php foreach ( $cprojects as $p ) :
-											$pid   = is_array( $p ) ? $p['id'] : (int) $p->id;
-											$pname = is_array( $p ) ? $p['name'] : $p->name;
+											$pid       = is_array( $p ) ? $p['id'] : (int) $p->id;
+											$pname     = is_array( $p ) ? $p['name'] : $p->name;
+											$parchived = is_array( $p ) && ! empty( $p['archived'] );
+											$plabel    = $parchived ? $pname . ' ' . __( '(Archived)', 'plain-language-time-tracker' ) : $pname;
 											?>
-											<option value="<?php echo esc_attr( $pid ); ?>" <?php selected( $project_id, $pid ); ?>>
-												<?php echo esc_html( $pname ); ?>
+											<option value="<?php echo esc_attr( $pid ); ?>" <?php selected( $project_id, $pid ); ?><?php echo $parchived ? ' class="pltt-project-archived"' : ''; ?>>
+												<?php echo esc_html( $plabel ); ?>
 											</option>
 										<?php endforeach; ?>
 									</optgroup>
@@ -375,19 +394,22 @@ $tab_base_url = add_query_arg( $filter_params, admin_url( 'admin.php' ) );
 
 			<?php if ( $total_entries > 0 ) : ?>
 
-			<!-- Card 1: Active Projects -->
-			<div class="card">
-				<div class="card-label"><?php esc_html_e( 'Active Projects', 'plain-language-time-tracker' ); ?></div>
-				<div class="card-value"><?php echo esc_html( $stats->active_projects ); ?></div>
-				<div class="card-secondary">
-					<?php
-					printf(
-						/* translators: %d: number of clients */
-						esc_html( _n( 'Across %d client', 'Across %d clients', (int) $stats->active_clients, 'plain-language-time-tracker' ) ),
-						(int) $stats->active_clients
-					);
-					?>
-				</div>
+			<!-- Card 1: Top Projects for the period -->
+			<div class="card pltt-top-projects-card">
+				<div class="card-label"><?php esc_html_e( 'Top Projects', 'plain-language-time-tracker' ); ?></div>
+				<?php if ( ! empty( $top_projects ) ) : ?>
+					<ol class="pltt-top-projects-list">
+						<?php foreach ( $top_projects as $tp ) : ?>
+							<li class="pltt-top-project">
+								<span class="pltt-top-project-name" title="<?php echo esc_attr( $tp->project_name ); ?>"><?php echo esc_html( $tp->project_name ); ?></span>
+								<span class="pltt-top-project-stats"><?php echo esc_html( pltt_format_duration( (int) $tp->total_minutes ) ); ?></span>
+							</li>
+						<?php endforeach; ?>
+					</ol>
+				<?php else : ?>
+					<div class="card-value pltt-card-value-empty">&mdash;</div>
+					<div class="card-secondary"><?php esc_html_e( 'No client work tracked', 'plain-language-time-tracker' ); ?></div>
+				<?php endif; ?>
 			</div>
 
 			<!-- Card 2: Total Hours -->
@@ -411,8 +433,14 @@ $tab_base_url = add_query_arg( $filter_params, admin_url( 'admin.php' ) );
 			<div class="card">
 				<div class="card-label"><?php esc_html_e( 'Billable Hours', 'plain-language-time-tracker' ); ?></div>
 				<div class="card-value"><?php echo esc_html( pltt_format_hours( $stats->billable_minutes ) ); ?></div>
+				<?php
+				$util_pct     = max( 0, min( 100, (float) $utilization ) );
+				$util_tooltip = __( 'Utilization = billable client hours ÷ total client hours. Work logged under the Internal client is excluded from both sides.', 'plain-language-time-tracker' );
+				?>
 				<div class="card-secondary">
-					<span><?php printf( '%s %s', esc_html( number_format( $utilization, 1 ) . '%' ), esc_html__( 'utilization', 'plain-language-time-tracker' ) ); ?></span>
+					<span class="pltt-utilization-text" title="<?php echo esc_attr( $util_tooltip ); ?>">
+						<?php printf( '%s %s', esc_html( number_format( $util_pct, 1 ) . '%' ), esc_html__( 'utilization', 'plain-language-time-tracker' ) ); ?>
+					</span>
 				</div>
 			</div>
 
@@ -459,6 +487,152 @@ $tab_base_url = add_query_arg( $filter_params, admin_url( 'admin.php' ) );
 			<?php endif; /* total_entries > 0 */ ?>
 
 		</div>
+	<?php endif; ?>
+
+
+	<?php
+	if ( 'summary' === $view && ! empty( $chart_buckets ) && $chart_max_minutes > 0 ) :
+		$chart_titles = array(
+			'day'   => __( 'Hours by day', 'plain-language-time-tracker' ),
+			'week'  => __( 'Hours by week', 'plain-language-time-tracker' ),
+			'month' => __( 'Hours by month', 'plain-language-time-tracker' ),
+		);
+		$chart_caption_formats = array(
+			/* translators: %s: human-readable date range, e.g. "May 1–15, 2026". */
+			'day'   => __( 'Billable and non-billable hours per day for %s.', 'plain-language-time-tracker' ),
+			/* translators: %s: human-readable date range. */
+			'week'  => __( 'Billable and non-billable hours per week for %s.', 'plain-language-time-tracker' ),
+			/* translators: %s: human-readable date range. */
+			'month' => __( 'Billable and non-billable hours per month for %s.', 'plain-language-time-tracker' ),
+		);
+		$chart_title   = $chart_titles[ $chart_bucket_size ];
+		$chart_caption = sprintf( $chart_caption_formats[ $chart_bucket_size ], pltt_format_date_range( $date_from, $date_to ) );
+		$chart_max_h   = $chart_max_minutes / 60;
+		// Round y-axis ceiling up to a nice number for the visible label.
+		if ( $chart_max_h <= 1 ) {
+			$y_ceiling = 1;
+		} elseif ( $chart_max_h <= 5 ) {
+			$y_ceiling = ceil( $chart_max_h );
+		} elseif ( $chart_max_h <= 20 ) {
+			$y_ceiling = ceil( $chart_max_h / 2 ) * 2;
+		} else {
+			$y_ceiling = ceil( $chart_max_h / 5 ) * 5;
+		}
+		$y_ceiling_mins = $y_ceiling * 60;
+		// Show per-bar value labels only when there's room (rough threshold).
+		$chart_show_values = count( $chart_buckets ) <= 14;
+		?>
+		<section class="pltt-chart-section" aria-labelledby="pltt-chart-title">
+			<header class="pltt-chart-header">
+				<h2 id="pltt-chart-title" class="pltt-chart-title"><?php echo esc_html( $chart_title ); ?></h2>
+				<ul class="pltt-chart-legend" aria-hidden="true">
+					<li><span class="pltt-chart-swatch pltt-chart-swatch-billable"></span><?php esc_html_e( 'Billable', 'plain-language-time-tracker' ); ?></li>
+					<li><span class="pltt-chart-swatch pltt-chart-swatch-nonbillable"></span><?php esc_html_e( 'Non-billable', 'plain-language-time-tracker' ); ?></li>
+				</ul>
+			</header>
+
+			<figure class="pltt-chart" role="figure" aria-label="<?php echo esc_attr( $chart_caption ); ?>">
+				<div class="pltt-chart-canvas" aria-hidden="true">
+					<div class="pltt-chart-y-axis">
+						<span class="pltt-chart-y-label pltt-chart-y-label-top">
+							<?php
+							/* translators: %s: number of hours, e.g. "20". */
+							printf( esc_html__( '%sh', 'plain-language-time-tracker' ), esc_html( number_format( $y_ceiling, ( $y_ceiling < 2 ? 1 : 0 ) ) ) );
+							?>
+						</span>
+						<span class="pltt-chart-y-label pltt-chart-y-label-mid">
+						<?php
+						/* translators: %s: number of hours, e.g. "10". */
+						printf( esc_html__( '%sh', 'plain-language-time-tracker' ), esc_html( number_format( $y_ceiling * 0.5, ( $y_ceiling < 2 ? 1 : 0 ) ) ) );
+						?>
+					</span>
+						<span class="pltt-chart-y-label pltt-chart-y-label-bottom">0</span>
+					</div>
+					<div class="pltt-chart-plot">
+						<?php
+						$show_avg_line = count( $chart_buckets ) >= 2 && $chart_avg_minutes > 0 && $y_ceiling_mins > 0;
+						if ( $show_avg_line ) :
+							$avg_pct = $chart_avg_minutes / $y_ceiling_mins;
+							?>
+							<div class="pltt-chart-avg-line"
+								style="--avg-pct: <?php echo esc_attr( number_format( $avg_pct, 4, '.', '' ) ); ?>;"
+								title="<?php
+								echo esc_attr( sprintf(
+									/* translators: %s: formatted duration like "4h 30m". */
+									__( 'Period average: %s per %s', 'plain-language-time-tracker' ),
+									pltt_format_duration( $chart_avg_minutes ),
+									$chart_bucket_size
+								) );
+								?>">
+								<span class="pltt-chart-avg-label">
+									<?php
+									/* translators: %s: formatted duration. */
+									printf( esc_html__( 'avg %s', 'plain-language-time-tracker' ), esc_html( pltt_format_duration( $chart_avg_minutes ) ) );
+									?>
+								</span>
+							</div>
+						<?php endif; ?>
+						<?php foreach ( $chart_buckets as $bucket ) :
+							$billable_pct    = $y_ceiling_mins > 0 ? ( $bucket['billable_minutes'] / $y_ceiling_mins ) : 0;
+							$nonbillable_pct = $y_ceiling_mins > 0 ? ( $bucket['nonbillable_minutes'] / $y_ceiling_mins ) : 0;
+							$total_minutes   = $bucket['billable_minutes'] + $bucket['nonbillable_minutes'];
+							$is_empty        = 0 === $total_minutes;
+							$is_today        = ! empty( $chart_today_key ) && $bucket['key'] === $chart_today_key;
+							$is_weekend      = ! empty( $bucket['is_weekend'] );
+
+							$col_classes = array( 'pltt-chart-col' );
+							if ( $is_empty )   $col_classes[] = 'pltt-chart-col-empty';
+							if ( $is_today )   $col_classes[] = 'pltt-chart-col-today';
+							if ( $is_weekend ) $col_classes[] = 'pltt-chart-col-weekend';
+							?>
+							<div class="<?php echo esc_attr( implode( ' ', $col_classes ) ); ?>"
+								style="--billable-pct: <?php echo esc_attr( number_format( $billable_pct, 4, '.', '' ) ); ?>; --nonbillable-pct: <?php echo esc_attr( number_format( $nonbillable_pct, 4, '.', '' ) ); ?>;"
+								title="<?php
+								echo esc_attr( sprintf(
+									/* translators: 1: bucket label, 2: billable hours, 3: non-billable hours. */
+									__( '%1$s — %2$s billable, %3$s non-billable', 'plain-language-time-tracker' ),
+									$bucket['long'],
+									pltt_format_hours( $bucket['billable_minutes'] ),
+									pltt_format_hours( $bucket['nonbillable_minutes'] )
+								) );
+								?>">
+								<div class="pltt-chart-bar">
+									<?php if ( $chart_show_values && ! $is_empty ) : ?>
+										<span class="pltt-chart-value"><?php echo esc_html( pltt_format_duration( $total_minutes ) ); ?></span>
+									<?php endif; ?>
+									<span class="pltt-chart-seg pltt-chart-seg-nonbillable"></span>
+									<span class="pltt-chart-seg pltt-chart-seg-billable"></span>
+								</div>
+							</div>
+						<?php endforeach; ?>
+					</div>
+				</div>
+
+				<div class="pltt-chart-x-axis" aria-hidden="true">
+					<div class="pltt-chart-x-spacer"></div>
+					<div class="pltt-chart-x-ticks">
+						<?php
+						// On dense daily views (typically a full month or longer), hide every
+						// other label to reduce x-axis clutter. Today's label always shows.
+						$skip_alt_labels = ( 'day' === $chart_bucket_size && count( $chart_buckets ) > 20 );
+						foreach ( $chart_buckets as $i => $bucket ) :
+							$tick_is_today = ! empty( $chart_today_key ) && $bucket['key'] === $chart_today_key;
+							$hide_label    = $skip_alt_labels && ( $i % 2 !== 0 ) && ! $tick_is_today;
+							?>
+							<span class="pltt-chart-x-tick<?php echo $tick_is_today ? ' pltt-chart-x-tick-today' : ''; ?>">
+								<span class="pltt-chart-x-label<?php echo $hide_label ? ' screen-reader-text' : ''; ?>">
+									<?php if ( ! empty( $bucket['short_top'] ) ) : ?>
+										<span class="pltt-chart-x-label-top"><?php echo esc_html( $bucket['short_top'] ); ?></span>
+									<?php endif; ?>
+									<span class="pltt-chart-x-label-bottom"><?php echo esc_html( $bucket['short'] ); ?></span>
+								</span>
+							</span>
+						<?php endforeach; ?>
+					</div>
+				</div>
+
+			</figure>
+		</section>
 	<?php endif; ?>
 
 	<div id="pltt-report-content" class="pltt-report-content">
