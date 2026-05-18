@@ -102,6 +102,11 @@ class PLTT_Reports {
 			? (float) $stats->billable_amount / ( $stats->total_minutes / 60 )
 			: 0;
 
+		// Top projects for the period (Card 1) — up to 2 highest-hours client-facing projects.
+		$top_projects = $total_entries > 0
+			? PLTT_Entries::get_top_projects_for_period( $date_from, $date_to, $filter_args, 2 )
+			: array();
+
 		// View-specific data.
 		$entries     = array();
 		$summary     = array();
@@ -111,8 +116,85 @@ class PLTT_Reports {
 		// Allocation stats for the summary table — always the full picture, not filtered by date.
 		$alloc_stats = array();
 
+		// Chart data (summary view only). Populated below.
+		$chart_buckets     = array();
+		$chart_bucket_size = 'day';
+		$chart_max_minutes = 0;
+		$chart_avg_minutes = 0;
+		$chart_today_key   = '';
+
 		if ( 'summary' === $view ) {
 			$summary = PLTT_Entries::get_summary_by_project( $date_from, $date_to, $filter_args );
+
+			// Build chart buckets aligned to the active filter range, then fold daily totals into them.
+			$chart_bucket_size = pltt_resolve_bucket_size( $date_from, $date_to );
+			$chart_buckets     = pltt_build_chart_buckets( $date_from, $date_to, $chart_bucket_size );
+
+			if ( ! empty( $chart_buckets ) ) {
+				$daily_rows = PLTT_Entries::get_chart_daily_totals( $date_from, $date_to, $filter_args );
+
+				// Initialize totals on each bucket and build a key -> index map for O(1) lookup.
+				$bucket_index = array();
+				foreach ( $chart_buckets as $i => $bucket ) {
+					$chart_buckets[ $i ]['billable_minutes']    = 0;
+					$chart_buckets[ $i ]['nonbillable_minutes'] = 0;
+					$bucket_index[ $bucket['key'] ]             = $i;
+				}
+
+				foreach ( $daily_rows as $row ) {
+					$ymd = $row->entry_date;
+					if ( 'day' === $chart_bucket_size ) {
+						$key = $ymd;
+					} elseif ( 'month' === $chart_bucket_size ) {
+						$key = substr( $ymd, 0, 7 );
+					} else {
+						// Weekly: find the bucket whose start <= ymd <= end.
+						$key = null;
+						foreach ( $chart_buckets as $bucket ) {
+							if ( $ymd >= $bucket['start'] && $ymd <= $bucket['end'] ) {
+								$key = $bucket['key'];
+								break;
+							}
+						}
+					}
+
+					if ( null === $key || ! isset( $bucket_index[ $key ] ) ) {
+						continue;
+					}
+
+					$i = $bucket_index[ $key ];
+					$chart_buckets[ $i ]['billable_minutes']    += (int) $row->billable_minutes;
+					$chart_buckets[ $i ]['nonbillable_minutes'] += (int) $row->nonbillable_minutes;
+				}
+
+				// Compute max + total minutes across buckets (for y-axis scale and average line).
+				$chart_total_minutes = 0;
+				foreach ( $chart_buckets as $bucket ) {
+					$bucket_total = (int) $bucket['billable_minutes'] + (int) $bucket['nonbillable_minutes'];
+					if ( $bucket_total > $chart_max_minutes ) {
+						$chart_max_minutes = $bucket_total;
+					}
+					$chart_total_minutes += $bucket_total;
+				}
+				$chart_avg_minutes = (int) round( $chart_total_minutes / count( $chart_buckets ) );
+
+				// Identify which bucket (if any) contains today, for the "today" marker.
+				$today_ymd = pltt_get_current_date();
+				if ( $today_ymd >= $date_from && $today_ymd <= $date_to ) {
+					if ( 'day' === $chart_bucket_size ) {
+						$chart_today_key = $today_ymd;
+					} elseif ( 'month' === $chart_bucket_size ) {
+						$chart_today_key = substr( $today_ymd, 0, 7 );
+					} else {
+						// Weekly: today's week-start key, aligned to start_of_week.
+						$week_start_dow  = (int) get_option( 'start_of_week', 0 );
+						$today_dt        = new DateTimeImmutable( $today_ymd, wp_timezone() );
+						$today_dow       = (int) $today_dt->format( 'w' );
+						$shift           = ( $today_dow - $week_start_dow + 7 ) % 7;
+						$chart_today_key = $today_dt->modify( "-{$shift} days" )->format( 'Y-m-d' );
+					}
+				}
+			}
 
 			// For projects with a budget, fetch allocation-aware stats.
 			// Recurring: hours within the selected date range vs monthly allocation.

@@ -33,21 +33,29 @@ $clients_url = admin_url( 'admin.php?page=pltt-clients' );
 	<?php else : ?>
 		<div class="pltt-context-projects">
 			<?php foreach ( $context_projects as $project ) :
-				$pid            = (int) $project->id;
-				$project_rate   = (float) ( $project->hourly_rate ?? 0 );
-				$effective_rate = pltt_resolve_billable_rate( (int) $context_client->id, $pid );
-
-				if ( $project_rate > 0 ) {
-					$rate_source = '';
-				} elseif ( (float) ( $context_client->hourly_rate ?? 0 ) > 0 ) {
-					$rate_source = __( 'client rate', 'plain-language-time-tracker' );
-				} else {
-					$rate_source = __( 'default', 'plain-language-time-tracker' );
-				}
+				$pid          = (int) $project->id;
+				$billing_type = pltt_get_billing_type( $project );
+				$is_internal  = ! empty( $context_client->is_internal ) || 'none' === $billing_type;
 
 				$meta_parts = array();
-				$meta_parts[] = pltt_format_currency( $effective_rate ) . '/hr'
-					. ( $rate_source ? ' (' . $rate_source . ')' : '' );
+
+				if ( $is_internal ) {
+					$meta_parts[] = __( 'N/A', 'plain-language-time-tracker' );
+				} else {
+					$project_rate   = (float) ( $project->hourly_rate ?? 0 );
+					$effective_rate = pltt_resolve_billable_rate( (int) $context_client->id, $pid );
+
+					if ( $project_rate > 0 ) {
+						$rate_source = '';
+					} elseif ( (float) ( $context_client->hourly_rate ?? 0 ) > 0 ) {
+						$rate_source = __( 'client rate', 'plain-language-time-tracker' );
+					} else {
+						$rate_source = __( 'default', 'plain-language-time-tracker' );
+					}
+
+					$meta_parts[] = pltt_format_currency( $effective_rate ) . '/hr'
+						. ( $rate_source ? ' (' . $rate_source . ')' : '' );
+				}
 
 				if ( ! empty( $project->recurring_period ) ) {
 					$meta_parts[] = ucfirst( $project->recurring_period );

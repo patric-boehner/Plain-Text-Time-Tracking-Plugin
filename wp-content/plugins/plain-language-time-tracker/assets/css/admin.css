@@ -124,12 +124,16 @@
 	flex-wrap: wrap;
 }
 
-/* Summary cards — extend WordPress .card with left-aligned layout */
+/* Summary cards — extend WordPress .card with left-aligned layout.
+   Column flex + margin-top:auto on .card-secondary pins the supporting
+   line to the bottom, so cards of different heights still align cleanly. */
 .pltt-summary-cards .card {
 	min-width: 150px;
 	text-align: left;
 	padding: 20px 25px;
 	border-radius: 4px;
+	display: flex;
+	flex-direction: column;
 }
 
 .card-value {
@@ -139,17 +143,81 @@
 	line-height: 1.2;
 }
 
+/* Card variant: value holds a string/name rather than a number. */
+.card-value.pltt-card-value-name {
+	font-size: 20px;
+	line-height: 1.25;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.card-value.pltt-card-value-empty {
+	color: var(--pltt-text-placeholder);
+}
+
+/* Client-name highlight inside .card-secondary (used by Top Project card). */
+.pltt-card-client {
+	color: var(--pltt-text-base);
+	font-weight: 500;
+}
+
+/* Utilization tooltip hover affordance on the Billable Hours card. */
+.pltt-utilization-text {
+	cursor: help;
+	border-bottom: 1px dotted var(--pltt-border);
+}
+
+/* Top Projects card: compact list of up to 2 client-facing projects (name + hours stacked). */
+.pltt-top-projects-list {
+	list-style: none;
+	margin: 0;
+	padding: 0;
+	display: flex;
+	flex-direction: column;
+	gap: 10px;
+}
+
+.pltt-top-project {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	min-width: 0;
+	margin: 0;
+}
+
+.pltt-top-project:last-child {
+	margin-bottom: 0;
+}
+
+.pltt-top-project-name {
+	font-size: 14px;
+	font-weight: 600;
+	line-height: 1.2;
+	color: var(--pltt-text-dark);
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.pltt-top-project-stats {
+	font-size: 12px;
+	line-height: 1.2;
+	color: var(--pltt-text-muted);
+	white-space: nowrap;
+}
+
 .card-label {
 	font-size: 13px;
 	color: var(--pltt-text-muted);
 	margin-bottom: 4px;
 }
 
-/* Card secondary metrics */
+/* Card secondary metrics — pinned to the bottom of the card via margin-top:auto. */
 .card-secondary {
 	font-size: 12px;
 	color: var(--pltt-text-subtle);
-	margin-top: 8px;
+	margin-top: auto;
 	padding-top: 8px;
 	border-top: 1px solid var(--pltt-border-light);
 	line-height: 1.5;

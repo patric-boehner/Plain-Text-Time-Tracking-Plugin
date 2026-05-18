@@ -63,6 +63,13 @@
 	white-space: nowrap;
 }
 
+/* Archived projects in the Project filter dropdown: visually deprioritized
+   but still selectable. They sort to the bottom of each client's group. */
+#pltt-filter-project option.pltt-project-archived {
+	color: #8c8f94;
+	font-style: italic;
+}
+
 /* Export button */
 #pltt-export-csv {
 	text-decoration: none;
@@ -262,6 +269,289 @@
 	font-size: 13px;
 }
 
+/* ---------- Reports chart (billable + non-billable bars) ---------- */
+
+.pltt-chart-section {
+	background: var(--pltt-bg-white);
+	border: 1px solid var(--pltt-border);
+	border-radius: 4px;
+	padding: 25px;
+	margin: 0 0 20px;
+}
+
+.pltt-chart-header {
+	display: flex;
+	align-items: baseline;
+	justify-content: space-between;
+	gap: 16px;
+	flex-wrap: wrap;
+	margin-bottom: 12px;
+}
+
+.pltt-chart-title {
+	margin: 0;
+	font-size: 14px;
+	font-weight: 600;
+	color: var(--pltt-text-dark);
+}
+
+.pltt-chart-legend {
+	display: flex;
+	gap: 16px;
+	margin: 0;
+	padding: 0;
+	list-style: none;
+	font-size: 12px;
+	color: var(--pltt-text-muted);
+}
+
+.pltt-chart-legend li {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+}
+
+.pltt-chart-swatch {
+	display: inline-block;
+	width: 10px;
+	height: 10px;
+	border-radius: 2px;
+}
+
+.pltt-chart-swatch-billable    { background: var(--pltt-success); }
+.pltt-chart-swatch-nonbillable { background: var(--pltt-border); }
+
+.pltt-chart {
+	margin: 0;
+}
+
+.pltt-chart-canvas {
+	display: flex;
+	gap: 10px;
+	height: 180px;
+	margin-top: 14px; /* headroom so value labels above tall bars don't crowd the header */
+}
+
+/* Shared sizing for the y-axis gutter — matched by the x-axis spacer below. */
+.pltt-chart-y-axis,
+.pltt-chart-x-spacer {
+	width: 30px;
+	flex: 0 0 30px;
+}
+
+.pltt-chart-y-axis {
+	position: relative;
+	font-size: 11px;
+	color: var(--pltt-text-muted);
+}
+
+.pltt-chart-y-label {
+	position: absolute;
+	right: 0;
+	line-height: 1;
+}
+
+.pltt-chart-y-label-top    { top: 0; }
+.pltt-chart-y-label-mid    { top: 50%; transform: translateY(-50%); }
+.pltt-chart-y-label-bottom { bottom: 0; }
+
+.pltt-chart-plot {
+	position: relative; /* containing block for the average reference line */
+	flex: 1 1 auto;
+	display: flex;
+	align-items: stretch;
+	gap: 4px;
+	min-width: 0;
+	border-bottom: 1px solid var(--pltt-border);
+	border-left:   1px solid var(--pltt-border);
+	padding: 0 4px;
+	/* Horizontal gridlines at 25%, 50%, 75% of the plot height. */
+	background-image:
+		linear-gradient(to right, var(--pltt-border-faint), var(--pltt-border-faint)),
+		linear-gradient(to right, var(--pltt-border-faint), var(--pltt-border-faint)),
+		linear-gradient(to right, var(--pltt-border-faint), var(--pltt-border-faint));
+	background-size: 100% 1px;
+	background-position: 0 25%, 0 50%, 0 75%;
+	background-repeat: no-repeat;
+}
+
+/* Weekend day-buckets get a near-imperceptible gray tint (daily view only). */
+.pltt-chart-col-weekend {
+	background: var(--pltt-bg-subtle);
+}
+
+/* Today's bar gets a faint primary-color background — slim column tint at bar
+   width, so it reads as "this one" without shouting at full-column width. */
+.pltt-chart-col-today .pltt-chart-bar {
+	background: #f0f6fc;
+}
+
+/* Period-average reference line, drawn over the columns. */
+.pltt-chart-avg-line {
+	position: absolute;
+	left: 4px;
+	right: 4px;
+	bottom: calc(var(--avg-pct, 0) * 100%);
+	height: 0;
+	border-top: 1px dashed var(--pltt-text-faint);
+	pointer-events: none;
+	z-index: 2;
+}
+
+.pltt-chart-avg-label {
+	position: absolute;
+	right: 0;
+	bottom: 100%;
+	margin-bottom: 1px;
+	padding: 1px 4px;
+	font-size: 10px;
+	font-weight: 600;
+	line-height: 1.2;
+	color: var(--pltt-text-muted);
+	background: var(--pltt-bg-white);
+	white-space: nowrap;
+	border-radius: 2px;
+}
+
+.pltt-chart-col {
+	flex: 1 1 0;
+	min-width: 0;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+}
+
+.pltt-chart-bar {
+	flex: 1 1 auto;
+	width: 100%;
+	max-width: 64px;
+	display: flex;
+	flex-direction: column;
+	justify-content: flex-end;
+	transition: opacity 120ms ease;
+}
+
+.pltt-chart-col:hover .pltt-chart-bar { opacity: 0.85; }
+
+.pltt-chart-seg {
+	display: block;
+	width: 100%;
+}
+
+/* Per-bar total label, sits just above the top segment in the flex stack. */
+.pltt-chart-value {
+	display: block;
+	font-size: 11px;
+	font-weight: 600;
+	line-height: 1.2;
+	color: var(--pltt-text-muted);
+	text-align: center;
+	padding-bottom: 5px;
+	white-space: nowrap;
+	flex-shrink: 0;
+}
+
+.pltt-chart-seg-billable {
+	background: var(--pltt-success);
+	height: calc(var(--billable-pct, 0) * 100%);
+	/* Rounding is hidden when non-billable sits on top; shows when non-billable is 0. */
+	border-radius: 2px 2px 0 0;
+}
+
+.pltt-chart-seg-nonbillable {
+	background: var(--pltt-border);
+	height: calc(var(--nonbillable-pct, 0) * 100%);
+	border-radius: 2px 2px 0 0;
+}
+
+.pltt-chart-col-empty .pltt-chart-bar::after {
+	content: "";
+	display: block;
+	width: 100%;
+	height: 1px;
+	background: var(--pltt-border-light);
+}
+
+/* X-axis: same flex layout as the plot, so tick centers line up with columns. */
+.pltt-chart-x-axis {
+	display: flex;
+	gap: 10px;
+	margin-top: 0;
+}
+
+.pltt-chart-x-ticks {
+	flex: 1 1 auto;
+	display: flex;
+	gap: 4px;
+	padding: 0 4px;
+	min-width: 0;
+}
+
+.pltt-chart-x-tick {
+	flex: 1 1 0;
+	min-width: 0;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+}
+
+.pltt-chart-x-tick::before {
+	content: "";
+	display: block;
+	width: 1px;
+	height: 4px;
+	background: var(--pltt-border);
+}
+
+/* "Today" emphasis: primary-colored tick, label, and date number. */
+.pltt-chart-x-tick-today::before {
+	width: 2px;
+	height: 6px;
+	background: var(--pltt-primary);
+}
+
+.pltt-chart-x-tick-today .pltt-chart-x-label-top,
+.pltt-chart-x-tick-today .pltt-chart-x-label-bottom {
+	color: var(--pltt-primary);
+}
+
+.pltt-chart-x-tick-today .pltt-chart-x-label-bottom {
+	font-weight: 700;
+}
+
+.pltt-chart-x-label {
+	margin-top: 4px;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 3px;
+	font-size: 11px;
+	line-height: 1.2;
+	color: var(--pltt-text-muted);
+	text-align: center;
+	max-width: 100%;
+}
+
+.pltt-chart-x-label-top {
+	font-size: 10px;
+	font-weight: 600;
+	color: var(--pltt-text-faint);
+	text-transform: uppercase;
+	letter-spacing: 0.02em;
+}
+
+.pltt-chart-x-label-bottom {
+	color: var(--pltt-text-muted);
+}
+
+.pltt-chart-x-label-top,
+.pltt-chart-x-label-bottom {
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	max-width: 100%;
+}
+
 /* Responsive */
 @media screen and (max-width: 782px) {
 	.pltt-report-content {
@@ -271,5 +561,13 @@
 	.pltt-report-content table {
 		display: block;
 		overflow-x: auto;
+	}
+
+	.pltt-chart-canvas {
+		height: 140px;
+	}
+
+	.pltt-chart-x-label {
+		font-size: 10px;
 	}
 }

@@ -587,6 +587,107 @@ class PLTT_Entries {
 	}
 
 	/**
+	 * Get the highest-hours projects for the given period.
+	 *
+	 * Used by the "Top Projects" summary card. Excludes the Internal client
+	 * (so the card reflects client-facing work).
+	 *
+	 * @param string $date_from Start date (Y-m-d).
+	 * @param string $date_to   End date (Y-m-d).
+	 * @param array  $args      Optional filters (same shape as get_summary_by_project()).
+	 * @param int    $limit     How many top projects to return (default 2).
+	 * @return array Rows of { project_id, project_name, client_name, total_minutes, entry_count }; empty if no data.
+	 */
+	public static function get_top_projects_for_period( $date_from, $date_to, $args = array(), $limit = 2 ) {
+		global $wpdb;
+		$entries_table  = PLTT_Database::get_table_name( 'time_entries' );
+		$projects_table = PLTT_Database::get_table_name( 'projects' );
+		$clients_table  = PLTT_Database::get_table_name( 'clients' );
+
+		$where   = array( 'e.entry_date >= %s', 'e.entry_date <= %s', 'e.verified = 1', 'e.project_id IS NOT NULL' );
+		$prepare = array( $date_from, $date_to );
+
+		// Exclude the Internal client so the "Top Project" card reflects client-facing work.
+		$internal_client_id = pltt_get_internal_client_id();
+		if ( $internal_client_id > 0 ) {
+			$where[] = 'e.client_id != %d';
+			$prepare[] = $internal_client_id;
+		}
+
+		// Shared filters: client, project, tag, billable, billed.
+		$common  = self::build_filter_clauses( $args, 'e.', 'e' );
+		$where   = array_merge( $where, $common['where'] );
+		$prepare = array_merge( $prepare, $common['prepare'] );
+
+		$where_sql = implode( ' AND ', $where );
+		$limit     = max( 1, (int) $limit );
+		$prepare[] = $limit;
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+		return $wpdb->get_results(
+			$wpdb->prepare(
+				"SELECT
+					p.id AS project_id,
+					p.name AS project_name,
+					c.name AS client_name,
+					SUM(e.duration_minutes) AS total_minutes,
+					COUNT(e.id) AS entry_count
+				FROM {$entries_table} e
+				LEFT JOIN {$projects_table} p ON e.project_id = p.id
+				LEFT JOIN {$clients_table} c ON e.client_id = c.id
+				WHERE {$where_sql}
+				GROUP BY p.id, p.name, c.name
+				ORDER BY total_minutes DESC, p.name ASC
+				LIMIT %d",
+				$prepare
+			)
+		);
+	}
+
+	/**
+	 * Get billable/non-billable daily totals for the reports chart.
+	 *
+	 * Returns one row per entry_date in the range, with the same filter set
+	 * as get_summary_by_project() so the chart matches the surrounding tables.
+	 * The caller is responsible for aggregating daily rows into week/month
+	 * buckets via pltt_build_chart_buckets().
+	 *
+	 * @param string $date_from Start date (Y-m-d).
+	 * @param string $date_to   End date (Y-m-d).
+	 * @param array  $args      Optional filters (client_id, project_id, tag, billable, billed, negate flags).
+	 * @return array Rows of { entry_date, billable_minutes, nonbillable_minutes }.
+	 */
+	public static function get_chart_daily_totals( $date_from, $date_to, $args = array() ) {
+		global $wpdb;
+		$entries_table = PLTT_Database::get_table_name( 'time_entries' );
+
+		$where   = array( 'e.entry_date >= %s', 'e.entry_date <= %s', 'e.verified = 1' );
+		$prepare = array( $date_from, $date_to );
+
+		// Shared filters: client, project, tag, billable, billed.
+		$common  = self::build_filter_clauses( $args, 'e.', 'e' );
+		$where   = array_merge( $where, $common['where'] );
+		$prepare = array_merge( $prepare, $common['prepare'] );
+
+		$where_sql = implode( ' AND ', $where );
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+		return $wpdb->get_results(
+			$wpdb->prepare(
+				"SELECT
+					e.entry_date,
+					COALESCE(SUM(CASE WHEN e.billable = 1 THEN e.duration_minutes ELSE 0 END), 0) AS billable_minutes,
+					COALESCE(SUM(CASE WHEN e.billable = 0 THEN e.duration_minutes ELSE 0 END), 0) AS nonbillable_minutes
+				FROM {$entries_table} e
+				WHERE {$where_sql}
+				GROUP BY e.entry_date
+				ORDER BY e.entry_date ASC",
+				$prepare
+			)
+		);
+	}
+
+	/**
 	 * Get daily totals for a date range.
 	 *
 	 * @param string $date_from Start date.
