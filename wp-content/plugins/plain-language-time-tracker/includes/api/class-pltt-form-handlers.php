@@ -89,9 +89,22 @@ class PLTT_Form_Handlers {
 		);
 
 		// Pass hourly_rate through — empty string clears it to NULL.
+		// TRC-13: '' is the documented signal to clear the column. The data
+		// layer routes it through pltt_set_nullable_fields() to write a real NULL
+		// (wpdb->update cannot write NULL via %d/%f).
 		if ( isset( $_POST['hourly_rate'] ) ) {
 			$raw_rate = wp_unslash( $_POST['hourly_rate'] );
-			$update_data['hourly_rate'] = '' === $raw_rate ? '' : floatval( $raw_rate );
+			if ( '' === $raw_rate ) {
+				$update_data['hourly_rate'] = '';
+			} else {
+				// SEC-M7: validate at the handler boundary.
+				$rate_float = floatval( $raw_rate );
+				$valid_rate = pltt_validate_hourly_rate( $rate_float );
+				if ( is_wp_error( $valid_rate ) ) {
+					self::redirect_back( array( 'pltt_error' => 'invalid_rate' ) );
+				}
+				$update_data['hourly_rate'] = $rate_float;
+			}
 		}
 
 		$result = PLTT_Clients::update( $client_id, $update_data );
@@ -148,6 +161,12 @@ class PLTT_Form_Handlers {
 			self::redirect_back( array( 'pltt_error' => 'invalid_project_id' ) );
 		}
 
+		// SEC-M2: status allowlist — the data layer rejects unknown values too,
+		// but reject early at the handler boundary.
+		if ( '' !== $status && ! in_array( $status, array( 'active', 'archived' ), true ) ) {
+			self::redirect_back( array( 'pltt_error' => 'invalid_status' ) );
+		}
+
 		$data = array();
 		if ( ! empty( $name ) ) {
 			$data['name'] = $name;
@@ -160,7 +179,17 @@ class PLTT_Form_Handlers {
 		}
 		if ( isset( $_POST['hourly_rate'] ) ) {
 			$raw_rate = wp_unslash( $_POST['hourly_rate'] );
-			$data['hourly_rate'] = '' === $raw_rate ? '' : floatval( $raw_rate );
+			if ( '' === $raw_rate ) {
+				$data['hourly_rate'] = '';
+			} else {
+				// SEC-M7: validate at the handler boundary.
+				$rate_float = floatval( $raw_rate );
+				$valid_rate = pltt_validate_hourly_rate( $rate_float );
+				if ( is_wp_error( $valid_rate ) ) {
+					self::redirect_back( array( 'pltt_error' => 'invalid_rate' ) );
+				}
+				$data['hourly_rate'] = $rate_float;
+			}
 		}
 		if ( isset( $_POST['recurring_period'] ) ) {
 			$recurring_period = sanitize_text_field( wp_unslash( $_POST['recurring_period'] ) );
@@ -248,6 +277,12 @@ class PLTT_Form_Handlers {
 			exit;
 		}
 
+		// SEC-M8: enforce the varchar(100) cap explicitly.
+		if ( mb_strlen( $tag_name ) > 100 ) {
+			wp_safe_redirect( add_query_arg( 'pltt_error', 'tag_too_long', $redirect_url ) );
+			exit;
+		}
+
 		// Check for duplicate.
 		if ( PLTT_Tags::get_by_name( $tag_name ) ) {
 			wp_safe_redirect( add_query_arg( 'pltt_error', 'tag_exists', $redirect_url ) );
@@ -287,6 +322,12 @@ class PLTT_Form_Handlers {
 
 		if ( ! $tag_id || empty( $new_tag ) ) {
 			wp_safe_redirect( add_query_arg( 'pltt_error', 'invalid_tag', $redirect_url ) );
+			exit;
+		}
+
+		// SEC-M8: enforce the varchar(100) cap.
+		if ( mb_strlen( $new_tag ) > 100 ) {
+			wp_safe_redirect( add_query_arg( 'pltt_error', 'tag_too_long', $redirect_url ) );
 			exit;
 		}
 
@@ -359,7 +400,12 @@ class PLTT_Form_Handlers {
 		// Empty/missing group_name => remove from group.
 		$group_name = isset( $_POST['group_name'] ) ? sanitize_text_field( wp_unslash( $_POST['group_name'] ) ) : '';
 
-		PLTT_Tags::bulk_set_group( $tag_ids, $group_name );
+		$result = PLTT_Tags::bulk_set_group( $tag_ids, $group_name );
+
+		if ( false === $result ) {
+			wp_safe_redirect( add_query_arg( 'pltt_error', 'tag_group_failed', $redirect_url ) );
+			exit;
+		}
 
 		wp_safe_redirect( add_query_arg( 'pltt_message', 'tags_grouped', $redirect_url ) );
 		exit;
@@ -374,7 +420,8 @@ class PLTT_Form_Handlers {
 		}
 		self::verify_nonce( 'pltt_save_entries' );
 
-		$date = isset( $_POST['date'] ) ? pltt_sanitize_date( wp_unslash( $_POST['date'] ) ) : '';
+		// SEC-M3: strict date — this handler writes to entries scoped by date.
+		$date = isset( $_POST['date'] ) ? pltt_sanitize_date_strict( wp_unslash( $_POST['date'] ) ) : '';
 
 		// Handle entries - may be JSON string or already decoded array.
 		$entries = array();
@@ -393,6 +440,11 @@ class PLTT_Form_Handlers {
 
 		if ( empty( $entries ) || ! is_array( $entries ) ) {
 			self::redirect_back( array( 'pltt_error' => 'no_entries' ) );
+		}
+
+		// SEC-H3: cap entries count to bound mass-corruption window from a forged submit.
+		if ( count( $entries ) > 200 ) {
+			self::redirect_back( array( 'pltt_error' => 'too_many_entries' ) );
 		}
 
 		$result = PLTT_Review::save_entries( $date, $entries );

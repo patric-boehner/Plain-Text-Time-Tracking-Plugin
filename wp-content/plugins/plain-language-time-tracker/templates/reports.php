@@ -666,11 +666,12 @@ $tab_base_url = add_query_arg( $filter_params, admin_url( 'admin.php' ) );
 						}
 						$detail_url = add_query_arg( $detail_args, admin_url( 'admin.php' ) );
 
-							$billing_type_pre = pltt_get_billing_type( $row );
-							$is_archived_row  = ! empty( $row->project_status ) && 'archived' === $row->project_status;
+							// OPT-DUP7: hoist billing_type once per row instead of calling twice.
+							$billing_type    = pltt_get_billing_type( $row );
+							$is_archived_row = ! empty( $row->project_status ) && 'archived' === $row->project_status;
 						?>
 							<tr<?php echo $is_archived_row ? ' class="pltt-row-archived"' : ''; ?>>
-								<td class="pltt-entry-desc-cell<?php echo 'none' !== $billing_type_pre ? ' pltt-desc-billable' : ''; ?>">
+								<td class="pltt-entry-desc-cell<?php echo 'none' !== $billing_type ? ' pltt-desc-billable' : ''; ?>">
 									<?php if ( ! empty( $row->project_name ) ) : ?>
 										<a href="<?php echo esc_url( $detail_url ); ?>"><span class="pltt-entry-desc-text"><?php echo esc_html( $row->project_name ); ?></span></a>
 									<?php else : ?>
@@ -686,16 +687,7 @@ $tab_base_url = add_query_arg( $filter_params, admin_url( 'admin.php' ) );
 									<?php endif; ?>
 								</td>
 								<td>
-									<?php $billing_type = pltt_get_billing_type( $row ); ?>
-									<?php if ( 'none' === $billing_type ) : ?>
-										<span class="pltt-badge"><?php esc_html_e( 'Internal', 'plain-language-time-tracker' ); ?></span>
-									<?php elseif ( 'recurring' === $billing_type ) : ?>
-										<span class="pltt-badge pltt-badge-info"><?php esc_html_e( 'Monthly', 'plain-language-time-tracker' ); ?></span>
-									<?php elseif ( 'fixed' === $billing_type ) : ?>
-										<span class="pltt-badge pltt-badge-purple"><?php esc_html_e( 'Fixed Budget', 'plain-language-time-tracker' ); ?></span>
-									<?php else : ?>
-										<span class="pltt-badge pltt-badge-success"><?php esc_html_e( 'Hourly', 'plain-language-time-tracker' ); ?></span>
-									<?php endif; ?>
+									<?php pltt_render_billing_type_badge( $billing_type ); ?>
 								</td>
 								<?php
 								$has_hours_alloc = ! empty( $row->budget_hours ) && ! empty( $row->project_id ) && isset( $alloc_stats[ $row->project_id ] );
@@ -756,7 +748,26 @@ $tab_base_url = add_query_arg( $filter_params, admin_url( 'admin.php' ) );
 				?>
 
 				<?php
-				$return_url = add_query_arg( $_GET, admin_url( 'admin.php' ) );
+				// SEC-M12: whitelist the query params that survive the round-trip
+				// into the Review screen's back-link, so attacker-injected params
+				// like pltt_error_message can't ride along.
+				$return_allowed = array_flip( array(
+					'page',
+					'view',
+					'from',
+					'to',
+					'client_id',
+					'project_id',
+					'tag',
+					'billable',
+					'billed',
+					'client_negate',
+					'project_negate',
+					'tag_negate',
+					'paged',
+				) );
+				// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only query for building a back-link.
+				$return_url = add_query_arg( array_intersect_key( wp_unslash( $_GET ), $return_allowed ), admin_url( 'admin.php' ) );
 				?>
 
 				<?php foreach ( $entries_by_date as $group_date => $group_entries ) :

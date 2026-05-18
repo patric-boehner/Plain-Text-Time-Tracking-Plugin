@@ -62,17 +62,20 @@ $has_entries      = ! empty( $existing_entries );
 		</div>
 
 		<?php
-		// Display success messages — inside header to prevent WordPress JS relocation.
-		if ( isset( $_GET['pltt_message'] ) ) {
-			$message_code = sanitize_text_field( wp_unslash( $_GET['pltt_message'] ) );
-			$messages     = array(
+		// OPT-DUP1: display success/error notices via shared helper. Inside the
+		// header div on purpose — see memory: WordPress JS relocates notices
+		// that are too far from the H1.
+		pltt_render_admin_notices(
+			array(
 				'entries_saved' => __( 'Entries saved successfully.', 'plain-language-time-tracker' ),
-			);
-
-			if ( isset( $messages[ $message_code ] ) ) {
-				echo '<div class="notice notice-success is-dismissible"><p>' . esc_html( $messages[ $message_code ] ) . '</p></div>';
-			}
-		}
+			),
+			array(
+				'invalid_date'     => __( 'Invalid date.', 'plain-language-time-tracker' ),
+				'no_entries'       => __( 'No entries to save.', 'plain-language-time-tracker' ),
+				'save_failed'      => __( 'Failed to save entries.', 'plain-language-time-tracker' ),
+				'too_many_entries' => __( 'Too many entries in one save (max 200).', 'plain-language-time-tracker' ),
+			)
+		);
 		?>
 	</div>
 

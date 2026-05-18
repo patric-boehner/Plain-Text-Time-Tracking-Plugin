@@ -19,13 +19,11 @@ foreach ( $clients as $client ) {
 	$clients_by_id[ $client->id ] = $client;
 }
 
-// Pre-fetch all project stats to avoid N+1 queries.
+// OPT-N2: bulk-load all per-project stats in one query instead of N×get_stats().
 $project_stats_by_id = array();
 if ( ! empty( $projects ) ) {
-	foreach ( $projects as $project ) {
-		$stats                                = PLTT_Entries::get_stats( array( 'project_id' => $project->id ) );
-		$project_stats_by_id[ $project->id ] = $stats;
-	}
+	$project_ids         = wp_list_pluck( $projects, 'id' );
+	$project_stats_by_id = PLTT_Entries::get_stats_grouped_by( 'project_id', array( 'project_ids' => $project_ids ) );
 }
 ?>
 
@@ -33,35 +31,21 @@ if ( ! empty( $projects ) ) {
 	<div class="pltt-header">
 		<h1><?php esc_html_e( 'Projects', 'plain-language-time-tracker' ); ?></h1>
 		<?php
-		// Display success/error messages.
-		if ( isset( $_GET['pltt_message'] ) ) {
-			$message_code = sanitize_text_field( wp_unslash( $_GET['pltt_message'] ) );
-			$messages     = array(
+		// OPT-DUP1: display success/error notices via shared helper.
+		pltt_render_admin_notices(
+			array(
 				'project_created' => __( 'Project created successfully.', 'plain-language-time-tracker' ),
 				'project_updated' => __( 'Project updated successfully.', 'plain-language-time-tracker' ),
 				'project_deleted' => __( 'Project deleted successfully.', 'plain-language-time-tracker' ),
-			);
-			if ( isset( $messages[ $message_code ] ) ) {
-				echo '<div class="notice notice-success is-dismissible"><p>' . esc_html( $messages[ $message_code ] ) . '</p></div>';
-			}
-		}
-
-		if ( isset( $_GET['pltt_error'] ) ) {
-			$error_code = sanitize_text_field( wp_unslash( $_GET['pltt_error'] ) );
-
-			if ( isset( $_GET['pltt_error_message'] ) ) {
-				$error_message = sanitize_text_field( wp_unslash( $_GET['pltt_error_message'] ) );
-				echo '<div class="notice notice-error is-dismissible"><p>' . esc_html( $error_message ) . '</p></div>';
-			} else {
-				$errors = array(
-					'invalid_project_id'    => __( 'Invalid project ID.', 'plain-language-time-tracker' ),
-					'project_update_failed' => __( 'Failed to update project.', 'plain-language-time-tracker' ),
-				);
-				if ( isset( $errors[ $error_code ] ) ) {
-					echo '<div class="notice notice-error is-dismissible"><p>' . esc_html( $errors[ $error_code ] ) . '</p></div>';
-				}
-			}
-		}
+			),
+			array(
+				'invalid_project_id'       => __( 'Invalid project ID.', 'plain-language-time-tracker' ),
+				'project_update_failed'    => __( 'Failed to update project.', 'plain-language-time-tracker' ),
+				'invalid_status'           => __( 'Invalid project status.', 'plain-language-time-tracker' ),
+				'invalid_recurring_period' => __( 'Invalid recurring period.', 'plain-language-time-tracker' ),
+				'invalid_rate'             => __( 'Hourly rate must be between 0 and 10,000.', 'plain-language-time-tracker' ),
+			)
+		);
 		?>
 		<div class="pltt-header-actions">
 			<button type="button" id="pltt-add-project-btn" class="button button-primary" <?php echo empty( $clients ) ? 'disabled' : ''; ?>>
@@ -206,15 +190,7 @@ if ( ! empty( $projects ) ) {
 								<?php echo $project_client ? esc_html( $project_client->name ) : '—'; ?>
 							</td>
 							<td>
-							<?php if ( 'none' === $billing_type ) : ?>
-								<span class="pltt-badge"><?php esc_html_e( 'Internal', 'plain-language-time-tracker' ); ?></span>
-							<?php elseif ( 'recurring' === $billing_type ) : ?>
-								<span class="pltt-badge pltt-badge-info"><?php esc_html_e( 'Monthly', 'plain-language-time-tracker' ); ?></span>
-							<?php elseif ( 'fixed' === $billing_type ) : ?>
-								<span class="pltt-badge pltt-badge-purple"><?php esc_html_e( 'Fixed Budget', 'plain-language-time-tracker' ); ?></span>
-							<?php else : ?>
-								<span class="pltt-badge pltt-badge-success"><?php esc_html_e( 'Hourly', 'plain-language-time-tracker' ); ?></span>
-							<?php endif; ?>
+								<?php pltt_render_billing_type_badge( $billing_type ); ?>
 							</td>
 							<td><?php
 								if ( 'none' === $billing_type ) {

@@ -206,26 +206,37 @@ class PLTT_Reports {
 				$to_ym              = substr( $date_to, 0, 7 );
 				$single_valid_month = ( $from_ym === $to_ym ) && ( $from_ym <= current_time( 'Y-m' ) );
 
+				// OPT-N3: bucket projects by which stats query they need, then run
+				// at most two bulk queries instead of one per project row.
+				$recurring_pids = array();
+				$alltime_pids   = array();
 				foreach ( $summary as $row ) {
 					$has_hours_budget = ! empty( $row->budget_hours );
 					$has_fee_budget   = ! empty( $row->budget_fee );
 					if ( empty( $row->project_id ) || ( ! $has_hours_budget && ! $has_fee_budget ) ) {
 						continue;
 					}
-					if ( ! empty( $row->recurring_period ) && $single_valid_month ) {
-						$alloc_stats[ $row->project_id ] = PLTT_Entries::get_stats( array(
-							'project_id' => (int) $row->project_id,
-							'date_from'  => $date_from,
-							'date_to'    => $date_to,
-						) );
-					} elseif ( ! empty( $row->recurring_period ) ) {
-						// Date range spans multiple months or is future — skip budget bar.
-						continue;
+					if ( ! empty( $row->recurring_period ) ) {
+						if ( $single_valid_month ) {
+							$recurring_pids[] = (int) $row->project_id;
+						}
+						// else: recurring but range spans months — skip budget bar entirely.
 					} else {
-						$alloc_stats[ $row->project_id ] = PLTT_Entries::get_stats( array(
-							'project_id' => (int) $row->project_id,
-						) );
+						$alltime_pids[] = (int) $row->project_id;
 					}
+				}
+
+				if ( ! empty( $recurring_pids ) ) {
+					$alloc_stats += PLTT_Entries::get_stats_grouped_by( 'project_id', array(
+						'project_ids' => $recurring_pids,
+						'date_from'   => $date_from,
+						'date_to'     => $date_to,
+					) );
+				}
+				if ( ! empty( $alltime_pids ) ) {
+					$alloc_stats += PLTT_Entries::get_stats_grouped_by( 'project_id', array(
+						'project_ids' => $alltime_pids,
+					) );
 				}
 			}
 		} else {

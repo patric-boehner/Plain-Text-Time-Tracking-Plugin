@@ -45,32 +45,24 @@ if ( ! empty( $ungrouped_tags ) ) {
 	<div class="pltt-header">
 		<h1><?php esc_html_e( 'Tags', 'plain-language-time-tracker' ); ?></h1>
 		<?php
-		// Display success/error messages.
-		if ( isset( $_GET['pltt_message'] ) ) {
-			$message_code = sanitize_text_field( wp_unslash( $_GET['pltt_message'] ) );
-			$messages     = array(
+		// OPT-DUP1: display success/error notices via shared helper.
+		pltt_render_admin_notices(
+			array(
 				'tag_created' => __( 'Tag created successfully.', 'plain-language-time-tracker' ),
 				'tag_renamed' => __( 'Tag renamed successfully.', 'plain-language-time-tracker' ),
 				'tag_deleted' => __( 'Tag deleted successfully.', 'plain-language-time-tracker' ),
-			);
-			if ( isset( $messages[ $message_code ] ) ) {
-				echo '<div class="notice notice-success is-dismissible"><p>' . esc_html( $messages[ $message_code ] ) . '</p></div>';
-			}
-		}
-
-		if ( isset( $_GET['pltt_error'] ) ) {
-			$error_code = sanitize_text_field( wp_unslash( $_GET['pltt_error'] ) );
-			$errors     = array(
+			),
+			array(
 				'tag_exists'        => __( 'A tag with that name already exists.', 'plain-language-time-tracker' ),
 				'tag_rename_failed' => __( 'Failed to rename tag.', 'plain-language-time-tracker' ),
 				'tag_create_failed' => __( 'Failed to create tag.', 'plain-language-time-tracker' ),
 				'tag_delete_failed' => __( 'Failed to delete tag.', 'plain-language-time-tracker' ),
+				'tag_group_failed'  => __( 'Failed to update tag group.', 'plain-language-time-tracker' ),
+				'tag_too_long'      => __( 'Tag name too long (max 100 characters).', 'plain-language-time-tracker' ),
 				'invalid_tag'       => __( 'Invalid tag name.', 'plain-language-time-tracker' ),
-			);
-			if ( isset( $errors[ $error_code ] ) ) {
-				echo '<div class="notice notice-error is-dismissible"><p>' . esc_html( $errors[ $error_code ] ) . '</p></div>';
-			}
-		}
+				'no_tags_selected'  => __( 'No tags selected.', 'plain-language-time-tracker' ),
+			)
+		);
 		?>
 		<div class="pltt-header-actions">
 			<button type="button" id="pltt-add-tag-btn" class="button button-primary">

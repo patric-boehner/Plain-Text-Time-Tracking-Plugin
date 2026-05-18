@@ -22,14 +22,16 @@ foreach ( $projects as $project ) {
 	$projects_by_client[ $project->client_id ][] = $project;
 }
 
-// Pre-fetch entry stats per client (entry count for delete-safety, date span for the View link).
+// OPT-N1: bulk-load all per-client stats in one query instead of N×get_stats().
 $entry_counts_by_client = array();
 $client_stats_by_id     = array();
 if ( ! empty( $clients ) ) {
+	$client_ids         = wp_list_pluck( $clients, 'id' );
+	$client_stats_by_id = PLTT_Entries::get_stats_grouped_by( 'client_id', array( 'client_ids' => $client_ids ) );
 	foreach ( $clients as $client ) {
-		$stats = PLTT_Entries::get_stats( array( 'client_id' => $client->id ) );
-		$entry_counts_by_client[ $client->id ] = isset( $stats->total_count ) ? (int) $stats->total_count : 0;
-		$client_stats_by_id[ $client->id ]     = $stats;
+		$entry_counts_by_client[ $client->id ] = isset( $client_stats_by_id[ $client->id ]->total_count )
+			? (int) $client_stats_by_id[ $client->id ]->total_count
+			: 0;
 	}
 }
 ?>
@@ -38,36 +40,20 @@ if ( ! empty( $clients ) ) {
 	<div class="pltt-header">
 		<h1><?php esc_html_e( 'Clients', 'plain-language-time-tracker' ); ?></h1>
 		<?php
-		// Display success/error messages.
-		if ( isset( $_GET['pltt_message'] ) ) {
-			$message_code = sanitize_text_field( wp_unslash( $_GET['pltt_message'] ) );
-			$messages     = array(
+		// OPT-DUP1: display success/error notices via shared helper.
+		pltt_render_admin_notices(
+			array(
 				'client_created' => __( 'Client created successfully.', 'plain-language-time-tracker' ),
 				'client_updated' => __( 'Client updated successfully.', 'plain-language-time-tracker' ),
 				'client_deleted' => __( 'Client deleted successfully.', 'plain-language-time-tracker' ),
-			);
-			if ( isset( $messages[ $message_code ] ) ) {
-				echo '<div class="notice notice-success is-dismissible"><p>' . esc_html( $messages[ $message_code ] ) . '</p></div>';
-			}
-		}
-
-		if ( isset( $_GET['pltt_error'] ) ) {
-			$error_code = sanitize_text_field( wp_unslash( $_GET['pltt_error'] ) );
-
-			if ( isset( $_GET['pltt_error_message'] ) ) {
-				$error_message = sanitize_text_field( wp_unslash( $_GET['pltt_error_message'] ) );
-				echo '<div class="notice notice-error is-dismissible"><p>' . esc_html( $error_message ) . '</p></div>';
-			} else {
-				$errors = array(
-					'invalid_client_id'    => __( 'Invalid client ID.', 'plain-language-time-tracker' ),
-					'client_update_failed' => __( 'Failed to update client.', 'plain-language-time-tracker' ),
-					'client_delete_failed' => __( 'Failed to delete client.', 'plain-language-time-tracker' ),
-				);
-				if ( isset( $errors[ $error_code ] ) ) {
-					echo '<div class="notice notice-error is-dismissible"><p>' . esc_html( $errors[ $error_code ] ) . '</p></div>';
-				}
-			}
-		}
+			),
+			array(
+				'invalid_client_id'    => __( 'Invalid client ID.', 'plain-language-time-tracker' ),
+				'client_update_failed' => __( 'Failed to update client.', 'plain-language-time-tracker' ),
+				'client_delete_failed' => __( 'Failed to delete client.', 'plain-language-time-tracker' ),
+				'invalid_rate'         => __( 'Hourly rate must be between 0 and 10,000.', 'plain-language-time-tracker' ),
+			)
+		);
 		?>
 		<div class="pltt-header-actions">
 			<button type="button" id="pltt-add-client-btn" class="button button-primary">

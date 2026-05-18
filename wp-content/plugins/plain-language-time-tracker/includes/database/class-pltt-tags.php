@@ -16,22 +16,6 @@ if ( ! defined( 'ABSPATH' ) ) {
 class PLTT_Tags {
 
 	/**
-	 * Get a single tag by ID.
-	 *
-	 * @param int $id Tag ID.
-	 * @return object|null Tag object or null.
-	 */
-	public static function get( $id ) {
-		global $wpdb;
-		$table = PLTT_Database::get_table_name( 'tags' );
-
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
-		return $wpdb->get_row(
-			$wpdb->prepare( "SELECT * FROM {$table} WHERE id = %d", $id )
-		);
-	}
-
-	/**
 	 * Get a single tag by name.
 	 *
 	 * @param string $name Tag name (case-insensitive).
@@ -127,7 +111,6 @@ class PLTT_Tags {
 		$result = $wpdb->insert( $table, $data, $formats );
 
 		if ( $result ) {
-			pltt_flush_tag_cache();
 			return $wpdb->insert_id;
 		}
 
@@ -190,7 +173,6 @@ class PLTT_Tags {
 			$wpdb->query( $wpdb->prepare( "UPDATE {$table} SET group_name = NULL WHERE id = %d", $id ) );
 		}
 
-		pltt_flush_tag_cache();
 		return true;
 	}
 
@@ -224,7 +206,6 @@ class PLTT_Tags {
 			return false;
 		}
 
-		pltt_flush_tag_cache();
 		return true;
 	}
 
@@ -272,7 +253,6 @@ class PLTT_Tags {
 			return 0;
 		}
 
-		pltt_flush_tag_cache();
 		return (int) $result;
 	}
 
@@ -338,7 +318,6 @@ class PLTT_Tags {
 		$result = $wpdb->delete( $tags_table, array( 'id' => $id ), array( '%d' ) );
 
 		if ( false !== $result ) {
-			pltt_flush_tag_cache();
 			return true;
 		}
 
@@ -492,7 +471,6 @@ class PLTT_Tags {
 			}
 		}
 
-		pltt_flush_tag_cache();
 		return $success;
 	}
 

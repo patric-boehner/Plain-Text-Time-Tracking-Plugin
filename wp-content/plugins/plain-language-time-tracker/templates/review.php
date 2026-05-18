@@ -23,7 +23,11 @@ foreach ( $entries as $entry ) {
 	$total_minutes += $entry['duration_minutes'] ?? 0;
 }
 
-$return_to = isset( $_GET['return_to'] ) ? esc_url_raw( wp_unslash( $_GET['return_to'] ) ) : '';
+// SEC-M11: Validate at render time as well as at form-submit time. An off-host
+// URL passes esc_url() but would still render in the back-link, enabling a
+// phishing back-button on the legit admin chrome.
+$return_to_raw = isset( $_GET['return_to'] ) ? esc_url_raw( wp_unslash( $_GET['return_to'] ) ) : '';
+$return_to     = $return_to_raw ? wp_validate_redirect( $return_to_raw, '' ) : '';
 ?>
 
 <div class="wrap pltt-wrap">
@@ -207,7 +211,6 @@ $return_to = isset( $_GET['return_to'] ) ? esc_url_raw( wp_unslash( $_GET['retur
 									value="<?php echo esc_attr( $entry['description'] ?? '' ); ?>"
 									title="<?php echo esc_attr( $entry['description'] ?? '' ); ?>"
 								>
-								<input type="hidden" name="entries[<?php echo esc_attr( $index ); ?>][raw_text]" value="<?php echo esc_attr( $entry['raw_text'] ?? '' ); ?>">
 								<?php if ( $entry_id ) : ?>
 									<input type="hidden" name="entries[<?php echo esc_attr( $index ); ?>][id]" value="<?php echo esc_attr( $entry_id ); ?>">
 								<?php endif; ?>

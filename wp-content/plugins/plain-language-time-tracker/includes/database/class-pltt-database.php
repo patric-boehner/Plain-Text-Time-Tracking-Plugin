@@ -170,20 +170,26 @@ class PLTT_Database {
 			KEY tag_id (tag_id)
 		) {$charset_collate};";
 		dbDelta( $sql_entry_tags );
-
-		// Update database version.
-		update_option( 'pltt_db_version', self::DB_VERSION );
 	}
 
 	/**
 	 * Check if database needs upgrade and run create_tables.
+	 *
+	 * Migrations run before create_tables() so dbDelta sees the post-migration
+	 * schema. The version option is only bumped after both succeed, so a
+	 * partial-failure run will retry on the next page load instead of being
+	 * silently considered "current."
 	 */
 	public static function maybe_upgrade() {
 		$current_version = get_option( 'pltt_db_version', '0' );
 
 		if ( version_compare( $current_version, self::DB_VERSION, '<' ) ) {
+			// Fresh installs skip migrate() — there is nothing to migrate from.
+			if ( '0' !== $current_version ) {
+				self::migrate( $current_version );
+			}
 			self::create_tables();
-			self::migrate( $current_version );
+			update_option( 'pltt_db_version', self::DB_VERSION );
 		}
 	}
 

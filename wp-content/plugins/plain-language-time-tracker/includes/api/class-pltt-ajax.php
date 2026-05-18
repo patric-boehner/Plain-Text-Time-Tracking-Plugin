@@ -118,7 +118,9 @@ class PLTT_Ajax {
 			return;
 		}
 
-		$date    = isset( $_POST['date'] ) ? pltt_sanitize_date( wp_unslash( $_POST['date'] ) ) : '';
+		// SEC-M3: Use the strict sanitizer here — silently falling back to today
+		// would cause an invalid/forged date to wipe today's entries.
+		$date    = isset( $_POST['date'] ) ? pltt_sanitize_date_strict( wp_unslash( $_POST['date'] ) ) : '';
 		$content = isset( $_POST['content'] ) ? sanitize_textarea_field( wp_unslash( $_POST['content'] ) ) : '';
 
 		if ( empty( $date ) ) {
@@ -166,8 +168,10 @@ class PLTT_Ajax {
 
 			if ( false === $result ) {
 				$all_created = false;
+				// SEC-M4: Log only non-sensitive fields. raw_text/description may
+				// contain client-confidential work descriptions.
 				// phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
-				error_log( sprintf( 'PLTT: Entry creation failed for date %s. Entry data: %s', $date, wp_json_encode( $entry ) ) );
+				error_log( sprintf( 'PLTT: Entry creation failed for date %s. start=%s end=%s', $date, $entry['start_time'] ?? '?', $entry['end_time'] ?? '?' ) );
 				break;
 			}
 		}
@@ -215,9 +219,6 @@ class PLTT_Ajax {
 			return;
 		}
 
-		global $wpdb;
-		$table = PLTT_Database::get_table_name( 'time_entries' );
-
 		if ( 'tags' === $field ) {
 			$tag_names = '' !== $value ? explode( ',', $value ) : array();
 			$result    = PLTT_Tags::sync_entry_tags( $entry_id, $tag_names );
@@ -234,31 +235,33 @@ class PLTT_Ajax {
 				return;
 			}
 
+			// SEC-M6/TRC-7: wrap the read-compute-write in a transaction and route
+			// through PLTT_Entries::update() (which detects nested TX) so the
+			// duration_minutes value used to compute billable_amount can't drift
+			// between read and write.
+			global $wpdb;
+			$wpdb->query( 'START TRANSACTION' );
+
 			$update_data = array( 'billable' => $int_value );
-			$formats     = array( '%d' );
 
 			if ( 1 === $int_value ) {
 				// Recalculate rate and amount when marking as billable.
 				$entry = PLTT_Entries::get( $entry_id );
 				if ( $entry && $entry->duration_minutes > 0 ) {
-					// OPT-M3: Use shared helper instead of inline rate resolution.
 					$hourly_rate                    = pltt_resolve_billable_rate( (int) $entry->client_id, (int) $entry->project_id );
 					$update_data['billable_rate']   = $hourly_rate;
 					$update_data['billable_amount'] = round( ( $entry->duration_minutes / 60.0 ) * $hourly_rate, 2 );
-					$formats[]                      = '%f';
-					$formats[]                      = '%f';
 				}
 			} else {
 				// Reset rate and amount when marking as non-billable.
 				$update_data['billable_rate']   = 0.00;
 				$update_data['billable_amount'] = 0.00;
-				$formats[]                      = '%f';
-				$formats[]                      = '%f';
 			}
 
-			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
-			$result = $wpdb->update( $table, $update_data, array( 'id' => $entry_id ), $formats, array( '%d' ) );
-			if ( false === $result ) {
+			$result = PLTT_Entries::update( $entry_id, $update_data );
+			$wpdb->query( $result ? 'COMMIT' : 'ROLLBACK' );
+
+			if ( ! $result ) {
 				wp_send_json_error( __( 'Failed to update entry.', 'plain-language-time-tracker' ) );
 				return;
 			}
@@ -267,6 +270,7 @@ class PLTT_Ajax {
 				'message'         => __( 'Saved.', 'plain-language-time-tracker' ),
 				'billable_amount' => $update_data['billable_amount'] ?? 0.0,
 			) );
+			return;
 		} else {
 			// 'billed' field — SEC-H3: Ensure value is strictly 0 or 1.
 			$int_value = (int) $value;
@@ -275,15 +279,8 @@ class PLTT_Ajax {
 				return;
 			}
 
-			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
-			$result = $wpdb->update(
-				$table,
-				array( $field => $int_value ),
-				array( 'id' => $entry_id ),
-				array( '%d' ),
-				array( '%d' )
-			);
-			if ( false === $result ) {
+			$result = PLTT_Entries::update( $entry_id, array( 'billed' => $int_value ) );
+			if ( ! $result ) {
 				wp_send_json_error( __( 'Failed to update entry.', 'plain-language-time-tracker' ) );
 				return;
 			}
@@ -338,7 +335,14 @@ class PLTT_Ajax {
 			'description' => $description,
 		);
 		if ( '' !== $hourly_rate ) {
-			$client_data['hourly_rate'] = floatval( $hourly_rate );
+			// SEC-M7: validate at the handler boundary too — the data layer also checks.
+			$rate_float = floatval( $hourly_rate );
+			$valid_rate = pltt_validate_hourly_rate( $rate_float );
+			if ( is_wp_error( $valid_rate ) ) {
+				wp_send_json_error( __( 'Invalid hourly rate.', 'plain-language-time-tracker' ) );
+				return;
+			}
+			$client_data['hourly_rate'] = $rate_float;
 		}
 
 		$client_id = PLTT_Clients::create( $client_data );
@@ -418,16 +422,33 @@ class PLTT_Ajax {
 			'billability_default' => $billability_default,
 		);
 		if ( '' !== $hourly_rate ) {
-			$project_data['hourly_rate'] = floatval( $hourly_rate );
+			// SEC-M7: validate at the handler boundary.
+			$rate_float = floatval( $hourly_rate );
+			$valid_rate = pltt_validate_hourly_rate( $rate_float );
+			if ( is_wp_error( $valid_rate ) ) {
+				wp_send_json_error( __( 'Invalid hourly rate.', 'plain-language-time-tracker' ) );
+				return;
+			}
+			$project_data['hourly_rate'] = $rate_float;
 		}
 		if ( '' !== $recurring_period ) {
 			$project_data['recurring_period'] = $recurring_period;
 		}
 		if ( '' !== $budget_hours ) {
-			$project_data['budget_hours'] = floatval( $budget_hours );
+			$hours_float = floatval( $budget_hours );
+			if ( $hours_float < 0 ) {
+				wp_send_json_error( __( 'Budget hours must be zero or positive.', 'plain-language-time-tracker' ) );
+				return;
+			}
+			$project_data['budget_hours'] = $hours_float;
 		}
 		if ( '' !== $budget_fee ) {
-			$project_data['budget_fee'] = floatval( $budget_fee );
+			$fee_float = floatval( $budget_fee );
+			if ( $fee_float < 0 ) {
+				wp_send_json_error( __( 'Budget fee must be zero or positive.', 'plain-language-time-tracker' ) );
+				return;
+			}
+			$project_data['budget_fee'] = $fee_float;
 			unset( $project_data['budget_hours'] ); // mutual exclusion: fee overrides hours
 		}
 
@@ -462,6 +483,14 @@ class PLTT_Ajax {
 			return;
 		}
 
+		// SEC-M8: tag.name is varchar(100). Reject explicitly rather than letting
+		// MySQL silently truncate (which would collide on the truncated prefix
+		// with another near-identical tag).
+		if ( mb_strlen( $tag_name ) > 100 ) {
+			wp_send_json_error( __( 'Tag name too long (max 100 characters).', 'plain-language-time-tracker' ) );
+			return;
+		}
+
 		if ( PLTT_Tags::get_by_name( $tag_name ) ) {
 			wp_send_json_error( __( 'A tag with that name already exists.', 'plain-language-time-tracker' ) );
 			return;
@@ -484,7 +513,8 @@ class PLTT_Ajax {
 			return;
 		}
 
-		$log_date = isset( $_POST['log_date'] ) ? pltt_sanitize_date( wp_unslash( $_POST['log_date'] ) ) : '';
+		// SEC-M3: strict date — this handler deletes data for the supplied date.
+		$log_date = isset( $_POST['log_date'] ) ? pltt_sanitize_date_strict( wp_unslash( $_POST['log_date'] ) ) : '';
 
 		if ( empty( $log_date ) ) {
 			wp_send_json_error( __( 'Invalid date.', 'plain-language-time-tracker' ) );

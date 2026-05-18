@@ -142,7 +142,6 @@ class PLTT_Clients {
 		);
 
 		if ( $result ) {
-			pltt_flush_client_cache();
 			return $wpdb->insert_id;
 		}
 
@@ -215,10 +214,6 @@ class PLTT_Clients {
 		// Set nullable fields to NULL directly since wpdb converts NULL to 0.
 		if ( $result && ! empty( $null_fields ) ) {
 			$result = pltt_set_nullable_fields( $table, $id, $null_fields );
-		}
-
-		if ( $result ) {
-			pltt_flush_client_cache();
 		}
 
 		return $result;
@@ -296,39 +291,10 @@ class PLTT_Clients {
 		);
 
 		if ( false !== $result ) {
-			pltt_flush_client_cache();
 			return true;
 		}
 
 		return false;
 	}
 
-	/**
-	 * Get client by name (for alias matching).
-	 *
-	 * @param string $name Client name.
-	 * @return object|null Client object or null.
-	 */
-	public static function get_by_name( $name ) {
-		global $wpdb;
-		$table = PLTT_Database::get_table_name( 'clients' );
-
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
-		return $wpdb->get_row(
-			$wpdb->prepare( "SELECT * FROM {$table} WHERE name = %s", $name )
-		);
-	}
-
-	/**
-	 * Count total clients.
-	 *
-	 * @return int Client count.
-	 */
-	public static function count() {
-		global $wpdb;
-		$table = PLTT_Database::get_table_name( 'clients' );
-
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
-		return (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$table}" );
-	}
 }

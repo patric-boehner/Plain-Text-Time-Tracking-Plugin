@@ -224,7 +224,6 @@ class PLTT_Projects {
 		);
 
 		if ( $result ) {
-			pltt_flush_project_cache();
 			return $wpdb->insert_id;
 		}
 
@@ -359,61 +358,7 @@ class PLTT_Projects {
 			$result = pltt_set_nullable_fields( $table, $id, $null_fields );
 		}
 
-		if ( $result ) {
-			pltt_flush_project_cache();
-		}
-
 		return $result;
-	}
-
-	/**
-	 * Archive a project.
-	 *
-	 * @param int $id Project ID.
-	 * @return bool True on success.
-	 */
-	public static function archive( $id ) {
-		return self::update( $id, array( 'status' => 'archived' ) );
-	}
-
-	/**
-	 * Restore an archived project.
-	 *
-	 * @param int $id Project ID.
-	 * @return bool True on success.
-	 */
-	public static function restore( $id ) {
-		return self::update( $id, array( 'status' => 'active' ) );
-	}
-
-	/**
-	 * Get the most recently used project for a client.
-	 *
-	 * Looks at recent time entries within PLTT_PREDICTION_WINDOW_DAYS.
-	 *
-	 * @param int $client_id Client ID.
-	 * @return object|null Project object or null.
-	 */
-	public static function get_recent_for_client( $client_id ) {
-		global $wpdb;
-		$entries_table  = PLTT_Database::get_table_name( 'time_entries' );
-		$projects_table = PLTT_Database::get_table_name( 'projects' );
-
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
-		return $wpdb->get_row(
-			$wpdb->prepare(
-				"SELECT p.* FROM {$projects_table} p
-				INNER JOIN {$entries_table} e ON p.id = e.project_id
-				WHERE p.client_id = %d
-				AND p.status = 'active'
-				AND e.entry_date >= DATE_SUB(CURDATE(), INTERVAL %d DAY)
-				GROUP BY p.id
-				ORDER BY MAX(e.entry_date) DESC, MAX(e.start_time) DESC
-				LIMIT 1",
-				$client_id,
-				PLTT_PREDICTION_WINDOW_DAYS
-			)
-		);
 	}
 
 	/**
@@ -520,27 +465,6 @@ class PLTT_Projects {
 		}
 
 		return $grouped;
-	}
-
-	/**
-	 * Count projects, optionally by status.
-	 *
-	 * @param string $status Optional status filter.
-	 * @return int Project count.
-	 */
-	public static function count( $status = '' ) {
-		global $wpdb;
-		$table = PLTT_Database::get_table_name( 'projects' );
-
-		if ( ! empty( $status ) ) {
-			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
-			return (int) $wpdb->get_var(
-				$wpdb->prepare( "SELECT COUNT(*) FROM {$table} WHERE status = %s", $status )
-			);
-		}
-
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
-		return (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$table}" );
 	}
 
 	/**

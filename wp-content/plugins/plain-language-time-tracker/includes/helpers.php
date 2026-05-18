@@ -72,30 +72,6 @@ function pltt_time_to_minutes( $time ) {
 }
 
 /**
- * Convert minutes since midnight to time string.
- *
- * @param int    $minutes Minutes since midnight.
- * @param string $format  Time format (12 or 24).
- * @return string Formatted time.
- */
-function pltt_minutes_to_time( $minutes, $format = '12' ) {
-	$hours = floor( $minutes / 60 );
-	$mins  = $minutes % 60;
-
-	if ( '24' === $format ) {
-		return sprintf( '%02d:%02d', $hours, $mins );
-	}
-
-	$period = $hours >= 12 ? 'pm' : 'am';
-	$hours  = $hours % 12;
-	if ( 0 === $hours ) {
-		$hours = 12;
-	}
-
-	return sprintf( '%d:%02d%s', $hours, $mins, $period );
-}
-
-/**
  * Format a Y-m-d date string for display.
  *
  * Interprets the date in the WordPress timezone so that the displayed
@@ -139,15 +115,6 @@ function pltt_get_current_date() {
 }
 
 /**
- * Get current time in H:i:s format.
- *
- * @return string Current time.
- */
-function pltt_get_current_time() {
-	return current_time( 'H:i:s' );
-}
-
-/**
  * Validate date string format.
  *
  * @param string $date Date string to validate.
@@ -163,7 +130,39 @@ function pltt_validate_date( $date ) {
 }
 
 /**
+ * Render admin success/error notices from query params. OPT-DUP1.
+ *
+ * Reads $_GET['pltt_message'] and $_GET['pltt_error'] and echoes the matching
+ * notice div if the code is in the provided allowlist map. Codes not in the
+ * map are silently ignored (defense against arbitrary query-string injection).
+ *
+ * @param array $messages Map of message code => localized success label.
+ * @param array $errors   Map of error code   => localized error label.
+ */
+function pltt_render_admin_notices( $messages = array(), $errors = array() ) {
+	if ( isset( $_GET['pltt_message'] ) ) {
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended
+		$message_code = sanitize_text_field( wp_unslash( $_GET['pltt_message'] ) );
+		if ( isset( $messages[ $message_code ] ) ) {
+			echo '<div class="notice notice-success is-dismissible"><p>' . esc_html( $messages[ $message_code ] ) . '</p></div>';
+		}
+	}
+
+	if ( isset( $_GET['pltt_error'] ) ) {
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended
+		$error_code = sanitize_text_field( wp_unslash( $_GET['pltt_error'] ) );
+		if ( isset( $errors[ $error_code ] ) ) {
+			echo '<div class="notice notice-error is-dismissible"><p>' . esc_html( $errors[ $error_code ] ) . '</p></div>';
+		}
+	}
+}
+
+/**
  * Sanitize and validate a date, returning current date if invalid.
+ *
+ * For destructive operations (delete/replace based on the supplied date),
+ * use pltt_sanitize_date_strict() instead — silently falling back to today
+ * would cause an invalid date to wipe today's data.
  *
  * @param string $date Date string.
  * @return string Valid date in Y-m-d format.
@@ -171,6 +170,21 @@ function pltt_validate_date( $date ) {
 function pltt_sanitize_date( $date ) {
 	$date = sanitize_text_field( $date );
 	return pltt_validate_date( $date ) ? $date : pltt_get_current_date();
+}
+
+/**
+ * Sanitize a date, returning empty string when invalid.
+ *
+ * Use this in destructive paths (process_log, delete_daily_log,
+ * save_entries) so that bad input fails closed instead of silently
+ * targeting today's data. SEC-M3.
+ *
+ * @param string $date Date string.
+ * @return string Valid Y-m-d date, or '' when invalid.
+ */
+function pltt_sanitize_date_strict( $date ) {
+	$date = sanitize_text_field( $date );
+	return pltt_validate_date( $date ) ? $date : '';
 }
 
 /**
@@ -232,31 +246,6 @@ function pltt_entry_ampm_side( $raw_text ) {
 		return 'pm';
 	}
 	return null;
-}
-
-/**
- * Check whether any time token in raw_text omits am/pm.
- *
- * Mirrors the time regex in PLTT_Time_Parser::parse_line(). Returns true
- * if at least one numeric time-like token in the line has no am/pm suffix
- * — the condition under which PHP silently defaults the time to AM.
- *
- * @param string $raw_text Original log line.
- * @return bool True if at least one time token lacks am/pm.
- */
-function pltt_raw_text_has_ambiguous_time( $raw_text ) {
-	if ( empty( $raw_text ) ) {
-		return false;
-	}
-	if ( ! preg_match_all( '/\b\d{1,2}(?::\d{2})?\s*(am|pm)?\b/i', $raw_text, $matches ) ) {
-		return false;
-	}
-	foreach ( $matches[1] as $ampm ) {
-		if ( '' === $ampm ) {
-			return true;
-		}
-	}
-	return false;
 }
 
 /**
@@ -608,61 +597,6 @@ function pltt_build_chart_buckets( $date_from, $date_to, $bucket_size ) {
 }
 
 /**
- * Get cached clients list.
- *
- * @return array Array of client objects.
- */
-function pltt_get_cached_clients() {
-	$cache_key = 'pltt_clients_list';
-	$clients   = get_transient( $cache_key );
-
-	if ( false === $clients ) {
-		$clients = PLTT_Clients::get_all();
-		set_transient( $cache_key, $clients, HOUR_IN_SECONDS );
-	}
-
-	return $clients;
-}
-
-/**
- * Flush clients cache.
- */
-function pltt_flush_client_cache() {
-	delete_transient( 'pltt_clients_list' );
-}
-
-/**
- * Get cached projects list.
- *
- * @param array $args Query arguments.
- * @return array Array of project objects.
- */
-function pltt_get_cached_projects( $args = array() ) {
-	// Only cache default "get all" queries.
-	if ( empty( $args ) ) {
-		$cache_key = 'pltt_projects_list';
-		$projects  = get_transient( $cache_key );
-
-		if ( false === $projects ) {
-			$projects = PLTT_Projects::get_all();
-			set_transient( $cache_key, $projects, HOUR_IN_SECONDS );
-		}
-
-		return $projects;
-	}
-
-	// Don't cache filtered queries.
-	return PLTT_Projects::get_all( $args );
-}
-
-/**
- * Flush projects cache.
- */
-function pltt_flush_project_cache() {
-	delete_transient( 'pltt_projects_list' );
-}
-
-/**
  * Get cached aliases list.
  *
  * @return array Array of alias objects.
@@ -684,30 +618,6 @@ function pltt_get_cached_aliases() {
  */
 function pltt_flush_alias_cache() {
 	delete_transient( 'pltt_aliases_list' );
-}
-
-/**
- * Get cached tags list.
- *
- * @return array Array of tag objects.
- */
-function pltt_get_cached_tags() {
-	$cache_key = 'pltt_tags_list';
-	$tags      = get_transient( $cache_key );
-
-	if ( false === $tags ) {
-		$tags = PLTT_Tags::get_all();
-		set_transient( $cache_key, $tags, HOUR_IN_SECONDS );
-	}
-
-	return $tags;
-}
-
-/**
- * Flush tags cache.
- */
-function pltt_flush_tag_cache() {
-	delete_transient( 'pltt_tags_list' );
 }
 
 /**
@@ -814,6 +724,24 @@ function pltt_render_pagination( $paged, $total_pages, $total_items, $base_url, 
  * @return bool True on success, false on DB error.
  */
 function pltt_set_nullable_fields( $table, $id, $fields ) {
+	if ( empty( $fields ) ) {
+		return true;
+	}
+
+	// SEC-M1: Defense-in-depth — column names are interpolated into raw SQL,
+	// so reject anything not on the known-nullable list before building the
+	// statement. esc_sql() only escapes string literals, not identifiers.
+	$allowed = array(
+		'client_id',
+		'project_id',
+		'hourly_rate',
+		'recurring_period',
+		'budget_hours',
+		'budget_fee',
+		'last_used',
+		'group_name',
+	);
+	$fields = array_values( array_intersect( $fields, $allowed ) );
 	if ( empty( $fields ) ) {
 		return true;
 	}
@@ -1081,6 +1009,24 @@ function pltt_get_billing_type( $project ) {
 	}
 	return 'hourly';
 }
+
+/**
+ * Echo a labeled badge for a billing type. OPT-DUP6.
+ *
+ * @param string $billing_type One of: recurring, fixed, hourly, none.
+ */
+function pltt_render_billing_type_badge( $billing_type ) {
+	$styles = array(
+		'none'      => array( '', __( 'Internal', 'plain-language-time-tracker' ) ),
+		'recurring' => array( 'pltt-badge-info', __( 'Monthly', 'plain-language-time-tracker' ) ),
+		'fixed'     => array( 'pltt-badge-purple', __( 'Fixed Budget', 'plain-language-time-tracker' ) ),
+		'hourly'    => array( 'pltt-badge-success', __( 'Hourly', 'plain-language-time-tracker' ) ),
+	);
+	list( $class, $label ) = $styles[ $billing_type ] ?? $styles['hourly'];
+	$class                 = trim( 'pltt-badge ' . $class );
+	echo '<span class="' . esc_attr( $class ) . '">' . esc_html( $label ) . '</span>';
+}
+
 
 /**
  * Render the allocation bar HTML for a project.

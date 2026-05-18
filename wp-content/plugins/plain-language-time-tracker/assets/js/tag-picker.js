@@ -318,21 +318,6 @@ var PlttTagPicker = ( function() {
 	};
 
 	/**
-	 * Remove a tag from the selection.
-	 *
-	 * @param {string} tag Tag to remove.
-	 */
-	PlttTagPicker.prototype._removeTag = function( tag ) {
-		var index = this.selectedTags.indexOf( tag );
-		if ( index !== -1 ) {
-			this.selectedTags.splice( index, 1 );
-			this._renderPills();
-			this._updateCheckboxStates();
-			this._sync();
-		}
-	};
-
-	/**
 	 * Bind all event listeners.
 	 */
 	PlttTagPicker.prototype._bindEvents = function() {

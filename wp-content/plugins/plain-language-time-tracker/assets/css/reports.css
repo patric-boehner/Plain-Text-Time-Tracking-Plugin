@@ -40,20 +40,6 @@
 	border-radius: 0 3px 3px 0;
 }
 
-/* Summary totals row */
-.pltt-summary-total td {
-	border-top: 2px solid var(--pltt-border);
-}
-
-/* Chart placeholder (future) */
-.pltt-chart-container {
-	margin: 20px 0;
-	padding: 20px;
-	background: var(--pltt-bg-faint);
-	border-radius: 4px;
-	min-height: 200px;
-}
-
 /* Filter dropdown width and truncation */
 .pltt-report-filters .pltt-filter-group select {
 	min-width: 160px;
@@ -68,11 +54,6 @@
 #pltt-filter-project option.pltt-project-archived {
 	color: #8c8f94;
 	font-style: italic;
-}
-
-/* Export button */
-#pltt-export-csv {
-	text-decoration: none;
 }
 
 /* Date group headers */
@@ -376,7 +357,7 @@
 }
 
 /* Weekend day-buckets get a near-imperceptible gray tint (daily view only). */
-.pltt-chart-col-weekend {
+.pltt-chart-col-weekend .pltt-chart-bar {
 	background: var(--pltt-bg-subtle);
 }
 

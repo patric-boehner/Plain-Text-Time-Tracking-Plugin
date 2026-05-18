@@ -302,7 +302,13 @@ class PLTT_Entries {
 			return false;
 		}
 
-		$wpdb->query( 'START TRANSACTION' );
+		// Only own the transaction if the caller has not already opened one
+		// (matches the pattern in create()).
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+		$own_transaction = ! (bool) $wpdb->get_var( 'SELECT @@in_transaction' );
+		if ( $own_transaction ) {
+			$wpdb->query( 'START TRANSACTION' );
+		}
 
 		$result = true;
 
@@ -328,7 +334,9 @@ class PLTT_Entries {
 			$result = PLTT_Tags::sync_entry_tags( $id, $data['tags'] );
 		}
 
-		$wpdb->query( $result ? 'COMMIT' : 'ROLLBACK' );
+		if ( $own_transaction ) {
+			$wpdb->query( $result ? 'COMMIT' : 'ROLLBACK' );
+		}
 
 		return $result;
 	}
@@ -384,50 +392,6 @@ class PLTT_Entries {
 			array( 'entry_date' => $date ),
 			array( '%s' )
 		);
-	}
-
-	/**
-	 * Get total minutes for a date range.
-	 *
-	 * @param array $args Query arguments (date_from, date_to, client_id, project_id).
-	 * @return int Total minutes.
-	 */
-	public static function get_total_minutes( $args = array() ) {
-		global $wpdb;
-		$table = PLTT_Database::get_table_name( 'time_entries' );
-
-		$where   = array( 'verified = 1' );
-		$prepare = array();
-
-		if ( ! empty( $args['date_from'] ) ) {
-			$where[]   = 'entry_date >= %s';
-			$prepare[] = $args['date_from'];
-		}
-
-		if ( ! empty( $args['date_to'] ) ) {
-			$where[]   = 'entry_date <= %s';
-			$prepare[] = $args['date_to'];
-		}
-
-		if ( ! empty( $args['client_id'] ) ) {
-			$where[]   = 'client_id = %d';
-			$prepare[] = absint( $args['client_id'] );
-		}
-
-		if ( ! empty( $args['project_id'] ) ) {
-			$where[]   = 'project_id = %d';
-			$prepare[] = absint( $args['project_id'] );
-		}
-
-		$sql = "SELECT COALESCE(SUM(duration_minutes), 0) FROM {$table} WHERE " . implode( ' AND ', $where );
-
-		if ( ! empty( $prepare ) ) {
-			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.NotPrepared
-			return (int) $wpdb->get_var( $wpdb->prepare( $sql, $prepare ) );
-		}
-
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.NotPrepared
-		return (int) $wpdb->get_var( $sql );
 	}
 
 	/**
@@ -502,36 +466,89 @@ class PLTT_Entries {
 	}
 
 	/**
-	 * Get summary by client for a date range.
+	 * Get aggregate stats grouped by client_id or project_id in a single query.
 	 *
-	 * @param string $date_from Start date.
-	 * @param string $date_to   End date.
-	 * @return array Array of client summaries.
+	 * OPT-N1/N2/N3: Replaces N×get_stats() calls in templates/clients.php,
+	 * templates/projects.php, and class-pltt-reports.php's allocation loop.
+	 *
+	 * @param string $group_by Either 'client_id' or 'project_id'.
+	 * @param array  $args     Optional filters: date_from, date_to, plus any
+	 *                         build_filter_clauses() args (billable/billed/tag/etc).
+	 *                         When grouping by project_id you may pass
+	 *                         project_ids => int[] to restrict the result; same
+	 *                         for client_ids when grouping by client_id.
+	 * @return array<int, object> Map keyed by the group column. Each value has
+	 *                            total_count, total_minutes, billable_minutes,
+	 *                            unbilled_billable_minutes, billable_amount,
+	 *                            first_entry_date, last_entry_date.
 	 */
-	public static function get_summary_by_client( $date_from, $date_to ) {
+	public static function get_stats_grouped_by( $group_by, $args = array() ) {
 		global $wpdb;
-		$entries_table = PLTT_Database::get_table_name( 'time_entries' );
-		$clients_table = PLTT_Database::get_table_name( 'clients' );
 
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
-		return $wpdb->get_results(
-			$wpdb->prepare(
-				"SELECT
-					c.id AS client_id,
-					c.name AS client_name,
-					SUM(e.duration_minutes) AS total_minutes,
-					COUNT(e.id) AS entry_count
-				FROM {$entries_table} e
-				LEFT JOIN {$clients_table} c ON e.client_id = c.id
-				WHERE e.entry_date >= %s
-				AND e.entry_date <= %s
-				AND e.verified = 1
-				GROUP BY c.id, c.name
-				ORDER BY total_minutes DESC",
-				$date_from,
-				$date_to
-			)
-		);
+		$allowed_groups = array( 'client_id', 'project_id' );
+		if ( ! in_array( $group_by, $allowed_groups, true ) ) {
+			return array();
+		}
+
+		$entries_table  = PLTT_Database::get_table_name( 'time_entries' );
+		$projects_table = PLTT_Database::get_table_name( 'projects' );
+		$clients_table  = PLTT_Database::get_table_name( 'clients' );
+
+		$where   = array( "e.{$group_by} IS NOT NULL" );
+		$prepare = array();
+
+		if ( ! empty( $args['date_from'] ) ) {
+			$where[]   = 'e.entry_date >= %s';
+			$prepare[] = $args['date_from'];
+		}
+		if ( ! empty( $args['date_to'] ) ) {
+			$where[]   = 'e.entry_date <= %s';
+			$prepare[] = $args['date_to'];
+		}
+
+		// Optional ID restriction (so we only aggregate rows we're going to read).
+		$ids_arg = $args[ $group_by . 's' ] ?? array();
+		$ids_arg = array_filter( array_map( 'absint', (array) $ids_arg ) );
+		if ( ! empty( $ids_arg ) ) {
+			$placeholders = implode( ',', array_fill( 0, count( $ids_arg ), '%d' ) );
+			$where[]      = "e.{$group_by} IN ({$placeholders})";
+			$prepare      = array_merge( $prepare, $ids_arg );
+		}
+
+		// Shared filters: client, project, tag, billable, billed.
+		$common  = self::build_filter_clauses( $args, 'e.', 'e' );
+		$where   = array_merge( $where, $common['where'] );
+		$prepare = array_merge( $prepare, $common['prepare'] );
+
+		$sql = "SELECT
+			e.{$group_by} AS group_key,
+			COUNT(*) AS total_count,
+			COALESCE(SUM(e.duration_minutes), 0) AS total_minutes,
+			COALESCE(SUM(CASE WHEN e.billable = 1 THEN e.duration_minutes ELSE 0 END), 0) AS billable_minutes,
+			COALESCE(SUM(CASE WHEN e.billable = 1 AND COALESCE(e.billed, 0) = 0 THEN e.duration_minutes ELSE 0 END), 0) AS unbilled_billable_minutes,
+			COALESCE(SUM(CASE WHEN e.billable = 1 THEN COALESCE(e.billable_amount, ROUND(e.duration_minutes / 60.0 * COALESCE(p.hourly_rate, c.hourly_rate, 0), 2)) ELSE 0 END), 0) AS billable_amount,
+			MIN(e.entry_date) AS first_entry_date,
+			MAX(e.entry_date) AS last_entry_date
+			FROM {$entries_table} e
+			LEFT JOIN {$projects_table} p ON e.project_id = p.id
+			LEFT JOIN {$clients_table} c ON e.client_id = c.id
+			WHERE " . implode( ' AND ', $where ) . "
+			GROUP BY e.{$group_by}";
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.NotPrepared
+		$rows = empty( $prepare )
+			? $wpdb->get_results( $sql )
+			: $wpdb->get_results( $wpdb->prepare( $sql, $prepare ) );
+
+		$out = array();
+		if ( $rows ) {
+			foreach ( $rows as $row ) {
+				$key         = (int) $row->group_key;
+				unset( $row->group_key );
+				$out[ $key ] = $row;
+			}
+		}
+		return $out;
 	}
 
 	/**
@@ -683,36 +700,6 @@ class PLTT_Entries {
 				GROUP BY e.entry_date
 				ORDER BY e.entry_date ASC",
 				$prepare
-			)
-		);
-	}
-
-	/**
-	 * Get daily totals for a date range.
-	 *
-	 * @param string $date_from Start date.
-	 * @param string $date_to   End date.
-	 * @return array Array of daily totals.
-	 */
-	public static function get_daily_totals( $date_from, $date_to ) {
-		global $wpdb;
-		$table = PLTT_Database::get_table_name( 'time_entries' );
-
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
-		return $wpdb->get_results(
-			$wpdb->prepare(
-				"SELECT
-					entry_date,
-					SUM(duration_minutes) AS total_minutes,
-					COUNT(id) AS entry_count
-				FROM {$table}
-				WHERE entry_date >= %s
-				AND entry_date <= %s
-				AND verified = 1
-				GROUP BY entry_date
-				ORDER BY entry_date ASC",
-				$date_from,
-				$date_to
 			)
 		);
 	}

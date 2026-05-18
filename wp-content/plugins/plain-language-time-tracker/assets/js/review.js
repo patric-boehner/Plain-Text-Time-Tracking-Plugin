@@ -337,7 +337,8 @@
 					var billDefault = parseInt( project.billability_default, 10 ) === 1 ? '1' : '0';
 					var dataAttr = ' data-billability-default="' + billDefault + '"' +
 						( isArchived ? ' data-archived="1"' : '' );
-					html += '<option value="' + project.id + '"' + dataAttr + '>' +
+					// SEC-M13: defense-in-depth — coerce id to int before interpolating.
+					html += '<option value="' + parseInt( project.id, 10 ) + '"' + dataAttr + '>' +
 						label + '</option>';
 				} );
 
@@ -713,7 +714,6 @@
 				start_time: row.querySelector( '.pltt-start-time' ).value,
 				end_time: row.querySelector( '.pltt-end-time' ).value,
 				duration_minutes: row.querySelector( '.pltt-duration-minutes' ).value,
-				raw_text: row.querySelector( 'input[name*="[raw_text]"]' ).value,
 				description: row.querySelector( '.pltt-description' ).value,
 				client_id: row.querySelector( '.pltt-client-select' ).value,
 				project_id: row.querySelector( '.pltt-project-select' ).value,
