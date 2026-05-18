@@ -109,7 +109,6 @@
 .pltt-date-nav {
 	display: flex;
 	align-items: center;
-	/* gap: 10px; */
 }
 
 .pltt-date-nav input[type="date"] {
@@ -143,23 +142,8 @@
 	line-height: 1.2;
 }
 
-/* Card variant: value holds a string/name rather than a number. */
-.card-value.pltt-card-value-name {
-	font-size: 20px;
-	line-height: 1.25;
-	white-space: nowrap;
-	overflow: hidden;
-	text-overflow: ellipsis;
-}
-
 .card-value.pltt-card-value-empty {
 	color: var(--pltt-text-placeholder);
-}
-
-/* Client-name highlight inside .card-secondary (used by Top Project card). */
-.pltt-card-client {
-	color: var(--pltt-text-base);
-	font-weight: 500;
 }
 
 /* Utilization tooltip hover affordance on the Billable Hours card. */
@@ -223,22 +207,7 @@
 	line-height: 1.5;
 }
 
-.card-detail {
-	font-size: 11px;
-	color: var(--pltt-text-muted);
-}
-
 /* Status indicators */
-.status-good {
-	color: var(--pltt-success);
-	font-weight: 500;
-}
-
-.status-warning {
-	color: var(--pltt-warning);
-	font-weight: 500;
-}
-
 .status-neutral {
 	color: var(--pltt-text-muted);
 	font-weight: 500;
@@ -363,16 +332,6 @@
 	line-height: 1.3;
 }
 
-.pltt-alloc-ok {
-	color: var(--pltt-success);
-	font-weight: 600;
-}
-
-.pltt-alloc-warn {
-	color: var(--pltt-warning);
-	font-weight: 600;
-}
-
 .pltt-alloc-over {
 	color: var(--pltt-danger);
 	font-weight: 600;
@@ -463,10 +422,6 @@
 
 .pltt-empty {
 	color: var(--pltt-text-placeholder);
-}
-
-.pltt-no-duration {
-	color: var(--pltt-warning);
 }
 
 /* Notices — uses WordPress .notice classes, only override p margin */
@@ -587,8 +542,6 @@
 	justify-content: space-between;
 	align-items: center;
 	margin-top: 25px;
-	/* padding-top: 20px; */
-	/* border-top: 1px solid var(--pltt-border); */
 }
 
 .pltt-form-actions-left,
@@ -596,34 +549,6 @@
 	display: flex;
 	align-items: center;
 	gap: 15px;
-}
-
-/* Status indicators */
-.pltt-status-saved {
-	color: var(--pltt-success);
-}
-
-.pltt-status-saving {
-	color: var(--pltt-warning);
-}
-
-.pltt-status-error {
-	color: var(--pltt-danger);
-}
-
-.pltt-status-verified {
-	color: var(--pltt-success);
-	font-weight: 500;
-}
-
-.pltt-status-draft {
-	color: var(--pltt-warning);
-	font-weight: 500;
-}
-
-.pltt-status-billable {
-	color: var(--pltt-primary);
-	font-weight: 500;
 }
 
 /* Billable $ symbol indicator */
@@ -937,39 +862,6 @@ fieldset.pltt-date-nav-custom-inputs input[type="date"] {
 	padding: 1em 0 0 0;
 }
 
-/* Clients & Projects two-column layout */
-.pltt-two-column {
-	display: grid;
-	grid-template-columns: 1fr 1fr;
-	gap: 30px;
-}
-
-.pltt-section {
-	background: var(--pltt-bg-white);
-	border: 1px solid var(--pltt-border);
-	border-radius: 4px;
-	padding: 20px;
-}
-
-.pltt-section-header {
-	display: flex;
-	justify-content: space-between;
-	align-items: center;
-	margin-bottom: 15px;
-	padding-bottom: 10px;
-	border-bottom: 1px solid var(--pltt-border-light);
-}
-
-.pltt-section-header h2 {
-	margin: 0;
-}
-
-@media screen and (max-width: 1200px) {
-	.pltt-two-column {
-		grid-template-columns: 1fr;
-	}
-}
-
 /* Responsive */
 @media screen and (max-width: 782px) {
 	.pltt-header {
@@ -1083,13 +975,6 @@ fieldset.pltt-date-nav-custom-inputs input[type="date"] {
 	font-weight: 600;
 }
 
-/* Inherited rate source label */
-.pltt-rate-source {
-	display: block;
-	font-size: 11px;
-	color: var(--pltt-text-faint);
-}
-
 /* Projects page: active/archived grouping. Tags page reuses the same section pattern. */
 .pltt-project-group,
 .pltt-tag-group {
@@ -1142,16 +1027,14 @@ fieldset.pltt-date-nav-custom-inputs input[type="date"] {
 	overflow-wrap: anywhere;
 }
 
-.pltt-projects-toolbar,
-.pltt-tags-toolbar {
+.pltt-projects-toolbar {
 	display: flex;
 	align-items: center;
 	gap: 8px;
 	margin-bottom: 12px;
 }
 
-.pltt-projects-toolbar label,
-.pltt-tags-toolbar label {
+.pltt-projects-toolbar label {
 	font-size: 13px;
 	color: var(--pltt-text-faint);
 }

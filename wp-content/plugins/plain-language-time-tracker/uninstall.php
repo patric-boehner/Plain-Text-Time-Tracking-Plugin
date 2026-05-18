@@ -26,9 +26,8 @@ delete_option( 'pltt_db_version' );
 // Delete plugin options not covered by drop_tables().
 delete_option( 'pltt_custom_tags' ); // May already be gone from 1.8.1 migration.
 
-// Delete any transients.
-delete_transient( 'pltt_daily_log_cache' );
+// Delete any transients written by the helpers.
 delete_transient( 'pltt_tags_list' );
-
-// Clear any scheduled events (if added in future).
-wp_clear_scheduled_hook( 'pltt_daily_cleanup' );
+delete_transient( 'pltt_clients_list' );
+delete_transient( 'pltt_projects_list' );
+delete_transient( 'pltt_aliases_list' );

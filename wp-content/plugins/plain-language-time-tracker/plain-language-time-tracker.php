@@ -33,7 +33,6 @@ define( 'PLTT_ENTRIES_PER_PAGE', 50 );
 define( 'PLTT_LOGS_PER_PAGE', 20 );
 define( 'PLTT_AUTOSAVE_DEBOUNCE_MS', 1500 );
 define( 'PLTT_DEFAULT_HOURLY_RATE', 100.00 );
-define( 'PLTT_INTERNAL_CLIENT_ID', 3 );
 define( 'PLTT_ALLOWED_RECURRING_PERIODS', array( '', 'weekly', 'monthly', 'quarterly', 'yearly' ) );
 
 /**
@@ -73,17 +72,9 @@ function pltt_activate() {
 	pltt_load_dependencies();
 	PLTT_Database::create_tables();
 	add_option( 'pltt_version', PLTT_VERSION );
-	add_option( 'pltt_db_version', '1.0.0' );
+	add_option( 'pltt_db_version', PLTT_Database::DB_VERSION );
 }
 register_activation_hook( __FILE__, 'pltt_activate' );
-
-/**
- * Plugin deactivation.
- */
-function pltt_deactivate() {
-	// No cleanup needed on deactivation.
-}
-register_deactivation_hook( __FILE__, 'pltt_deactivate' );
 
 /**
  * Initialize the plugin.

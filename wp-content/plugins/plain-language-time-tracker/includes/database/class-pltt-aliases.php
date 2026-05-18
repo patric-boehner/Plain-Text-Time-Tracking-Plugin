@@ -16,13 +16,6 @@ if ( ! defined( 'ABSPATH' ) ) {
 class PLTT_Aliases {
 
 	/**
-	 * Minimum confidence threshold for auto-selection.
-	 *
-	 * @var float
-	 */
-	const CONFIDENCE_THRESHOLD = PLTT_CONFIDENCE_THRESHOLD;
-
-	/**
 	 * Generic words that should not be used as client aliases.
 	 *
 	 * These are common activity/task words that appear across many clients
@@ -130,39 +123,6 @@ class PLTT_Aliases {
 	}
 
 	/**
-	 * Create or update an alias.
-	 *
-	 * If alias exists, updates it. Otherwise creates new.
-	 *
-	 * @param array $data Alias data.
-	 * @return int|false Alias ID or false on failure.
-	 */
-	public static function save( $data ) {
-		$alias_text = sanitize_text_field( $data['alias_text'] ?? '' );
-
-		if ( empty( $alias_text ) ) {
-			return false;
-		}
-
-		$existing = self::get_by_text( $alias_text );
-
-		if ( $existing ) {
-			// Update existing alias.
-			self::update(
-				$existing->id,
-				array(
-					'client_id'  => $data['client_id'] ?? $existing->client_id,
-					'project_id' => $data['project_id'] ?? $existing->project_id,
-				)
-			);
-			return $existing->id;
-		}
-
-		// Create new alias.
-		return self::create( $data );
-	}
-
-	/**
 	 * Create a new alias.
 	 *
 	 * @param array $data Alias data.
@@ -215,85 +175,6 @@ class PLTT_Aliases {
 	}
 
 	/**
-	 * Update an alias.
-	 *
-	 * @param int   $id   Alias ID.
-	 * @param array $data Data to update.
-	 * @return bool True on success.
-	 */
-	public static function update( $id, $data ) {
-		global $wpdb;
-		$table = PLTT_Database::get_table_name( 'aliases' );
-
-		$update_data  = array();
-		$formats      = array();
-		$null_fields  = array();
-
-		$nullable_fields = array( 'client_id', 'project_id' );
-
-		if ( array_key_exists( 'client_id', $data ) ) {
-			if ( ! empty( $data['client_id'] ) ) {
-				$update_data['client_id'] = absint( $data['client_id'] );
-				$formats[]                = '%d';
-			} else {
-				$null_fields[] = 'client_id';
-			}
-		}
-
-		if ( array_key_exists( 'project_id', $data ) ) {
-			if ( ! empty( $data['project_id'] ) ) {
-				$update_data['project_id'] = absint( $data['project_id'] );
-				$formats[]                 = '%d';
-			} else {
-				$null_fields[] = 'project_id';
-			}
-		}
-
-		if ( isset( $data['confidence'] ) ) {
-			$update_data['confidence'] = max( 0, min( 1, floatval( $data['confidence'] ) ) );
-			$formats[]                 = '%f';
-		}
-
-		if ( isset( $data['use_count'] ) ) {
-			$update_data['use_count'] = absint( $data['use_count'] );
-			$formats[]                = '%d';
-		}
-
-		if ( isset( $data['correct_count'] ) ) {
-			$update_data['correct_count'] = absint( $data['correct_count'] );
-			$formats[]                    = '%d';
-		}
-
-		if ( empty( $update_data ) && empty( $null_fields ) ) {
-			return false;
-		}
-
-		$result = true;
-
-		if ( ! empty( $update_data ) ) {
-			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
-			$result = false !== $wpdb->update(
-				$table,
-				$update_data,
-				array( 'id' => $id ),
-				$formats,
-				array( '%d' )
-			);
-		}
-
-		// Set nullable fields to NULL directly since wpdb->update() converts NULL to 0 with %d.
-		if ( $result && ! empty( $null_fields ) ) {
-			$result = pltt_set_nullable_fields( $table, $id, $null_fields );
-		}
-
-		if ( $result ) {
-			pltt_flush_alias_cache();
-		}
-
-		return $result;
-	}
-
-	/**
 	 * Record a usage of an alias.
 	 *
 	 * @param int  $id         Alias ID.
@@ -302,30 +183,30 @@ class PLTT_Aliases {
 	public static function record_usage( $id, $was_correct = true ) {
 		global $wpdb;
 		$table = PLTT_Database::get_table_name( 'aliases' );
+		$id    = absint( $id );
 
-		$alias = self::get( $id );
-		if ( ! $alias ) {
+		if ( ! $id ) {
 			return;
 		}
 
-		$new_use_count     = $alias->use_count + 1;
-		$new_correct_count = $was_correct ? $alias->correct_count + 1 : $alias->correct_count;
+		// SEC-M9: atomic UPDATE so concurrent calls increment monotonically.
+		// The previous read-modify-write could lose counter bumps.
+		$delta = $was_correct ? 1 : 0;
 
-		// Recalculate confidence.
-		$new_confidence = $new_use_count > 0 ? $new_correct_count / $new_use_count : 0.5;
-
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
-		$wpdb->update(
-			$table,
-			array(
-				'use_count'     => $new_use_count,
-				'correct_count' => $new_correct_count,
-				'confidence'    => $new_confidence,
-				'last_used'     => current_time( 'mysql' ),
-			),
-			array( 'id' => $id ),
-			array( '%d', '%d', '%f', '%s' ),
-			array( '%d' )
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.NotPrepared
+		$wpdb->query(
+			$wpdb->prepare(
+				"UPDATE {$table}
+				 SET use_count     = use_count + 1,
+				     correct_count = correct_count + %d,
+				     confidence    = (correct_count + %d) / (use_count + 1),
+				     last_used     = %s
+				 WHERE id = %d",
+				$delta,
+				$delta,
+				current_time( 'mysql' ),
+				$id
+			)
 		);
 	}
 
@@ -335,7 +216,7 @@ class PLTT_Aliases {
 	 * @param string $text Text to search.
 	 * @return array Array of matching alias objects with positions.
 	 */
-	public static function find_in_text( $text ) {
+	private static function find_in_text( $text ) {
 		$aliases = pltt_get_cached_aliases();
 		$matches = array();
 
@@ -374,31 +255,6 @@ class PLTT_Aliases {
 		}
 
 		return null;
-	}
-
-	/**
-	 * Delete an alias.
-	 *
-	 * @param int $id Alias ID.
-	 * @return bool True on success.
-	 */
-	public static function delete( $id ) {
-		global $wpdb;
-		$table = PLTT_Database::get_table_name( 'aliases' );
-
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
-		$result = $wpdb->delete(
-			$table,
-			array( 'id' => $id ),
-			array( '%d' )
-		);
-
-		if ( false !== $result ) {
-			pltt_flush_alias_cache();
-			return true;
-		}
-
-		return false;
 	}
 
 	/**

@@ -31,8 +31,7 @@ const PLTT = {
 		} )
 			.then( response => response.json() )
 			.then( callback )
-			.catch( error => {
-				console.error( 'PLTT Error:', error );
+			.catch( () => {
 				callback( { success: false, data: plttData.i18n.error } );
 			} );
 	},
@@ -55,15 +54,20 @@ const PLTT = {
 	/**
 	 * Format minutes as duration string.
 	 *
-	 * OPT-L6 SYNC: Output format must match pltt_format_duration() in includes/helpers.php.
-	 * Update both if the format changes.
+	 * SYNC: Output format and edge-case handling must match pltt_format_duration()
+	 * in includes/helpers.php. Update both if the format changes.
 	 *
 	 * @param {number} minutes Total minutes.
 	 * @return {string} Formatted duration.
 	 */
 	formatDuration: function( minutes ) {
-		const hours = Math.floor( minutes / 60 );
-		const mins = minutes % 60;
+		const n = Number( minutes );
+		if ( ! Number.isFinite( n ) || n <= 0 ) {
+			return '0m';
+		}
+		const total = Math.round( n );
+		const hours = Math.floor( total / 60 );
+		const mins  = total % 60;
 
 		if ( hours > 0 && mins > 0 ) {
 			return hours + 'h ' + mins + 'm';
@@ -76,11 +80,18 @@ const PLTT = {
 	/**
 	 * Format minutes as decimal hours.
 	 *
+	 * SYNC: Matches pltt_format_hours() in includes/helpers.php, which uses
+	 * number_format(_, 2) — includes a thousands separator for values ≥1000.
+	 *
 	 * @param {number} minutes Total minutes.
 	 * @return {string} Formatted hours.
 	 */
 	formatHours: function( minutes ) {
-		return ( minutes / 60 ).toFixed( 2 );
+		const n = Number( minutes );
+		if ( ! Number.isFinite( n ) || n < 0 ) {
+			return '0.00';
+		}
+		return ( n / 60 ).toLocaleString( 'en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 } );
 	},
 
 	/**

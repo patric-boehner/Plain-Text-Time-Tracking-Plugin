@@ -426,134 +426,120 @@
 		}
 
 		/**
-		 * Billable toggle — click handler via delegation.
+		 * OPT-DUP19 / Group H: shared inline-toggle binding.
+		 *
+		 * @param {Object} opts
+		 *   selector  - CSS selector for the toggle button (matched via .closest).
+		 *   field     - server field name ('billable' or 'billed').
+		 *   classes   - { on, off } classes to toggle on the button.
+		 *   labels    - { on, off } accessible label strings.
+		 *   apply     - fn( btn, row, isOn ) - extra UI changes when state flips on/off.
+		 *   onSuccess - fn( btn, row, data ) - optional, called after server confirms.
 		 */
-		document.addEventListener( 'click', function( e ) {
-			var btn = e.target.closest( '.pltt-billable-symbol.pltt-inline-toggle' );
-			if ( ! btn ) {
-				return;
-			}
+		function bindInlineToggle( opts ) {
+			document.addEventListener( 'click', function( e ) {
+				var btn = e.target.closest( opts.selector );
+				if ( ! btn ) {
+					return;
+				}
 
-			var currentValue = btn.dataset.value === '1';
-			var newValue     = currentValue ? '0' : '1';
-			var isBillable   = ! currentValue;
-			var row          = btn.closest( 'tr' );
+				var currentOn = btn.dataset.value === '1';
+				var newValue  = currentOn ? '0' : '1';
+				var isOn      = ! currentOn;
+				var row       = btn.closest( 'tr' );
 
-			// Optimistic update.
-			btn.classList.toggle( 'is-billable', isBillable );
-			btn.classList.toggle( 'not-billable', ! isBillable );
-			btn.dataset.value = newValue;
-			var label = isBillable ? 'Billable \u2014 click to toggle' : 'Not billable \u2014 click to toggle';
-			btn.setAttribute( 'aria-label', label );
-			btn.setAttribute( 'title', label );
+				function setVisual( on ) {
+					btn.classList.toggle( opts.classes.on,  on );
+					btn.classList.toggle( opts.classes.off, ! on );
+					btn.dataset.value = on ? '1' : '0';
+					var label = on ? opts.labels.on : opts.labels.off;
+					btn.setAttribute( 'aria-label', label );
+					btn.setAttribute( 'title', label );
+					if ( typeof opts.apply === 'function' ) {
+						opts.apply( btn, row, on );
+					}
+				}
 
-			// Show/hide the Inv. toggle based on billable state.
-			// If turning off billable and entry is currently invoiced, clear it too.
-			if ( row ) {
+				// Optimistic update.
+				setVisual( isOn );
+
+				saveField(
+					btn,
+					opts.field,
+					newValue,
+					function( data ) {
+						if ( typeof opts.onSuccess === 'function' ) {
+							opts.onSuccess( btn, row, data );
+						}
+					},
+					function() {
+						setVisual( currentOn );
+					}
+				);
+			} );
+		}
+
+		// Billable toggle: also shows/hides the Inv. toggle and clears invoiced
+		// state when turning billable off on a previously-invoiced row.
+		bindInlineToggle( {
+			selector: '.pltt-billable-symbol.pltt-inline-toggle',
+			field:    'billable',
+			classes:  { on: 'is-billable', off: 'not-billable' },
+			labels:   {
+				on:  'Billable — click to toggle',
+				off: 'Not billable — click to toggle'
+			},
+			apply: function( btn, row, isBillable ) {
+				if ( ! row ) { return; }
 				var invoicedBtn = row.querySelector( '.pltt-invoiced-toggle' );
-				if ( invoicedBtn ) {
-					if ( isBillable ) {
-						invoicedBtn.style.visibility = '';
-					} else {
-						invoicedBtn.style.visibility = 'hidden';
-						if ( invoicedBtn.dataset.value === '1' ) {
-							// Clear invoiced state optimistically.
-							invoicedBtn.classList.remove( 'is-invoiced' );
-							invoicedBtn.classList.add( 'not-invoiced' );
-							invoicedBtn.dataset.value = '0';
-							invoicedBtn.textContent = '\u25cb';
-							row.classList.remove( 'pltt-billed' );
-							// Persist the cleared invoiced state.
-							PLTT.ajax( 'pltt_update_entry_field', {
-								entry_id: invoicedBtn.dataset.entryId,
-								field: 'billed',
-								value: '0'
-							}, function() {} );
-						}
+				if ( ! invoicedBtn ) { return; }
+				if ( isBillable ) {
+					invoicedBtn.style.visibility = '';
+				} else {
+					invoicedBtn.style.visibility = 'hidden';
+					if ( invoicedBtn.dataset.value === '1' ) {
+						// Cascade: clear invoiced state when billable goes off.
+						invoicedBtn.classList.remove( 'is-invoiced' );
+						invoicedBtn.classList.add( 'not-invoiced' );
+						invoicedBtn.dataset.value = '0';
+						invoicedBtn.textContent   = '○';
+						row.classList.remove( 'pltt-billed' );
+						PLTT.ajax( 'pltt_update_entry_field', {
+							entry_id: invoicedBtn.dataset.entryId,
+							field:    'billed',
+							value:    '0'
+						}, function() {} );
 					}
+				}
+			},
+			onSuccess: function( btn, row, data ) {
+				// Update the Amount cell with the server-calculated value.
+				var amountCell = row && row.querySelector( '.pltt-amount-col' );
+				if ( ! amountCell ) { return; }
+				var amount = data && parseFloat( data.billable_amount );
+				if ( amount > 0 ) {
+					amountCell.textContent = '$' + amount.toLocaleString( 'en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 } );
+				} else {
+					amountCell.innerHTML = '<span class="pltt-empty">—</span>';
 				}
 			}
-
-			saveField(
-				btn,
-				'billable',
-				newValue,
-				function( data ) {
-					// Update the Amount cell with the server-calculated value.
-					var amountCell = row && row.querySelector( '.pltt-amount-col' );
-					if ( amountCell ) {
-						var amount = data && parseFloat( data.billable_amount );
-						if ( amount > 0 ) {
-							amountCell.textContent = '$' + amount.toLocaleString( 'en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 } );
-						} else {
-							amountCell.innerHTML = '<span class="pltt-empty">—</span>';
-						}
-					}
-				},
-				function() {
-					// Revert.
-					btn.classList.toggle( 'is-billable', currentValue );
-					btn.classList.toggle( 'not-billable', ! currentValue );
-					btn.dataset.value = currentValue ? '1' : '0';
-					var revertLabel = currentValue ? 'Billable \u2014 click to toggle' : 'Not billable \u2014 click to toggle';
-					btn.setAttribute( 'aria-label', revertLabel );
-					btn.setAttribute( 'title', revertLabel );
-					// Revert Inv. toggle visibility too.
-					if ( row ) {
-						var invoicedBtn = row.querySelector( '.pltt-invoiced-toggle' );
-						if ( invoicedBtn ) {
-							invoicedBtn.style.visibility = currentValue ? '' : 'hidden';
-						}
-					}
-				}
-			);
 		} );
 
-		/**
-		 * Invoiced toggle — click handler via delegation.
-		 */
-		document.addEventListener( 'click', function( e ) {
-			var btn = e.target.closest( '.pltt-invoiced-toggle' );
-			if ( ! btn ) {
-				return;
-			}
-
-			var currentValue = btn.dataset.value === '1';
-			var newValue     = currentValue ? '0' : '1';
-			var isInvoiced   = ! currentValue;
-			var row          = btn.closest( 'tr' );
-
-			// Optimistic update.
-			btn.classList.toggle( 'is-invoiced', isInvoiced );
-			btn.classList.toggle( 'not-invoiced', ! isInvoiced );
-			btn.dataset.value = newValue;
-			btn.textContent = isInvoiced ? '\u2713' : '\u25cb';
-			var label = isInvoiced ? 'Invoiced \u2014 click to toggle' : 'Not invoiced \u2014 click to toggle';
-			btn.setAttribute( 'aria-label', label );
-			btn.setAttribute( 'title', label );
-			if ( row ) {
-				row.classList.toggle( 'pltt-billed', isInvoiced );
-			}
-
-			saveField(
-				btn,
-				'billed',
-				newValue,
-				function() { /* already updated optimistically */ },
-				function() {
-					// Revert.
-					btn.classList.toggle( 'is-invoiced', currentValue );
-					btn.classList.toggle( 'not-invoiced', ! currentValue );
-					btn.dataset.value = currentValue ? '1' : '0';
-					btn.textContent = currentValue ? '\u2713' : '\u25cb';
-					var revertLabel = currentValue ? 'Invoiced \u2014 click to toggle' : 'Not invoiced \u2014 click to toggle';
-					btn.setAttribute( 'aria-label', revertLabel );
-					btn.setAttribute( 'title', revertLabel );
-					if ( row ) {
-						row.classList.toggle( 'pltt-billed', currentValue );
-					}
+		// Invoiced toggle: simpler - flips the checkmark and the row tint.
+		bindInlineToggle( {
+			selector: '.pltt-invoiced-toggle',
+			field:    'billed',
+			classes:  { on: 'is-invoiced', off: 'not-invoiced' },
+			labels:   {
+				on:  'Invoiced — click to toggle',
+				off: 'Not invoiced — click to toggle'
+			},
+			apply: function( btn, row, isInvoiced ) {
+				btn.textContent = isInvoiced ? '✓' : '○';
+				if ( row ) {
+					row.classList.toggle( 'pltt-billed', isInvoiced );
 				}
-			);
+			}
 		} );
 
 		/**

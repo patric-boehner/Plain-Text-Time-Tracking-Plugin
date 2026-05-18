@@ -141,22 +141,9 @@ class PLTT_Review {
 				if ( ! empty( $entry->verified ) && null !== $entry->billable_amount ) {
 					$billable_amount = (float) $entry->billable_amount;
 				} else {
-					// Calculate dynamically for unverified entries.
-					$hourly_rate = 0.0;
-
-					// Project rate takes precedence, fallback to client rate, fallback to default, fallback to 0.
-					if ( $project_id > 0 && isset( $projects_cache[ $project_id ] ) ) {
-						$hourly_rate = (float) ( $projects_cache[ $project_id ]->hourly_rate ?? 0 );
-					}
-
-					if ( 0.0 === $hourly_rate && $client_id > 0 && isset( $clients_cache[ $client_id ] ) ) {
-						$hourly_rate = (float) ( $clients_cache[ $client_id ]->hourly_rate ?? 0 );
-					}
-
-					if ( 0.0 === $hourly_rate && defined( 'PLTT_DEFAULT_HOURLY_RATE' ) ) {
-						$hourly_rate = (float) PLTT_DEFAULT_HOURLY_RATE;
-					}
-
+					// OPT-DUP5 / TRC-3: route through the canonical rate-resolution
+					// helper instead of duplicating the cascade.
+					$hourly_rate     = pltt_resolve_billable_rate( $client_id, $project_id, $clients_cache, $projects_cache );
 					$billable_amount = round( ( $entry->duration_minutes / 60.0 ) * $hourly_rate, 2 );
 				}
 
@@ -241,6 +228,28 @@ class PLTT_Review {
 			// Load original entry before updating (for alias learning and rate snapshotting).
 			$original = PLTT_Entries::get( $entry_id );
 
+			// SEC-H2: Reject rows whose entry_id belongs to a different date. A
+			// forged or CSRF-chained submit must not be able to overwrite entries
+			// outside the date this form was rendered for.
+			if ( ! $original || $original->entry_date !== $date ) {
+				++$error_count;
+				continue;
+			}
+
+			// SEC-H3: Validate per-row start_time/end_time against a strict HH:MM[:SS]
+			// pattern before they reach date_create() / pltt_time_to_minutes().
+			$time_pattern = '/^\d{1,2}:\d{2}(:\d{2})?$/';
+			if ( isset( $entry_data['start_time'] ) && '' !== $entry_data['start_time']
+				&& ! preg_match( $time_pattern, $entry_data['start_time'] ) ) {
+				++$error_count;
+				continue;
+			}
+			if ( isset( $entry_data['end_time'] ) && '' !== $entry_data['end_time']
+				&& ! preg_match( $time_pattern, $entry_data['end_time'] ) ) {
+				++$error_count;
+				continue;
+			}
+
 			// Update all editable fields from the review screen.
 			// Mark as verified when saved from review screen.
 			$data = array(
@@ -266,8 +275,13 @@ class PLTT_Review {
 			// Recalculate duration server-side when both times are present.
 			// Discards the client-supplied value to prevent tampering.
 			if ( isset( $data['start_time'] ) && isset( $data['end_time'] ) && '' !== $data['start_time'] ) {
-				$start_mins            = pltt_time_to_minutes( $data['start_time'] );
-				$end_mins              = pltt_time_to_minutes( $data['end_time'] );
+				$start_mins = pltt_time_to_minutes( $data['start_time'] );
+				$end_mins   = pltt_time_to_minutes( $data['end_time'] );
+				if ( false === $start_mins || false === $end_mins ) {
+					// Malformed time — skip this entry rather than store a negative duration.
+					++$error_count;
+					continue;
+				}
 				$data['duration_minutes'] = ( $end_mins >= $start_mins )
 					? ( $end_mins - $start_mins )
 					: ( 1440 - $start_mins + $end_mins ); // Overnight span.
