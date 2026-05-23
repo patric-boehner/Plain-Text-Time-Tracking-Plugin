@@ -41,7 +41,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 				<?php if ( $prev_url ) : ?>
 				<a href="<?php echo esc_url( $prev_url ); ?>"
 					class="pltt-date-nav-step pltt-date-nav-prev"
-					aria-label="<?php esc_attr_e( 'Previous month', 'plain-language-time-tracker' ); ?>">&#8249;</a>
+					aria-label="<?php esc_attr_e( 'Previous month', 'plain-language-time-tracker' ); ?>"></a>
 				<?php endif; ?>
 
 				<div class="pltt-date-nav-picker">
@@ -49,7 +49,6 @@ if ( ! defined( 'ABSPATH' ) ) {
 						aria-expanded="false"
 						id="pltt-date-nav-trigger">
 						<span class="pltt-date-nav-label-main"><?php echo esc_html( $nav_label ); ?></span>
-						<span class="pltt-date-nav-chevron" aria-hidden="true"></span>
 					</button>
 
 					<div class="pltt-date-nav-dropdown" hidden>
@@ -96,7 +95,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 				<?php if ( $has_next ) : ?>
 					<a href="<?php echo esc_url( $next_url ); ?>"
 						class="pltt-date-nav-step pltt-date-nav-next"
-						aria-label="<?php esc_attr_e( 'Next month', 'plain-language-time-tracker' ); ?>">&#8250;</a>
+						aria-label="<?php esc_attr_e( 'Next month', 'plain-language-time-tracker' ); ?>"></a>
 				<?php endif; ?>
 
 			</nav>

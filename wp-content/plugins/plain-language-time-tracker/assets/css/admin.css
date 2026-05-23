@@ -52,7 +52,7 @@
 	--pltt-badge-purple-text:  #6e3fa3;
 
 	/* Billed row highlight */
-	--pltt-billed-bg:     #f0f6fc;
+	--pltt-billed-bg:     #f7fbff;
 	--pltt-billed-border: #d0e4f5;
 
 	/* Tag pill hover */
@@ -721,14 +721,43 @@
 	z-index: 1;
 }
 
-/* ‹ prev — left-rounded, no left-margin (it's the first element) */
+/* ‹ prev / › next — icon buttons. Chevron is rendered via CSS mask so it
+   inherits currentColor (so the hover/focus tints from .pltt-date-nav-step
+   apply to the icon without swapping data URIs). Shape is the same WP-core
+   chevron SVG as the dropdown indicator, rotated -90deg / 90deg. */
+.pltt-date-nav-prev,
+.pltt-date-nav-next {
+	align-items: center;
+	color: var(--pltt-text-muted);
+	display: inline-flex;
+	justify-content: center;
+	min-width: 26px;
+	padding: 0 8px;
+}
+
 .pltt-date-nav-prev {
 	border-radius: 3px 0 0 3px;
-	color: var(--pltt-text-muted);
-	font-size: 20px;
-	line-height: 1;
 	margin-left: 0;
-	padding: 5px 13px 6px;
+}
+
+.pltt-date-nav-prev::before,
+.pltt-date-nav-next::before {
+	background-color: currentColor;
+	content: "";
+	display: block;
+	height: 20px;
+	-webkit-mask-position: center;
+	mask-position: center;
+	-webkit-mask-repeat: no-repeat;
+	mask-repeat: no-repeat;
+	-webkit-mask-size: 16px 16px;
+	mask-size: 16px 16px;
+	width: 20px;
+}
+
+.pltt-date-nav-prev::before {
+	-webkit-mask-image: url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20width%3D%2220%22%20height%3D%2220%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%3E%3Cpath%20transform%3D%22rotate%2890%2010%2010%29%22%20d%3D%22M5%206l5%205%205-5%202%201-7%207-7-7%202-1z%22%20fill%3D%22%231e1e1e%22%2F%3E%3C%2Fsvg%3E");
+	mask-image: url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20width%3D%2220%22%20height%3D%2220%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%3E%3Cpath%20transform%3D%22rotate%2890%2010%2010%29%22%20d%3D%22M5%206l5%205%205-5%202%201-7%207-7-7%202-1z%22%20fill%3D%22%231e1e1e%22%2F%3E%3C%2Fsvg%3E");
 }
 
 /* Picker div wraps the label button; the label fills it entirely */
@@ -736,10 +765,15 @@
 	display: flex;
 }
 
-/* The label button inside the picker: fills the picker, no border of its own */
+/* The label button inside the picker: fills the picker, no border of its own.
+   Chevron is rendered as a background image, matching core <select> styling. */
 .pltt-date-nav-label {
 	align-items: center;
-	background: transparent;
+	background-color: transparent;
+	background-image: url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20width%3D%2220%22%20height%3D%2220%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%3E%3Cpath%20d%3D%22M5%206l5%205%205-5%202%201-7%207-7-7%202-1z%22%20fill%3D%22%231e1e1e%22%2F%3E%3C%2Fsvg%3E");
+	background-position: right 8px center;
+	background-repeat: no-repeat;
+	background-size: 16px 16px;
 	border: none;
 	border-radius: 0;
 	color: var(--pltt-text-base);
@@ -749,8 +783,9 @@
 	font-size: 13px;
 	gap: 8px;
 	min-width: 200px;
+	min-height: 40px;
 	outline: none;
-	padding: 10px 18px 10px 17px;
+	padding: 10px 35px 10px 17px;
 }
 
 .pltt-date-nav-label:focus-visible {
@@ -758,6 +793,13 @@
 	outline-offset: -2px;
 	white-space: nowrap;
 	width: 100%;
+}
+
+/* Flip the chevron when the dropdown is open (or, for the simple
+   <input type="date"> picker on daily-log, when its field is focused). */
+.pltt-date-nav-label[aria-expanded="true"],
+.pltt-date-nav-picker:focus-within .pltt-date-nav-label {
+	background-image: url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20width%3D%2220%22%20height%3D%2220%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%3E%3Cpath%20d%3D%22M5%2014l5-5%205%205%202-1-7-7-7%207%202%201z%22%20fill%3D%22%231e1e1e%22%2F%3E%3C%2Fsvg%3E");
 }
 
 .pltt-date-nav-label-main {
@@ -769,25 +811,15 @@
 	font-weight: 400;
 }
 
-.pltt-date-nav-chevron {
-	border-bottom: 2px solid currentColor;
-	border-right: 2px solid currentColor;
-	color: var(--pltt-text-muted);
-	display: inline-block;
-	flex-shrink: 0;
-	height: 6px;
-	margin-left: 12px;
-	transform: rotate(45deg) translateY(-3px);
-	width: 6px;
-}
-
-/* › next — right-rounded by default; flat when clear button is shown */
+/* › next — right-rounded by default; flat when clear button is shown.
+   Shared layout/sizing lives in the .pltt-date-nav-prev rule above. */
 .pltt-date-nav-next {
 	border-radius: 0 3px 3px 0;
-	color: var(--pltt-text-muted);
-	font-size: 20px;
-	line-height: 1;
-	padding: 5px 13px 6px;
+}
+
+.pltt-date-nav-next::before {
+	-webkit-mask-image: url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20width%3D%2220%22%20height%3D%2220%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%3E%3Cpath%20transform%3D%22rotate%28-90%2010%2010%29%22%20d%3D%22M5%206l5%205%205-5%202%201-7%207-7-7%202-1z%22%20fill%3D%22%231e1e1e%22%2F%3E%3C%2Fsvg%3E");
+	mask-image: url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20width%3D%2220%22%20height%3D%2220%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%3E%3Cpath%20transform%3D%22rotate%28-90%2010%2010%29%22%20d%3D%22M5%206l5%205%205-5%202%201-7%207-7-7%202-1z%22%20fill%3D%22%231e1e1e%22%2F%3E%3C%2Fsvg%3E");
 }
 
 /* Dropdown panel */

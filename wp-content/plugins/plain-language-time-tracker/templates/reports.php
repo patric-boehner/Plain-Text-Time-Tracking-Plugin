@@ -176,7 +176,7 @@ $tab_base_url = add_query_arg( $filter_params, admin_url( 'admin.php' ) );
 			<input type="hidden" name="to"   id="pltt-date-to"   value="<?php echo esc_attr( $date_to ); ?>">
 
 			<button type="button" class="pltt-date-nav-step pltt-date-nav-prev"
-				aria-label="<?php esc_attr_e( 'Previous period', 'plain-language-time-tracker' ); ?>">&#8249;</button>
+				aria-label="<?php esc_attr_e( 'Previous period', 'plain-language-time-tracker' ); ?>"></button>
 
 			<div class="pltt-date-nav-picker">
 				<button type="button" class="pltt-date-nav-label"
@@ -186,7 +186,6 @@ $tab_base_url = add_query_arg( $filter_params, admin_url( 'admin.php' ) );
 					<?php if ( $active_preset ) : ?>
 						<span class="pltt-date-nav-label-sub"><?php echo esc_html( $range_label ); ?></span>
 					<?php endif; ?>
-					<span class="pltt-date-nav-chevron" aria-hidden="true"></span>
 				</button>
 
 				<div class="pltt-date-nav-dropdown" hidden>
@@ -221,7 +220,7 @@ $tab_base_url = add_query_arg( $filter_params, admin_url( 'admin.php' ) );
 			</div>
 
 			<button type="button" class="pltt-date-nav-step pltt-date-nav-next"
-				aria-label="<?php esc_attr_e( 'Next period', 'plain-language-time-tracker' ); ?>">&#8250;</button>
+				aria-label="<?php esc_attr_e( 'Next period', 'plain-language-time-tracker' ); ?>"></button>
 		</div>
 		</div>
 
@@ -582,8 +581,8 @@ $tab_base_url = add_query_arg( $filter_params, admin_url( 'admin.php' ) );
 								style="--avg-pct: <?php echo esc_attr( number_format( $avg_pct, 4, '.', '' ) ); ?>;"
 								title="<?php
 								echo esc_attr( sprintf(
-									/* translators: %s: formatted duration like "4h 30m". */
-									__( 'Period average: %s per %s', 'plain-language-time-tracker' ),
+									/* translators: 1: formatted duration like "4h 30m"; 2: bucket label (day/week/month). */
+									__( 'Average per active %2$s: %1$s (empty %2$ss excluded)', 'plain-language-time-tracker' ),
 									pltt_format_duration( $chart_avg_minutes ),
 									$chart_bucket_size
 								) );

@@ -203,7 +203,11 @@ class PLTT_Reports {
 				}
 
 				// Compute max + total minutes across buckets (for y-axis scale and average line).
-				$chart_total_minutes = 0;
+				// Average uses only buckets with logged time as the denominator, so empty
+				// days/weeks/months (weekends, leave, future days within the range) don't
+				// dilute the line.
+				$chart_total_minutes  = 0;
+				$chart_active_buckets = 0;
 				foreach ( $chart_buckets as $bucket ) {
 					$bucket_total = (int) $bucket['billable_minutes']
 						+ (int) $bucket['client_flat_minutes']
@@ -212,8 +216,13 @@ class PLTT_Reports {
 						$chart_max_minutes = $bucket_total;
 					}
 					$chart_total_minutes += $bucket_total;
+					if ( $bucket_total > 0 ) {
+						$chart_active_buckets++;
+					}
 				}
-				$chart_avg_minutes = (int) round( $chart_total_minutes / count( $chart_buckets ) );
+				$chart_avg_minutes = $chart_active_buckets > 0
+					? (int) round( $chart_total_minutes / $chart_active_buckets )
+					: 0;
 
 				// Identify which bucket (if any) contains today, for the "today" marker.
 				$today_ymd = pltt_get_current_date();
