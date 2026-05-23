@@ -33,7 +33,7 @@
 
 	/* Status */
 	--pltt-success:     #00a32a;
-	--pltt-warning:     #dba617;
+	--pltt-warning:		#ecc251;
 	--pltt-danger:      #d63638;
 	--pltt-danger-dark: #b32d2e; /* Delete link color */
 
@@ -207,6 +207,36 @@
 	line-height: 1.5;
 }
 
+/* Card breakdown rows (Total Hours card): label, value, percent on each row.
+   Value is emphasized (dark, weight 600); percent is muted. The label and
+   percent share the muted secondary color; the value pops as the data point. */
+.pltt-card-breakdown {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+}
+
+.pltt-card-breakdown-row {
+	display: flex;
+	align-items: baseline;
+	gap: 6px;
+}
+
+.pltt-card-breakdown-label {
+	min-width: 56px;
+}
+
+.pltt-card-breakdown-value {
+	color: var(--pltt-text-dark);
+	font-weight: 600;
+	font-variant-numeric: tabular-nums;
+}
+
+.pltt-card-breakdown-pct {
+	color: var(--pltt-text-muted);
+	font-variant-numeric: tabular-nums;
+}
+
 /* Status indicators */
 .status-neutral {
 	color: var(--pltt-text-muted);
@@ -333,11 +363,12 @@
 }
 
 .pltt-alloc-over {
-	color: var(--pltt-danger);
+	color: var(--pltt-warning);
 	font-weight: 600;
 }
 
 .pltt-alloc-bar-wrap {
+	display: flex;
 	width: 100%;
 	max-width: 120px;
 	height: 5px;
@@ -347,16 +378,15 @@
 	overflow: hidden;
 }
 
-.pltt-alloc-bar {
+/* Filled bar segments. Within-budget is blue (client work, regardless of type);
+   overage portion (when bar exceeds 100%) sits on top in amber. */
+.pltt-alloc-seg {
+	display: block;
 	height: 100%;
-	border-radius: 2px;
-	background: var(--pltt-primary);
-	max-width: 100%;
 }
 
-.pltt-alloc-bar.pltt-alloc-over {
-	background: var(--pltt-primary);
-}
+.pltt-alloc-seg-within { background: var(--pltt-primary); } /* blue: any client work */
+.pltt-alloc-seg-over   { background: var(--pltt-warning); } /* amber: overage portion */
 
 .pltt-alloc-label {
 	font-size: 11px;
@@ -630,6 +660,8 @@
 	cursor: pointer;
 	font-weight: 500;
 	line-height: 1;
+	min-height: 40px;
+	min-width: 42px;
 	padding: 7px 10px;
 	text-transform: lowercase;
 	white-space: nowrap;
@@ -970,8 +1002,8 @@ fieldset.pltt-date-nav-custom-inputs input[type="date"] {
 	display: inline-block;
 }
 
-/* Billable entry description */
-.pltt-entry-desc-cell.pltt-desc-billable .pltt-entry-desc-text {
+/* Entry description (project/description text) */
+.pltt-entry-desc-cell .pltt-entry-desc-text {
 	font-weight: 600;
 }
 

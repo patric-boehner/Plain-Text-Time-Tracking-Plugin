@@ -362,30 +362,12 @@ if ( ! empty( $projects ) ) {
 			none:      '<?php echo esc_js( __( 'Not applicable for internal projects.', 'plain-language-time-tracker' ) ); ?>'
 		},
 		nonbillable: {
-			hourly:    '<?php echo esc_js( __( 'Entries default to non-billable. Can be overridden per entry.', 'plain-language-time-tracker' ) ); ?>',
-			fixed:     '<?php echo esc_js( __( 'Entries default to non-billable. Can be overridden per entry.', 'plain-language-time-tracker' ) ); ?>',
-			recurring: '<?php echo esc_js( __( 'Checked by default for recurring projects. Can be overridden.', 'plain-language-time-tracker' ) ); ?>',
+			hourly:    '<?php echo esc_js( __( 'Entries default to billable. Check this to default new entries to non-billable instead.', 'plain-language-time-tracker' ) ); ?>',
+			fixed:     '<?php echo esc_js( __( 'Entries default to non-billable (fixed-fee work is invoiced separately, not from time × rate).', 'plain-language-time-tracker' ) ); ?>',
+			recurring: '<?php echo esc_js( __( 'Entries default to non-billable (within-allocation retainer time is covered by the flat fee). Manually mark overage entries billable when invoicing.', 'plain-language-time-tracker' ) ); ?>',
 			none:      '<?php echo esc_js( __( 'Always non-billable for internal projects.', 'plain-language-time-tracker' ) ); ?>'
 		}
 	};
-
-	function applyRecurringBudgetLock() {
-		var billingType = el('pltt-project-billing-type');
-		if ( ! billingType || billingType.value !== 'recurring') return;
-		var budgetHours      = el('pltt-project-budget-hours');
-		var nonBillable      = el('pltt-project-non-billable');
-		var nonBillableGroup = el('pltt-project-nonbillable-group');
-		var descEl           = el('pltt-nonbillable-description');
-		var hasBudget        = budgetHours && parseFloat(budgetHours.value) > 0;
-		if (hasBudget) {
-			nonBillable.checked = false;
-			nonBillableGroup.classList.add('pltt-field-disabled');
-			descEl.textContent = '<?php echo esc_js( __( 'Billable entries count toward the monthly allocation.', 'plain-language-time-tracker' ) ); ?>';
-		} else {
-			nonBillableGroup.classList.remove('pltt-field-disabled');
-			descEl.textContent = BILLING_DESCRIPTIONS.nonbillable.recurring;
-		}
-	}
 
 	function applyBillingTypeUI(type, setDefaults) {
 		var rateField        = el('pltt-project-rate');
@@ -441,7 +423,8 @@ if ( ! empty( $projects ) ) {
 			var budgetMode = (feeInput.value !== '') ? 'fee' : 'hours';
 			el('pltt-project-budget-mode').value = budgetMode;
 			applyBudgetModeUI(budgetMode);
-			if (setDefaults) { nonBillable.checked = false; }
+			// Fixed-fee dollars come from the flat fee, not time × rate — default entries to non-billable.
+			if (setDefaults) { nonBillable.checked = true; }
 
 		} else if (type === 'recurring') {
 			settingsBox.classList.remove('pltt-hidden');
@@ -451,7 +434,7 @@ if ( ! empty( $projects ) ) {
 			budgetModeGroup.classList.add('pltt-hidden');
 			el('pltt-project-budget-mode').value = 'hours';
 			budgetLabel.firstChild.textContent = '<?php echo esc_js( __( 'Hour Allocation', 'plain-language-time-tracker' ) ); ?> ';
-			settingsDesc.textContent = '<?php echo esc_js( __( 'Hours included per period. Entries over the allocation remain non-billable unless manually marked otherwise.', 'plain-language-time-tracker' ) ); ?>';
+			settingsDesc.textContent = '<?php echo esc_js( __( 'Hours included per period. Within-allocation time is covered by the flat fee; mark overage entries billable manually when invoicing.', 'plain-language-time-tracker' ) ); ?>';
 			recurringSelect.disabled = false;
 			feeInput.disabled        = true;
 			hoursInput.disabled      = false;
@@ -463,7 +446,6 @@ if ( ! empty( $projects ) ) {
 				nonBillable.checked = true;
 				if (recurringSelect.value === '') { recurringSelect.value = 'monthly'; }
 			}
-			applyRecurringBudgetLock();
 
 		} else if (type === 'none') {
 			settingsBox.classList.add('pltt-hidden');
@@ -536,13 +518,6 @@ if ( ! empty( $projects ) ) {
 		});
 	}
 
-	var budgetHoursInput = document.getElementById('pltt-project-budget-hours');
-	if (budgetHoursInput) {
-		budgetHoursInput.addEventListener('input', function() {
-			applyRecurringBudgetLock();
-		});
-	}
-
 	var budgetModeSelect = el('pltt-project-budget-mode');
 	if (budgetModeSelect) {
 		budgetModeSelect.addEventListener('change', function() {
@@ -569,7 +544,6 @@ if ( ! empty( $projects ) ) {
 			var billingType = row.dataset.billingType || 'hourly';
 			applyBillingTypeUI(billingType, false);
 			document.getElementById('pltt-project-non-billable').checked = row.dataset.billabilityDefault === '0';
-			applyRecurringBudgetLock();
 
 			var archiveBtn = document.getElementById('pltt-archive-project-btn');
 			archiveBtn.classList.add('visible');

@@ -61,17 +61,50 @@ class PLTT_Reports {
 		$context_client   = null;
 		$context_projects = array();
 
-		if ( $client_id > 0 ) {
+		if ( $client_id > 0 && ! $client_negate ) {
 			$context_client = PLTT_Clients::get( $client_id );
 
 			if ( $context_client ) {
-				if ( is_numeric( $project_id ) && (int) $project_id > 0 ) {
-					$single = PLTT_Projects::get( (int) $project_id );
-					if ( $single && (int) $single->client_id === (int) $client_id ) {
-						$context_projects = array( $single );
+				$is_internal_client = ! empty( $context_client->is_internal );
+
+				if ( ! $is_internal_client ) {
+					if ( is_numeric( $project_id ) && (int) $project_id > 0 ) {
+						$single = PLTT_Projects::get( (int) $project_id );
+						if ( $single && (int) $single->client_id === (int) $client_id ) {
+							$context_projects = array( $single );
+						}
+					} else {
+						$range_days = ( strtotime( $date_to ) - strtotime( $date_from ) ) / DAY_IN_SECONDS + 1;
+						if ( $range_days <= 92 ) {
+							$context_projects = PLTT_Projects::get_by_client( $client_id, true );
+						}
 					}
-				} else {
-					$context_projects = PLTT_Projects::get_by_client( $client_id, true );
+				}
+			}
+		}
+
+		// Single-project + single-client filter: project identity is unambiguous,
+		// so the Top Projects card is redundant with the client context card.
+		$is_single_project_view = ( $client_id > 0 && ! $client_negate )
+			&& ( $project_id > 0 && ! $project_negate );
+
+		// Overage decision-support context: populated only on detailed view when
+		// filtered to a single retainer/fixed-fee project with an allocation.
+		// Mirrors the $context_client / $context_projects pattern above.
+		$context_overage       = null;
+		$context_alloc_project = null;
+		$is_single_alloc_view  = false;
+
+		if ( 'detailed' === $view && $project_id > 0 && ! $project_negate ) {
+			$alloc_project = PLTT_Projects::get( (int) $project_id );
+			if ( $alloc_project ) {
+				$btype     = pltt_get_billing_type( $alloc_project );
+				$has_alloc = in_array( $btype, array( 'recurring', 'fixed' ), true )
+					&& ( ! empty( $alloc_project->budget_hours ) || ! empty( $alloc_project->budget_fee ) );
+				if ( $has_alloc ) {
+					$context_alloc_project = $alloc_project;
+					$context_overage       = pltt_compute_overage_threshold( $alloc_project, $filter_args );
+					$is_single_alloc_view  = ( 'over' === $context_overage['state'] );
 				}
 			}
 		}
@@ -92,9 +125,9 @@ class PLTT_Reports {
 		// Working days for daily averages (Card 2).
 		$working_days = pltt_count_working_days( $date_from, $date_to );
 
-		// Utilization percentage (Card 3) — client-facing time only, excludes Internal client.
-		$utilization = $stats && $stats->client_total_minutes > 0
-			? ( $stats->client_billable_minutes / $stats->client_total_minutes ) * 100
+		// Internal hours (Card 2 sub-line): total − client-facing.
+		$internal_minutes = $stats
+			? max( 0, (int) $stats->total_minutes - (int) $stats->client_total_minutes )
 			: 0;
 
 		// Overall Effective Hourly Rate (Card 5).
@@ -137,7 +170,8 @@ class PLTT_Reports {
 				$bucket_index = array();
 				foreach ( $chart_buckets as $i => $bucket ) {
 					$chart_buckets[ $i ]['billable_minutes']    = 0;
-					$chart_buckets[ $i ]['nonbillable_minutes'] = 0;
+					$chart_buckets[ $i ]['client_flat_minutes'] = 0;
+					$chart_buckets[ $i ]['internal_minutes']    = 0;
 					$bucket_index[ $bucket['key'] ]             = $i;
 				}
 
@@ -164,13 +198,16 @@ class PLTT_Reports {
 
 					$i = $bucket_index[ $key ];
 					$chart_buckets[ $i ]['billable_minutes']    += (int) $row->billable_minutes;
-					$chart_buckets[ $i ]['nonbillable_minutes'] += (int) $row->nonbillable_minutes;
+					$chart_buckets[ $i ]['client_flat_minutes'] += (int) $row->client_flat_minutes;
+					$chart_buckets[ $i ]['internal_minutes']    += (int) $row->internal_minutes;
 				}
 
 				// Compute max + total minutes across buckets (for y-axis scale and average line).
 				$chart_total_minutes = 0;
 				foreach ( $chart_buckets as $bucket ) {
-					$bucket_total = (int) $bucket['billable_minutes'] + (int) $bucket['nonbillable_minutes'];
+					$bucket_total = (int) $bucket['billable_minutes']
+						+ (int) $bucket['client_flat_minutes']
+						+ (int) $bucket['internal_minutes'];
 					if ( $bucket_total > $chart_max_minutes ) {
 						$chart_max_minutes = $bucket_total;
 					}
