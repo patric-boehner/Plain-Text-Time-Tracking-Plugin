@@ -672,11 +672,12 @@ class PLTT_Entries {
 	 * @param string $date_from Start date (Y-m-d).
 	 * @param string $date_to   End date (Y-m-d).
 	 * @param array  $args      Optional filters (client_id, project_id, tag, billable, billed, negate flags).
-	 * @return array Rows of { entry_date, billable_minutes, nonbillable_minutes }.
+	 * @return array Rows of { entry_date, billable_minutes, client_flat_minutes, internal_minutes }.
 	 */
 	public static function get_chart_daily_totals( $date_from, $date_to, $args = array() ) {
 		global $wpdb;
 		$entries_table = PLTT_Database::get_table_name( 'time_entries' );
+		$clients_table = PLTT_Database::get_table_name( 'clients' );
 
 		$where   = array( 'e.entry_date >= %s', 'e.entry_date <= %s', 'e.verified = 1' );
 		$prepare = array( $date_from, $date_to );
@@ -688,14 +689,22 @@ class PLTT_Entries {
 
 		$where_sql = implode( ' AND ', $where );
 
+		// SEC-L1 pattern: resolve via is_internal flag (DB 1.9.3+) rather than hardcoded ID.
+		$internal_client_id = pltt_get_internal_client_id();
+		$internal_clause    = $internal_client_id > 0
+			? "e.client_id = {$internal_client_id}"
+			: "LOWER(c.name) = 'internal'";
+
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
 		return $wpdb->get_results(
 			$wpdb->prepare(
 				"SELECT
 					e.entry_date,
 					COALESCE(SUM(CASE WHEN e.billable = 1 THEN e.duration_minutes ELSE 0 END), 0) AS billable_minutes,
-					COALESCE(SUM(CASE WHEN e.billable = 0 THEN e.duration_minutes ELSE 0 END), 0) AS nonbillable_minutes
+					COALESCE(SUM(CASE WHEN e.billable = 0 AND NOT ({$internal_clause}) THEN e.duration_minutes ELSE 0 END), 0) AS client_flat_minutes,
+					COALESCE(SUM(CASE WHEN e.billable = 0 AND ({$internal_clause}) THEN e.duration_minutes ELSE 0 END), 0) AS internal_minutes
 				FROM {$entries_table} e
+				LEFT JOIN {$clients_table} c ON e.client_id = c.id
 				WHERE {$where_sql}
 				GROUP BY e.entry_date
 				ORDER BY e.entry_date ASC",

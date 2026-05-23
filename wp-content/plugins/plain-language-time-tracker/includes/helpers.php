@@ -825,6 +825,34 @@ function pltt_resolve_billable_rate( $client_id, $project_id, $clients_cache = a
 }
 
 /**
+ * Render the overage threshold marker row inside an entry table.
+ *
+ * Spans the full table width. Styled as chrome (dashed amber borders, warm
+ * gradient bg), not a data row.
+ *
+ * @param int    $colspan   Number of columns in the parent table.
+ * @param string $primary   Primary label (e.g. "Allocation reached · 10h used").
+ * @param string $secondary Secondary label (e.g. "Entries below are overage candidates").
+ */
+function pltt_render_threshold_marker_row( $colspan, $primary, $secondary = '' ) {
+	?>
+	<tr class="pltt-threshold-marker-row">
+		<td colspan="<?php echo esc_attr( (int) $colspan ); ?>">
+			<div class="pltt-threshold-marker">
+				<span class="pltt-threshold-icon" aria-hidden="true">⚑</span>
+				<div class="pltt-threshold-labels">
+					<span class="pltt-threshold-primary"><?php echo esc_html( $primary ); ?></span>
+					<?php if ( '' !== $secondary ) : ?>
+						<span class="pltt-threshold-secondary"><?php echo esc_html( $secondary ); ?></span>
+					<?php endif; ?>
+				</div>
+			</div>
+		</td>
+	</tr>
+	<?php
+}
+
+/**
  * Render an entry table.
  *
  * Outputs a complete <table> with entry rows showing description,
@@ -835,10 +863,14 @@ function pltt_resolve_billable_rate( $client_id, $project_id, $clients_cache = a
  * @param array $options {
  *     Optional. Display options.
  *
- *     @type bool   $show_amount Whether to show the Amount column. Default false.
- *     @type string $table_class Additional CSS class for the table element.
- *     @type bool   $inline_edit Whether to render interactive inline edit controls. Default false.
- *     @type array  $all_tags    All available tag name strings. Required when inline_edit is true.
+ *     @type bool   $show_amount                Whether to show the Amount column. Default false.
+ *     @type string $table_class                Additional CSS class for the table element.
+ *     @type bool   $inline_edit                Whether to render interactive inline edit controls. Default false.
+ *     @type array  $all_tags                   All available tag name strings. Required when inline_edit is true.
+ *     @type array  $overage_entry_ids          Entry IDs to flag with the .pltt-row-overage class.
+ *     @type int    $threshold_marker_before    Insert a threshold marker row immediately before the row matching this entry ID.
+ *     @type string $threshold_marker_primary   Marker primary label text.
+ *     @type string $threshold_marker_secondary Marker secondary label text.
  * }
  */
 function pltt_render_entry_table( $entries, $options = array() ) {
@@ -847,8 +879,26 @@ function pltt_render_entry_table( $entries, $options = array() ) {
 	$inline_edit = ! empty( $options['inline_edit'] );
 	$all_tags    = $inline_edit && ! empty( $options['all_tags'] ) ? $options['all_tags'] : array();
 
+	// Overage decision-support options.
+	$overage_lookup          = ! empty( $options['overage_entry_ids'] )
+		? array_flip( array_map( 'intval', (array) $options['overage_entry_ids'] ) )
+		: array();
+	$threshold_marker_before = isset( $options['threshold_marker_before'] ) ? (int) $options['threshold_marker_before'] : 0;
+	$marker_primary          = isset( $options['threshold_marker_primary'] ) ? (string) $options['threshold_marker_primary'] : '';
+	$marker_secondary        = isset( $options['threshold_marker_secondary'] ) ? (string) $options['threshold_marker_secondary'] : '';
+
 	if ( empty( $entries ) ) {
 		return;
+	}
+
+	// Colspan for the threshold marker row: Desc, Tags, Time, Duration, Billable
+	// (+1 if inline_edit adds the Inv. column, +1 if show_amount adds Amount).
+	$colspan = 5;
+	if ( $inline_edit ) {
+		$colspan++;
+	}
+	if ( $show_amount ) {
+		$colspan++;
 	}
 
 	// Collect unique project and client IDs to avoid N+1 queries.
@@ -895,9 +945,24 @@ function pltt_render_entry_table( $entries, $options = array() ) {
 				$entry_tags   = $tags_by_entry[ (int) $entry->id ] ?? array();
 				$is_billed    = ! empty( $entry->billed );
 				$is_billable  = ! empty( $entry->billable );
+				$entry_id_int = (int) $entry->id;
+
+				// Insert the threshold marker immediately before the boundary entry.
+				if ( $threshold_marker_before && $entry_id_int === $threshold_marker_before ) {
+					pltt_render_threshold_marker_row( $colspan, $marker_primary, $marker_secondary );
+				}
+
+				$tr_classes = array();
+				if ( $is_billed ) {
+					$tr_classes[] = 'pltt-billed';
+				}
+				if ( isset( $overage_lookup[ $entry_id_int ] ) ) {
+					$tr_classes[] = 'pltt-row-overage';
+				}
+				$class_attr = $tr_classes ? ' class="' . esc_attr( implode( ' ', $tr_classes ) ) . '"' : '';
 				?>
-				<tr<?php echo $is_billed ? ' class="pltt-billed"' : ''; ?><?php echo $inline_edit ? ' data-entry-id="' . esc_attr( $entry->id ) . '"' : ''; ?>>
-					<td class="pltt-entry-desc-cell<?php echo $is_billable ? ' pltt-desc-billable' : ''; ?>">
+				<tr<?php echo $class_attr; ?><?php echo $inline_edit ? ' data-entry-id="' . esc_attr( $entry->id ) . '"' : ''; ?>>
+					<td class="pltt-entry-desc-cell">
 						<?php if ( $is_billed && ! $inline_edit ) : ?>
 							<span class="screen-reader-text"><?php esc_html_e( 'Invoiced:', 'plain-language-time-tracker' ); ?></span>
 						<?php endif; ?>
@@ -1029,6 +1094,212 @@ function pltt_render_billing_type_badge( $billing_type ) {
 
 
 /**
+ * Resolve the start/end YYYY-MM-DD bounds for a project's current allocation period.
+ *
+ * Recurring projects reset each period (weekly aligned to start_of_week, monthly,
+ * quarterly, yearly). Fixed-fee and non-recurring projects accumulate against the
+ * budget all-time, signaled by [null, null].
+ *
+ * @param object $project        Project row with recurring_period set (or empty).
+ * @param string $reference_date YYYY-MM-DD within the period of interest.
+ * @return array{0:?string,1:?string}
+ */
+function pltt_get_allocation_period_bounds( $project, $reference_date ) {
+	if ( empty( $project->recurring_period ) ) {
+		return array( null, null );
+	}
+
+	$tz = wp_timezone();
+	try {
+		$dt = new DateTimeImmutable( $reference_date, $tz );
+	} catch ( Exception $e ) {
+		return array( null, null );
+	}
+
+	switch ( $project->recurring_period ) {
+		case 'weekly':
+			$week_start_dow = (int) get_option( 'start_of_week', 0 );
+			$dow            = (int) $dt->format( 'w' );
+			$shift          = ( $dow - $week_start_dow + 7 ) % 7;
+			$start          = $dt->modify( "-{$shift} days" );
+			$end            = $start->modify( '+6 days' );
+			break;
+
+		case 'monthly':
+			$start = $dt->modify( 'first day of this month' );
+			$end   = $dt->modify( 'last day of this month' );
+			break;
+
+		case 'quarterly':
+			$month         = (int) $dt->format( 'n' );
+			$q_start_month = ( (int) floor( ( $month - 1 ) / 3 ) * 3 ) + 1;
+			$start         = $dt->setDate( (int) $dt->format( 'Y' ), $q_start_month, 1 );
+			$end           = $start->modify( '+2 months' )->modify( 'last day of this month' );
+			break;
+
+		case 'yearly':
+			$year  = (int) $dt->format( 'Y' );
+			$start = $dt->setDate( $year, 1, 1 );
+			$end   = $dt->setDate( $year, 12, 31 );
+			break;
+
+		default:
+			return array( null, null );
+	}
+
+	return array( $start->format( 'Y-m-d' ), $end->format( 'Y-m-d' ) );
+}
+
+/**
+ * Compute the cumulative allocation boundary for a single allocation-bearing project.
+ *
+ * Cumulative is measured across the project's natural allocation period (current
+ * month for monthly retainers, etc.) — not the user's filter range. This means a
+ * user viewing a single week of a monthly retainer still sees the same boundary
+ * as if they were viewing the whole month.
+ *
+ * The user's tag/billable/billed filters are intentionally ignored here: "what
+ * entries crossed the boundary" depends on every entry in the period, not on the
+ * subset the user is currently viewing.
+ *
+ * @param object $project     Project with budget_hours / budget_fee / recurring_period.
+ * @param array  $filter_args Active filter args (uses date_from as the period anchor).
+ * @return array{
+ *     state: 'over'|'within'|'unavailable',
+ *     allocation_minutes: int,
+ *     used_minutes: int,
+ *     remaining_minutes: int,
+ *     overage_minutes: int,
+ *     overage_amount: float,
+ *     marker_entry_id: ?int,
+ *     overage_entry_ids: int[],
+ *     period_start: ?string,
+ *     period_end: ?string,
+ *     reason: ?string,
+ * }
+ */
+function pltt_compute_overage_threshold( $project, $filter_args ) {
+	$out = array(
+		'state'              => 'unavailable',
+		'allocation_minutes' => 0,
+		'used_minutes'       => 0,
+		'remaining_minutes'  => 0,
+		'overage_minutes'    => 0,
+		'overage_amount'     => 0.0,
+		'marker_entry_id'    => null,
+		'overage_entry_ids'  => array(),
+		'period_start'       => null,
+		'period_end'         => null,
+		'reason'             => null,
+	);
+
+	if ( empty( $project ) ) {
+		$out['reason'] = 'no_project';
+		return $out;
+	}
+
+	// Resolve allocation in minutes. Prefer explicit budget_hours.
+	$alloc_minutes = 0;
+	if ( ! empty( $project->budget_hours ) ) {
+		$alloc_minutes = (int) round( (float) $project->budget_hours * 60 );
+	} elseif ( ! empty( $project->budget_fee ) ) {
+		$rate = pltt_resolve_billable_rate( (int) $project->client_id, (int) $project->id );
+		if ( $rate > 0 ) {
+			$alloc_minutes = (int) round( ( (float) $project->budget_fee / $rate ) * 60 );
+		}
+	}
+
+	if ( $alloc_minutes <= 0 ) {
+		$out['reason'] = 'no_allocation';
+		return $out;
+	}
+	$out['allocation_minutes'] = $alloc_minutes;
+
+	// Resolve the allocation period bounds.
+	$reference_date = ! empty( $filter_args['date_from'] ) ? $filter_args['date_from'] : current_time( 'Y-m-d' );
+	list( $period_start, $period_end ) = pltt_get_allocation_period_bounds( $project, $reference_date );
+	$out['period_start'] = $period_start;
+	$out['period_end']   = $period_end;
+
+	// For recurring projects, the user's range must stay inside the period.
+	// Fixed-fee skips this — its allocation is all-time.
+	if ( ! empty( $project->recurring_period ) && $period_start && $period_end ) {
+		$range_from = $filter_args['date_from'] ?? null;
+		$range_to   = $filter_args['date_to'] ?? null;
+		if ( ( $range_from && $range_from < $period_start ) || ( $range_to && $range_to > $period_end ) ) {
+			$out['reason'] = 'range_spans_periods';
+			return $out;
+		}
+	}
+
+	// Fetch all entries in the period for this project, oldest-first.
+	$period_args = array(
+		'project_id' => (int) $project->id,
+		'orderby'    => 'entry_date',
+		'order'      => 'ASC',
+	);
+	if ( $period_start ) {
+		$period_args['date_from'] = $period_start;
+	}
+	if ( $period_end ) {
+		$period_args['date_to'] = $period_end;
+	}
+
+	$period_entries = PLTT_Entries::get_all( $period_args );
+
+	$cumulative     = 0;
+	$marker_id      = null;
+	$overage_ids    = array();
+	$overage_amount = 0.0;
+
+	foreach ( $period_entries as $e ) {
+		$dur  = (int) $e->duration_minutes;
+		$next = $cumulative + $dur;
+
+		$is_overage = false;
+		if ( $cumulative >= $alloc_minutes ) {
+			$is_overage = true;
+		} elseif ( $next > $alloc_minutes ) {
+			$is_overage = true;
+		}
+
+		if ( $is_overage ) {
+			if ( null === $marker_id ) {
+				$marker_id = (int) $e->id;
+			}
+			$overage_ids[] = (int) $e->id;
+
+			// Accumulate only dollars from entries the user has flipped to billable.
+			if ( ! empty( $e->billable ) && $dur > 0 ) {
+				if ( null !== $e->billable_amount && '' !== $e->billable_amount ) {
+					$overage_amount += (float) $e->billable_amount;
+				} else {
+					$rate = pltt_resolve_billable_rate( (int) $e->client_id, (int) $e->project_id );
+					$overage_amount += round( ( $dur / 60.0 ) * $rate, 2 );
+				}
+			}
+		}
+
+		$cumulative = $next;
+	}
+
+	$out['used_minutes'] = $cumulative;
+
+	if ( ! empty( $overage_ids ) ) {
+		$out['state']             = 'over';
+		$out['overage_minutes']   = max( 0, $cumulative - $alloc_minutes );
+		$out['overage_amount']    = round( $overage_amount, 2 );
+		$out['marker_entry_id']   = $marker_id;
+		$out['overage_entry_ids'] = $overage_ids;
+	} else {
+		$out['state']             = 'within';
+		$out['remaining_minutes'] = max( 0, $alloc_minutes - $cumulative );
+	}
+
+	return $out;
+}
+
+/**
  * Render the allocation bar HTML for a project.
  *
  * Outputs a progress bar showing how much of the budget/allocation has been used.
@@ -1046,15 +1317,21 @@ function pltt_render_allocation_bar( $alloc_mins, $budget_hours, $billing_type, 
 	$alloc_hours = $alloc_mins / 60;
 	$pct         = $budget_hours > 0 ? ( $alloc_hours / $budget_hours ) * 100 : 0;
 	$is_over     = $pct >= 100;
-	$bar_width   = min( $pct, 100 );
-	$pct_display = round( $pct );
+	$pct_display = (int) round( $pct );
 
 	if ( $is_over ) {
-		$delta_fmt = pltt_format_duration( ( $alloc_hours - $budget_hours ) * 60 );
-		$label     = $delta_fmt . ' ' . __( 'over', 'plain-language-time-tracker' ) . ' · ' . $pct_display . '%';
+		// When over: bar fills 100% of the wrap, split between within-budget (type color)
+		// and overage (amber). Both segments are proportional to the total used time.
+		$within_seg_pct = $alloc_hours > 0 ? ( $budget_hours / $alloc_hours ) * 100 : 0;
+		$over_seg_pct   = 100 - $within_seg_pct;
+		$delta_fmt      = pltt_format_duration( ( $alloc_hours - $budget_hours ) * 60 );
+		$label          = $delta_fmt . ' ' . __( 'over', 'plain-language-time-tracker' ) . ' · ' . $pct_display . '%';
 	} else {
-		$delta_fmt = pltt_format_duration( ( $budget_hours - $alloc_hours ) * 60 );
-		$label     = $delta_fmt . ' ' . __( 'left', 'plain-language-time-tracker' ) . ' · ' . $pct_display . '%';
+		// Within budget: single type-colored segment, rest of wrap shows background.
+		$within_seg_pct = $pct;
+		$over_seg_pct   = 0;
+		$delta_fmt      = pltt_format_duration( ( $budget_hours - $alloc_hours ) * 60 );
+		$label          = $delta_fmt . ' ' . __( 'left', 'plain-language-time-tracker' ) . ' · ' . $pct_display . '%';
 	}
 
 	if ( null !== $fee_args ) {
@@ -1065,11 +1342,16 @@ function pltt_render_allocation_bar( $alloc_mins, $budget_hours, $billing_type, 
 		$tooltip = pltt_format_hours( $alloc_mins ) . ' ' . __( 'hrs', 'plain-language-time-tracker' )
 			. ' · ' . __( 'Budget:', 'plain-language-time-tracker' ) . ' ' . pltt_format_hours( $budget_hours * 60 ) . ' ' . __( 'hrs', 'plain-language-time-tracker' );
 	}
+
 	?>
 	<div class="pltt-alloc-cell" title="<?php echo esc_attr( $tooltip ); ?>">
-		<div class="pltt-alloc-bar-wrap">
-			<div class="pltt-alloc-bar<?php echo $is_over ? ' pltt-alloc-over' : ''; ?>"
-				 style="width:<?php echo esc_attr( $bar_width ); ?>%"></div>
+		<div class="pltt-alloc-bar-wrap<?php echo $is_over ? ' pltt-alloc-over' : ''; ?>">
+			<span class="pltt-alloc-seg pltt-alloc-seg-within"
+				  style="width:<?php echo esc_attr( $within_seg_pct ); ?>%"></span>
+			<?php if ( $is_over ) : ?>
+				<span class="pltt-alloc-seg pltt-alloc-seg-over"
+					  style="width:<?php echo esc_attr( $over_seg_pct ); ?>%"></span>
+			<?php endif; ?>
 		</div>
 		<span class="pltt-alloc-label<?php echo $is_over ? ' pltt-alloc-over' : ''; ?>">
 			<?php echo esc_html( $label ); ?>

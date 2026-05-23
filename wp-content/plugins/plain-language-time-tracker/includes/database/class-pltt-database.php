@@ -20,7 +20,7 @@ class PLTT_Database {
 	 *
 	 * @var string
 	 */
-	const DB_VERSION = '1.9.4';
+	const DB_VERSION = '1.9.5';
 
 	/**
 	 * Get the full table name with WordPress prefix.
@@ -186,7 +186,12 @@ class PLTT_Database {
 		if ( version_compare( $current_version, self::DB_VERSION, '<' ) ) {
 			// Fresh installs skip migrate() — there is nothing to migrate from.
 			if ( '0' !== $current_version ) {
-				self::migrate( $current_version );
+				if ( false === self::migrate( $current_version ) ) {
+					// A sub-migration signalled failure. Leave the version where it is
+					// so the next page load retries — bumping now would mark this
+					// upgrade "done" and silently strand the data in a half-migrated state.
+					return;
+				}
 			}
 			self::create_tables();
 			update_option( 'pltt_db_version', self::DB_VERSION );
@@ -196,7 +201,12 @@ class PLTT_Database {
 	/**
 	 * Run migrations for specific version upgrades.
 	 *
+	 * Returns false if any sub-migration that opted into status reporting failed,
+	 * true otherwise. Older sub-migrations that don't return a value implicitly
+	 * succeed (they pre-date the failure-propagation contract).
+	 *
 	 * @param string $from_version Version upgrading from.
+	 * @return bool
 	 */
 	private static function migrate( $from_version ) {
 		global $wpdb;
@@ -376,6 +386,238 @@ class PLTT_Database {
 			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.SchemaChange
 			$wpdb->query( "ALTER TABLE {$tags_table} ADD INDEX IF NOT EXISTS group_name (group_name)" );
 		}
+
+		// 1.9.5: Billable model honesty — flip retainer / fixed-fee projects (and
+		// their existing billable entries) to non-billable by default. The billable
+		// flag now means "this entry generates invoiceable dollars from time × rate"
+		// — work paid via flat fees no longer counts. See plan: lets-take-a-look-bright-grove.md.
+		if ( version_compare( $from_version, '1.9.5', '<' ) ) {
+			if ( false === self::migrate_to_1_9_5() ) {
+				return false;
+			}
+		}
+
+		return true;
+	}
+
+	/**
+	 * 1.9.5 migration: flip retainer / fixed-fee projects + entries to non-billable.
+	 *
+	 * Two distinct sets of rows are affected:
+	 *   - Project defaults: every retainer / fixed-fee project with
+	 *     billability_default = 1 gets flipped to 0.
+	 *   - Entries: every billable=1 entry on ANY retainer / fixed-fee project
+	 *     gets flipped to 0, regardless of that project's current default
+	 *     (a project may have been switched to default=0 earlier, but its
+	 *     legacy billable entries still need cleanup under the new model).
+	 *
+	 * Writes a plain-text review log to wp-content/uploads listing every
+	 * flipped entry that was already invoiced (billed=1) so the user can
+	 * manually re-flip true overage afterward.
+	 *
+	 * @return bool true on success (or no-op), false on hard failure —
+	 *              caller MUST NOT bump the DB version when false is returned.
+	 */
+	private static function migrate_to_1_9_5() {
+		global $wpdb;
+
+		$entries_table  = self::get_table_name( 'time_entries' );
+		$projects_table = self::get_table_name( 'projects' );
+		$clients_table  = self::get_table_name( 'clients' );
+
+		// All retainer / fixed-fee projects (regardless of current billability_default).
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+		$retainer_fixed_projects = $wpdb->get_results(
+			"SELECT p.id, p.name, p.recurring_period, p.budget_hours, p.budget_fee,
+			        p.billability_default, c.name AS client_name
+			 FROM {$projects_table} p
+			 LEFT JOIN {$clients_table} c ON p.client_id = c.id
+			 WHERE p.recurring_period IS NOT NULL
+			    OR p.budget_hours IS NOT NULL
+			    OR p.budget_fee IS NOT NULL
+			 ORDER BY c.name ASC, p.name ASC"
+		);
+
+		if ( empty( $retainer_fixed_projects ) ) {
+			return true; // Nothing on this install matches the new non-billable types.
+		}
+
+		$project_ids                  = array_map( static function( $p ) { return (int) $p->id; }, $retainer_fixed_projects );
+		$default_flip_ids             = array_map(
+			static function( $p ) { return (int) $p->id; },
+			array_values( array_filter( $retainer_fixed_projects, static function( $p ) {
+				return 1 === (int) $p->billability_default;
+			} ) )
+		);
+		$placeholders_all             = implode( ',', array_fill( 0, count( $project_ids ), '%d' ) );
+
+		// Collect entries about to be flipped — for the log.
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.NotPrepared
+		$entries_to_flip = $wpdb->get_results( $wpdb->prepare(
+			"SELECT e.id, e.entry_date, e.duration_minutes, e.description, e.project_id, e.billed
+			 FROM {$entries_table} e
+			 WHERE e.billable = 1 AND e.project_id IN ({$placeholders_all})
+			 ORDER BY e.project_id ASC, e.entry_date ASC, e.id ASC",
+			$project_ids
+		) );
+
+		// True no-op: no defaults to flip AND no entries to flip. Skip the log + notice.
+		if ( empty( $default_flip_ids ) && empty( $entries_to_flip ) ) {
+			return true;
+		}
+
+		// Write log BEFORE flipping so a write failure aborts the migration cleanly.
+		$log_url = self::write_migration_1_9_5_log( $retainer_fixed_projects, $default_flip_ids, $entries_to_flip ?: array() );
+		if ( '' === $log_url ) {
+			return false; // File system not writable — caller will retry next page load.
+		}
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.SchemaChange
+		$wpdb->query( 'START TRANSACTION' );
+
+		// Flip project defaults (only the subset that still defaults to billable).
+		$projects_updated = 0;
+		if ( ! empty( $default_flip_ids ) ) {
+			$placeholders_defaults = implode( ',', array_fill( 0, count( $default_flip_ids ), '%d' ) );
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.NotPrepared
+			$projects_updated = $wpdb->query( $wpdb->prepare(
+				"UPDATE {$projects_table} SET billability_default = 0 WHERE id IN ({$placeholders_defaults})",
+				$default_flip_ids
+			) );
+		}
+
+		// Flip ALL existing billable entries on any retainer / fixed-fee project.
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.NotPrepared
+		$entries_updated = $wpdb->query( $wpdb->prepare(
+			"UPDATE {$entries_table} SET billable = 0 WHERE billable = 1 AND project_id IN ({$placeholders_all})",
+			$project_ids
+		) );
+
+		if ( false === $projects_updated || false === $entries_updated ) {
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.SchemaChange
+			$wpdb->query( 'ROLLBACK' );
+			return false;
+		}
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.SchemaChange
+		$wpdb->query( 'COMMIT' );
+
+		update_option( 'pltt_migration_1_9_5_log_url', $log_url, false );
+
+		return true;
+	}
+
+	/**
+	 * Write the 1.9.5 migration log to wp-content/uploads.
+	 *
+	 * @param array $retainer_fixed_projects All retainer / fixed-fee projects (any billability_default).
+	 * @param array $default_flip_ids        IDs of projects whose default flipped 1 -> 0.
+	 * @param array $entries_to_flip         Rows of { id, entry_date, duration_minutes, description, project_id, billed }.
+	 * @return string Public URL of the log file, or empty string on failure.
+	 */
+	private static function write_migration_1_9_5_log( $retainer_fixed_projects, $default_flip_ids, $entries_to_flip ) {
+		$upload_dir = wp_upload_dir();
+		if ( ! empty( $upload_dir['error'] ) ) {
+			return '';
+		}
+
+		$filename = 'pltt-migration-1.9.5-' . gmdate( 'Ymd-His' ) . '.txt';
+		$filepath = trailingslashit( $upload_dir['basedir'] ) . $filename;
+		$fileurl  = trailingslashit( $upload_dir['baseurl'] ) . $filename;
+
+		$default_flip_set = array_flip( array_map( 'intval', $default_flip_ids ) );
+
+		// Build a per-project lookup with running counters.
+		$project_lookup = array();
+		foreach ( $retainer_fixed_projects as $p ) {
+			$type = ! empty( $p->recurring_period ) ? 'Retainer' : 'Fixed-fee';
+			$pid  = (int) $p->id;
+			$project_lookup[ $pid ] = (object) array(
+				'name'         => (string) $p->name,
+				'client_name'  => (string) ( $p->client_name ?? '—' ),
+				'type'         => $type,
+				'default_flip' => isset( $default_flip_set[ $pid ] ),
+				'count'        => 0,
+				'invoiced'     => 0,
+			);
+		}
+
+		// Group invoiced entries by project for the review section.
+		$invoiced_entries_by_project = array();
+		foreach ( $entries_to_flip as $entry ) {
+			$pid = (int) $entry->project_id;
+			if ( ! isset( $project_lookup[ $pid ] ) ) {
+				continue;
+			}
+			$project_lookup[ $pid ]->count++;
+			if ( ! empty( $entry->billed ) ) {
+				$project_lookup[ $pid ]->invoiced++;
+				$invoiced_entries_by_project[ $pid ][] = $entry;
+			}
+		}
+
+		$total_entries  = count( $entries_to_flip );
+		$total_invoiced = 0;
+		foreach ( $project_lookup as $p ) {
+			$total_invoiced += $p->invoiced;
+		}
+
+		$lines   = array();
+		$lines[] = 'PLTT Billable Model Migration (1.9.5)';
+		$lines[] = 'Generated: ' . gmdate( 'Y-m-d H:i:s' ) . ' UTC';
+		$lines[] = '';
+		$lines[] = '=== Summary ===';
+		$lines[] = 'Retainer / fixed-fee projects on this install: ' . count( $project_lookup );
+		$lines[] = 'Project defaults flipped (billability_default 1 -> 0): ' . count( $default_flip_ids );
+		$lines[] = 'Entries flipped (billable 1 -> 0): ' . $total_entries;
+		$lines[] = '  ...of those, marked invoiced (billed=1): ' . $total_invoiced . '   <-- REVIEW THESE MANUALLY';
+		$lines[] = '';
+
+		if ( $total_invoiced > 0 ) {
+			$lines[] = '=== INVOICED ENTRIES NEEDING REVIEW ===';
+			$lines[] = '(Most likely real overage that should stay billable; re-flip via Reports -> inline edit.)';
+			$lines[] = '';
+			foreach ( $invoiced_entries_by_project as $pid => $entries ) {
+				$p       = $project_lookup[ $pid ];
+				$lines[] = sprintf( 'Project: %s (%s -- %s)', $p->name, $p->client_name, $p->type );
+				foreach ( $entries as $e ) {
+					$desc = trim( (string) ( $e->description ?? '' ) );
+					if ( '' !== $desc ) {
+						$desc = preg_replace( '/\s+/', ' ', $desc );
+						if ( function_exists( 'mb_strlen' ) && mb_strlen( $desc ) > 80 ) {
+							$desc = mb_substr( $desc, 0, 77 ) . '...';
+						} elseif ( strlen( $desc ) > 80 ) {
+							$desc = substr( $desc, 0, 77 ) . '...';
+						}
+					}
+					$lines[] = sprintf(
+						'  #%d | %s | %s | "%s"',
+						(int) $e->id,
+						$e->entry_date,
+						pltt_format_duration( (int) $e->duration_minutes ),
+						$desc
+					);
+				}
+				$lines[] = '';
+			}
+		}
+
+		$lines[] = '=== ALL RETAINER / FIXED-FEE PROJECTS ===';
+		foreach ( $project_lookup as $p ) {
+			$default_note = $p->default_flip ? ' [default flipped]' : ' [default already non-billable]';
+			$lines[]      = sprintf( '%s (%s -- %s)%s', $p->name, $p->client_name, $p->type, $default_note );
+			$lines[]      = sprintf( '  %d entries flipped to non-billable (%d were invoiced)', $p->count, $p->invoiced );
+		}
+		$lines[] = '';
+
+		$body = implode( "\n", $lines );
+
+		// phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations
+		if ( false === @file_put_contents( $filepath, $body ) ) {
+			return '';
+		}
+
+		return $fileurl;
 	}
 
 	/**
@@ -402,7 +644,8 @@ class PLTT_Database {
 
 		delete_option( 'pltt_version' );
 		delete_option( 'pltt_db_version' );
-		delete_option( 'pltt_task_types' );    // May already be gone from 1.6.0 migration.
-		delete_option( 'pltt_custom_tags' );   // May already be gone from 1.8.1 migration.
+		delete_option( 'pltt_task_types' );          // May already be gone from 1.6.0 migration.
+		delete_option( 'pltt_custom_tags' );         // May already be gone from 1.8.1 migration.
+		delete_option( 'pltt_migration_1_9_5_log_url' );
 	}
 }

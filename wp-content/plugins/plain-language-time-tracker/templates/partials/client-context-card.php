@@ -18,7 +18,8 @@ if ( empty( $context_client ) ) {
 	return;
 }
 
-$clients_url = admin_url( 'admin.php?page=pltt-clients' );
+$clients_url        = admin_url( 'admin.php?page=pltt-clients' );
+$is_internal_client = ! empty( $context_client->is_internal );
 ?>
 <div class="card pltt-client-context-card">
 	<div class="pltt-context-header">
@@ -28,8 +29,23 @@ $clients_url = admin_url( 'admin.php?page=pltt-clients' );
 		</a>
 	</div>
 
-	<?php if ( empty( $context_projects ) ) : ?>
-		<p class="pltt-context-empty"><?php esc_html_e( 'No active projects.', 'plain-language-time-tracker' ); ?></p>
+	<?php if ( $is_internal_client ) : ?>
+		<?php // Internal client — projects have no billable rates worth reviewing. ?>
+	<?php elseif ( empty( $context_projects ) ) : ?>
+		<?php
+		$client_rate = (float) ( $context_client->hourly_rate ?? 0 );
+		$fallback_rate   = pltt_resolve_billable_rate( (int) $context_client->id, 0 );
+		$fallback_source = $client_rate > 0
+			? __( 'client rate', 'plain-language-time-tracker' )
+			: __( 'default', 'plain-language-time-tracker' );
+		?>
+		<div class="pltt-context-projects">
+			<div class="pltt-context-project">
+				<div class="pltt-context-project-meta">
+					<?php echo esc_html( pltt_format_currency( $fallback_rate ) . '/hr (' . $fallback_source . ')' ); ?>
+				</div>
+			</div>
+		</div>
 	<?php else : ?>
 		<div class="pltt-context-projects">
 			<?php foreach ( $context_projects as $project ) :

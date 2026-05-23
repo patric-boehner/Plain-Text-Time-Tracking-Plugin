@@ -154,12 +154,6 @@
 	width: 90px;
 }
 
-/* Over-budget duration cell in summary table */
-.pltt-report-content td.pltt-alloc-over {
-	color: var(--pltt-primary);
-	font-weight: 600;
-}
-
 /* Entry description cell — two-line layout */
 .pltt-entry-desc-cell {
 	font-size: 13px;
@@ -300,7 +294,8 @@
 }
 
 .pltt-chart-swatch-billable    { background: var(--pltt-success); }
-.pltt-chart-swatch-nonbillable { background: var(--pltt-border); }
+.pltt-chart-swatch-client-flat { background: color-mix(in srgb, var(--pltt-success) 45%, #c3c4c7 55%); }
+.pltt-chart-swatch-internal    { background: var(--pltt-border); }
 
 .pltt-chart {
 	margin: 0;
@@ -432,16 +427,24 @@
 	flex-shrink: 0;
 }
 
+/* Stack order (bottom → top): billable, client (flat-fee), internal.
+   Each segment rounds its top corners — only the topmost visible segment's
+   rounding actually shows, so a column with just billable still looks rounded. */
 .pltt-chart-seg-billable {
 	background: var(--pltt-success);
 	height: calc(var(--billable-pct, 0) * 100%);
-	/* Rounding is hidden when non-billable sits on top; shows when non-billable is 0. */
 	border-radius: 2px 2px 0 0;
 }
 
-.pltt-chart-seg-nonbillable {
+.pltt-chart-seg-client-flat {
+	background: color-mix(in srgb, var(--pltt-success) 45%, #c3c4c7 55%);
+	height: calc(var(--client-flat-pct, 0) * 100%);
+	border-radius: 2px 2px 0 0;
+}
+
+.pltt-chart-seg-internal {
 	background: var(--pltt-border);
-	height: calc(var(--nonbillable-pct, 0) * 100%);
+	height: calc(var(--internal-pct, 0) * 100%);
 	border-radius: 2px 2px 0 0;
 }
 
@@ -551,4 +554,70 @@
 	.pltt-chart-x-label {
 		font-size: 10px;
 	}
+}
+
+/* ===== Overage decision support (single-project retainer/fixed-fee view) ===== */
+
+/* Threshold marker — chrome inside the day table, not a data row. */
+.pltt-date-group .widefat tr.pltt-threshold-marker-row,
+.pltt-date-group .widefat tr.pltt-threshold-marker-row:hover {
+	background: transparent;
+	box-shadow: none;
+}
+
+.pltt-date-group .widefat tr.pltt-threshold-marker-row > td {
+	padding: 0;
+	border-top: 1px dashed var(--pltt-warning);
+	border-bottom: 1px dashed var(--pltt-warning);
+	background: linear-gradient(
+		to bottom,
+		rgba(219, 166, 23, 0.04),
+		rgba(219, 166, 23, 0.10) 45%,
+		rgba(219, 166, 23, 0.04)
+	);
+}
+
+.pltt-threshold-marker {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	padding: 10px 14px;
+}
+
+.pltt-threshold-icon {
+	font-size: 16px;
+	line-height: 1;
+	color: var(--pltt-warning);
+}
+
+.pltt-threshold-labels {
+	display: flex;
+	flex-direction: row;
+	align-items: baseline;
+	gap: 10px;
+	min-width: 0;
+}
+
+.pltt-threshold-primary {
+	font-weight: 600;
+	color: var(--pltt-text-dark);
+	font-size: 13px;
+}
+
+.pltt-threshold-secondary {
+	color: var(--pltt-text-muted);
+	font-size: 12px;
+}
+
+/* Overage row tint — warm cream bg + amber left edge. */
+.pltt-date-group .widefat tr.pltt-row-overage {
+	background: #fefaf2;
+}
+
+.pltt-date-group .widefat tr.pltt-row-overage > td:first-child {
+	box-shadow: inset 3px 0 0 var(--pltt-warning);
+}
+
+.pltt-date-group .widefat tr.pltt-row-overage:hover {
+	background: #fcf5e3;
 }
