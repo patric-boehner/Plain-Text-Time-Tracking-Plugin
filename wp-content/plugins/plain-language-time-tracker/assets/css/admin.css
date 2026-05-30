@@ -140,6 +140,7 @@
 	font-weight: 600;
 	color: var(--pltt-text-dark);
 	line-height: 1.2;
+	margin-bottom: 8px;
 }
 
 .card-value.pltt-card-value-empty {
@@ -321,7 +322,7 @@
 .pltt-summary-cards .card.pltt-project-context-card {
 	flex: 0 1 340px;
 	max-width: 340px;
-	align-self: flex-start;
+	align-self: stretch;
 	margin-left: auto;
 	order: 99;
 }
@@ -370,22 +371,20 @@
 
 .pltt-project-context-card .pltt-alloc-bar-wrap {
 	max-width: none;
-	height: 6px;
+	height: 8px;
 }
 
-/* Archived project: muted whole-card treatment. */
-.pltt-project-context-card.is-archived {
-	background: var(--pltt-bg-subtle);
+/* Overage-to-invoice card — a separate card shown only for retainers in overage.
+   Sits immediately to the right of the project context card (margin-left:auto on the
+   project card pushes the pair flush-right; this card follows at the next order step). */
+.pltt-summary-cards .card.pltt-project-overage-card {
+	flex: 0 1 280px;
+	max-width: 300px;
+	align-self: stretch;
+	order: 100;
 }
 
-/* Overage-to-invoice block: calculated overage vs. what's marked billable. */
-.pltt-project-context-card .pltt-pcc-overage {
-	margin-top: 14px;
-	padding-top: 12px;
-	border-top: 1px solid var(--pltt-border-faint);
-}
-
-.pltt-project-context-card .pltt-pcc-overage-label {
+.pltt-project-overage-card .pltt-pcc-overage-label {
 	font-size: 11px;
 	font-weight: 600;
 	letter-spacing: 0.04em;
@@ -393,39 +392,39 @@
 	color: var(--pltt-text-muted);
 }
 
-.pltt-project-context-card .pltt-pcc-overage-figure {
+.pltt-project-overage-card .pltt-pcc-overage-figure {
 	margin-top: 2px;
 	font-size: 18px;
 	font-weight: 600;
 	color: var(--pltt-text-dark);
 }
 
-.pltt-project-context-card .pltt-pcc-overage-amount {
+.pltt-project-overage-card .pltt-pcc-overage-amount {
 	margin-left: 6px;
 	color: var(--pltt-success);
 }
 
-.pltt-project-context-card .pltt-pcc-overage-note {
+.pltt-project-overage-card .pltt-pcc-overage-note {
 	display: flex;
 	align-items: flex-start;
 	gap: 6px;
-	margin-top: 8px;
+	margin-top: 12px;
 	font-size: 12px;
 	line-height: 1.4;
 	color: var(--pltt-text-subtle);
 }
 
-.pltt-project-context-card .pltt-pcc-overage-note .dashicons {
+.pltt-project-overage-card .pltt-pcc-overage-note .dashicons {
 	flex: none;
 	width: 16px;
 	height: 16px;
 	font-size: 16px;
 }
 
-.pltt-project-context-card .pltt-pcc-overage-note.is-match .dashicons { color: var(--pltt-success); }
-.pltt-project-context-card .pltt-pcc-overage-note.is-over  .dashicons,
-.pltt-project-context-card .pltt-pcc-overage-note.is-none  .dashicons { color: var(--pltt-warning); }
-.pltt-project-context-card .pltt-pcc-overage-note.is-under .dashicons { color: var(--pltt-text-muted); }
+.pltt-project-overage-card .pltt-pcc-overage-note.is-match .dashicons { color: var(--pltt-success); }
+.pltt-project-overage-card .pltt-pcc-overage-note.is-over  .dashicons,
+.pltt-project-overage-card .pltt-pcc-overage-note.is-none  .dashicons { color: var(--pltt-warning); }
+.pltt-project-overage-card .pltt-pcc-overage-note.is-under .dashicons { color: var(--pltt-text-muted); }
 
 /* Badges */
 .pltt-badge {
@@ -500,9 +499,11 @@
 .pltt-alloc-seg-over   { background: var(--pltt-warning); } /* amber: overage portion */
 
 .pltt-alloc-label {
-	font-size: 11px;
+	font-size: 12px;
 	color: var(--pltt-text-subtle);
 	white-space: nowrap;
+	display: block;
+	margin-top: 8px;
 }
 
 /* WordPress row-actions for management tables */
