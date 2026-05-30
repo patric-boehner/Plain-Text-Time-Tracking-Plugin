@@ -116,17 +116,20 @@ if ( $has_alloc ) {
 		pltt_render_allocation_bar( $used_min, $alloc_min / 60, $billing_type, $fee_args, $caption );
 	}
 	?>
+</div>
 
-	<?php
-	// Overage-to-invoice: the calculated overage (math-correct) versus what the user has
-	// flipped to billable. Retainers only — fixed-fee work isn't invoiced per-entry.
-	if ( 'recurring' === $billing_type && ! empty( $overage ) && 'over' === $overage['state'] ) :
+<?php
+// Overage-to-invoice card — a separate, contextually-shown card (retainers in overage
+// only; fixed-fee work isn't invoiced per-entry). Compares the calculated overage
+// (math-correct) against what the user has flipped to billable. Relies on $overage /
+// $billing_type / $project set above; reports.php includes this partial as one unit.
+if ( 'recurring' === $billing_type && ! empty( $overage ) && 'over' === $overage['state'] ) :
 		$rate           = pltt_resolve_billable_rate( (int) $project->client_id, (int) $project->id );
 		$calc_minutes   = (int) $overage['overage_minutes'];
 		$calc_amount    = round( $calc_minutes / 60.0 * $rate, 2 );
 		$marked_minutes = (int) $overage['marked_billable_minutes'];
 		$marked_amount  = (float) $overage['marked_billable_amount'];
-		$diff           = $marked_minutes - $calc_minutes;
+		$diff = $marked_minutes - $calc_minutes;
 
 		if ( 0 === $marked_minutes ) {
 			$note_state = 'none';
@@ -159,7 +162,7 @@ if ( $has_alloc ) {
 			);
 		}
 		?>
-		<div class="pltt-pcc-overage">
+		<div class="card pltt-project-overage-card">
 			<div class="pltt-pcc-overage-label"><?php esc_html_e( 'Overage to invoice', 'plain-language-time-tracker' ); ?></div>
 			<div class="pltt-pcc-overage-figure">
 				<span class="pltt-pcc-overage-time"><?php echo esc_html( pltt_format_duration( $calc_minutes ) ); ?></span>
@@ -170,5 +173,4 @@ if ( $has_alloc ) {
 				<span class="pltt-pcc-overage-note-text"><?php echo esc_html( $note_text ); ?></span>
 			</div>
 		</div>
-	<?php endif; ?>
-</div>
+<?php endif; ?>
