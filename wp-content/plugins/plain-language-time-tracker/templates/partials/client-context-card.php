@@ -18,15 +18,11 @@ if ( empty( $context_client ) ) {
 	return;
 }
 
-$clients_url        = admin_url( 'admin.php?page=pltt-clients' );
 $is_internal_client = ! empty( $context_client->is_internal );
 ?>
 <div class="card pltt-client-context-card">
 	<div class="pltt-context-header">
 		<h2><?php echo esc_html( $context_client->name ); ?></h2>
-		<a href="<?php echo esc_url( $clients_url ); ?>" class="pltt-context-link">
-			<?php esc_html_e( 'View client', 'plain-language-time-tracker' ); ?>
-		</a>
 	</div>
 
 	<?php if ( $is_internal_client ) : ?>

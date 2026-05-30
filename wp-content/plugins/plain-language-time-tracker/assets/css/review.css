@@ -42,6 +42,10 @@
 	min-width: 325px;
 }
 
+.pltt-form-duration {
+	width: 100px;
+}
+
 .pltt-col-client,
 .pltt-col-project {
 	width: 180px;
@@ -282,5 +286,211 @@
 	.pltt-col-client,
 	.pltt-col-project {
 		width: 150px;
+	}
+}
+
+/* ============================================================
+   Editing-existing review state
+   ============================================================ */
+
+/* Footer below the entries table — right-aligned back link */
+.pltt-entries-footer {
+	margin-top: 15px;
+	text-align: right;
+}
+
+/* Compact entry rows. Row-actions reveal on hover, matching WP core convention. */
+.pltt-entries-table .pltt-entry-compact td {
+	vertical-align: middle;
+}
+
+.pltt-entries-table .pltt-entry-compact .row-actions {
+	visibility: hidden;
+	color: #8c8f94;
+	font-size: 12px;
+	margin-top: 2px;
+}
+
+.pltt-entries-table .pltt-entry-compact:hover .row-actions,
+.pltt-entries-table .pltt-entry-compact:focus-within .row-actions {
+	visibility: visible;
+}
+
+.pltt-entries-table .pltt-entry-compact.pltt-entry-being-edited {
+	background-color: #f0f6fc; /* match the open-form blue tint below */
+}
+
+.pltt-entries-table .pltt-entry-compact .pltt-entry-meta {
+	font-size: 12px;
+	color: #50575e;
+	margin-top: 2px;
+}
+
+.pltt-entries-table .pltt-entry-compact .pltt-entry-meta-sep {
+	color: #c3c4c7;
+}
+
+/* Hidden form rows */
+.pltt-entry-form-row.pltt-hidden {
+	display: none;
+}
+
+/* The form panel — card look matching the .widefat table treatment */
+.pltt-entry-form {
+	background-color: #fff;
+	border: 1px solid #c3c4c7;
+	border-radius: 4px;
+}
+
+/* The wrapping td acts as the "open drawer" for the entry being edited — a soft
+ * blue background that visually links to the .pltt-entry-being-edited tint on
+ * the display row above. The white form card sits on top and stands out as the
+ * editable surface. */
+.pltt-entry-form-row > td {
+	padding: 8px 10px;
+	background-color: #f0f6fc;
+}
+
+/* Header section — visually distinct band, mirrors the .widefat thead style */
+.pltt-entry-form-header {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	padding: 10px 16px;
+	border-bottom: 1px solid #c3c4c7;
+}
+
+.pltt-entry-form-header .pltt-entry-form-title {
+	margin: 0;
+	font-size: 14px;
+	font-weight: 600;
+}
+
+.pltt-entry-form-header .dashicons {
+	color: #50575e;
+}
+
+.pltt-entry-form-fields {
+	display: flex;
+	flex-direction: column;
+	gap: 12px;
+	padding: 16px;
+}
+
+.pltt-entry-form .pltt-field label {
+	display: block;
+	font-weight: 600;
+	font-size: 12px;
+	color: #1d2327;
+	margin-bottom: 4px;
+}
+
+.pltt-entry-form .pltt-field-description input {
+	width: 100%;
+}
+
+.pltt-field-row {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 12px;
+	align-items: flex-end;
+}
+
+.pltt-field-row-time .pltt-field-date {
+	flex: 0 0 150px;
+}
+
+.pltt-field-row-time .pltt-field-start,
+.pltt-field-row-time .pltt-field-end {
+	flex: 0 0 110px;
+}
+
+.pltt-field-row-time .pltt-field-duration {
+	flex: 0 1 100px;
+	max-width: 100px;
+}
+
+/* Client and Project are sized to fixed widths so the row stays uniform.
+ * Tags is content-sized but can grow as more chips are added — Tags and
+ * Billable sit next to each other rather than Tags filling all remaining space. */
+.pltt-field-row-assignment .pltt-field-client,
+.pltt-field-row-assignment .pltt-field-project {
+	flex: 0 1 200px;
+	min-width: 180px;
+}
+
+.pltt-field-row-assignment .pltt-field-tags {
+	flex: 0 1 auto;
+	min-width: 180px;
+}
+
+.pltt-field-row-assignment .pltt-field-billable {
+	flex: 0 0 auto;
+}
+
+.pltt-field-row-assignment select {
+	width: 100%;
+}
+
+/* The hidden checkbox carries the form value; the button is the user-facing control.
+ * `hidden` attribute alone is overridden by WP admin form styles, so force it. */
+.pltt-entry-form .pltt-form-billable {
+	display: none !important;
+}
+
+/* Billable toggle in the form — reuses the .pltt-billable-symbol color states
+ * from admin.css. The reset rules below mirror .pltt-inline-toggle in reports.css,
+ * which isn't enqueued on the review screen. */
+.pltt-form-billable-btn {
+	background: none;
+	border: none;
+	padding: 4px 8px;
+	cursor: pointer;
+	line-height: 1;
+	transition: opacity 0.1s;
+}
+
+.pltt-form-billable-btn:focus {
+	outline: 2px solid var(--pltt-primary);
+	outline-offset: 2px;
+	border-radius: 2px;
+}
+
+.pltt-entry-form-error {
+	display: none;
+	margin: 0 16px;
+	padding: 8px 12px;
+	background-color: #fcf0f1;
+	border-left: 3px solid #d63638;
+	color: #8a1f25;
+	font-size: 13px;
+}
+
+.pltt-entry-form-error.is-visible {
+	display: block;
+}
+
+/* Actions sit in their own footer band — Save and Cancel right-aligned */
+.pltt-entry-form-actions {
+	display: flex;
+	align-items: center;
+	justify-content: flex-end;
+	gap: 8px;
+	padding: 12px 16px;
+	border-top: 1px solid #c3c4c7;
+}
+
+.pltt-entry-form-actions .pltt-form-status {
+	margin-right: auto;
+	color: #50575e;
+	font-size: 12px;
+}
+
+@media screen and (max-width: 782px) {
+	.pltt-field-row-time .pltt-field-date,
+	.pltt-field-row-time .pltt-field-start,
+	.pltt-field-row-time .pltt-field-end,
+	.pltt-field-row-time .pltt-field-duration {
+		flex: 1 1 calc(50% - 12px);
 	}
 }

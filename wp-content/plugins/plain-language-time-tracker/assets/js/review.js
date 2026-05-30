@@ -741,3 +741,692 @@
 		form.submit();
 	} );
 } )();
+
+
+/**
+ * Editing-existing screen state: compact rows with hover Edit/Delete,
+ * expandable unified form (add + edit), per-row save via AJAX.
+ *
+ * This IIFE no-ops in post-parse mode (when #pltt-review-form is present).
+ */
+( function() {
+	'use strict';
+
+	if ( document.getElementById( 'pltt-review-form' ) ) {
+		return; // Post-parse mode handles its own UI.
+	}
+
+	const tbody = document.getElementById( 'pltt-entries-tbody' );
+	if ( ! tbody ) {
+		return;
+	}
+
+	const tagSuggestions = ( typeof plttAllTags !== 'undefined' ) ? plttAllTags : [];
+	const tagGroups = ( typeof plttTagGroups !== 'undefined' ) ? plttTagGroups : {};
+
+	// One tag picker instance per form row, keyed by row element.
+	const tagPickers = new WeakMap();
+	// Track which form row currently owns the "create new tag" modal flow.
+	let activeTagPicker = null;
+	// Track which form row currently owns the "create new client/project" modal flow.
+	let activeFormRow = null;
+	// Track which form row is currently open (only one at a time).
+	let openFormRow = null;
+
+	/**
+	 * Look up the compact display row that owns a given form row.
+	 *
+	 * @param {HTMLElement} formRow .pltt-entry-form-row tr.
+	 * @return {HTMLElement|null} The preceding compact row.
+	 */
+	function getDisplayRow( formRow ) {
+		return formRow.previousElementSibling;
+	}
+
+	/**
+	 * Initialize a tag picker on a form row if one doesn't already exist.
+	 *
+	 * @param {HTMLElement} formRow .pltt-entry-form-row element.
+	 */
+	function ensureTagPicker( formRow ) {
+		if ( tagPickers.has( formRow ) ) {
+			return;
+		}
+		const container = formRow.querySelector( '.pltt-tag-input-wrap' );
+		if ( ! container ) {
+			return;
+		}
+		const picker = new PlttTagPicker(
+			container,
+			tagSuggestions,
+			function( p ) {
+				activeTagPicker = p;
+				PLTT.showModal( 'pltt-tag-modal' );
+			},
+			null,
+			tagGroups
+		);
+		tagPickers.set( formRow, picker );
+	}
+
+	/**
+	 * Snapshot the form's current field values for cancel/revert.
+	 *
+	 * @param {HTMLElement} formRow .pltt-entry-form-row element.
+	 * @return {Object} Snapshot of field values.
+	 */
+	function snapshotForm( formRow ) {
+		return {
+			description: formRow.querySelector( '.pltt-form-description' ).value,
+			date: formRow.querySelector( '.pltt-form-date' ).value,
+			start: formRow.querySelector( '.pltt-form-start' ).value,
+			end: formRow.querySelector( '.pltt-form-end' ).value,
+			duration: formRow.querySelector( '.pltt-form-duration' ).value,
+			billable: formRow.querySelector( '.pltt-form-billable' ).checked,
+			client: formRow.querySelector( '.pltt-form-client' ).value,
+			project: formRow.querySelector( '.pltt-form-project' ).value,
+			tags: formRow.querySelector( '.pltt-form-tags' ).value
+		};
+	}
+
+	/**
+	 * Restore form fields from a snapshot.
+	 *
+	 * @param {HTMLElement} formRow  .pltt-entry-form-row element.
+	 * @param {Object}      snapshot Previously captured field values.
+	 */
+	function restoreForm( formRow, snapshot ) {
+		formRow.querySelector( '.pltt-form-description' ).value = snapshot.description;
+		formRow.querySelector( '.pltt-form-date' ).value = snapshot.date;
+		formRow.querySelector( '.pltt-form-start' ).value = snapshot.start;
+		formRow.querySelector( '.pltt-form-end' ).value = snapshot.end;
+		formRow.querySelector( '.pltt-form-duration' ).value = snapshot.duration;
+		formRow.querySelector( '.pltt-form-billable' ).checked = snapshot.billable;
+		syncBillableButton( formRow );
+		formRow.querySelector( '.pltt-form-client' ).value = snapshot.client;
+		formRow.querySelector( '.pltt-form-project' ).value = snapshot.project;
+		const tagsInput = formRow.querySelector( '.pltt-form-tags' );
+		tagsInput.value = snapshot.tags;
+		// Force the tag picker to re-read its hidden input.
+		tagsInput.dispatchEvent( new Event( 'change' ) );
+	}
+
+	/**
+	 * Show a form row and capture its pre-edit snapshot.
+	 */
+	function expandForm( formRow ) {
+		formRow.classList.remove( 'pltt-hidden' );
+		formRow._snapshot = snapshotForm( formRow );
+		formRow._durationManual = false;
+		ensureTagPicker( formRow );
+
+		const displayRow = getDisplayRow( formRow );
+		if ( displayRow ) {
+			displayRow.classList.add( 'pltt-entry-being-edited' );
+		}
+
+		openFormRow = formRow;
+		clearFormError( formRow );
+
+		const desc = formRow.querySelector( '.pltt-form-description' );
+		if ( desc ) {
+			desc.focus();
+		}
+	}
+
+	/**
+	 * Hide a form row without changing its values.
+	 */
+	function collapseForm( formRow ) {
+		formRow.classList.add( 'pltt-hidden' );
+
+		const displayRow = getDisplayRow( formRow );
+		if ( displayRow ) {
+			displayRow.classList.remove( 'pltt-entry-being-edited' );
+		}
+
+		if ( openFormRow === formRow ) {
+			openFormRow = null;
+		}
+	}
+
+	/**
+	 * Display a validation/error message in a form row.
+	 *
+	 * @param {HTMLElement} formRow .pltt-entry-form-row element.
+	 * @param {string}      message Error text to display.
+	 */
+	function showFormError( formRow, message ) {
+		const target = formRow.querySelector( '.pltt-entry-form-error' );
+		if ( target ) {
+			target.textContent = message;
+			target.classList.add( 'is-visible' );
+		}
+	}
+
+	function clearFormError( formRow ) {
+		const target = formRow.querySelector( '.pltt-entry-form-error' );
+		if ( target ) {
+			target.textContent = '';
+			target.classList.remove( 'is-visible' );
+		}
+	}
+
+	/**
+	 * Calculate duration in minutes from start/end time strings (HH:MM).
+	 *
+	 * @param {string} startTime HH:MM.
+	 * @param {string} endTime   HH:MM.
+	 * @return {number|null} Duration in minutes, or null if either input is missing.
+	 */
+	function calculateDuration( startTime, endTime ) {
+		if ( ! startTime || ! endTime ) {
+			return null;
+		}
+		const startParts = startTime.split( ':' ).map( Number );
+		const endParts = endTime.split( ':' ).map( Number );
+		let minutes = ( endParts[0] * 60 + endParts[1] ) - ( startParts[0] * 60 + startParts[1] );
+		if ( minutes < 0 ) {
+			minutes += 24 * 60; // Overnight span.
+		}
+		return minutes;
+	}
+
+	/**
+	 * Build the request payload from a form row.
+	 *
+	 * @param {HTMLElement} formRow .pltt-entry-form-row element.
+	 * @return {Object} Payload for pltt_save_entry.
+	 */
+	function collectPayload( formRow ) {
+		const payload = {
+			entry_id: formRow.dataset.formForEntryId || 0,
+			entry_date: formRow.querySelector( '.pltt-form-date' ).value,
+			start_time: formRow.querySelector( '.pltt-form-start' ).value,
+			end_time: formRow.querySelector( '.pltt-form-end' ).value,
+			duration_minutes: formRow.querySelector( '.pltt-form-duration' ).value || 0,
+			description: formRow.querySelector( '.pltt-form-description' ).value,
+			client_id: formRow.querySelector( '.pltt-form-client' ).value,
+			project_id: formRow.querySelector( '.pltt-form-project' ).value,
+			tags: formRow.querySelector( '.pltt-form-tags' ).value,
+			billable: formRow.querySelector( '.pltt-form-billable' ).checked ? 1 : 0
+		};
+		// Don't send 'new' as a real selection — strip to empty.
+		if ( payload.client_id === 'new' ) {
+			payload.client_id = '';
+		}
+		if ( payload.project_id === 'new' ) {
+			payload.project_id = '';
+		}
+		return payload;
+	}
+
+	/**
+	 * Save the form row via AJAX. Resolves to true on success, false on failure.
+	 *
+	 * @param {HTMLElement} formRow .pltt-entry-form-row element.
+	 * @return {Promise<boolean>}
+	 */
+	function saveForm( formRow ) {
+		return new Promise( function( resolve ) {
+			clearFormError( formRow );
+
+			const saveBtn = formRow.querySelector( '.pltt-form-save' );
+			const status = formRow.querySelector( '.pltt-form-status' );
+			const payload = collectPayload( formRow );
+
+			if ( ! payload.start_time ) {
+				showFormError( formRow, 'A start time is required.' );
+				resolve( false );
+				return;
+			}
+
+			saveBtn.disabled = true;
+			if ( status ) {
+				status.textContent = plttData.i18n.saving || 'Saving…';
+			}
+
+			PLTT.ajax( 'pltt_save_entry', payload, function( response ) {
+				saveBtn.disabled = false;
+				if ( status ) {
+					status.textContent = '';
+				}
+
+				if ( response.success ) {
+					applySaveResponse( formRow, response.data );
+					resolve( true );
+				} else {
+					const message = ( response.data && response.data.message ) || response.data || 'Failed to save entry.';
+					showFormError( formRow, message );
+					resolve( false );
+				}
+			} );
+		} );
+	}
+
+	/**
+	 * Replace the saved row's HTML with the server-rendered markup.
+	 *
+	 * @param {HTMLElement} formRow .pltt-entry-form-row element that was saved.
+	 * @param {Object}      data    Response payload (row_html, entry_id).
+	 */
+	function applySaveResponse( formRow, data ) {
+		const wrapper = document.createElement( 'tbody' );
+		wrapper.innerHTML = data.row_html.trim();
+		const newRows = Array.from( wrapper.children );
+
+		// Replace the existing display row + form row in place.
+		const displayRow = formRow.previousElementSibling;
+		if ( displayRow ) {
+			displayRow.replaceWith( newRows[0] );
+		}
+		formRow.replaceWith( newRows[1] );
+		openFormRow = null;
+
+		updateSummary();
+	}
+
+	/**
+	 * Update summary cards after a save/delete.
+	 */
+	function updateSummary() {
+		const rows = document.querySelectorAll( '.pltt-entry-compact' );
+		const entryCountEl = document.querySelector( '[data-card="entry-count"]' );
+		if ( entryCountEl ) {
+			entryCountEl.textContent = rows.length;
+		}
+		// Total Hours card is not recalculated client-side; relies on full reload for now.
+	}
+
+	/**
+	 * Auto-save the currently open form before opening a different one.
+	 * If the open form fails to save, the new row does NOT expand.
+	 *
+	 * @param {HTMLElement|null} nextFormRow Form row about to be opened, or null.
+	 * @return {Promise<boolean>} True if it's safe to open the next row.
+	 */
+	async function commitOpenForm( nextFormRow ) {
+		if ( ! openFormRow || openFormRow === nextFormRow ) {
+			return true;
+		}
+		const ok = await saveForm( openFormRow );
+		return ok;
+	}
+
+	/**
+	 * Resolve the form row an event originated in.
+	 */
+	function closestForm( target ) {
+		return target.closest( '.pltt-entry-form-row' );
+	}
+
+	/**
+	 * Delegate Edit, Delete, Cancel, Save clicks to the tbody.
+	 */
+	tbody.addEventListener( 'click', async function( e ) {
+		// Edit link in compact row.
+		const editLink = e.target.closest( '.pltt-edit-entry' );
+		if ( editLink ) {
+			e.preventDefault();
+			const displayRow = editLink.closest( '.pltt-entry-compact' );
+			const formRow = displayRow ? displayRow.nextElementSibling : null;
+			if ( ! formRow || ! formRow.classList.contains( 'pltt-entry-form-row' ) ) {
+				return;
+			}
+
+			if ( openFormRow === formRow ) {
+				return; // Already open.
+			}
+
+			const safe = await commitOpenForm( formRow );
+			if ( ! safe ) {
+				return;
+			}
+			expandForm( formRow );
+			return;
+		}
+
+		// Delete link in compact row.
+		const deleteLink = e.target.closest( '.pltt-delete-entry' );
+		if ( deleteLink ) {
+			e.preventDefault();
+			if ( ! confirm( plttData.i18n.confirm ) ) {
+				return;
+			}
+			const displayRow = deleteLink.closest( '.pltt-entry-compact' );
+			const entryId = displayRow ? displayRow.dataset.entryId : 0;
+			const formRow = displayRow ? displayRow.nextElementSibling : null;
+			if ( ! entryId ) {
+				return;
+			}
+			PLTT.ajax( 'pltt_delete_entry', { entry_id: entryId }, function( response ) {
+				if ( response.success ) {
+					if ( openFormRow === formRow ) {
+						openFormRow = null;
+					}
+					displayRow.remove();
+					if ( formRow && formRow.classList.contains( 'pltt-entry-form-row' ) ) {
+						formRow.remove();
+					}
+					updateSummary();
+				} else {
+					alert( response.data || 'Error deleting entry.' );
+				}
+			} );
+			return;
+		}
+
+		// Save button inside form.
+		const saveBtn = e.target.closest( '.pltt-form-save' );
+		if ( saveBtn ) {
+			e.preventDefault();
+			const formRow = closestForm( saveBtn );
+			if ( formRow ) {
+				saveForm( formRow );
+			}
+			return;
+		}
+
+		// Cancel button inside form.
+		const cancelBtn = e.target.closest( '.pltt-form-cancel' );
+		if ( cancelBtn ) {
+			e.preventDefault();
+			const formRow = closestForm( cancelBtn );
+			if ( formRow ) {
+				if ( formRow._snapshot ) {
+					restoreForm( formRow, formRow._snapshot );
+				}
+				collapseForm( formRow );
+			}
+			return;
+		}
+
+		// Billable $ toggle button inside form.
+		const billableBtn = e.target.closest( '.pltt-form-billable-btn' );
+		if ( billableBtn ) {
+			e.preventDefault();
+			const formRow = closestForm( billableBtn );
+			if ( ! formRow ) {
+				return;
+			}
+			const checkbox = formRow.querySelector( '.pltt-form-billable' );
+			checkbox.checked = ! checkbox.checked;
+			syncBillableButton( formRow );
+		}
+	} );
+
+	/**
+	 * Sync the billable button's visual state to its hidden checkbox.
+	 * Call after any programmatic change to the checkbox (e.g. project change).
+	 *
+	 * @param {HTMLElement} formRow .pltt-entry-form-row element.
+	 */
+	function syncBillableButton( formRow ) {
+		const checkbox = formRow.querySelector( '.pltt-form-billable' );
+		const button = formRow.querySelector( '.pltt-form-billable-btn' );
+		if ( ! checkbox || ! button ) {
+			return;
+		}
+		const checked = !! checkbox.checked;
+		button.classList.toggle( 'is-billable', checked );
+		button.classList.toggle( 'not-billable', ! checked );
+		button.setAttribute( 'aria-pressed', checked ? 'true' : 'false' );
+	}
+
+	/**
+	 * Auto-calc duration from start/end. Editing the duration manually breaks
+	 * the auto-calc relationship for the rest of the form's editing session.
+	 */
+	tbody.addEventListener( 'input', function( e ) {
+		const formRow = closestForm( e.target );
+		if ( ! formRow ) {
+			return;
+		}
+
+		if ( e.target.classList.contains( 'pltt-form-start' ) || e.target.classList.contains( 'pltt-form-end' ) ) {
+			if ( formRow._durationManual ) {
+				return;
+			}
+			const start = formRow.querySelector( '.pltt-form-start' ).value;
+			const end = formRow.querySelector( '.pltt-form-end' ).value;
+			const minutes = calculateDuration( start, end );
+			if ( minutes !== null ) {
+				formRow.querySelector( '.pltt-form-duration' ).value = minutes;
+			}
+		} else if ( e.target.classList.contains( 'pltt-form-duration' ) ) {
+			formRow._durationManual = true;
+		}
+	} );
+
+	/**
+	 * Client change → load projects (AJAX). Project change → apply billability default.
+	 */
+	tbody.addEventListener( 'change', function( e ) {
+		const formRow = closestForm( e.target );
+		if ( ! formRow ) {
+			return;
+		}
+
+		if ( e.target.classList.contains( 'pltt-form-client' ) ) {
+			if ( e.target.value === 'new' ) {
+				activeFormRow = formRow;
+				PLTT.showModal( 'pltt-client-modal' );
+				e.target.value = '';
+				return;
+			}
+
+			// Internal client → force non-billable.
+			const opt = e.target.options[ e.target.selectedIndex ];
+			if ( opt && opt.dataset.isInternal === '1' ) {
+				formRow.querySelector( '.pltt-form-billable' ).checked = false;
+				syncBillableButton( formRow );
+			}
+
+			const projectSelect = formRow.querySelector( '.pltt-form-project' );
+			loadProjects( e.target, projectSelect );
+			return;
+		}
+
+		if ( e.target.classList.contains( 'pltt-form-project' ) ) {
+			if ( e.target.value === 'new' ) {
+				const clientSelect = formRow.querySelector( '.pltt-form-client' );
+				if ( ! clientSelect.value || clientSelect.value === 'new' ) {
+					alert( 'Please select a client first.' );
+					e.target.value = '';
+					return;
+				}
+				activeFormRow = formRow;
+				document.getElementById( 'pltt-new-project-client-id' ).value = clientSelect.value;
+				PLTT.showModal( 'pltt-project-modal' );
+				e.target.value = '';
+				return;
+			}
+
+			// Apply billability default from the selected project.
+			const opt = e.target.options[ e.target.selectedIndex ];
+			if ( opt && opt.value ) {
+				const billDefault = opt.dataset.billabilityDefault;
+				if ( billDefault !== undefined ) {
+					formRow.querySelector( '.pltt-form-billable' ).checked = billDefault === '1';
+					syncBillableButton( formRow );
+				}
+			}
+		}
+	} );
+
+	/**
+	 * Load projects for a client into the form's project dropdown (AJAX).
+	 *
+	 * @param {HTMLSelectElement} clientSelect  Client dropdown.
+	 * @param {HTMLSelectElement} projectSelect Project dropdown.
+	 */
+	function loadProjects( clientSelect, projectSelect ) {
+		const clientId = clientSelect.value;
+		if ( ! clientId || clientId === 'new' ) {
+			projectSelect.innerHTML = '<option value="">Select project...</option>' +
+				'<option value="new">+ Add new project...</option>';
+			return;
+		}
+
+		PLTT.ajax( 'pltt_get_projects', { client_id: clientId }, function( response ) {
+			if ( ! response.success ) {
+				return;
+			}
+			let html = '<option value="">Select project...</option>';
+			response.data.projects.forEach( function( project ) {
+				const isArchived = ( project.status === 'archived' );
+				if ( isArchived ) {
+					return; // Don't pollute the picker with archived projects.
+				}
+				const billDefault = parseInt( project.billability_default, 10 ) === 1 ? '1' : '0';
+				html += '<option value="' + parseInt( project.id, 10 ) + '" data-billability-default="' + billDefault + '">' +
+					PLTT.escapeHtml( project.name ) + '</option>';
+			} );
+			html += '<option value="new">+ Add new project...</option>';
+			projectSelect.innerHTML = html;
+		} );
+	}
+
+	/**
+	 * Modal: Create Client (used from the form's client dropdown).
+	 */
+	const saveClientBtn = document.getElementById( 'pltt-save-client' );
+	if ( saveClientBtn ) {
+		saveClientBtn.addEventListener( 'click', function() {
+			const nameInput = document.getElementById( 'pltt-new-client-name' );
+			const rateInput = document.getElementById( 'pltt-new-client-rate' );
+			const name = nameInput.value.trim();
+			const rate = PLTT.parseCurrencyValue( rateInput.value );
+
+			if ( ! name ) {
+				alert( 'Please enter a client name.' );
+				nameInput.focus();
+				return;
+			}
+
+			this.disabled = true;
+			PLTT.ajax( 'pltt_create_client', { name: name, hourly_rate: rate }, function( response ) {
+				saveClientBtn.disabled = false;
+				if ( response.success && response.data.client ) {
+					const client = response.data.client;
+					// Add to every client dropdown on the page.
+					document.querySelectorAll( '.pltt-form-client' ).forEach( function( select ) {
+						const option = document.createElement( 'option' );
+						option.value = client.id;
+						option.textContent = client.name;
+						const addNewOption = select.querySelector( 'option[value="new"]' );
+						select.insertBefore( option, addNewOption );
+					} );
+					if ( activeFormRow ) {
+						const clientSelect = activeFormRow.querySelector( '.pltt-form-client' );
+						clientSelect.value = client.id;
+						const projectSelect = activeFormRow.querySelector( '.pltt-form-project' );
+						loadProjects( clientSelect, projectSelect );
+					}
+					PLTT.hideModal( 'pltt-client-modal' );
+					nameInput.value = '';
+					rateInput.value = '';
+				} else {
+					alert( response.data || 'Error creating client.' );
+				}
+			} );
+		} );
+	}
+
+	/**
+	 * Modal: Create Project.
+	 */
+	const saveProjectBtn = document.getElementById( 'pltt-save-project' );
+	if ( saveProjectBtn ) {
+		saveProjectBtn.addEventListener( 'click', function() {
+			const nameInput = document.getElementById( 'pltt-new-project-name' );
+			const clientIdInput = document.getElementById( 'pltt-new-project-client-id' );
+			const rateInput = document.getElementById( 'pltt-new-project-rate' );
+			const name = nameInput.value.trim();
+			const clientId = clientIdInput.value;
+			const rate = PLTT.parseCurrencyValue( rateInput.value );
+
+			if ( ! name ) {
+				alert( 'Please enter a project name.' );
+				nameInput.focus();
+				return;
+			}
+
+			this.disabled = true;
+			PLTT.ajax( 'pltt_create_project', { name: name, client_id: clientId, hourly_rate: rate }, function( response ) {
+				saveProjectBtn.disabled = false;
+				if ( response.success && response.data.project ) {
+					const project = response.data.project;
+					if ( activeFormRow ) {
+						const projectSelect = activeFormRow.querySelector( '.pltt-form-project' );
+						const option = document.createElement( 'option' );
+						option.value = project.id;
+						option.textContent = project.name;
+						option.dataset.billabilityDefault = parseInt( project.billability_default, 10 ) === 1 ? '1' : '0';
+						option.selected = true;
+						const addNewOption = projectSelect.querySelector( 'option[value="new"]' );
+						projectSelect.insertBefore( option, addNewOption );
+						projectSelect.dispatchEvent( new Event( 'change' ) );
+					}
+					PLTT.hideModal( 'pltt-project-modal' );
+					nameInput.value = '';
+					rateInput.value = '';
+				} else {
+					alert( response.data || 'Error creating project.' );
+				}
+			} );
+		} );
+	}
+
+	/**
+	 * Modal: Create Tag.
+	 */
+	const saveTagBtn = document.getElementById( 'pltt-save-tag' );
+	if ( saveTagBtn ) {
+		saveTagBtn.addEventListener( 'click', function() {
+			const nameInput = document.getElementById( 'pltt-new-tag-name' );
+			const name = nameInput.value.trim();
+			if ( ! name ) {
+				alert( 'Please enter a tag name.' );
+				nameInput.focus();
+				return;
+			}
+
+			this.disabled = true;
+			PLTT.ajax( 'pltt_create_tag', { tag_name: name }, function( response ) {
+				saveTagBtn.disabled = false;
+				if ( response.success && response.data.tag ) {
+					const tag = response.data.tag;
+					// Add to all pickers; auto-select only in the triggering picker.
+					tbody.querySelectorAll( '.pltt-entry-form-row' ).forEach( function( formRow ) {
+						const picker = tagPickers.get( formRow );
+						if ( picker ) {
+							picker.addTagOption( tag, picker === activeTagPicker );
+						}
+					} );
+					if ( tagSuggestions.indexOf( tag ) === -1 ) {
+						tagSuggestions.push( tag );
+					}
+					PLTT.hideModal( 'pltt-tag-modal' );
+					nameInput.value = '';
+					activeTagPicker = null;
+				} else {
+					alert( response.data || 'Error creating tag.' );
+				}
+			} );
+		} );
+	}
+
+	/**
+	 * Escape key cancels the open form.
+	 */
+	document.addEventListener( 'keydown', function( e ) {
+		if ( e.key === 'Escape' && openFormRow ) {
+			if ( openFormRow._snapshot ) {
+				restoreForm( openFormRow, openFormRow._snapshot );
+			}
+			collapseForm( openFormRow );
+		}
+	} );
+
+} )();

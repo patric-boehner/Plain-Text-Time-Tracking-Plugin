@@ -254,7 +254,7 @@ function pltt_entry_ampm_side( $raw_text ) {
  * Expects entries sorted by start_time ASC (the order PLTT_Review uses).
  * Returns a map of entry_id => warning reasons. Three independent checks:
  *
- *   - 'long_duration': duration > 6h. Catches the common case where an
+ *   - 'long_duration': duration > 4h. Catches the common case where an
  *     inflated duration comes from a filtered `Done` end marker whose
  *     own AM/PM was mistyped — that raw text is gone by render time,
  *     so duration is the only remaining signal.
@@ -294,7 +294,7 @@ function pltt_compute_entry_warnings( array $entries ) {
 			continue;
 		}
 
-		if ( $duration > 360 ) {
+		if ( $duration > 240 ) {
 			$warnings[ $id ]['long_duration'] = true;
 		}
 
@@ -383,6 +383,27 @@ function pltt_format_currency( $amount ) {
 	$amount = floatval( $amount );
 
 	return '$' . number_format( $amount, 2 );
+}
+
+/**
+ * Format a dollar amount without cents when the value is whole.
+ *
+ * "$300", "$5,800", but "$150.50" keeps its cents. Used in compact contexts
+ * like the project context card's info line where a trailing ".00" is noise.
+ *
+ * @param float|string|null $amount Dollar amount.
+ * @return string Formatted currency string, or "—" if null/empty.
+ */
+function pltt_format_currency_compact( $amount ) {
+	if ( null === $amount || '' === $amount ) {
+		return '—';
+	}
+
+	$amount = floatval( $amount );
+
+	return floor( $amount ) === $amount
+		? '$' . number_format( $amount, 0 )
+		: '$' . number_format( $amount, 2 );
 }
 
 /**
@@ -1010,6 +1031,7 @@ function pltt_render_entry_table( $entries, $options = array() ) {
 								data-entry-id="<?php echo esc_attr( $entry->id ); ?>"
 								data-field="billable"
 								data-value="<?php echo $is_billable ? '1' : '0'; ?>"
+								data-minutes="<?php echo esc_attr( (int) $entry->duration_minutes ); ?>"
 								aria-label="<?php echo $is_billable ? esc_attr__( 'Billable — click to toggle', 'plain-language-time-tracker' ) : esc_attr__( 'Not billable — click to toggle', 'plain-language-time-tracker' ); ?>"
 								title="<?php echo $is_billable ? esc_attr__( 'Billable — click to toggle', 'plain-language-time-tracker' ) : esc_attr__( 'Not billable — click to toggle', 'plain-language-time-tracker' ); ?>">$</button>
 						<?php else : ?>
@@ -1092,6 +1114,93 @@ function pltt_render_billing_type_badge( $billing_type ) {
 	echo '<span class="' . esc_attr( $class ) . '">' . esc_html( $label ) . '</span>';
 }
 
+/**
+ * Build the one-line project info string for the project context card.
+ *
+ * Format by billing type:
+ *   Hourly:    "Hourly · $150/hr"
+ *   Retainer:  "Retainer · $300/mo · 3 hrs · $150/hr over"
+ *   Fixed Fee: "Fixed Fee · $5,800 · 38h 53m budget"
+ *   Internal:  "Internal"
+ *
+ * @param object $project Project row (client_id, id, recurring_period, budget_hours, budget_fee).
+ * @return string Middot-joined info line (unescaped; caller escapes).
+ */
+function pltt_format_project_info_line( $project ) {
+	$type  = pltt_get_billing_type( $project );
+	$parts = array();
+
+	switch ( $type ) {
+		case 'recurring':
+			$parts[] = __( 'Retainer', 'plain-language-time-tracker' );
+
+			if ( ! empty( $project->budget_fee ) ) {
+				$period_abbr = array(
+					'weekly'    => __( 'wk', 'plain-language-time-tracker' ),
+					'monthly'   => __( 'mo', 'plain-language-time-tracker' ),
+					'quarterly' => __( 'qtr', 'plain-language-time-tracker' ),
+					'yearly'    => __( 'yr', 'plain-language-time-tracker' ),
+				);
+				$abbr    = $period_abbr[ $project->recurring_period ] ?? '';
+				$parts[] = pltt_format_currency_compact( $project->budget_fee ) . ( $abbr ? '/' . $abbr : '' );
+			}
+
+			if ( ! empty( $project->budget_hours ) ) {
+				$parts[] = sprintf(
+					/* translators: %s: number of budgeted hours, e.g. "3" or "3.5". */
+					__( '%s hrs', 'plain-language-time-tracker' ),
+					rtrim( rtrim( number_format( (float) $project->budget_hours, 2 ), '0' ), '.' )
+				);
+			}
+
+			$rate = pltt_resolve_billable_rate( (int) $project->client_id, (int) $project->id );
+			if ( $rate > 0 ) {
+				$parts[] = sprintf(
+					/* translators: %s: hourly overage rate, e.g. "$150". */
+					__( '%s/hr', 'plain-language-time-tracker' ),
+					pltt_format_currency_compact( $rate )
+				);
+			}
+			break;
+
+		case 'fixed':
+			$parts[] = __( 'Fixed Fee', 'plain-language-time-tracker' );
+
+			if ( ! empty( $project->budget_fee ) ) {
+				$parts[] = pltt_format_currency_compact( $project->budget_fee );
+			}
+
+			if ( ! empty( $project->budget_hours ) ) {
+				$parts[] = sprintf(
+					/* translators: %s: budgeted time, e.g. "38h 53m". */
+					__( '%s budget', 'plain-language-time-tracker' ),
+					pltt_format_duration( (float) $project->budget_hours * 60 )
+				);
+			}
+			break;
+
+		case 'none':
+			$parts[] = __( 'Internal', 'plain-language-time-tracker' );
+			break;
+
+		case 'hourly':
+		default:
+			$parts[] = __( 'Hourly', 'plain-language-time-tracker' );
+
+			$rate = pltt_resolve_billable_rate( (int) $project->client_id, (int) $project->id );
+			if ( $rate > 0 ) {
+				$parts[] = sprintf(
+					/* translators: %s: hourly rate, e.g. "$150". */
+					__( '%s/hr', 'plain-language-time-tracker' ),
+					pltt_format_currency_compact( $rate )
+				);
+			}
+			break;
+	}
+
+	return implode( ' · ', $parts );
+}
+
 
 /**
  * Resolve the start/end YYYY-MM-DD bounds for a project's current allocation period.
@@ -1171,8 +1280,11 @@ function pltt_get_allocation_period_bounds( $project, $reference_date ) {
  *     remaining_minutes: int,
  *     overage_minutes: int,
  *     overage_amount: float,
+ *     marked_billable_minutes: int,
+ *     marked_billable_amount: float,
  *     marker_entry_id: ?int,
  *     overage_entry_ids: int[],
+ *     boundary_time: ?string,
  *     period_start: ?string,
  *     period_end: ?string,
  *     reason: ?string,
@@ -1186,8 +1298,11 @@ function pltt_compute_overage_threshold( $project, $filter_args ) {
 		'remaining_minutes'  => 0,
 		'overage_minutes'    => 0,
 		'overage_amount'     => 0.0,
+		'marked_billable_minutes' => 0,
+		'marked_billable_amount'  => 0.0,
 		'marker_entry_id'    => null,
 		'overage_entry_ids'  => array(),
+		'boundary_time'      => null,
 		'period_start'       => null,
 		'period_end'         => null,
 		'reason'             => null,
@@ -1252,9 +1367,25 @@ function pltt_compute_overage_threshold( $project, $filter_args ) {
 	$overage_ids    = array();
 	$overage_amount = 0.0;
 
+	// Running totals of what the user has actually flipped to billable across the
+	// whole period — independent of the calculated allocation boundary. The card
+	// compares these against the calculated overage to surface over/under-billing.
+	$marked_minutes = 0;
+	$marked_amount  = 0.0;
+
 	foreach ( $period_entries as $e ) {
 		$dur  = (int) $e->duration_minutes;
 		$next = $cumulative + $dur;
+
+		if ( ! empty( $e->billable ) && $dur > 0 ) {
+			$marked_minutes += $dur;
+			if ( null !== $e->billable_amount && '' !== $e->billable_amount ) {
+				$marked_amount += (float) $e->billable_amount;
+			} else {
+				$rate           = pltt_resolve_billable_rate( (int) $e->client_id, (int) $e->project_id );
+				$marked_amount += round( ( $dur / 60.0 ) * $rate, 2 );
+			}
+		}
 
 		$is_overage = false;
 		if ( $cumulative >= $alloc_minutes ) {
@@ -1266,10 +1397,31 @@ function pltt_compute_overage_threshold( $project, $filter_args ) {
 		if ( $is_overage ) {
 			if ( null === $marker_id ) {
 				$marker_id = (int) $e->id;
+
+				// Clock time the allocation was actually consumed: this entry's
+				// start plus the minutes into it that filled the remaining budget.
+				// ($cumulative is still the running total BEFORE this entry here.)
+				if ( ! empty( $e->start_time ) ) {
+					$start_mins = pltt_time_to_minutes( $e->start_time );
+					if ( false !== $start_mins ) {
+						$into          = max( 0, $alloc_minutes - $cumulative );
+						$boundary_mins = min( $start_mins + $into, ( 23 * 60 ) + 59 );
+						$out['boundary_time'] = pltt_format_time(
+							sprintf( '%02d:%02d:00', intdiv( $boundary_mins, 60 ), $boundary_mins % 60 )
+						);
+					}
+				}
 			}
 			$overage_ids[] = (int) $e->id;
 
 			// Accumulate only dollars from entries the user has flipped to billable.
+			//
+			// NOTE: this counts the FULL amount of each billable entry past the
+			// crossing point, including the within-allocation portion of the entry
+			// that straddles the line. That overstates true overage dollars when an
+			// entry spans the boundary (see the "billable flag vs. allocation line"
+			// open question documented in project memory). Kept as-is intentionally
+			// so the billable flag stays the single source of truth for now.
 			if ( ! empty( $e->billable ) && $dur > 0 ) {
 				if ( null !== $e->billable_amount && '' !== $e->billable_amount ) {
 					$overage_amount += (float) $e->billable_amount;
@@ -1283,7 +1435,9 @@ function pltt_compute_overage_threshold( $project, $filter_args ) {
 		$cumulative = $next;
 	}
 
-	$out['used_minutes'] = $cumulative;
+	$out['used_minutes']            = $cumulative;
+	$out['marked_billable_minutes'] = $marked_minutes;
+	$out['marked_billable_amount']  = round( $marked_amount, 2 );
 
 	if ( ! empty( $overage_ids ) ) {
 		$out['state']             = 'over';
@@ -1308,12 +1462,14 @@ function pltt_compute_overage_threshold( $project, $filter_args ) {
  * 'budget_dollars' keys — the bar still displays hours (caller pre-computes budget_hours
  * from budget_fee ÷ rate), and the tooltip adds the dollar breakdown.
  *
- * @param float       $alloc_mins   Minutes logged in the relevant allocation period.
- * @param float       $budget_hours Allocation budget in hours.
- * @param string      $billing_type 'recurring' or 'fixed'.
- * @param array|null  $fee_args     Optional. Keys: 'spent_dollars' (float), 'budget_dollars' (float).
+ * @param float       $alloc_mins     Minutes logged in the relevant allocation period.
+ * @param float       $budget_hours   Allocation budget in hours.
+ * @param string      $billing_type   'recurring' or 'fixed'.
+ * @param array|null  $fee_args       Optional. Keys: 'spent_dollars' (float), 'budget_dollars' (float).
+ * @param string|null $label_override Optional. Replaces the computed bar label (e.g. the
+ *                                    project context card's "5h 15m used · 2h 15m over" caption).
  */
-function pltt_render_allocation_bar( $alloc_mins, $budget_hours, $billing_type, $fee_args = null ) {
+function pltt_render_allocation_bar( $alloc_mins, $budget_hours, $billing_type, $fee_args = null, $label_override = null ) {
 	$alloc_hours = $alloc_mins / 60;
 	$pct         = $budget_hours > 0 ? ( $alloc_hours / $budget_hours ) * 100 : 0;
 	$is_over     = $pct >= 100;
@@ -1332,6 +1488,10 @@ function pltt_render_allocation_bar( $alloc_mins, $budget_hours, $billing_type, 
 		$over_seg_pct   = 0;
 		$delta_fmt      = pltt_format_duration( ( $budget_hours - $alloc_hours ) * 60 );
 		$label          = $delta_fmt . ' ' . __( 'left', 'plain-language-time-tracker' ) . ' · ' . $pct_display . '%';
+	}
+
+	if ( null !== $label_override ) {
+		$label = $label_override;
 	}
 
 	if ( null !== $fee_args ) {
