@@ -15,92 +15,33 @@ This makes the Billable Amount card honest — it shows only revenue that will a
 
 ## Approach
 
-### Data model
-
-No schema changes. The billable flag's meaning shifts; how it's used downstream shifts with it.
-
-### Entry defaults at journal parse time
-
-| Project type | Billable default |
-| --- | --- |
-| Hourly | billable |
-| Fixed-fee | non-billable |
-| Retainer | non-billable |
-| Internal | non-billable |
-
-For retainer projects, overage gets marked billable manually when reviewing the month's entries and deciding what to invoice separately. Within-allocation work stays non-billable since it's covered by the flat retainer fee.
-
-### Amount column logic (summary view project table)
-
-One rule across all project types:
-
-```
-Amount = sum(billable hours × rate)
-```
-
-Em-dashes appear naturally for any project where no entries are billable (fixed-fee, within-allocation retainers, internal). No per-project-type special cases.
-
-### Billable Amount card
-
-Sum of the Amount column. Real invoiceable dollars only. No caption needed; the data model is self-consistent.
-
-### Billable Hours card
-
-The number drops significantly under the new model, since retainer hours no longer count. That's correct — billable hours now means hours that generate per-hour invoices. A simple "hrs/day avg" sub-line keeps parity with the Total Hours card's existing treatment.
-
-### Total Hours card
-
-Adds a client vs. internal breakdown beneath the total. This is the more useful "share" metric than utilization for this business model:
-
-- Client share = hours on any non-internal project (retainers, fixed-fee, hourly, including overage)
-- Internal share = hours on internal projects
-
-Overage hours count as client work because they are client work — the split is about *where the time went*, not how it was billed.
-
-### Utilization metric
-
-Remove. Utilization is a consultancy-culture metric that assumes a clean "billable hours / available work hours" relationship. Most of this business's client work is paid via flat fees and is non-billable under the new definition, so a utilization percentage would read low and misleadingly suggest under-working. The client vs. internal split on the Total Hours card answers a more relevant question.
-
-### Retainer project allocation bar
-
-When the bar exceeds 100%, the over-allocation portion renders in amber rather than green. Label changes from "X left · Y%" to "X over · Y%" when past 100%.
-
-The bar continues to count *all* client work hours on the project (both within-allocation non-billable and overage billable). It's tracking consumption against allocation, not billability.
+The billable-model foundation **shipped in 1.9.5** and has been removed from this doc. Implemented: no-schema-change data model (the flag's meaning shifted), parse-time billable defaults by project type (hourly = billable; fixed-fee / retainer / internal = non-billable), the `Amount = sum(billable hours × rate)` column rule with natural em-dashes, the Billable Amount card, the Billable Hours card with its "hrs/day avg" sub-line, the Total Hours card with its client-vs-internal breakdown, removal of the utilization metric, and the retainer allocation bar's amber over-allocation treatment ("X over · Y%" past 100%).
 
 ## Overage decision support (detailed report view)
 
-### When this feature appears
+*Status: shipped and removed from this doc* — the single-project gating (retainer/fixed-fee only), the threshold-marker band with its "Allocation reached · time · used" label, marker placement at the chronological crossing point, and per-entry overage row tinting (with the billable-indicator feedback loop) are all implemented for the **over** state. The remaining work is below.
 
-Only on the detailed report view, and only when the report is filtered to a single retainer or fixed-fee project. The threshold concept doesn't apply when multiple projects are visible — there's no single allocation to compare against. Outside that filtered context, the detailed view behaves as it does today, with no markers and no row tinting.
-
-### What we're trying to achieve
-
-When reviewing a retainer's monthly entries to decide what overage to invoice, the user needs to see where allocation was crossed. This is the moment when the billable flag gets flipped on selected entries. The view should make the boundary visually unmistakable while preserving the user's control over which specific entries get marked billable.
-
-### Design
-
-**Threshold marker.** A horizontal band, clearly distinct from entry rows, that sits between the last within-allocation entry and the first overage entry in chronological cumulative order. Dashed amber borders top and bottom, soft warm gradient background, flag icon, and a two-part label:
-
-- Primary: "Allocation reached · 3h 0m used"
-- Secondary: "Entries below are overage candidates"
-
-The marker is chrome, not data — it doesn't look like an entry row and isn't selectable.
-
-**Placement.** The marker lives inside the day card where the crossing happened, between the two specific entries that straddle the boundary. Since entries are listed newest-first within and across days, the marker visually anchors the day where you ran out of allocation, with overage entries above it (more recent) and within-allocation entries below it (earlier in the month).
-
-**Overage row tinting.** Entries past the threshold get a subtle warm cream background, carrying the amber visual language consistently from the threshold marker. This means overage status is visible per-entry even when scrolling away from the threshold marker — you don't have to remember which side of the line a given entry was on.
-
-**Visual feedback loop.** The amber tint and the billable indicator should travel together. A non-billable entry in an amber row signals "this is overage you may be eating"; a billable entry in a white row signals "this might be flagged incorrectly." The user can scan for inconsistencies between the two visual signals.
+### Design (remaining)
 
 **When no overage exists.** The threshold marker still appears, sitting at the position where the running cumulative would equal the allocation. The label changes to "X left of allocation" rather than "Allocation reached." This keeps the marker as a consistent boundary signal — always present, always meaningful — rather than something that only appears in overage months.
+
+### Multi-month range behavior
+
+When the date range spans more than one calendar month, hide the inline threshold marker. Retainer allocations reset monthly, so a multi-month view has multiple thresholds and trying to display all of them inline would clutter the entry stream.
+
+Per-entry amber tinting still applies — each entry's overage status is a fact about that entry (relative to its own month's allocation), independent of the current view. So even without markers, overage entries remain visually distinguishable from within-allocation entries.
+
+The stat cards continue to aggregate correctly across the range: Billable Hours and Billable Amount sum the overage from all months in view. The right-side client context card can optionally show aggregate stats ("3h 4m total overage across selected range") if useful.
+
+Start simple. If multi-month retainer review becomes a common workflow, revisit with a richer treatment (e.g., per-month summary headers above each month's entries).
 
 ### Stat card behavior under single-project filter
 
 The summary cards adapt their captions to the filtered context, since meaning is unambiguous when only one project is in view:
 
-- **Billable Hours**: shows overage hours only, with a "overage only" sub-label
-- **Billable Amount**: shows overage dollars only, with a "retainer overage" sub-label
-- **Top Projects card**: hidden, since the project being viewed is already named in the right-side client context card
+- **Billable Hours**: shows overage hours only, with a "overage only" sub-label *(remaining)*
+- **Billable Amount**: shows overage dollars only, with a "retainer overage" sub-label *(remaining)*
+- **Top Projects card**: hidden, since the project being viewed is already named in the right-side client context card *(done)*
 
 ### What we're not doing
 
@@ -161,55 +102,13 @@ After expansion, the notice strip disappears or transforms into a brief confirma
 - Showing a "+X hrs" pill or other quantitative summary inline on the summary row (an icon is sufficient; specifics live in the tooltip and the destination view)
 - Branching the notice strip wording or button by stranded-time direction (one universal pattern)
 
-## Daily bar chart: three-color split
-
-### What we're trying to achieve
-
-The current chart uses two colors — green for billable, gray for non-billable. Under the new billable model, most retainer and fixed-fee work shifts from green to gray, which creates a visual problem: the chart will look like a lot less work is getting done, when really the same amount of client work is happening, it's just paid via flat fees instead of per-hour.
-
-A three-color split solves this by separating two questions the chart was conflating:
-
-1. **Was I doing client work?** (productivity question — both green categories combined)
-2. **How much of that generated per-hour invoices?** (billable question — green alone)
-
-Both answers are visible at the same time without either fighting the other.
-
-### Color mapping
-
-- **Billable** (full green): hourly project work, retainer overage flipped to billable. Generates per-hour invoice dollars.
-- **Client (flat-fee)** (muted sage-green): within-allocation retainer time, fixed-fee project time. Client-facing work paid via flat fees.
-- **Internal** (warm gray): admin, business development, internal care plan work, anything not client-attributable.
-
-The two greens share a color family so they read as related categories at a glance — your eye groups them as "client work" while still distinguishing billable from flat-fee. The internal gray sits visibly apart from both.
-
-### Stack order
-
-Bottom to top: billable, flat-fee, internal. This anchors the billable slice at the baseline so it's always visually grounded, even when small. Each bar reads as "real revenue work first, then other client work, then internal" — the categories build up in order of how directly they contribute to per-hour revenue.
-
-### Amber stays reserved
-
-Amber is used elsewhere to mean "crossed a threshold" — overage past retainer allocation, the project bar exceeding 100%. Reusing it as a third category color in the chart would dilute that meaning. Keep amber for threshold-crossing specifically; don't fold it into the chart's category system.
-
-### Legend labels
-
-"Billable / Client (flat-fee) / Internal" reads more clearly than "Billable / Non-billable / Internal" because it names what each category *is* rather than what it isn't. Future-you reading the chart cold should be able to interpret it without remembering the data model.
-
 ## Unified entry form (add and edit)
 
-### Problem
+*Status: the edit half shipped and is removed from this doc.* The expandable per-row edit form (`templates/partials/entry-form-row.php`, `review-edit-existing.php`), per-row Save via the `pltt_save_entry` AJAX handler, the field set, the blue inline-expansion treatment, and strict overlap validation are all implemented. **What remains is ADD mode** — the entry-point buttons, the add-mode title/defaults, and creating entries on days that have no parsed notes yet.
 
-Two related problems share a solution:
+### Problem (remaining)
 
-1. **Entries can only be created through journal parsing.** When work happens after a day's notes have been processed, or when something needs to be added that wasn't captured in the notes, there's no clean way to add it.
-2. **The existing inline editing on the review/edit screen is cramped and awkward.** The current pattern replaces column text with inputs in place, which works but produces small inputs, hard-to-use dropdowns, and no room for the tag picker or validation messages.
-
-A unified expandable-row form solves both: the same form serves as the editor for existing entries and the creator for new ones.
-
-### Architecture
-
-The review/edit screen is the canonical place where entries are created, edited, and committed. The daily log screen remains a viewing surface for the day's notes and resulting entries, with a shortcut that routes to the review/edit screen when modification is needed.
-
-One canonical edit surface, two entry points for adding. One form component for editing and adding.
+**Entries can only be created through journal parsing.** When work happens after a day's notes have been processed, or when something needs to be added that wasn't captured in the notes, there's no clean way to add it. The unified form already serves as the editor for existing entries; it now also needs to serve as the creator for new ones.
 
 ### Two entry points for adding
 
@@ -217,34 +116,9 @@ One canonical edit surface, two entry points for adding. One form component for 
 
 **From the review/edit screen directly:** A "+ Add entry" button at the top of the entries list. Clicking it expands the form inline at the top.
 
-### Editing existing entries
+### Form title (add mode)
 
-Each entry row uses WordPress's row-actions convention: a reserved-but-invisible area beneath the date/time cell holds Edit and Delete links that fade in on hover. Click Edit to expand that row into the same form layout used for adding new entries.
-
-Only one row is expanded at a time. If the user clicks Edit on another row while one is already expanded, the open form auto-saves (if valid) before the new row expands. This keeps commit boundaries predictable without forcing extra confirmations.
-
-### Form behavior
-
-The form expands inline in place of the compact row, with a blue tinted background and blue borders to clearly mark the editing region. The Add entry button de-emphasizes (fades) while the form is open if the open form came from that button.
-
-Form title varies by context:
-
-- **Add mode**: "New manual entry" with a plus icon
-- **Edit mode**: "Editing entry" with a pencil icon
-
-Everything else about the form is identical between the two modes.
-
-### Fields
-
-- **Description** (text input, full width)
-- **Date** (date picker — defaults to the day being viewed, editable in case an entry needs to be moved to a different day)
-- **Start time** and **End time** (small time inputs, with auto-calculated **Duration** field beside them; Duration is also editable, and editing it manually breaks the auto-calc relationship)
-- **Billable** (checkbox, inline with the time row)
-- **Client** (select)
-- **Project** (select, filtered by selected client)
-- **Tags** (tag picker matching the one used elsewhere in the tool)
-
-Invoiced status is not included. That field is managed from the detailed report view; it's not a property the user interacts with at entry creation or routine editing.
+The shared form already varies its chrome by context for edit mode. Add mode needs its own title — "New manual entry" with a plus icon (edit mode shows "Editing entry" with a pencil icon). The Add entry button de-emphasizes (fades) while the form opened from it is open. Everything else about the form is identical between the two modes.
 
 ### Smart defaults (add mode only)
 
@@ -259,24 +133,12 @@ Defaults aim to make the common case ("I forgot a small task right after the las
 
 In edit mode, fields are populated with the entry's existing values.
 
-### Save behavior
-
-Per-row Save commits that entry independently. No need to use "Save All Entries" for routine editing — each edit commits when its form is saved (or auto-saved on navigating to another row). Cancel reverts that row's form to its pre-edit state without affecting other rows.
-
-"Save All Entries" remains on the post-parse review state where it makes sense as a bulk commit of newly parsed entries. Outside that flow, per-row save is sufficient.
-
-### Validation
-
-Strict overlap validation. If the entered times overlap with another existing entry on that day (excluding the entry being edited), the form does not submit. An inline error appears under the time fields naming the conflicting entry and its time range, and the form stays open until the conflict is resolved.
-
-No "save anyway" override. Time overlaps are almost always typos, and forcing a clean state keeps the entries list internally consistent.
-
 ### Review/edit screen states
 
-The screen now handles four contexts using the same form pattern:
+The screen handles four contexts using the same form pattern. Contexts 1 and 2 are **done**; contexts 3 and 4 are the remaining work:
 
-1. **Post-parse review** (existing): new unsaved entries from parsing; "Save All Entries" commits them as a batch
-2. **Editing existing entries** (existing, redesigned): per-row hover reveals Edit/Delete actions; clicking Edit expands the row into the unified form; per-row Save commits
+1. ~~**Post-parse review**: new unsaved entries from parsing; "Save All Entries" commits them as a batch~~ *(done)*
+2. ~~**Editing existing entries**: per-row hover reveals Edit/Delete actions; clicking Edit expands the row into the unified form; per-row Save commits~~ *(done)*
 3. **Adding to an existing day** (new): "+ Add entry" button expands the form at the top of the list; Save commits the new entry
 4. **Adding to a day with no notes yet** (new): same as above, just on a day that has no journal notes — the manual entry form is the only way entries get created for that day
 
@@ -329,15 +191,220 @@ A horizontal timeline spanning working hours (default 8am–6pm, but extending d
 
 This is the largest new piece of UI in the overall change set. Most other changes are logic and defaults; this is a real new component. Worth its own implementation pass after the billable cleanup ships and has been used for a bit. The simpler version of the report (chart shows a single bar at day zoom) isn't broken, just suboptimal — there's no urgency.
 
-## Migration
+## Project context card (detailed view)
 
-One-time backfill of existing entries:
+### Problem
 
-- **Retainer projects**: flip currently-billable entries to non-billable, *except* entries that were genuinely overage and got invoiced separately. Identifying overage entries probably means cross-referencing against past Zoho invoices, or reviewing each retainer's history manually since overage cases should be relatively rare.
-- **Fixed-fee projects**: flip currently-billable entries to non-billable. No exceptions — fixed-fee dollars never came from time × rate.
-- **Invoiced flag on flipped entries**: leave as-is or backfill to un-invoiced. Either is fine; pick the option that requires less effort. No downstream behavior depends on this.
+The right-side project context card on the detailed view was carrying minimal information (client name, View client link, project name, rate). Two specific gaps surfaced:
 
-A dry-run script that lists what would change before the migration runs is worth the small extra effort.
+1. **No archive status indication.** Archived projects look identical to active ones in the detailed view, even though the summary view tints them gray with an "Archived" label.
+2. **Inconsistent information density.** The card had room to communicate project-level context but wasn't using it.
+
+### Approach
+
+Redesign the card to communicate the at-a-glance project identity and state — what the project is, how it's structured, what state it's in, and (where applicable) where things stand against the project's budget or allocation.
+
+Keep the card minimal. Period-specific activity (hours worked, billable amounts) lives in the summary stat cards at the top of the page. Per-entry invoicing status lives in the entries themselves. The card focuses on project-level facts that the rest of the page doesn't communicate.
+
+### Universal content
+
+Every card shows:
+
+- **Client name** as a link (replaces the previous "View client" link — the name itself is the link target)
+- **Project name** as subtitle (unlinked, since the user is already viewing the project)
+- **Project info line**: type, plus the relevant financial detail for that type, joined by middots
+
+### Type-specific content
+
+The project info line varies:
+
+- **Hourly**: "Hourly · $150/hr"
+- **Retainer**: "Retainer · $300/mo · 3 hrs · $150/hr over"
+- **Fixed Fee**: "Fixed Fee · $5,800 · 38h 53m budget"
+- **Internal**: "Internal"
+
+Retainers and fixed-fee projects also show an allocation/budget bar with a one-line caption beneath:
+
+- **Retainer within allocation**: green bar at consumption %, caption "X used · Y remaining"
+- **Retainer with overage**: green bar to 100% with amber overage extension past, caption "Xh Ym over · Z%" in amber text
+- **Fixed Fee**: purple bar at budget consumption %, caption "X of Y used · Z%"
+
+Hourly and Internal projects don't show bars (no budget concept applies).
+
+### Status badge
+
+A small status pill appears in the top-right corner of the card header, but only when the status is non-default. An active project shows no badge — the absence is the signal. Archived projects show an "Archived" badge plus a subtle muted background treatment on the whole card.
+
+### What we're not showing
+
+Deliberately excluded to keep the card minimal:
+
+- **Period activity** (hours, billable amount for the date range): already shown in the summary stat cards at the top of the page
+- **Invoicing status / breakdown**: per-entry invoiced state is visible in the entries list via the existing blue tint; the card doesn't need to summarize it
+- **"View client" link**: redundant with making the client name itself a link
+
+If invoicing-summary or period-activity-summary become genuinely useful later, they can be added as conditional sections — but the default should stay this minimal.
+
+### Overage notification bar
+
+When viewing a retainer with overage where no entries have been marked billable yet (the "haven't started the decision" state), show a notification bar above the entries table prompting the user to auto-mark the overage.
+
+**Trigger conditions.** All must be true:
+
+- The view is filtered to a single retainer project
+- Calculated overage exists and is greater than 15 minutes (smaller overages aren't worth notifying about — likely to be absorbed anyway)
+- No entries have been marked billable yet for the period
+
+**Initial notification (no entries marked):**
+
+- Amber background (consistent with other "needs attention" notifications)
+- Alert icon
+- Message: "2h 15m of overage to bill on this retainer"
+- Action link: "Mark overage automatically"
+- Dismiss × on the right side
+
+Clicking the action runs the smart selection logic (described below) and transitions the notification to its post-action state.
+
+Clicking the × dismisses the notification for the current view without taking action. The notification doesn't reappear in this view session, but will reappear if conditions are met again in a future session.
+
+**Smart selection logic.**
+
+When auto-marking overage entries, prefer slightly under rather than slightly over. The asymmetry matters:
+
+- Over-selecting means overbilling the client (real consequence, requires manual correction)
+- Under-selecting means absorbing a few minutes that could have been billed (small consequence, easy to adjust)
+
+Algorithm: working from the chronologically-latest overage entry backwards, include entries until adding the next one would push the total past the calculated overage. The selection lands at or just under the calculated overage amount. The card's overage section will then show the "absorbing Xm" note for any small remaining gap, which the user can resolve manually if desired.
+
+**Post-action notification (entries marked, now needs invoicing):**
+
+After clicking "Mark overage automatically," the notification transitions to a confirmation state:
+
+- Same amber background and styling
+- Check icon (green, indicating success)
+- Message: "Marked 2h 10m billable · absorbing 5m"
+- Action link: "Mark as invoiced"
+- Dismiss × still present
+
+The "Mark as invoiced" link sets the invoiced flag on all the newly-marked billable entries. After clicking, the notification dismisses itself (the work is done — both decisions are recorded).
+
+**When the notification doesn't apply.**
+
+- Hourly projects (no allocation concept — different workflow, different surfaces)
+- Fixed-fee projects (no per-entry invoicing)
+- Retainers within allocation (no overage to make decisions about)
+- Retainers where overage is ≤ 15 minutes (not worth the prompt)
+- Retainers where the user has already started marking entries (the card's note carries guidance from there)
+- Multi-project views (no single allocation to reference)
+
+### Calculated overage vs. marked billable display
+
+Because allocation boundaries don't respect entry boundaries (overage usually happens mid-entry), there can be a small gap between the mathematically calculated overage and what the user has marked as billable. A 133-minute entry that contains the allocation crossing has only ~5 minutes that are truly overage — but the billable flag is a single boolean for the whole entry. Marking it billable overbills by ~128 minutes; not marking it underbills by 5 minutes.
+
+To make this gap visible and decidable, the retainer-with-overage variant of the context card shows the calculated overage as the headline financial figure, with a small inline note when the user's marked-billable selection differs from the calculated amount.
+
+**Display rules:**
+
+- Primary line: "Overage: 2h 15m · $337.50" (the math-correct figure based on cumulative consumption past allocation)
+- Conditional note when there's a discrepancy:
+  - If marked billable > calculated overage: "You've marked 2h 20m (5m more than overage — adjust invoice down)"
+  - If marked billable < calculated overage: "You've marked 1h 45m (30m less — you're absorbing the difference)"
+  - If marked billable = calculated overage: no note (the common clean case)
+
+The note is informational. The user decides what to do about the gap — adjust invoice amount, change which entries are marked, or accept the difference as deliberate (absorbing some overage, billing some).
+
+**Summary view stays simpler.** The summary view's Amount column continues to show what's marked billable × rate (the user's selection). The summary is "based on my current decisions, here's what's invoiceable." The detailed view's context card is where the math-vs-selection comparison happens because that's where decisions get made.
+
+**Threshold marker placement unchanged.** The marker continues to land at the precise crossing minute, even when that's mid-entry. The card communicates the financial reality; the marker shows the visual boundary. Together they tell the full story — "here's where you crossed, here's what to bill, here's the gap if any."
+
+## Bulk billing actions
+
+### Problem
+
+At end of month, marking each billable hourly entry as invoiced individually is repetitive when invoicing the whole month at once. A single bulk action covers the common case.
+
+(The related retainer-overage flow — marking entries billable and invoiced in one action — is handled by the overage notification bar rather than a separate bulk action, since the retainer case benefits from smart selection that a plain bulk action wouldn't provide.)
+
+### The bulk action
+
+**"Mark all billable as invoiced"** — appears above the entry list when the filtered view contains billable entries that haven't been invoiced yet. The button is contextual; its absence is itself a signal that no bulk action is needed in the current view.
+
+Clicking the button does not immediately commit the change. Instead, it surfaces a confirmation notification (using the same notification component as the overage prompt) showing the specifics of what's about to happen. The user clicks the action link in the notification to confirm, or dismisses with X to cancel.
+
+### Confirmation via notification
+
+When the user clicks "Mark all billable as invoiced," the notification appears at the top of the entries area:
+
+- Amber background, alert-style icon
+- Message: "Marking 12 billable entries (8h 30m, $1,275.00) as invoiced"
+- Action link: "Confirm"
+- Dismiss × on the right
+
+Clicking Confirm transitions the notification to a green success state summarizing the action (e.g., "12 entries marked as invoiced"). Clicking × dismisses without applying changes.
+
+This replaces a traditional modal confirmation dialog with the same notification pattern used elsewhere in the tool. Visual consistency, less interruption, and the user reviews the action in the same focused area where they'd see automatic prompts.
+
+### Scope
+
+"All" means all entries currently visible in the filtered view, not all entries in the database. If the user has filtered to March 2026, the bulk action only affects March 2026 entries that match the criteria.
+
+### Individual workflow preserved
+
+The bulk action is an addition, not a replacement. Individual invoiced toggles still work as before.
+
+### Shared notification component
+
+The notification component used here is the same one used for the overage notification bar. Both surface action-required information with the same visual treatment (amber initial state, green success state, persistent dismiss option). The notification system serves three flavors:
+
+1. **Auto-prompts** — system surfaces something the user might want to do ("X minutes of overage to bill · Mark overage automatically")
+2. **Confirmation requests** — user requested an action via button click; notification confirms specifics before committing ("Marking X entries as invoiced · Confirm")
+3. **Success states** — action completed; optional follow-up action available ("Marked X minutes billable · Mark as invoiced")
+
+Visual differentiation between flavors comes from icon and grammar rather than fundamentally different layouts. The user learns the notification pattern once and reuses that understanding everywhere bulk-ish actions happen.
+
+### What we're not doing
+
+- Modal dialogs for confirmation (notification pattern serves the same purpose with less interruption)
+- Generic multi-select with checkboxes (targeted button + notification confirmation is simpler)
+- A separate "Mark all overage as billed" bulk action (handled by the overage notification bar with smart selection)
+- Auto-flipping billable to true when invoiced is clicked on a single non-billable entry (explicit per-entry control is fine; bulk action covers the high-volume case)
+- Persistent always-visible bulk action button (contextual visibility keeps the surface quiet most of the time)
+
+## Sortable columns on the summary project table
+
+### Problem
+
+Under the new billable model, many project rows have em-dashed Amount columns (fixed-fee, retainer within-allocation, internal). This isn't a scannability disaster — em-dashes are visually quiet — but it does mean the rows with actual invoiceable amounts are mixed in with rows that don't have any, in whatever order the table happens to default to.
+
+### Approach
+
+Add column sorting rather than restructuring the table. Sorting is a familiar WordPress admin pattern, low-cost to implement, and gives the user agency over how rows are ordered without locking in any single structure.
+
+### Initial scope
+
+Two sortable columns to start:
+
+- **Project**: alphabetical sort, useful for finding a specific client or scanning by name
+- **Type**: clusters by project type, so all Hourly rows group together, then Monthly (retainer), then Fixed Fee, then Internal — which naturally separates rows with billable amounts from rows without
+
+Other columns (Hours, Budget, Amount) are not initially sortable. Add them later if a clear need surfaces in actual use rather than anticipating.
+
+### Sort behavior
+
+Standard WordPress admin convention: click a column header once to sort ascending, click again to toggle descending. The small arrow indicator in the header shows current sort direction. Only one column is sorted at a time.
+
+Default sort on first load: whatever the current default is. No change needed.
+
+### Em-dash handling
+
+Not directly relevant for the initial two sortable columns (Project and Type both contain real values for every row). When sorting is extended to Amount or Budget later, em-dashed cells should sort to the bottom in descending order regardless of direction — they're "no value" rather than "zero," and treating them as zeros at the top of an ascending sort would be confusing.
+
+### What we're not doing
+
+- Grouping or sectioning the table by project type (sorting accomplishes the practical goal more simply)
+- Collapsing non-billable project sections by default (table is short enough that em-dashes aren't a real problem)
+- Multi-column sort (one column at a time is sufficient)
+- Sortable Hours, Budget, or Amount columns in the initial build (add later if needed)
 
 ## Explicitly out of scope
 
@@ -347,3 +414,19 @@ These came up during the design conversation but are deferred:
 - **Revenue reporting.** Fixed-fee invoice revenue, retainer revenue, and total invoiced amounts live in Zoho Books. Cross-system reporting is a future concern, separate from time tracking. For now, revenue questions get answered in Zoho directly.
 - **Annual "billed overage vs. eaten overage" reports.** Computable from entry data under the new model, but doesn't need to be built as part of this change.
 - **Utilization metric redefinition.** If a different productivity signal becomes useful later, design it then with a specific question in mind. Don't preemptively replace what's being removed.
+- **Per-project-type stat card layouts.** When the report is filtered to a single retainer or fixed-fee project, the existing Billable Hours and Billable Amount cards mostly read zero (correct, but uninformative). The right long-term fix is different card lineups per project type — retainers showing allocation/fee/billed overage, fixed-fee showing budget consumption and effective rate, hourly keeping the current cards. Deferred until there's enough lived experience with the new model to know which metrics actually matter for each project type. The current "overage only" / "retainer overage" captions are the minimum-viable explanation in the meantime.
+- **Invoiced status indicator on summary view project rows.** Summary view doesn't communicate which projects have outstanding billable work. In practice, invoicing happens in the detailed view filtered to a specific project, so the summary's role is more "how did the month go" than "what do I still need to bill." If lived experience surfaces a real need (e.g., losing track of which projects need invoicing across a quarter), revisit with a small indicator in the existing alert column — a blue/billing icon meaning "there's unbilled billable time within this range." Could coexist with the existing amber "unbilled outside range" indicator since they answer related but distinct questions.
+
+- **Billing unit records (first-class invoice events).** The current model uses two per-entry flags (billable, invoiced) to express what was billed. This works but has known limitations:
+  - Entry-level flags can't express mid-entry allocation splits (the ~5-minute-of-a-133-minute-entry overage problem) without overbilling or underbilling
+  - Partial billing of overage ("I billed 1h 45m of the 2h 15m overage, absorbed the rest") loses information — entries get marked as either billable or not, and the "this was deliberately absorbed" intent isn't recorded anywhere
+  - The waffling-about-billing tension applies to any project that produces invoiceable time (not just retainers — ad-hoc research hours on hourly projects have the same dynamic)
+  - There's no consolidated "billing history" view; what got billed lives in Zoho, what got logged lives in the time tracker, no record connects them
+
+  A future redesign would introduce billing unit records as first-class entities — one record per invoice event, with fields like project, period covered, amount actually invoiced, optional invoice number reference, and a manifest of which time entries the unit represents (the work being billed for, not necessarily a one-to-one match with the time amount). Fixed-fee projects stay outside this since their invoicing is fee-scheduled.
+
+  Under this model, the per-entry invoiced flag would become either a derived visual state (computed from manifest membership) or removed entirely. The billable flag stays manual as a user editorial judgment. Billing units become the source of truth for "what was actually billed."
+
+  Deferred because: it's a significant architectural shift that adds a new domain concept (billing/invoicing) to a tool whose original ethos is "low-friction time tracker, billing happens in Zoho." The immediate friction (entry-boundary inaccuracy, two-click bill-then-invoice) is bounded and addressable with smaller fixes (the calculated-vs-marked display, bulk billing actions). Worth revisiting after 6+ months of using the simpler design to validate whether the friction is real and persistent, or whether the simpler model is actually sufficient.
+
+  If pursued later: would also enable an AI-generated invoice description feature (using the WordPress 7.0 AI connector system to summarize entry descriptions into invoice line item text). That's a separate downstream possibility, not part of the billing unit concept itself.

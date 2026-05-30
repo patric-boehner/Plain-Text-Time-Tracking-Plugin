@@ -379,7 +379,13 @@ $tab_base_url = add_query_arg( $filter_params, admin_url( 'admin.php' ) );
 		'var plttProjectsByClient = ' . wp_json_encode( $projects_by_client ) . ';' .
 		'var plttClientNames = ' . wp_json_encode( $client_names ) . ';' .
 		'var plttAllTags = ' . wp_json_encode( $all_tags ) . ';' .
-		'var plttTagGroups = ' . wp_json_encode( PLTT_Tags::get_name_to_group_map() ) . ';',
+		'var plttTagGroups = ' . wp_json_encode( PLTT_Tags::get_name_to_group_map() ) . ';' .
+		'var plttReportStats = ' . wp_json_encode( array(
+			'billableMinutes' => $stats ? (int) $stats->billable_minutes : 0,
+			'billableAmount'  => $stats ? round( (float) $stats->billable_amount, 2 ) : 0,
+			'workingDays'     => (int) $working_days,
+			'prevAmount'      => $prev_stats ? round( (float) $prev_stats->billable_amount, 2 ) : 0,
+		) ) . ';',
 		'before'
 	);
 	?>
@@ -387,7 +393,9 @@ $tab_base_url = add_query_arg( $filter_params, admin_url( 'admin.php' ) );
 	<?php if ( ! empty( $context_client ) || $total_entries > 0 ) : ?>
 		<div class="pltt-summary-cards">
 
-			<?php if ( ! empty( $context_client ) ) : ?>
+			<?php if ( $is_single_project_view && ! empty( $context_projects ) ) : ?>
+				<?php include PLTT_PLUGIN_DIR . 'templates/partials/project-context-card.php'; ?>
+			<?php elseif ( ! empty( $context_client ) ) : ?>
 				<?php include PLTT_PLUGIN_DIR . 'templates/partials/client-context-card.php'; ?>
 			<?php endif; ?>
 
@@ -439,72 +447,68 @@ $tab_base_url = add_query_arg( $filter_params, admin_url( 'admin.php' ) );
 			<!-- Card 3: Billable Hours -->
 			<div class="card">
 				<div class="card-label"><?php esc_html_e( 'Billable Hours', 'plain-language-time-tracker' ); ?></div>
-				<?php if ( $is_single_alloc_view ) : ?>
-					<div class="card-value"><?php echo esc_html( pltt_format_hours( (int) $context_overage['overage_minutes'] ) ); ?></div>
-					<div class="card-secondary"><?php esc_html_e( 'overage only', 'plain-language-time-tracker' ); ?></div>
-				<?php else : ?>
-					<div class="card-value"><?php echo esc_html( pltt_format_hours( $stats->billable_minutes ) ); ?></div>
-					<?php if ( $working_days > 0 ) : ?>
-						<div class="card-secondary">
-							<?php
-							$billable_avg_per_day = $stats->billable_minutes / 60 / $working_days;
-							printf(
-								esc_html__( '%s hrs/day avg', 'plain-language-time-tracker' ),
-								esc_html( number_format( $billable_avg_per_day, 1 ) )
-							);
-							?>
-						</div>
-					<?php endif; ?>
+				<?php
+				// Flag-based on every view: billable = entries the user marked billable.
+				// The allocation/overage split is shown in the detailed entry list's
+				// threshold marker, not in this card. See the "billable flag vs.
+				// allocation line" open question in project memory.
+				?>
+				<div class="card-value" id="pltt-stat-billable-hours"><?php echo esc_html( pltt_format_hours( $stats->billable_minutes ) ); ?></div>
+				<?php if ( $working_days > 0 ) : ?>
+					<div class="card-secondary">
+						<?php
+						$billable_avg_per_day = $stats->billable_minutes / 60 / $working_days;
+						printf(
+							esc_html__( '%s hrs/day avg', 'plain-language-time-tracker' ),
+							'<span id="pltt-stat-billable-avg">' . esc_html( number_format( $billable_avg_per_day, 1 ) ) . '</span>'
+						);
+						?>
+					</div>
 				<?php endif; ?>
 			</div>
 
 			<!-- Card 4: Billable Amount -->
-			<?php if ( $is_single_alloc_view ) : ?>
-				<?php if ( (float) $context_overage['overage_amount'] > 0 ) : ?>
-					<div class="card">
-						<div class="card-label"><?php esc_html_e( 'Billable Amount', 'plain-language-time-tracker' ); ?></div>
-						<div class="card-value"><?php echo esc_html( pltt_format_currency( (float) $context_overage['overage_amount'] ) ); ?></div>
-						<div class="card-secondary"><?php esc_html_e( 'retainer overage', 'plain-language-time-tracker' ); ?></div>
-					</div>
-				<?php endif; ?>
-			<?php elseif ( (float) $stats->billable_amount > 0 ) : ?>
-				<div class="card">
-					<div class="card-label"><?php esc_html_e( 'Billable Amount', 'plain-language-time-tracker' ); ?></div>
-					<div class="card-value"><?php echo esc_html( pltt_format_currency( $stats->billable_amount ) ); ?></div>
-					<div class="card-secondary">
-						<?php
-						$prev_amount = $prev_stats ? (float) $prev_stats->billable_amount : 0;
-						$curr_amount = (float) $stats->billable_amount;
+			<?php
+			// Flag-based on every view (sum of entries marked billable). See Card 3 note.
+			// Always rendered (hidden at $0) so the inline billable toggle can update and
+			// reveal/hide it live without rebuilding DOM. JS mirrors the math below.
+			$prev_amount  = $prev_stats ? (float) $prev_stats->billable_amount : 0;
+			$curr_amount  = (float) $stats->billable_amount;
+			$amount_shown = $curr_amount > 0;
 
-						if ( $prev_amount > 0 ) {
-							$pct_change = ( $curr_amount - $prev_amount ) / $prev_amount * 100;
-						} else {
-							$pct_change = 100;
-						}
+			if ( $prev_amount > 0 ) {
+				$pct_change = ( $curr_amount - $prev_amount ) / $prev_amount * 100;
+			} else {
+				$pct_change = 100;
+			}
 
-						if ( abs( $pct_change ) < 5 ) {
-							$change_class = 'status-neutral';
-							$change_icon  = '→';
-						} elseif ( $pct_change > 0 ) {
-							$change_class = 'status-increase';
-							$change_icon  = '↑';
-						} else {
-							$change_class = 'status-decrease';
-							$change_icon  = '↓';
-						}
-
-						printf(
-							esc_html__( 'vs. %s last period', 'plain-language-time-tracker' ),
-							esc_html( pltt_format_currency( $prev_amount ) )
-						);
-						?>
-						&bull;
-						<span class="<?php echo esc_attr( $change_class ); ?>">
-							<?php echo esc_html( $change_icon . ' ' . number_format( abs( $pct_change ), 0 ) . '%' ); ?>
-						</span>
-					</div>
+			if ( abs( $pct_change ) < 5 ) {
+				$change_class = 'status-neutral';
+				$change_icon  = '→';
+			} elseif ( $pct_change > 0 ) {
+				$change_class = 'status-increase';
+				$change_icon  = '↑';
+			} else {
+				$change_class = 'status-decrease';
+				$change_icon  = '↓';
+			}
+			?>
+			<div class="card<?php echo $amount_shown ? '' : ' pltt-hidden'; ?>" id="pltt-stat-amount-card">
+				<div class="card-label"><?php esc_html_e( 'Billable Amount', 'plain-language-time-tracker' ); ?></div>
+				<div class="card-value" id="pltt-stat-billable-amount"><?php echo esc_html( pltt_format_currency( $curr_amount ) ); ?></div>
+				<div class="card-secondary">
+					<?php
+					printf(
+						esc_html__( 'vs. %s last period', 'plain-language-time-tracker' ),
+						esc_html( pltt_format_currency( $prev_amount ) )
+					);
+					?>
+					&bull;
+					<span id="pltt-stat-amount-change" class="<?php echo esc_attr( $change_class ); ?>">
+						<?php echo esc_html( $change_icon . ' ' . number_format( abs( $pct_change ), 0 ) . '%' ); ?>
+					</span>
 				</div>
-			<?php endif; ?>
+			</div>
 
 			<?php endif; /* total_entries > 0 */ ?>
 
@@ -781,11 +785,20 @@ $tab_base_url = add_query_arg( $filter_params, admin_url( 'admin.php' ) );
 					$page_ids            = array_map( function ( $e ) { return (int) $e->id; }, $entries );
 					$visible_overage_ids = array_values( array_intersect( $context_overage['overage_entry_ids'], $page_ids ) );
 
-					$marker_primary_text = sprintf(
-						/* translators: %s: hours/minutes used to date, e.g. "10h 0m". */
-						__( 'Allocation reached · %s used', 'plain-language-time-tracker' ),
-						pltt_format_duration( $context_overage['allocation_minutes'] )
-					);
+					if ( ! empty( $context_overage['boundary_time'] ) ) {
+						$marker_primary_text = sprintf(
+							/* translators: 1: clock time the allocation was crossed, e.g. "3:45pm"; 2: hours/minutes used, e.g. "3h 0m". */
+							__( 'Allocation reached at %1$s · %2$s used', 'plain-language-time-tracker' ),
+							$context_overage['boundary_time'],
+							pltt_format_duration( $context_overage['allocation_minutes'] )
+						);
+					} else {
+						$marker_primary_text = sprintf(
+							/* translators: %s: hours/minutes used to date, e.g. "10h 0m". */
+							__( 'Allocation reached · %s used', 'plain-language-time-tracker' ),
+							pltt_format_duration( $context_overage['allocation_minutes'] )
+						);
+					}
 					$marker_secondary_text = __( 'Entries below are overage candidates', 'plain-language-time-tracker' );
 
 					// Find which day group hosts the boundary entry (may be on another page).

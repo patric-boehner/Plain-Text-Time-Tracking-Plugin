@@ -28,6 +28,7 @@ class PLTT_Ajax {
 		// Entry operations.
 		add_action( 'wp_ajax_pltt_delete_entry', array( __CLASS__, 'delete_entry' ) );
 		add_action( 'wp_ajax_pltt_update_entry_field', array( __CLASS__, 'update_entry_field' ) );
+		add_action( 'wp_ajax_pltt_save_entry', array( __CLASS__, 'save_entry' ) );
 
 		// Client operations (create only - used from review screen modals).
 		add_action( 'wp_ajax_pltt_create_client', array( __CLASS__, 'create_client' ) );
@@ -503,6 +504,175 @@ class PLTT_Ajax {
 		} else {
 			wp_send_json_error( __( 'Failed to create tag.', 'plain-language-time-tracker' ) );
 		}
+	}
+
+	/**
+	 * Update a single entry from the per-row edit form on the review screen.
+	 *
+	 * Runs strict overlap validation against the target date (excluding this
+	 * entry) and returns the rendered row markup so the JS can swap it into
+	 * the entries list without a page reload.
+	 */
+	public static function save_entry() {
+		if ( ! self::verify_request() ) {
+			return;
+		}
+
+		$entry_id   = isset( $_POST['entry_id'] ) ? absint( $_POST['entry_id'] ) : 0;
+		if ( $entry_id <= 0 ) {
+			wp_send_json_error( __( 'Entry ID is required.', 'plain-language-time-tracker' ) );
+			return;
+		}
+		$entry_date = isset( $_POST['entry_date'] ) ? pltt_sanitize_date( wp_unslash( $_POST['entry_date'] ) ) : '';
+		$start_time = isset( $_POST['start_time'] ) ? sanitize_text_field( wp_unslash( $_POST['start_time'] ) ) : '';
+		$end_time   = isset( $_POST['end_time'] ) ? sanitize_text_field( wp_unslash( $_POST['end_time'] ) ) : '';
+		$duration   = isset( $_POST['duration_minutes'] ) ? absint( $_POST['duration_minutes'] ) : 0;
+		$description = isset( $_POST['description'] ) ? sanitize_textarea_field( wp_unslash( $_POST['description'] ) ) : '';
+		$client_id   = isset( $_POST['client_id'] ) && '' !== $_POST['client_id'] ? absint( $_POST['client_id'] ) : 0;
+		$project_id  = isset( $_POST['project_id'] ) && '' !== $_POST['project_id'] ? absint( $_POST['project_id'] ) : 0;
+		$tags        = isset( $_POST['tags'] ) ? sanitize_text_field( wp_unslash( $_POST['tags'] ) ) : '';
+		$billable    = isset( $_POST['billable'] ) && '1' === (string) $_POST['billable'] ? 1 : 0;
+
+		if ( empty( $entry_date ) ) {
+			wp_send_json_error( __( 'A date is required.', 'plain-language-time-tracker' ) );
+			return;
+		}
+
+		// Reject malformed times before they reach date_create().
+		$time_pattern = '/^\d{1,2}:\d{2}(:\d{2})?$/';
+		if ( '' === $start_time || ! preg_match( $time_pattern, $start_time ) ) {
+			wp_send_json_error( __( 'A valid start time is required.', 'plain-language-time-tracker' ) );
+			return;
+		}
+		if ( '' !== $end_time && ! preg_match( $time_pattern, $end_time ) ) {
+			wp_send_json_error( __( 'End time is invalid.', 'plain-language-time-tracker' ) );
+			return;
+		}
+
+		// Recalculate duration server-side when both times are present so a
+		// tampered duration_minutes can't disagree with the stored start/end.
+		if ( '' !== $end_time ) {
+			$start_mins = pltt_time_to_minutes( $start_time );
+			$end_mins   = pltt_time_to_minutes( $end_time );
+			if ( false === $start_mins || false === $end_mins ) {
+				wp_send_json_error( __( 'Time values could not be parsed.', 'plain-language-time-tracker' ) );
+				return;
+			}
+			$duration = ( $end_mins >= $start_mins )
+				? ( $end_mins - $start_mins )
+				: ( 1440 - $start_mins + $end_mins );
+		}
+
+		// Strict overlap validation against other entries on the same date,
+		// excluding the entry being edited.
+		$conflict = self::find_overlap_conflict( $entry_date, $start_time, $end_time, $duration, $entry_id );
+		if ( $conflict ) {
+			wp_send_json_error(
+				array(
+					'message' => sprintf(
+						/* translators: 1: conflicting entry description, 2: time range */
+						__( 'Times overlap with "%1$s" (%2$s).', 'plain-language-time-tracker' ),
+						$conflict->description,
+						pltt_format_time( $conflict->start_time ) . ( $conflict->end_time ? ' – ' . pltt_format_time( $conflict->end_time ) : '' )
+					),
+					'conflict_id' => (int) $conflict->id,
+				)
+			);
+			return;
+		}
+
+		$data = array(
+			'entry_date'       => $entry_date,
+			'start_time'       => $start_time,
+			'end_time'         => $end_time,
+			'duration_minutes' => $duration,
+			'description'      => $description,
+			'client_id'        => $client_id > 0 ? $client_id : null,
+			'project_id'       => $project_id > 0 ? $project_id : null,
+			'tags'             => $tags,
+			'billable'         => $billable,
+			'verified'         => 1,
+		);
+
+		// Snapshot billable rate + amount when billable.
+		if ( $billable && $duration > 0 ) {
+			$hourly_rate            = pltt_resolve_billable_rate( $client_id, $project_id );
+			$data['billable_rate']  = $hourly_rate;
+			$data['billable_amount'] = round( ( $duration / 60.0 ) * $hourly_rate, 2 );
+		} else {
+			$data['billable_rate']   = 0.00;
+			$data['billable_amount'] = 0.00;
+		}
+
+		$existing = PLTT_Entries::get( $entry_id );
+		if ( ! $existing ) {
+			wp_send_json_error( __( 'Entry not found.', 'plain-language-time-tracker' ) );
+			return;
+		}
+
+		$result = PLTT_Entries::update( $entry_id, $data );
+		if ( ! $result ) {
+			wp_send_json_error( __( 'Failed to save entry.', 'plain-language-time-tracker' ) );
+			return;
+		}
+
+		// Render the updated row as HTML so the JS can swap it in without a page reload.
+		$saved_entry = PLTT_Entries::get( $entry_id );
+		ob_start();
+		PLTT_Review::render_entry_row( $saved_entry );
+		$row_html = ob_get_clean();
+
+		wp_send_json_success(
+			array(
+				'message'  => __( 'Saved.', 'plain-language-time-tracker' ),
+				'entry_id' => (int) $entry_id,
+				'row_html' => $row_html,
+			)
+		);
+	}
+
+	/**
+	 * Find an overlapping entry on the same date, ignoring the entry being edited.
+	 *
+	 * Returns the conflicting entry object, or null if none. Open-ended entries
+	 * (no end_time) treat their duration as zero — they only conflict if their
+	 * start_time falls inside the candidate range, or vice versa.
+	 *
+	 * @param string $date            Y-m-d.
+	 * @param string $start_time      HH:MM[:SS].
+	 * @param string $end_time        HH:MM[:SS] or ''.
+	 * @param int    $duration_mins   Duration in minutes.
+	 * @param int    $exclude_id      Entry ID to exclude (0 when creating).
+	 * @return object|null Conflicting entry or null.
+	 */
+	private static function find_overlap_conflict( $date, $start_time, $end_time, $duration_mins, $exclude_id ) {
+		$start_mins = pltt_time_to_minutes( $start_time );
+		if ( false === $start_mins ) {
+			return null;
+		}
+		// Open-ended entries collapse to a zero-length span at start_time;
+		// they only conflict if another entry's range contains start_time.
+		$end_mins = '' !== $end_time ? $start_mins + (int) $duration_mins : $start_mins;
+
+		$existing = PLTT_Entries::get_by_date( $date );
+		foreach ( $existing as $other ) {
+			if ( (int) $other->id === (int) $exclude_id ) {
+				continue;
+			}
+			$o_start = pltt_time_to_minutes( $other->start_time );
+			if ( false === $o_start ) {
+				continue;
+			}
+			$o_end = ! empty( $other->end_time )
+				? $o_start + (int) $other->duration_minutes
+				: $o_start;
+
+			// Strict inequalities allow back-to-back entries (10:00 end / 10:00 start).
+			if ( $start_mins < $o_end && $o_start < $end_mins ) {
+				return $other;
+			}
+		}
+		return null;
 	}
 
 	/**

@@ -405,6 +405,72 @@
 		 * @param {Function}    onSuccess Called on AJAX success.
 		 * @param {Function}    onError   Called on AJAX error (revert).
 		 */
+		/**
+		 * Parse a rendered currency cell ("$1,234.56" or "—") back to a number.
+		 *
+		 * @param {string} text Cell text content.
+		 * @return {number} Parsed amount, or 0 if not a number.
+		 */
+		function parseAmount( text ) {
+			if ( ! text ) { return 0; }
+			var n = parseFloat( String( text ).replace( /[^0-9.\-]/g, '' ) );
+			return isFinite( n ) ? n : 0;
+		}
+
+		/**
+		 * Apply a billable delta to the summary stat cards live (Billable Hours +
+		 * its hrs/day avg sub-line, Billable Amount + its vs-last-period sub-line).
+		 * Mirrors the PHP math in templates/reports.php so a refresh produces the
+		 * same numbers. No-op if the cards aren't on the page.
+		 *
+		 * @param {number} minDelta Signed change in billable minutes.
+		 * @param {number} amtDelta Signed change in billable dollars.
+		 */
+		function updateBillableCards( minDelta, amtDelta ) {
+			if ( typeof plttReportStats === 'undefined' ) { return; }
+
+			plttReportStats.billableMinutes = Math.max( 0, plttReportStats.billableMinutes + minDelta );
+			plttReportStats.billableAmount  = Math.max( 0, Math.round( ( plttReportStats.billableAmount + amtDelta ) * 100 ) / 100 );
+
+			var hrsEl = document.getElementById( 'pltt-stat-billable-hours' );
+			if ( hrsEl ) {
+				hrsEl.textContent = PLTT.formatHours( plttReportStats.billableMinutes );
+			}
+
+			var avgEl = document.getElementById( 'pltt-stat-billable-avg' );
+			if ( avgEl && plttReportStats.workingDays > 0 ) {
+				avgEl.textContent = ( plttReportStats.billableMinutes / 60 / plttReportStats.workingDays )
+					.toLocaleString( 'en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 } );
+			}
+
+			var amtEl = document.getElementById( 'pltt-stat-billable-amount' );
+			if ( amtEl ) {
+				amtEl.textContent = '$' + plttReportStats.billableAmount.toLocaleString( 'en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 } );
+			}
+
+			var card = document.getElementById( 'pltt-stat-amount-card' );
+			if ( card ) {
+				card.classList.toggle( 'pltt-hidden', ! ( plttReportStats.billableAmount > 0 ) );
+			}
+
+			var changeEl = document.getElementById( 'pltt-stat-amount-change' );
+			if ( changeEl ) {
+				var prev = plttReportStats.prevAmount;
+				var curr = plttReportStats.billableAmount;
+				var pct  = prev > 0 ? ( curr - prev ) / prev * 100 : 100;
+				var cls, icon;
+				if ( Math.abs( pct ) < 5 ) {
+					cls = 'status-neutral'; icon = '→';
+				} else if ( pct > 0 ) {
+					cls = 'status-increase'; icon = '↑';
+				} else {
+					cls = 'status-decrease'; icon = '↓';
+				}
+				changeEl.className   = cls;
+				changeEl.textContent = icon + ' ' + Math.round( Math.abs( pct ) ) + '%';
+			}
+		}
+
 		function saveField( btn, field, value, onSuccess, onError ) {
 			var entryId = btn.dataset.entryId;
 			btn.classList.add( 'pltt-saving' );
@@ -513,15 +579,24 @@
 				}
 			},
 			onSuccess: function( btn, row, data ) {
-				// Update the Amount cell with the server-calculated value.
+				// Update the Amount cell with the server-calculated value, then push
+				// the deltas to the summary stat cards so they update without a refresh.
 				var amountCell = row && row.querySelector( '.pltt-amount-col' );
-				if ( ! amountCell ) { return; }
-				var amount = data && parseFloat( data.billable_amount );
-				if ( amount > 0 ) {
-					amountCell.textContent = '$' + amount.toLocaleString( 'en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 } );
-				} else {
-					amountCell.innerHTML = '<span class="pltt-empty">—</span>';
+				var newAmount  = data ? parseFloat( data.billable_amount ) || 0 : 0;
+				var oldAmount  = amountCell ? parseAmount( amountCell.textContent ) : 0;
+
+				if ( amountCell ) {
+					if ( newAmount > 0 ) {
+						amountCell.textContent = '$' + newAmount.toLocaleString( 'en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 } );
+					} else {
+						amountCell.innerHTML = '<span class="pltt-empty">—</span>';
+					}
 				}
+
+				// btn.dataset.value already reflects the new (post-toggle) state.
+				var isBillable = btn.dataset.value === '1';
+				var minutes    = parseInt( btn.dataset.minutes, 10 ) || 0;
+				updateBillableCards( isBillable ? minutes : -minutes, newAmount - oldAmount );
 			}
 		} );
 
