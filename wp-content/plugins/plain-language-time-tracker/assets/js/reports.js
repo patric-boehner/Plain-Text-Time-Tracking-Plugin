@@ -387,6 +387,22 @@
 	} );
 
 	/**
+	 * Dismiss the "unbilled outside range" notice strip.
+	 *
+	 * Client-side only, matching WordPress's standard is-dismissible behavior:
+	 * the strip hides for the current page load and reappears on reload while
+	 * the underlying condition still holds.
+	 */
+	document.querySelectorAll( '.pltt-unbilled-notice-dismiss' ).forEach( function( btn ) {
+		btn.addEventListener( 'click', function() {
+			var notice = this.closest( '.pltt-unbilled-notice' );
+			if ( notice ) {
+				notice.remove();
+			}
+		} );
+	} );
+
+	/**
 	 * Inline field editing — Billable, Invoiced, Tags.
 	 *
 	 * Saves each change immediately via AJAX. No page reload needed.
@@ -419,7 +435,7 @@
 
 		/**
 		 * Apply a billable delta to the summary stat cards live (Billable Hours +
-		 * its hrs/day avg sub-line, Billable Amount + its vs-last-period sub-line).
+		 * its vs-last-period sub-line, Billable Amount + its vs-last-period sub-line).
 		 * Mirrors the PHP math in templates/reports.php so a refresh produces the
 		 * same numbers. No-op if the cards aren't on the page.
 		 *
@@ -437,10 +453,21 @@
 				hrsEl.textContent = PLTT.formatHours( plttReportStats.billableMinutes );
 			}
 
-			var avgEl = document.getElementById( 'pltt-stat-billable-avg' );
-			if ( avgEl && plttReportStats.workingDays > 0 ) {
-				avgEl.textContent = ( plttReportStats.billableMinutes / 60 / plttReportStats.workingDays )
-					.toLocaleString( 'en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 } );
+			var hrsChangeEl = document.getElementById( 'pltt-stat-hours-change' );
+			if ( hrsChangeEl ) {
+				var prevMins = plttReportStats.prevMinutes;
+				var currMins = plttReportStats.billableMinutes;
+				var hrsPct   = prevMins > 0 ? ( currMins - prevMins ) / prevMins * 100 : 100;
+				var hrsCls, hrsIcon;
+				if ( Math.abs( hrsPct ) < 5 ) {
+					hrsCls = 'status-neutral'; hrsIcon = '→';
+				} else if ( hrsPct > 0 ) {
+					hrsCls = 'status-increase'; hrsIcon = '↑';
+				} else {
+					hrsCls = 'status-decrease'; hrsIcon = '↓';
+				}
+				hrsChangeEl.className   = hrsCls;
+				hrsChangeEl.textContent = hrsIcon + ' ' + Math.round( Math.abs( hrsPct ) ) + '%';
 			}
 
 			var amtEl = document.getElementById( 'pltt-stat-billable-amount' );

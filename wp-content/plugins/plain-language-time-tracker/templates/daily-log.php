@@ -147,7 +147,7 @@ $has_entries      = ! empty( $existing_entries );
 
 			<div class="pltt-existing-entries-footer">
 				<a href="<?php echo esc_url( pltt_get_admin_url( 'review', array( 'date' => $date ) ) ); ?>" class="button button-primary">
-					<?php esc_html_e( 'View & Edit Entries', 'plain-language-time-tracker' ); ?> &rarr;
+					<?php esc_html_e( 'Edit Entries', 'plain-language-time-tracker' ); ?> &rarr;
 				</a>
 			</div>
 		</div>

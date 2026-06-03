@@ -22,20 +22,26 @@
 	--pltt-border-faint: #f0f0f1; /* Very light row separators */
 
 	/* Backgrounds */
-	--pltt-bg-white:  #fff;
-	--pltt-bg-light:  #f0f0f1; /* Light gray: badge bg, code, button bg */
-	--pltt-bg-subtle: #f6f7f7; /* Hover bg on white surfaces */
-	--pltt-bg-faint:  #f9f9f9; /* Near-white alternating rows */
-	--pltt-bg-hover:  #e0e0e0; /* Button hover, allocation bar track */
+	--pltt-bg-white:         #fff;
+	--pltt-bg-light:         #f0f0f1; /* Light gray: badge bg, code, button bg */
+	--pltt-bg-subtle:        #f6f7f7; /* Hover bg on white surfaces */
+	--pltt-bg-faint:         #f9f9f9; /* Near-white alternating rows */
+	--pltt-bg-hover:         #e0e0e0; /* Button hover, allocation bar track */
+	--pltt-bg-highlight:     #f0f6fc; /* Light blue: active / being-edited surfaces */
+	--pltt-bg-overage:       #fefaf2; /* Warm cream: overage entry rows */
+	--pltt-bg-overage-hover: #fcf5e3; /* Overage row hover */
+	--pltt-bg-danger:        #fcf0f1; /* Pink: inline form error background */
 
 	/* Brand / Primary */
-	--pltt-primary: #2271b1; /* WP admin blue */
+	--pltt-primary:       #2271b1; /* WP admin blue */
+	--pltt-primary-light: #72aee6; /* Lighter admin blue: allocation overage segment */
 
 	/* Status */
 	--pltt-success:     #00a32a;
-	--pltt-warning:		#ecc251;
+	--pltt-warning:     #ecc251;
 	--pltt-danger:      #d63638;
 	--pltt-danger-dark: #b32d2e; /* Delete link color */
+	--pltt-danger-text: #8a1f25; /* Dark red: inline form error text */
 
 	/* Badges */
 	--pltt-badge-bg:           #f0f0f1;
@@ -58,11 +64,12 @@
 	/* Tag pill hover */
 	--pltt-tag-pill-hover: #c9dff0;
 
-	/* Negate-active filter button */
-	--pltt-negate-active-bg: #fcf0f0;
+	/* Negate-active filter button (shares the danger-background pink) */
+	--pltt-negate-active-bg: var(--pltt-bg-danger);
 
 	/* Overlays and shadows */
 	--pltt-overlay:               rgba(0, 0, 0, 0.5);
+	--pltt-overlay-faint:         rgba(0, 0, 0, 0.02); /* Archived row tint */
 	--pltt-shadow-modal:          0 5px 15px rgba(0, 0, 0, 0.3);
 	--pltt-shadow-dropdown:       0 2px 6px rgba(0, 0, 0, 0.15);
 	--pltt-shadow-dropdown-light: 0 2px 6px rgba(0, 0, 0, 0.12);
@@ -133,6 +140,7 @@
 	border-radius: 4px;
 	display: flex;
 	flex-direction: column;
+	margin-top: 0;
 }
 
 .card-value {
@@ -489,14 +497,14 @@
 }
 
 /* Filled bar segments. Within-budget is blue (client work, regardless of type);
-   overage portion (when bar exceeds 100%) sits on top in amber. */
+   overage portion (when bar exceeds 100%) sits on top in a lighter blue. */
 .pltt-alloc-seg {
 	display: block;
 	height: 100%;
 }
 
 .pltt-alloc-seg-within { background: var(--pltt-primary); } /* blue: any client work */
-.pltt-alloc-seg-over   { background: var(--pltt-warning); } /* amber: overage portion */
+.pltt-alloc-seg-over   { background: var(--pltt-primary-light); } /* light blue: overage portion */
 
 .pltt-alloc-label {
 	font-size: 12px;
@@ -627,12 +635,12 @@
 	border: 1px solid var(--pltt-border);
 	border-radius: 4px;
 	overflow: hidden;
-	background: #fff;
+	background: var(--pltt-bg-white);
 }
 
 .pltt-input-adornment-wrap:focus-within {
-	border-color: #2271b1;
-	box-shadow: 0 0 0 1px #2271b1;
+	border-color: var(--pltt-primary);
+	box-shadow: 0 0 0 1px var(--pltt-primary);
 	outline: none;
 }
 
@@ -724,7 +732,7 @@
 
 /* Archived row highlight (reports summary, projects list when not grouped by status). */
 .widefat tr.pltt-row-archived td {
-	background-color: rgba(0, 0, 0, 0.02);
+	background-color: var(--pltt-overlay-faint);
 }
 
 .widefat tr.pltt-row-archived td:first-child {

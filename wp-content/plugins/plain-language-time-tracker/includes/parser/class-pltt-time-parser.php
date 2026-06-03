@@ -144,7 +144,7 @@ class PLTT_Time_Parser {
 	 * @return bool True if this is an end marker.
 	 */
 	private static function is_end_marker( $description ) {
-		$end_markers = array( 'done', 'end', 'finished', 'stop', 'break', 'lunch', 'eod' );
+		$end_markers = array( 'done', 'end', 'finished', 'stop', 'break', 'lunch', 'eod', 'pause' );
 
 		// Normalize: lowercase, trim, remove trailing punctuation.
 		$clean = strtolower( trim( $description ) );

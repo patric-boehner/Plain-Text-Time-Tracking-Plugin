@@ -604,6 +604,71 @@ class PLTT_Entries {
 	}
 
 	/**
+	 * Find unbilled time that falls outside a given date range, per project.
+	 *
+	 * "Unbilled" means marked billable, not yet invoiced, and verified. Under the
+	 * new billable model this naturally excludes within-allocation retainer time
+	 * and fixed-fee work (both non-billable), so the result is the stranded
+	 * invoiceable time a user might forget to bill from a prior/later period.
+	 *
+	 * Returns only projects that actually have unbilled time outside the range
+	 * (HAVING outside_minutes > 0) — most projects won't appear. Each row also
+	 * carries the overall earliest/latest unbilled entry dates so callers can
+	 * expand the date range to encompass everything unbilled on the project.
+	 *
+	 * @param int[]  $project_ids Projects to inspect (the ones currently shown).
+	 * @param string $date_from   Current range start (Y-m-d).
+	 * @param string $date_to     Current range end (Y-m-d).
+	 * @return array<int, object> Map keyed by project_id, each with:
+	 *                            outside_minutes, outside_count,
+	 *                            overall_earliest, overall_latest (Y-m-d).
+	 */
+	public static function get_unbilled_outside_range( $project_ids, $date_from, $date_to ) {
+		global $wpdb;
+
+		$project_ids = array_filter( array_map( 'absint', (array) $project_ids ) );
+		if ( empty( $project_ids ) ) {
+			return array();
+		}
+
+		$table        = PLTT_Database::get_table_name( 'time_entries' );
+		$placeholders = implode( ',', array_fill( 0, count( $project_ids ), '%d' ) );
+
+		// Conditional aggregates: "outside" = before the range start or after its end.
+		$prepare = array_merge(
+			array( $date_from, $date_to, $date_from, $date_to ),
+			$project_ids
+		);
+
+		$sql = "SELECT
+			e.project_id AS group_key,
+			COALESCE(SUM(CASE WHEN e.entry_date < %s OR e.entry_date > %s THEN e.duration_minutes ELSE 0 END), 0) AS outside_minutes,
+			SUM(CASE WHEN e.entry_date < %s OR e.entry_date > %s THEN 1 ELSE 0 END) AS outside_count,
+			MIN(e.entry_date) AS overall_earliest,
+			MAX(e.entry_date) AS overall_latest
+			FROM {$table} e
+			WHERE e.project_id IN ({$placeholders})
+				AND e.billable = 1
+				AND COALESCE(e.billed, 0) = 0
+				AND e.verified = 1
+			GROUP BY e.project_id
+			HAVING outside_minutes > 0";
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.NotPrepared
+		$rows = $wpdb->get_results( $wpdb->prepare( $sql, $prepare ) );
+
+		$out = array();
+		if ( $rows ) {
+			foreach ( $rows as $row ) {
+				$key = (int) $row->group_key;
+				unset( $row->group_key );
+				$out[ $key ] = $row;
+			}
+		}
+		return $out;
+	}
+
+	/**
 	 * Get the highest-hours projects for the given period.
 	 *
 	 * Used by the "Top Projects" summary card. Excludes the Internal client

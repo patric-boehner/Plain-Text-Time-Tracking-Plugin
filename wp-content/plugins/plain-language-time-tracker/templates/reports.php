@@ -383,7 +383,7 @@ $tab_base_url = add_query_arg( $filter_params, admin_url( 'admin.php' ) );
 		'var plttReportStats = ' . wp_json_encode( array(
 			'billableMinutes' => $stats ? (int) $stats->billable_minutes : 0,
 			'billableAmount'  => $stats ? round( (float) $stats->billable_amount, 2 ) : 0,
-			'workingDays'     => (int) $working_days,
+			'prevMinutes'     => $prev_stats ? (int) $prev_stats->billable_minutes : 0,
 			'prevAmount'      => $prev_stats ? round( (float) $prev_stats->billable_amount, 2 ) : 0,
 		) ) . ';',
 		'before'
@@ -445,26 +445,49 @@ $tab_base_url = add_query_arg( $filter_params, admin_url( 'admin.php' ) );
 			</div>
 
 			<!-- Card 3: Billable Hours -->
+			<?php
+			// Flag-based on every view: billable = entries the user marked billable.
+			// The allocation/overage split is shown in the detailed entry list's
+			// threshold marker, not in this card. See the "billable flag vs.
+			// allocation line" open question in project memory.
+			//
+			// Period-over-period comparison mirrors the Billable Amount card (Card 4);
+			// JS mirrors this math so the inline billable toggle can update it live.
+			$prev_hours_mins = $prev_stats ? (int) $prev_stats->billable_minutes : 0;
+			$curr_hours_mins = (int) $stats->billable_minutes;
+
+			if ( $prev_hours_mins > 0 ) {
+				$hours_pct_change = ( $curr_hours_mins - $prev_hours_mins ) / $prev_hours_mins * 100;
+			} else {
+				$hours_pct_change = 100;
+			}
+
+			if ( abs( $hours_pct_change ) < 5 ) {
+				$hours_change_class = 'status-neutral';
+				$hours_change_icon  = '→';
+			} elseif ( $hours_pct_change > 0 ) {
+				$hours_change_class = 'status-increase';
+				$hours_change_icon  = '↑';
+			} else {
+				$hours_change_class = 'status-decrease';
+				$hours_change_icon  = '↓';
+			}
+			?>
 			<div class="card">
 				<div class="card-label"><?php esc_html_e( 'Billable Hours', 'plain-language-time-tracker' ); ?></div>
-				<?php
-				// Flag-based on every view: billable = entries the user marked billable.
-				// The allocation/overage split is shown in the detailed entry list's
-				// threshold marker, not in this card. See the "billable flag vs.
-				// allocation line" open question in project memory.
-				?>
 				<div class="card-value" id="pltt-stat-billable-hours"><?php echo esc_html( pltt_format_hours( $stats->billable_minutes ) ); ?></div>
-				<?php if ( $working_days > 0 ) : ?>
-					<div class="card-secondary">
-						<?php
-						$billable_avg_per_day = $stats->billable_minutes / 60 / $working_days;
-						printf(
-							esc_html__( '%s hrs/day avg', 'plain-language-time-tracker' ),
-							'<span id="pltt-stat-billable-avg">' . esc_html( number_format( $billable_avg_per_day, 1 ) ) . '</span>'
-						);
-						?>
-					</div>
-				<?php endif; ?>
+				<div class="card-secondary">
+					<?php
+					printf(
+						esc_html__( 'vs. %s last period', 'plain-language-time-tracker' ),
+						esc_html( pltt_format_hours( $prev_hours_mins ) )
+					);
+					?>
+					&bull;
+					<span id="pltt-stat-hours-change" class="<?php echo esc_attr( $hours_change_class ); ?>">
+						<?php echo esc_html( $hours_change_icon . ' ' . number_format( abs( $hours_pct_change ), 0 ) . '%' ); ?>
+					</span>
+				</div>
 			</div>
 
 			<!-- Card 4: Billable Amount -->
@@ -678,6 +701,9 @@ $tab_base_url = add_query_arg( $filter_params, admin_url( 'admin.php' ) );
 							<th><?php esc_html_e( 'Hours', 'plain-language-time-tracker' ); ?></th>
 							<th class="pltt-budget-col"><?php esc_html_e( 'Budget', 'plain-language-time-tracker' ); ?></th>
 							<th><?php esc_html_e( 'Amount', 'plain-language-time-tracker' ); ?></th>
+							<th class="pltt-unbilled-col">
+								<span class="screen-reader-text"><?php esc_html_e( 'Unbilled outside range', 'plain-language-time-tracker' ); ?></span>
+							</th>
 						</tr>
 					</thead>
 					<tbody>
@@ -754,6 +780,30 @@ $tab_base_url = add_query_arg( $filter_params, admin_url( 'admin.php' ) );
 									<?php endif; ?>
 								</td>
 								<td class="pltt-duration-cell"><?php echo (float) $row->billable_amount > 0 ? esc_html( pltt_format_currency( $row->billable_amount ) ) : '<span class="pltt-empty">—</span>'; ?></td>
+								<td class="pltt-unbilled-col">
+									<?php
+									$uo = ! empty( $row->project_id ) ? ( $unbilled_outside_map[ (int) $row->project_id ] ?? null ) : null;
+									if ( $uo && (int) $uo->outside_minutes > 0 ) :
+										// Expand the range to cover all unbilled time on this project.
+										$exp_from   = min( $date_from, $uo->overall_earliest );
+										$exp_to     = max( $date_to, $uo->overall_latest );
+										$exp_args   = $detail_args;
+										$exp_args['from'] = $exp_from;
+										$exp_args['to']   = $exp_to;
+										$exp_url    = add_query_arg( $exp_args, admin_url( 'admin.php' ) );
+										$earliest_l = ( new DateTimeImmutable( $uo->overall_earliest, wp_timezone() ) )->format( 'M j, Y' );
+										$alert_label = sprintf(
+											/* translators: 1: duration e.g. "2h 15m"; 2: date e.g. "May 3, 2026". */
+											__( '%1$s of unbilled time outside your date range · earliest unbilled entry %2$s. Click to expand the range.', 'plain-language-time-tracker' ),
+											pltt_format_duration( (int) $uo->outside_minutes ),
+											$earliest_l
+										);
+									?>
+										<a href="<?php echo esc_url( $exp_url ); ?>" class="pltt-unbilled-alert" title="<?php echo esc_attr( $alert_label ); ?>" aria-label="<?php echo esc_attr( $alert_label ); ?>">
+											<span class="pltt-unbilled-dot" aria-hidden="true">!</span>
+										</a>
+									<?php endif; ?>
+								</td>
 								</tr>
 						<?php endforeach; ?>
 					</tbody>
@@ -765,6 +815,57 @@ $tab_base_url = add_query_arg( $filter_params, admin_url( 'admin.php' ) );
 			<?php endif; ?>
 
 		<?php else : ?>
+
+			<?php
+			// Stranded-unbilled notice: shown when filtered to a single project that
+			// has billable, uninvoiced time outside the current date range. Rendered
+			// before any day cards (and regardless of whether the range has entries).
+			if ( $unbilled_outside && (int) $unbilled_outside->outside_minutes > 0 ) :
+				$uo_from = min( $date_from, $unbilled_outside->overall_earliest );
+				$uo_to   = max( $date_to, $unbilled_outside->overall_latest );
+				$uo_args = array(
+					'page'       => 'pltt-reports',
+					'view'       => 'detailed',
+					'from'       => $uo_from,
+					'to'         => $uo_to,
+					'project_id' => $project_id,
+				);
+				if ( $client_id > 0 ) {
+					$uo_args['client_id'] = $client_id;
+				}
+				$uo_url       = add_query_arg( $uo_args, admin_url( 'admin.php' ) );
+				$uo_earliest  = ( new DateTimeImmutable( $unbilled_outside->overall_earliest, wp_timezone() ) )->format( 'F j, Y' );
+				?>
+				<div class="pltt-unbilled-notice">
+					<span class="pltt-unbilled-notice-icon" aria-hidden="true">!</span>
+					<div class="pltt-unbilled-notice-body">
+						<p class="pltt-unbilled-notice-primary">
+							<?php
+							printf(
+								/* translators: %s: duration, e.g. "2h 15m". */
+								esc_html__( '%s of unbilled time on this project outside your date range', 'plain-language-time-tracker' ),
+								esc_html( pltt_format_duration( (int) $unbilled_outside->outside_minutes ) )
+							);
+							?>
+						</p>
+						<p class="pltt-unbilled-notice-secondary">
+							<?php
+							printf(
+								/* translators: %s: date, e.g. "May 3, 2026". */
+								esc_html__( 'Earliest unbilled entry: %s', 'plain-language-time-tracker' ),
+								esc_html( $uo_earliest )
+							);
+							?>
+						</p>
+					</div>
+					<a href="<?php echo esc_url( $uo_url ); ?>" class="pltt-unbilled-notice-action">
+						<?php esc_html_e( 'Expand range to show all unbilled', 'plain-language-time-tracker' ); ?>
+					</a>
+					<button type="button" class="pltt-unbilled-notice-dismiss" aria-label="<?php esc_attr_e( 'Dismiss this notice', 'plain-language-time-tracker' ); ?>">
+						<span aria-hidden="true">&times;</span>
+					</button>
+				</div>
+			<?php endif; ?>
 
 			<?php if ( ! empty( $entries ) ) : ?>
 				<?php

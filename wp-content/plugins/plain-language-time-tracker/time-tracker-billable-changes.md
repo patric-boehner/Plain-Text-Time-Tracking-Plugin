@@ -52,56 +52,6 @@ The summary cards adapt their captions to the filtered context, since meaning is
 
 The per-entry billable flag preserves the per-entry decision, which keeps the door open for future "billed overage vs. swallowed overage" reports computed directly from entry data.
 
-## Unbilled time outside the current range
-
-### Problem
-
-When reviewing reports at end-of-month to decide what to invoice, billable uninvoiced time from previous months can be invisible. The most common reasons time rolls over from a previous month: forgetting to bill it at the time, or back-and-forth with the client extending the timeline (initial work, weeks of email, client follow-up, more work). The current view shows only what's in the date range, so previous-month entries are stranded unless the user remembers they exist and manually widens the range.
-
-### Goal
-
-Surface the existence of stranded unbilled time on a project without forcing the user to remember it's there or manually expand the date range to check. One click expands the range to cover everything.
-
-### Two surfaces
-
-**Summary view project table.** A new narrow column at the end of the row, after Amount. Most rows are empty in this column. Rows with unbilled time outside the current date range show an amber alert icon (filled circle, 22px circular amber background, neutral header label). The empty space across most rows is itself the signal — exceptions stand out without visual noise.
-
-Hovering the icon reveals the specifics. Clicking navigates to the detailed view, filtered to that project, with the date range expanded to encompass all unbilled time on the project.
-
-**Detailed view when filtered to a single project.** A notice strip above the entry list, before any day cards. Amber background, alert icon, message describing the stranded time, and a button to expand the range. The strip persists until the user expands the range or navigates away.
-
-### Notice strip wording
-
-One consistent message structure regardless of whether stranded time is before, after, or both sides of the current range:
-
-- Primary: "X of unbilled time on this project outside your date range"
-- Secondary: "Earliest unbilled entry: [date]" (or similar — show the boundary that matters)
-- Button: "Expand range to show all unbilled"
-
-Keeping the wording uniform means one design, one set of strings, and no branching logic for which side the stranded time is on.
-
-### What counts as "unbilled"
-
-An entry is unbilled if it is marked billable and not marked invoiced. Under the new billable model this means:
-
-- Hourly project entries marked billable and not invoiced
-- Retainer project entries marked billable (i.e., flagged as overage) and not invoiced
-- Fixed-fee entries don't generate this state — fixed-fee work is invoiced separately on its own schedule
-
-The indicator only appears for projects that have at least one billable uninvoiced entry outside the current date range.
-
-### Range expansion behavior
-
-Clicking either the icon or the button expands the date range to span from the earliest unbilled entry to the latest unbilled entry (or to the current range's far boundary, whichever is wider). The intent is "show me everything I might want to invoice on this project right now" — not preserve the user's previous range structure.
-
-After expansion, the notice strip disappears or transforms into a brief confirmation state, since the stranded time is no longer outside the range.
-
-### What we're not doing
-
-- Showing the indicator on projects with no stranded unbilled time (most rows will be empty in the alert column)
-- Showing a "+X hrs" pill or other quantitative summary inline on the summary row (an icon is sufficient; specifics live in the tooltip and the destination view)
-- Branching the notice strip wording or button by stranded-time direction (one universal pattern)
-
 ## Unified entry form (add and edit)
 
 *Status: the edit half shipped and is removed from this doc.* The expandable per-row edit form (`templates/partials/entry-form-row.php`, `review-edit-existing.php`), per-row Save via the `pltt_save_entry` AJAX handler, the field set, the blue inline-expansion treatment, and strict overlap validation are all implemented. **What remains is ADD mode** — the entry-point buttons, the add-mode title/defaults, and creating entries on days that have no parsed notes yet.
@@ -316,6 +266,53 @@ The note is informational. The user decides what to do about the gap — adjust 
 **Summary view stays simpler.** The summary view's Amount column continues to show what's marked billable × rate (the user's selection). The summary is "based on my current decisions, here's what's invoiceable." The detailed view's context card is where the math-vs-selection comparison happens because that's where decisions get made.
 
 **Threshold marker placement unchanged.** The marker continues to land at the precise crossing minute, even when that's mid-entry. The card communicates the financial reality; the marker shows the visual boundary. Together they tell the full story — "here's where you crossed, here's what to bill, here's the gap if any."
+
+## Monthly usage card (multi-month retainer views)
+ 
+### Problem
+ 
+Single-month retainer views show whether the current month went over or under allocation. But the bigger business question — "is this retainer right-sized for this client?" — needs longitudinal data. Right now there's no surface that helps the user walk into a retainer-renegotiation conversation prepared, with concrete numbers about how consumption has actually trended over time.
+ 
+### Trigger conditions
+ 
+The card appears when all of these are true:
+ 
+- The report is filtered to a single retainer project
+- The date range spans 3 or more months
+- The range includes at least 2 complete months of data (partial months can be excluded or noted)
+Below 3 months, averages aren't meaningful enough to drive an allocation conversation. The single-month overage card is the right surface at shorter ranges.
+ 
+### What the card shows
+ 
+Five pieces of information, each with its own clear job:
+ 
+1. **Period** — small label naming the range being averaged ("Last 6 months · Nov 2025 – Apr 2026")
+2. **Average vs. Allocation** — side-by-side comparison of the average monthly hours used against the set allocation
+3. **Gap** — the numeric and percent difference, colored by direction (amber over, sage under, neutral matched)
+4. **Consistency** — "X of N months over allocation" + range (min and max month)
+5. **Anomaly note** — small note that adapts based on whether outliers exist
+### Anomaly handling
+ 
+The card always includes all data in the average — no automatic exclusion. The anomaly note carries the interpretation:
+ 
+- **Significant outlier exists** (e.g., a single month at 2x or more the median): note names the month and value, and shows the median as an alternative metric ("Jan 2026 (8h 15m) may be skewing the average. Median: 3h 45m.")
+- **No outliers**: note confirms steadiness ("Usage is consistent month-to-month. No outliers." or "No significant outliers in this period.")
+The user decides what to do with the information. Software doesn't filter the data; it just flags when the headline number might not represent the typical pattern.
+ 
+### Color and tone
+ 
+- **Gap over allocation**: amber ("+1h 12m · 40% over") — consistent with overage signaling elsewhere
+- **Gap under allocation**: sage green ("−1h 12m · 40% under") — positive signal, has headroom
+- **Gap matched**: neutral ("−2m · on target") — no action implied
+The card is reference material for a business conversation, not an alert. It doesn't recommend an action (e.g., "consider increasing allocation") — it just shows the data and lets the user make the call.
+ 
+### What the card doesn't do
+ 
+- Doesn't recommend specific allocation changes (judgment call, not software call)
+- Doesn't replace the existing bar chart's monthly view (chart shows texture, card shows headline — both are useful, doing different jobs)
+- Doesn't appear on single-month views (the overage decision card handles that case)
+- Doesn't appear on hourly, fixed-fee, or internal projects (no allocation concept)
+
 
 ## Bulk billing actions
 
