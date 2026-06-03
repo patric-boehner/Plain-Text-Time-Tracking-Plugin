@@ -109,6 +109,15 @@ class PLTT_Reports {
 			}
 		}
 
+		// Stranded-unbilled notice on the detailed view when filtered to a single
+		// project — applies to any project type, not just those with allocations.
+		// $unbilled_outside_map is populated for the summary view further below.
+		$unbilled_outside = null;
+		if ( 'detailed' === $view && $project_id > 0 && ! $project_negate ) {
+			$single_unbilled = PLTT_Entries::get_unbilled_outside_range( array( $project_id ), $date_from, $date_to );
+			$unbilled_outside = $single_unbilled[ $project_id ] ?? null;
+		}
+
 		// Get summary stats in one query (independent of view/pagination).
 		$stats = PLTT_Entries::get_stats( $filter_args );
 
@@ -121,9 +130,6 @@ class PLTT_Reports {
 			'date_to'   => $prev_period['to'],
 		) );
 		$prev_stats = PLTT_Entries::get_stats( $prev_filter_args );
-
-		// Working days for daily averages (Card 2).
-		$working_days = pltt_count_working_days( $date_from, $date_to );
 
 		// Internal hours (Card 2 sub-line): total − client-facing.
 		$internal_minutes = $stats
@@ -148,6 +154,11 @@ class PLTT_Reports {
 
 		// Allocation stats for the summary table — always the full picture, not filtered by date.
 		$alloc_stats = array();
+
+		// Unbilled time stranded outside the current date range — summary view:
+		// map of project_id => stranded-time row (alert column). The detailed-view
+		// counterpart ($unbilled_outside) is computed earlier, above $stats.
+		$unbilled_outside_map = array();
 
 		// Chart data (summary view only). Populated below.
 		$chart_buckets     = array();
@@ -283,6 +294,17 @@ class PLTT_Reports {
 					$alloc_stats += PLTT_Entries::get_stats_grouped_by( 'project_id', array(
 						'project_ids' => $alltime_pids,
 					) );
+				}
+
+				// Flag projects with billable, uninvoiced time stranded outside this range.
+				$summary_pids = array();
+				foreach ( $summary as $row ) {
+					if ( ! empty( $row->project_id ) ) {
+						$summary_pids[] = (int) $row->project_id;
+					}
+				}
+				if ( ! empty( $summary_pids ) ) {
+					$unbilled_outside_map = PLTT_Entries::get_unbilled_outside_range( $summary_pids, $date_from, $date_to );
 				}
 			}
 		} else {
