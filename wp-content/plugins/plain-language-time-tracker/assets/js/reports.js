@@ -387,20 +387,39 @@
 	} );
 
 	/**
-	 * Dismiss the "unbilled outside range" notice strip.
+	 * Dismiss the global "billable time outside your date range" notification.
 	 *
-	 * Client-side only, matching WordPress's standard is-dismissible behavior:
-	 * the strip hides for the current page load and reappears on reload while
-	 * the underlying condition still holds.
+	 * Dismissal is session-scoped: a sessionStorage flag keeps it hidden for the
+	 * rest of the browser session, but it returns in a future session if the
+	 * condition still holds. Server still renders it; we hide on load when flagged.
 	 */
-	document.querySelectorAll( '.pltt-unbilled-notice-dismiss' ).forEach( function( btn ) {
-		btn.addEventListener( 'click', function() {
-			var notice = this.closest( '.pltt-unbilled-notice' );
-			if ( notice ) {
+	( function() {
+		var DISMISS_KEY = 'pltt-unbilled-notice-dismissed';
+		var notice = document.querySelector( '[data-pltt-unbilled-notice]' );
+		if ( ! notice ) {
+			return;
+		}
+
+		var dismissed = false;
+		try {
+			dismissed = window.sessionStorage.getItem( DISMISS_KEY ) === '1';
+		} catch ( e ) {}
+
+		if ( dismissed ) {
+			notice.remove();
+			return;
+		}
+
+		var btn = notice.querySelector( '.pltt-unbilled-notice-dismiss' );
+		if ( btn ) {
+			btn.addEventListener( 'click', function() {
+				try {
+					window.sessionStorage.setItem( DISMISS_KEY, '1' );
+				} catch ( e ) {}
 				notice.remove();
-			}
-		} );
-	} );
+			} );
+		}
+	} )();
 
 	/**
 	 * Inline field editing — Billable, Invoiced, Tags.

@@ -604,68 +604,68 @@ class PLTT_Entries {
 	}
 
 	/**
-	 * Find unbilled time that falls outside a given date range, per project.
+	 * Aggregate billable, uninvoiced, verified time that falls OUTSIDE a date range.
 	 *
-	 * "Unbilled" means marked billable, not yet invoiced, and verified. Under the
-	 * new billable model this naturally excludes within-allocation retainer time
-	 * and fixed-fee work (both non-billable), so the result is the stranded
-	 * invoiceable time a user might forget to bill from a prior/later period.
+	 * Powers the single global "billable time outside your range" notification on the
+	 * summary report view. Returns one row across all qualifying entries (respecting
+	 * the active client/project/tag filters) or null when nothing qualifies.
 	 *
-	 * Returns only projects that actually have unbilled time outside the range
-	 * (HAVING outside_minutes > 0) — most projects won't appear. Each row also
-	 * carries the overall earliest/latest unbilled entry dates so callers can
-	 * expand the date range to encompass everything unbilled on the project.
+	 * Two project types are excluded explicitly — not left to the billable model —
+	 * so a manually-flipped flag or migrated row can't raise a false notification:
+	 *  - Archived projects: completed engagements; leftover billable state is noise.
+	 *  - Fixed-fee projects: invoiced on their own schedule, not from time entries.
 	 *
-	 * @param int[]  $project_ids Projects to inspect (the ones currently shown).
-	 * @param string $date_from   Current range start (Y-m-d).
-	 * @param string $date_to     Current range end (Y-m-d).
-	 * @return array<int, object> Map keyed by project_id, each with:
-	 *                            outside_minutes, outside_count,
-	 *                            overall_earliest, overall_latest (Y-m-d).
+	 * "Outside" is directionally neutral: before the range start OR after its end.
+	 *
+	 * @param string $date_from Current range start (Y-m-d).
+	 * @param string $date_to   Current range end (Y-m-d).
+	 * @param array  $args      Shared filters (client_id, project_id, tag + negates).
+	 *                          billable/billed are ignored here — the criteria are fixed.
+	 * @return object|null { entry_count, total_minutes, earliest, latest } or null.
 	 */
-	public static function get_unbilled_outside_range( $project_ids, $date_from, $date_to ) {
+	public static function get_unbilled_outside_range_summary( $date_from, $date_to, $args = array() ) {
 		global $wpdb;
 
-		$project_ids = array_filter( array_map( 'absint', (array) $project_ids ) );
-		if ( empty( $project_ids ) ) {
-			return array();
-		}
+		$entries_table  = PLTT_Database::get_table_name( 'time_entries' );
+		$projects_table = PLTT_Database::get_table_name( 'projects' );
 
-		$table        = PLTT_Database::get_table_name( 'time_entries' );
-		$placeholders = implode( ',', array_fill( 0, count( $project_ids ), '%d' ) );
-
-		// Conditional aggregates: "outside" = before the range start or after its end.
-		$prepare = array_merge(
-			array( $date_from, $date_to, $date_from, $date_to ),
-			$project_ids
+		$where = array(
+			'(e.entry_date < %s OR e.entry_date > %s)',
+			'e.billable = 1',
+			'COALESCE(e.billed, 0) = 0',
+			'e.verified = 1',
+			// Exclude archived projects (entries with no project still count).
+			"(p.id IS NULL OR p.status != 'archived')",
+			// Exclude fixed-fee projects: no recurring period but a budget set
+			// (mirrors the 'fixed' branch of pltt_get_billing_type()).
+			"NOT ( p.id IS NOT NULL AND (p.recurring_period IS NULL OR p.recurring_period = '') AND (COALESCE(p.budget_hours, 0) > 0 OR COALESCE(p.budget_fee, 0) > 0) )",
 		);
+		$prepare = array( $date_from, $date_to );
+
+		// Apply the page's client/project/tag filters, but NOT billable/billed —
+		// those are fixed criteria for this notification, set above.
+		$filter_args = $args;
+		unset( $filter_args['billable'], $filter_args['billed'] );
+		$common  = self::build_filter_clauses( $filter_args, 'e.', 'e' );
+		$where   = array_merge( $where, $common['where'] );
+		$prepare = array_merge( $prepare, $common['prepare'] );
 
 		$sql = "SELECT
-			e.project_id AS group_key,
-			COALESCE(SUM(CASE WHEN e.entry_date < %s OR e.entry_date > %s THEN e.duration_minutes ELSE 0 END), 0) AS outside_minutes,
-			SUM(CASE WHEN e.entry_date < %s OR e.entry_date > %s THEN 1 ELSE 0 END) AS outside_count,
-			MIN(e.entry_date) AS overall_earliest,
-			MAX(e.entry_date) AS overall_latest
-			FROM {$table} e
-			WHERE e.project_id IN ({$placeholders})
-				AND e.billable = 1
-				AND COALESCE(e.billed, 0) = 0
-				AND e.verified = 1
-			GROUP BY e.project_id
-			HAVING outside_minutes > 0";
+			COUNT(*) AS entry_count,
+			COALESCE(SUM(e.duration_minutes), 0) AS total_minutes,
+			MIN(e.entry_date) AS earliest,
+			MAX(e.entry_date) AS latest
+			FROM {$entries_table} e
+			LEFT JOIN {$projects_table} p ON e.project_id = p.id
+			WHERE " . implode( ' AND ', $where );
 
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.NotPrepared
-		$rows = $wpdb->get_results( $wpdb->prepare( $sql, $prepare ) );
+		$row = $wpdb->get_row( $wpdb->prepare( $sql, $prepare ) );
 
-		$out = array();
-		if ( $rows ) {
-			foreach ( $rows as $row ) {
-				$key = (int) $row->group_key;
-				unset( $row->group_key );
-				$out[ $key ] = $row;
-			}
+		if ( ! $row || (int) $row->entry_count === 0 ) {
+			return null;
 		}
-		return $out;
+		return $row;
 	}
 
 	/**
