@@ -692,6 +692,52 @@ $tab_base_url = add_query_arg( $filter_params, admin_url( 'admin.php' ) );
 
 		<?php if ( 'summary' === $view ) : ?>
 
+			<?php
+			// Global "billable time outside your date range" notification, under the
+			// chart and above the summary table. One aggregate signal across all
+			// non-archived, non-fixed-fee projects.
+			if ( $unbilled_notice ) :
+				// Expand to cover all stranded time; keep current edges if already wider.
+				$un_from = min( $date_from, $unbilled_notice->earliest );
+				$un_to   = max( $date_to, $unbilled_notice->latest );
+				// Action lands on the actionable view: expanded range + Billable=yes,
+				// Invoiced=no, preserving the current client/project/tag filters.
+				$un_args = array(
+					'page'     => 'pltt-reports',
+					'view'     => 'summary',
+					'from'     => $un_from,
+					'to'       => $un_to,
+					'billable' => 1,
+					'billed'   => 0,
+				);
+				foreach ( array( 'client_id', 'project_id', 'tag', 'client_negate', 'project_negate', 'tag_negate' ) as $carry ) {
+					if ( ! empty( $$carry ) ) {
+						$un_args[ $carry ] = $$carry;
+					}
+				}
+				$un_url = add_query_arg( $un_args, admin_url( 'admin.php' ) );
+				?>
+				<div class="pltt-unbilled-notice" data-pltt-unbilled-notice>
+					<span class="pltt-unbilled-notice-icon" aria-hidden="true">!</span>
+					<p class="pltt-unbilled-notice-body">
+						<?php
+						printf(
+							/* translators: 1: entry count phrase, e.g. "4 entries"; 2: total duration, e.g. "3h 15m". */
+							esc_html__( 'There\'s billable time outside your current date range — %1$s totaling %2$s', 'plain-language-time-tracker' ),
+							esc_html( sprintf( _n( '%s entry', '%s entries', (int) $unbilled_notice->entry_count, 'plain-language-time-tracker' ), number_format_i18n( (int) $unbilled_notice->entry_count ) ) ),
+							esc_html( pltt_format_duration( (int) $unbilled_notice->total_minutes ) )
+						);
+						?>
+					</p>
+					<a href="<?php echo esc_url( $un_url ); ?>" class="pltt-unbilled-notice-action">
+						<?php esc_html_e( 'Expand range to show all unbilled', 'plain-language-time-tracker' ); ?>
+					</a>
+					<button type="button" class="pltt-unbilled-notice-dismiss" aria-label="<?php esc_attr_e( 'Dismiss this notice', 'plain-language-time-tracker' ); ?>">
+						<span aria-hidden="true">&times;</span>
+					</button>
+				</div>
+			<?php endif; ?>
+
 			<?php if ( ! empty( $summary ) ) : ?>
 				<table class="widefat pltt-summary-table">
 					<thead>
@@ -701,9 +747,6 @@ $tab_base_url = add_query_arg( $filter_params, admin_url( 'admin.php' ) );
 							<th><?php esc_html_e( 'Hours', 'plain-language-time-tracker' ); ?></th>
 							<th class="pltt-budget-col"><?php esc_html_e( 'Budget', 'plain-language-time-tracker' ); ?></th>
 							<th><?php esc_html_e( 'Amount', 'plain-language-time-tracker' ); ?></th>
-							<th class="pltt-unbilled-col">
-								<span class="screen-reader-text"><?php esc_html_e( 'Unbilled outside range', 'plain-language-time-tracker' ); ?></span>
-							</th>
 						</tr>
 					</thead>
 					<tbody>
@@ -780,30 +823,6 @@ $tab_base_url = add_query_arg( $filter_params, admin_url( 'admin.php' ) );
 									<?php endif; ?>
 								</td>
 								<td class="pltt-duration-cell"><?php echo (float) $row->billable_amount > 0 ? esc_html( pltt_format_currency( $row->billable_amount ) ) : '<span class="pltt-empty">—</span>'; ?></td>
-								<td class="pltt-unbilled-col">
-									<?php
-									$uo = ! empty( $row->project_id ) ? ( $unbilled_outside_map[ (int) $row->project_id ] ?? null ) : null;
-									if ( $uo && (int) $uo->outside_minutes > 0 ) :
-										// Expand the range to cover all unbilled time on this project.
-										$exp_from   = min( $date_from, $uo->overall_earliest );
-										$exp_to     = max( $date_to, $uo->overall_latest );
-										$exp_args   = $detail_args;
-										$exp_args['from'] = $exp_from;
-										$exp_args['to']   = $exp_to;
-										$exp_url    = add_query_arg( $exp_args, admin_url( 'admin.php' ) );
-										$earliest_l = ( new DateTimeImmutable( $uo->overall_earliest, wp_timezone() ) )->format( 'M j, Y' );
-										$alert_label = sprintf(
-											/* translators: 1: duration e.g. "2h 15m"; 2: date e.g. "May 3, 2026". */
-											__( '%1$s of unbilled time outside your date range · earliest unbilled entry %2$s. Click to expand the range.', 'plain-language-time-tracker' ),
-											pltt_format_duration( (int) $uo->outside_minutes ),
-											$earliest_l
-										);
-									?>
-										<a href="<?php echo esc_url( $exp_url ); ?>" class="pltt-unbilled-alert" title="<?php echo esc_attr( $alert_label ); ?>" aria-label="<?php echo esc_attr( $alert_label ); ?>">
-											<span class="pltt-unbilled-dot" aria-hidden="true">!</span>
-										</a>
-									<?php endif; ?>
-								</td>
 								</tr>
 						<?php endforeach; ?>
 					</tbody>
@@ -815,57 +834,6 @@ $tab_base_url = add_query_arg( $filter_params, admin_url( 'admin.php' ) );
 			<?php endif; ?>
 
 		<?php else : ?>
-
-			<?php
-			// Stranded-unbilled notice: shown when filtered to a single project that
-			// has billable, uninvoiced time outside the current date range. Rendered
-			// before any day cards (and regardless of whether the range has entries).
-			if ( $unbilled_outside && (int) $unbilled_outside->outside_minutes > 0 ) :
-				$uo_from = min( $date_from, $unbilled_outside->overall_earliest );
-				$uo_to   = max( $date_to, $unbilled_outside->overall_latest );
-				$uo_args = array(
-					'page'       => 'pltt-reports',
-					'view'       => 'detailed',
-					'from'       => $uo_from,
-					'to'         => $uo_to,
-					'project_id' => $project_id,
-				);
-				if ( $client_id > 0 ) {
-					$uo_args['client_id'] = $client_id;
-				}
-				$uo_url       = add_query_arg( $uo_args, admin_url( 'admin.php' ) );
-				$uo_earliest  = ( new DateTimeImmutable( $unbilled_outside->overall_earliest, wp_timezone() ) )->format( 'F j, Y' );
-				?>
-				<div class="pltt-unbilled-notice">
-					<span class="pltt-unbilled-notice-icon" aria-hidden="true">!</span>
-					<div class="pltt-unbilled-notice-body">
-						<p class="pltt-unbilled-notice-primary">
-							<?php
-							printf(
-								/* translators: %s: duration, e.g. "2h 15m". */
-								esc_html__( '%s of unbilled time on this project outside your date range', 'plain-language-time-tracker' ),
-								esc_html( pltt_format_duration( (int) $unbilled_outside->outside_minutes ) )
-							);
-							?>
-						</p>
-						<p class="pltt-unbilled-notice-secondary">
-							<?php
-							printf(
-								/* translators: %s: date, e.g. "May 3, 2026". */
-								esc_html__( 'Earliest unbilled entry: %s', 'plain-language-time-tracker' ),
-								esc_html( $uo_earliest )
-							);
-							?>
-						</p>
-					</div>
-					<a href="<?php echo esc_url( $uo_url ); ?>" class="pltt-unbilled-notice-action">
-						<?php esc_html_e( 'Expand range to show all unbilled', 'plain-language-time-tracker' ); ?>
-					</a>
-					<button type="button" class="pltt-unbilled-notice-dismiss" aria-label="<?php esc_attr_e( 'Dismiss this notice', 'plain-language-time-tracker' ); ?>">
-						<span aria-hidden="true">&times;</span>
-					</button>
-				</div>
-			<?php endif; ?>
 
 			<?php if ( ! empty( $entries ) ) : ?>
 				<?php

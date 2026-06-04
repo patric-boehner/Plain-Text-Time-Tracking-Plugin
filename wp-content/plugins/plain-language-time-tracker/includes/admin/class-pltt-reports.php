@@ -109,13 +109,18 @@ class PLTT_Reports {
 			}
 		}
 
-		// Stranded-unbilled notice on the detailed view when filtered to a single
-		// project — applies to any project type, not just those with allocations.
-		// $unbilled_outside_map is populated for the summary view further below.
-		$unbilled_outside = null;
-		if ( 'detailed' === $view && $project_id > 0 && ! $project_negate ) {
-			$single_unbilled = PLTT_Entries::get_unbilled_outside_range( array( $project_id ), $date_from, $date_to );
-			$unbilled_outside = $single_unbilled[ $project_id ] ?? null;
+		// Global "billable time outside your date range" notification — summary
+		// view only. One aggregate signal across all projects (excluding fixed-fee
+		// and archived), replacing the former per-project indicators.
+		//
+		// Only surface it when the viewed range includes today: looking at a current
+		// window (today / this week / this month / a custom range through now) is the
+		// "what do I still need to bill" context. Looking at a closed past range is a
+		// retrospective view where the stranded-time nudge would just be noise.
+		$unbilled_notice = null;
+		$today           = pltt_get_current_date();
+		if ( 'summary' === $view && $today >= $date_from && $today <= $date_to ) {
+			$unbilled_notice = PLTT_Entries::get_unbilled_outside_range_summary( $date_from, $date_to, $filter_args );
 		}
 
 		// Get summary stats in one query (independent of view/pagination).
@@ -154,11 +159,6 @@ class PLTT_Reports {
 
 		// Allocation stats for the summary table — always the full picture, not filtered by date.
 		$alloc_stats = array();
-
-		// Unbilled time stranded outside the current date range — summary view:
-		// map of project_id => stranded-time row (alert column). The detailed-view
-		// counterpart ($unbilled_outside) is computed earlier, above $stats.
-		$unbilled_outside_map = array();
 
 		// Chart data (summary view only). Populated below.
 		$chart_buckets     = array();
@@ -294,17 +294,6 @@ class PLTT_Reports {
 					$alloc_stats += PLTT_Entries::get_stats_grouped_by( 'project_id', array(
 						'project_ids' => $alltime_pids,
 					) );
-				}
-
-				// Flag projects with billable, uninvoiced time stranded outside this range.
-				$summary_pids = array();
-				foreach ( $summary as $row ) {
-					if ( ! empty( $row->project_id ) ) {
-						$summary_pids[] = (int) $row->project_id;
-					}
-				}
-				if ( ! empty( $summary_pids ) ) {
-					$unbilled_outside_map = PLTT_Entries::get_unbilled_outside_range( $summary_pids, $date_from, $date_to );
 				}
 			}
 		} else {
