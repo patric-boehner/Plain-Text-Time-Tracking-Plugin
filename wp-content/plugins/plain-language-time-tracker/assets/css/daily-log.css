@@ -79,7 +79,7 @@
 }
 
 .pltt-save-indicator.saving {
-	color: var(--pltt-warning);
+	color: var(--pltt-warning-text);
 }
 
 .pltt-save-indicator.saved {

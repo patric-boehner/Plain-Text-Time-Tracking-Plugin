@@ -181,7 +181,7 @@
 }
 
 .pltt-warning-indicator {
-	color: var(--pltt-warning);
+	color: var(--pltt-warning-text);
 	cursor: help;
 }
 

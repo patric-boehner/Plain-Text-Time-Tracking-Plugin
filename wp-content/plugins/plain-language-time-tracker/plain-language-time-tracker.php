@@ -3,7 +3,7 @@
  * Plugin Name: Plain Language Time Tracker
  * Plugin URI: https://github.com/patrickb/plain-language-time-tracker
  * Description: Time tracking with a "capture first, categorize later" workflow. Jot plain text notes with timestamps, then process them into structured time entries.
- * Version: 1.9.11
+ * Version: 1.9.12
  * Author: Patrick Boehner
  * Text Domain: plain-language-time-tracker
  * Domain Path: /languages
@@ -20,7 +20,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 // Plugin constants.
-define( 'PLTT_VERSION', '1.9.11' );
+define( 'PLTT_VERSION', '1.9.12' );
 define( 'PLTT_PLUGIN_FILE', __FILE__ );
 define( 'PLTT_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'PLTT_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
@@ -62,6 +62,8 @@ function pltt_load_dependencies() {
 	require_once PLTT_PLUGIN_DIR . 'includes/admin/class-pltt-daily-log.php';
 	require_once PLTT_PLUGIN_DIR . 'includes/admin/class-pltt-review.php';
 	require_once PLTT_PLUGIN_DIR . 'includes/admin/class-pltt-reports.php';
+	require_once PLTT_PLUGIN_DIR . 'includes/admin/class-pltt-project-report.php';
+	require_once PLTT_PLUGIN_DIR . 'includes/admin/class-pltt-project-detail.php';
 	require_once PLTT_PLUGIN_DIR . 'includes/admin/class-pltt-log-archive.php';
 }
 

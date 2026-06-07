@@ -37,8 +37,9 @@
 	--pltt-primary-light: #72aee6; /* Lighter admin blue: allocation overage segment */
 
 	/* Status */
-	--pltt-success:     #00a32a;
-	--pltt-warning:     #ecc251;
+	--pltt-success:      #00a32a;
+	--pltt-warning:      #ecc251; /* Light gold: borders, bar fills, low-opacity tints */
+	--pltt-warning-text: #b45309; /* Dark amber: warning text/icons (AA contrast on light) */
 	--pltt-danger:      #d63638;
 	--pltt-danger-dark: #b32d2e; /* Delete link color */
 	--pltt-danger-text: #8a1f25; /* Dark red: inline form error text */
@@ -51,7 +52,7 @@
 	--pltt-badge-info-bg:      #d1ecf1;
 	--pltt-badge-info-text:    #0c5460;
 	--pltt-badge-warning-bg:   #fff3cd;
-	--pltt-badge-warning-text: #856404;
+	--pltt-badge-warning-text: #b45309;
 	--pltt-badge-tag-bg:       #e1eef9;
 	--pltt-badge-tag-text:     #36658c;
 	--pltt-badge-purple-bg:    #f0e6ff;
@@ -431,7 +432,7 @@
 
 .pltt-project-overage-card .pltt-pcc-overage-note.is-match .dashicons { color: var(--pltt-success); }
 .pltt-project-overage-card .pltt-pcc-overage-note.is-over  .dashicons,
-.pltt-project-overage-card .pltt-pcc-overage-note.is-none  .dashicons { color: var(--pltt-warning); }
+.pltt-project-overage-card .pltt-pcc-overage-note.is-none  .dashicons { color: var(--pltt-warning-text); }
 .pltt-project-overage-card .pltt-pcc-overage-note.is-under .dashicons { color: var(--pltt-text-muted); }
 
 /* Badges */
@@ -481,7 +482,7 @@
 }
 
 .pltt-alloc-over {
-	color: var(--pltt-warning);
+	color: var(--pltt-warning-text);
 	font-weight: 600;
 }
 

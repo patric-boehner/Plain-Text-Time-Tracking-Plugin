@@ -215,6 +215,13 @@ class PLTT_Admin {
 			wp_die( esc_html__( 'You do not have permission to access this page.', 'plain-language-time-tracker' ) );
 		}
 
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only screen routing.
+		$action = isset( $_GET['action'] ) ? sanitize_key( wp_unslash( $_GET['action'] ) ) : '';
+		if ( 'view' === $action ) {
+			PLTT_Project_Detail::render();
+			return;
+		}
+
 		include PLTT_PLUGIN_DIR . 'templates/projects.php';
 	}
 
@@ -347,6 +354,24 @@ class PLTT_Admin {
 			wp_enqueue_script(
 				'pltt-log-archive',
 				PLTT_PLUGIN_URL . 'assets/js/log-archive.js',
+				array( 'pltt-shared' ),
+				$version,
+				true
+			);
+		}
+
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only asset routing.
+		$projects_action = isset( $_GET['action'] ) ? sanitize_key( wp_unslash( $_GET['action'] ) ) : '';
+		if ( 'time-tracker_page_pltt-projects' === $hook && 'view' === $projects_action ) {
+			wp_enqueue_style(
+				'pltt-project-detail',
+				PLTT_PLUGIN_URL . 'assets/css/project-detail.css',
+				array( 'pltt-admin' ),
+				$version
+			);
+			wp_enqueue_script(
+				'pltt-project-detail',
+				PLTT_PLUGIN_URL . 'assets/js/project-detail.js',
 				array( 'pltt-shared' ),
 				$version,
 				true
