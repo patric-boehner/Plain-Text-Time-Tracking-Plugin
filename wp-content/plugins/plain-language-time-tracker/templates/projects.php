@@ -44,6 +44,8 @@ if ( ! empty( $projects ) ) {
 				'invalid_status'           => __( 'Invalid project status.', 'plain-language-time-tracker' ),
 				'invalid_recurring_period' => __( 'Invalid recurring period.', 'plain-language-time-tracker' ),
 				'invalid_rate'             => __( 'Hourly rate must be between 0 and 10,000.', 'plain-language-time-tracker' ),
+				'missing_client'           => __( 'Please choose a client for this project.', 'plain-language-time-tracker' ),
+				'missing_name'             => __( 'Please enter a project name.', 'plain-language-time-tracker' ),
 			)
 		);
 		?>
@@ -156,23 +158,11 @@ if ( ! empty( $projects ) ) {
 						$project_unbilled_minutes   = isset( $project_stats->unbilled_billable_minutes ) ? (int) $project_stats->unbilled_billable_minutes : 0;
 						$row_class                  = ( 'archived' === $project->status && 'status' !== $group_mode ) ? 'pltt-row-archived' : '';
 
-						$view_args = array(
-							'page'       => 'pltt-reports',
-							'view'       => 'summary',
-							'project_id' => $project->id,
-						);
-						if ( ! empty( $project_stats->first_entry_date ) ) {
-							$view_args['from'] = $project_stats->first_entry_date;
-						}
-						if ( ! empty( $project_stats->last_entry_date ) ) {
-							$today_ymd       = pltt_get_current_date();
-							$view_args['to'] = $project_stats->last_entry_date > $today_ymd ? $today_ymd : $project_stats->last_entry_date;
-						}
-						$view_url = add_query_arg( $view_args, admin_url( 'admin.php' ) );
+						$view_url = PLTT_Project_Detail::get_url( $project->id );
 						?>
 						<tr<?php echo $row_class ? ' class="' . esc_attr( $row_class ) . '"' : ''; ?> data-project-id="<?php echo esc_attr( $project->id ); ?>" data-unbilled-minutes="<?php echo esc_attr( $project_unbilled_minutes ); ?>" data-name="<?php echo esc_attr( $project->name ); ?>" data-client-id="<?php echo esc_attr( $project->client_id ); ?>" data-status="<?php echo esc_attr( $project->status ); ?>" data-rate="<?php echo esc_attr( $project->hourly_rate ?? '' ); ?>" data-billability-default="<?php echo esc_attr( $project->billability_default ?? '1' ); ?>" data-recurring-period="<?php echo esc_attr( $project->recurring_period ?? '' ); ?>" data-billing-type="<?php echo esc_attr( $billing_type ); ?>" data-budget-hours="<?php echo esc_attr( $project->budget_hours ?? '' ); ?>" data-budget-fee="<?php echo esc_attr( $project->budget_fee ?? '' ); ?>" data-entry-count="<?php echo esc_attr( $project_entry_count ); ?>">
 							<td>
-								<strong><?php echo esc_html( $project->name ); ?></strong>
+								<strong><a href="<?php echo esc_url( $view_url ); ?>"><?php echo esc_html( $project->name ); ?></a></strong>
 								<?php if ( 'archived' === $project->status && 'status' !== $group_mode ) : ?>
 									<span class="pltt-badge pltt-badge-archived"><?php esc_html_e( 'Archived', 'plain-language-time-tracker' ); ?></span>
 								<?php endif; ?>
@@ -317,11 +307,21 @@ if ( ! empty( $projects ) ) {
 				<small class="description" id="pltt-nonbillable-description"><?php esc_html_e( 'Entries default to non-billable. Can be overridden per entry.', 'plain-language-time-tracker' ); ?></small>
 			</p>
 
+			<div id="pltt-project-status-group" class="pltt-hidden">
+				<hr class="pltt-form-separator">
+				<p>
+					<label for="pltt-project-status"><?php esc_html_e( 'Project Status', 'plain-language-time-tracker' ); ?></label>
+					<select id="pltt-project-status" name="status" class="widefat">
+						<option value="active"><?php esc_html_e( 'Active', 'plain-language-time-tracker' ); ?></option>
+						<option value="archived"><?php esc_html_e( 'Archived', 'plain-language-time-tracker' ); ?></option>
+					</select>
+				</p>
+			</div>
+
 			<hr class="pltt-form-separator">
 
 			<div class="pltt-modal-actions">
 				<div class="pltt-modal-actions-left">
-					<button type="button" id="pltt-archive-project-btn" class="button button-link-delete pltt-modal-delete-btn"><?php esc_html_e( 'Archive', 'plain-language-time-tracker' ); ?></button>
 					<button type="button" id="pltt-delete-project-btn" class="button button-link-delete pltt-modal-delete-btn"><?php esc_html_e( 'Delete', 'plain-language-time-tracker' ); ?></button>
 				</div>
 				<div class="pltt-modal-actions-right">
@@ -501,7 +501,8 @@ if ( ! empty( $projects ) ) {
 			document.getElementById('pltt-project-rate').value = '';
 			document.getElementById('pltt-project-budget-hours').value = '';
 			document.getElementById('pltt-project-budget-fee').value = '';
-			document.getElementById('pltt-archive-project-btn').classList.remove('visible');
+			document.getElementById('pltt-project-status-group').classList.add('pltt-hidden');
+			document.getElementById('pltt-project-status').value = 'active';
 			document.getElementById('pltt-delete-project-btn').classList.remove('visible');
 			document.getElementById('pltt-project-form-action').value = 'pltt_create_project';
 			document.getElementById('pltt-project-billing-type').value = 'hourly';
@@ -545,10 +546,8 @@ if ( ! empty( $projects ) ) {
 			applyBillingTypeUI(billingType, false);
 			document.getElementById('pltt-project-non-billable').checked = row.dataset.billabilityDefault === '0';
 
-			var archiveBtn = document.getElementById('pltt-archive-project-btn');
-			archiveBtn.classList.add('visible');
-			archiveBtn.textContent = isArchived ? '<?php echo esc_js( __( 'Restore', 'plain-language-time-tracker' ) ); ?>' : '<?php echo esc_js( __( 'Archive', 'plain-language-time-tracker' ) ); ?>';
-			archiveBtn.dataset.newStatus = isArchived ? 'active' : 'archived';
+			document.getElementById('pltt-project-status-group').classList.remove('pltt-hidden');
+			document.getElementById('pltt-project-status').value = isArchived ? 'archived' : 'active';
 
 			var deleteBtn = document.getElementById('pltt-delete-project-btn');
 			if (isDeletable) {
@@ -610,21 +609,18 @@ if ( ! empty( $projects ) ) {
 					alert(response.data || 'Error saving project.');
 				}
 			});
-		}
-	});
-
-	// Archive/Restore Project button (in modal).
-	document.getElementById('pltt-archive-project-btn').addEventListener('click', function() {
-		var id = document.getElementById('pltt-edit-project-id').value;
-		var newStatus = this.dataset.newStatus;
-		var row = document.querySelector('tr[data-project-id="' + id + '"]');
-		var unbilled = row ? parseInt(row.dataset.unbilledMinutes || '0', 10) : 0;
-		if (!confirmArchiveIfUnbilled(newStatus, unbilled)) {
 			return;
 		}
-		document.getElementById('pltt-archive-project-id').value = id;
-		document.getElementById('pltt-archive-project-status').value = newStatus;
-		document.getElementById('pltt-archive-project-form').submit();
+
+		// Editing: confirm before archiving a project that still has uninvoiced billable time.
+		var statusSel = document.getElementById('pltt-project-status');
+		var editRow = document.querySelector('tr[data-project-id="' + id + '"]');
+		if (statusSel && statusSel.value === 'archived' && editRow && editRow.dataset.status !== 'archived') {
+			var unbilled = parseInt(editRow.dataset.unbilledMinutes || '0', 10);
+			if (!confirmArchiveIfUnbilled('archived', unbilled)) {
+				e.preventDefault();
+			}
+		}
 	});
 
 	// Delete Project button (in modal).

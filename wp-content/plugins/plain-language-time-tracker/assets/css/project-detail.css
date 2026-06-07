@@ -1,0 +1,410 @@
+/**
+ * Project detail page (lifetime report).
+ *
+ * Reuses the shared color tokens from admin.css. Spacing/radius tokens are
+ * scoped here so this screen's layout is token-driven without touching the
+ * global stylesheet.
+ */
+
+.pltt-project-detail {
+	/* Scoped spacing / radius tokens. */
+	--pltt-pd-space-xs: 4px;
+	--pltt-pd-space-sm: 8px;
+	--pltt-pd-space-md: 16px;
+	--pltt-pd-space-lg: 24px;
+	--pltt-pd-space-xl: 32px;
+	--pltt-pd-radius: 6px;
+}
+
+/* Header: title block (left) + back button (right), matching .pltt-header. */
+.pltt-detail-titlewrap {
+	display: flex;
+	flex-direction: column;
+	gap: var(--pltt-pd-space-xs);
+}
+
+.pltt-detail-title {
+	display: flex;
+	align-items: center;
+	flex-wrap: wrap;
+	gap: var(--pltt-pd-space-sm);
+}
+
+.pltt-detail-title h1 {
+	margin: 0;
+	padding: 0;
+}
+
+/* Notices sit on their own row beneath the title (WP keeps them near the H1). */
+.pltt-detail-header .notice {
+	grid-column: 1 / -1;
+	margin: var(--pltt-pd-space-xs) 0 0;
+}
+
+.pltt-detail-subhead {
+	margin: 0;
+	color: var(--pltt-text-muted);
+	font-size: 14px;
+}
+
+/* Muted treatment when archived */
+.pltt-detail-archived .pltt-detail-title h1 {
+	color: var(--pltt-text-muted);
+}
+
+/* The Archived badge sits on the gray admin page here, not a white table row —
+   give it a white background so it stands out. */
+.pltt-detail-title .pltt-badge-archived {
+	background: var(--pltt-bg-white);
+}
+
+/* Cards ------------------------------------------------------------------ */
+.pltt-card {
+	background: var(--pltt-bg-white);
+	border: 1px solid var(--pltt-border-light);
+	border-radius: var(--pltt-pd-radius);
+	padding: var(--pltt-pd-space-lg);
+}
+
+.pltt-report-placeholder,
+.pltt-report-empty {
+	text-align: center;
+	color: var(--pltt-text-muted);
+}
+
+.pltt-report-placeholder-lead {
+	font-size: 16px;
+	font-weight: 600;
+	color: var(--pltt-text-base);
+	margin-top: 0;
+}
+
+/* Stat cards — reuse the shared .pltt-summary-cards / .card pattern (admin.css).
+   Here there are exactly four, so let them grow to fill the row evenly. */
+.pltt-stat-cards {
+	margin-bottom: var(--pltt-pd-space-lg);
+}
+
+.pltt-stat-cards .card {
+	flex: 1 1 150px;
+}
+
+/* Secondary "of {budget}" qualifier inside a card value. */
+.pltt-card-value-of {
+	font-size: 14px;
+	font-weight: 400;
+	color: var(--pltt-text-muted);
+}
+
+/* Where the time went ---------------------------------------------------- */
+.pltt-where-card {
+	margin-bottom: var(--pltt-pd-space-lg);
+}
+
+.pltt-where-header {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	flex-wrap: wrap;
+	gap: var(--pltt-pd-space-md);
+	margin-bottom: var(--pltt-pd-space-lg);
+}
+
+.pltt-where-title {
+	margin: 0;
+	font-size: 16px;
+}
+
+/* Group-by control: a label + a segmented button group built from WordPress
+   .button / .button-primary, joined like the Reports view toggle (.pltt-view-toggle). */
+.pltt-groupby {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--pltt-pd-space-sm);
+	flex-wrap: wrap;
+}
+
+.pltt-groupby-label {
+	font-size: 13px;
+	color: var(--pltt-text-muted);
+}
+
+.pltt-groupby-toggle {
+	display: inline-flex;
+}
+
+.pltt-groupby-toggle .button {
+	border-radius: 0;
+	margin-left: -1px;
+}
+
+.pltt-groupby-toggle .button:first-child {
+	border-radius: 3px 0 0 3px;
+	margin-left: 0;
+}
+
+.pltt-groupby-toggle .button:last-child {
+	border-radius: 0 3px 3px 0;
+}
+
+/* Keep the pressed button above its neighbors so its border reads cleanly. */
+.pltt-groupby-toggle .button.button-primary {
+	position: relative;
+	z-index: 1;
+}
+
+/* Horizontal bars */
+.pltt-bars {
+	margin: 0;
+	list-style: none;
+}
+
+/* Per-grouping helper sentence under the header. */
+.pltt-where-desc {
+	margin: 0 0 var(--pltt-pd-space-md);
+	color: var(--pltt-text-muted);
+	font-size: 13px;
+}
+
+/* Category color palette for bar dots + fills (cycled by bucket index). */
+.pltt-bar-color-0 { --pltt-bar-color: #2271b1; } /* blue   */
+.pltt-bar-color-1 { --pltt-bar-color: #7c3aed; } /* purple */
+.pltt-bar-color-2 { --pltt-bar-color: #d6336c; } /* magenta */
+.pltt-bar-color-3 { --pltt-bar-color: #0d9488; } /* teal   */
+.pltt-bar-color-4 { --pltt-bar-color: #16a34a; } /* green  */
+.pltt-bar-color-5 { --pltt-bar-color: #d97706; } /* amber  */
+.pltt-bar-color-6 { --pltt-bar-color: #2563eb; } /* indigo */
+.pltt-bar-color-7 { --pltt-bar-color: #64748b; } /* slate  */
+
+.pltt-bar-row {
+	display: grid;
+	grid-template-columns: 160px 1fr;
+	align-items: start;
+	gap: var(--pltt-pd-space-md);
+	padding: var(--pltt-pd-space-sm) 0;
+	border-bottom: 1px solid var(--pltt-border-faint);
+}
+
+.pltt-bar-row:last-child {
+	border-bottom: none;
+}
+
+.pltt-bar-labelwrap {
+	display: flex;
+	align-items: center;
+	gap: var(--pltt-pd-space-sm);
+	padding-top: 2px;
+}
+
+.pltt-bar-dot {
+	flex: 0 0 auto;
+	width: 10px;
+	height: 10px;
+	border-radius: 2px;
+	background: var(--pltt-bar-color, var(--pltt-primary));
+}
+
+.pltt-bar-label {
+	font-weight: 600;
+	color: var(--pltt-text-base);
+	overflow-wrap: anywhere;
+}
+
+.pltt-bar-main {
+	display: flex;
+	flex-direction: column;
+	gap: var(--pltt-pd-space-xs);
+	min-width: 0;
+}
+
+.pltt-bar-track {
+	width: 100%;
+}
+
+.pltt-bar-fill {
+	height: 22px;
+	min-width: 2px;
+	border-radius: 3px;
+	background: var(--pltt-bar-color, var(--pltt-primary));
+}
+
+/* Hatched, muted treatment for the untagged bucket. */
+.pltt-bar-untagged .pltt-bar-dot {
+	background: var(--pltt-bg-hover);
+}
+
+.pltt-bar-untagged .pltt-bar-label {
+	color: var(--pltt-text-muted);
+	font-style: italic;
+	font-weight: 500;
+}
+
+.pltt-bar-untagged .pltt-bar-fill {
+	background: var(--pltt-bg-hover);
+	background-image: repeating-linear-gradient(
+		45deg,
+		transparent,
+		transparent 4px,
+		rgba(0, 0, 0, 0.08) 4px,
+		rgba(0, 0, 0, 0.08) 8px
+	);
+}
+
+/* Meta line sits below the bar. */
+.pltt-bar-meta {
+	font-size: 12px;
+}
+
+.pltt-bar-hours {
+	font-weight: 600;
+	color: var(--pltt-text-subtle);
+}
+
+.pltt-bar-meta-sub {
+	color: var(--pltt-text-muted);
+}
+
+.pltt-bars-empty {
+	margin: 0;
+	padding: var(--pltt-pd-space-md) 0;
+}
+
+@media (max-width: 600px) {
+	.pltt-bar-row {
+		grid-template-columns: 1fr;
+		gap: var(--pltt-pd-space-xs);
+	}
+}
+
+/* Activity over time — swimlane timeline -------------------------------- */
+.pltt-timeline-card {
+	margin-bottom: var(--pltt-pd-space-lg);
+}
+
+/* Untagged buckets render gray in both bars and timeline. */
+.pltt-bar-untagged {
+	--pltt-bar-color: var(--pltt-text-faint);
+}
+
+.pltt-timeline {
+	--tl-label-w: 150px;
+	--tl-lane-h: 24px;
+}
+
+.pltt-tl-head {
+	display: grid;
+	grid-template-columns: var(--tl-label-w) 1fr;
+}
+
+.pltt-tl-axis {
+	position: relative;
+	height: 20px;
+}
+
+.pltt-tl-month {
+	position: absolute;
+	transform: translateX(-50%);
+	font-size: 11px;
+	color: var(--pltt-text-muted);
+	white-space: nowrap;
+}
+
+.pltt-tl-month:first-child {
+	transform: none; /* keep the first label from clipping at the left edge */
+}
+
+.pltt-tl-body {
+	position: relative;
+}
+
+/* Month gridlines overlay (behind the lanes). */
+.pltt-tl-grid {
+	position: absolute;
+	top: 0;
+	bottom: 0;
+	left: var(--tl-label-w);
+	right: 0;
+	z-index: 0;
+	pointer-events: none;
+}
+
+.pltt-tl-gridline {
+	position: absolute;
+	top: 0;
+	bottom: 0;
+	width: 1px;
+	background: var(--pltt-border-faint);
+}
+
+.pltt-tl-track {
+	position: relative;
+	z-index: 1;
+	display: grid;
+	grid-template-columns: var(--tl-label-w) 1fr;
+	align-items: center;
+	gap: 0;
+	padding: var(--pltt-pd-space-xs) 0;
+}
+
+.pltt-tl-labelwrap {
+	display: flex;
+	align-items: center;
+	gap: var(--pltt-pd-space-sm);
+	padding-right: var(--pltt-pd-space-sm);
+	min-width: 0;
+}
+
+.pltt-tl-label {
+	font-size: 13px;
+	font-weight: 600;
+	color: var(--pltt-text-base);
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.pltt-tl-lane {
+	position: relative;
+	height: var(--tl-lane-h);
+}
+
+/* Solid pill for each active stretch of work. */
+.pltt-tl-seg {
+	position: absolute;
+	top: 50%;
+	height: 14px;
+	min-width: 14px;
+	transform: translateY(-50%);
+	border-radius: 7px;
+	background: var(--pltt-bar-color, var(--pltt-primary));
+	z-index: 2;
+}
+
+/* Dashed connector bridging a 7+ day gap between segments. */
+.pltt-tl-connector {
+	position: absolute;
+	top: 50%;
+	height: 0;
+	border-top: 2px dashed var(--pltt-border);
+	transform: translateY(-50%);
+	z-index: 1;
+}
+
+/* Untagged lane: hatched pills. */
+.pltt-tl-track.pltt-bar-untagged .pltt-tl-seg {
+	background-color: var(--pltt-bg-hover);
+	background-image: repeating-linear-gradient(
+		45deg,
+		transparent,
+		transparent 4px,
+		rgba(0, 0, 0, 0.08) 4px,
+		rgba(0, 0, 0, 0.08) 8px
+	);
+}
+
+@media (max-width: 600px) {
+	.pltt-timeline {
+		--tl-label-w: 90px;
+	}
+}
+

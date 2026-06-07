@@ -219,10 +219,19 @@ class PLTT_Form_Handlers {
 		if ( isset( $_POST['name'] ) ) {
 			$data['billability_default'] = isset( $_POST['non_billable'] ) ? 0 : 1;
 		}
+		// Client reassignment (project detail Settings tab exposes a client select).
+		// The data layer validates non-empty; gate on presence so status-only submits
+		// (archive/restore) don't touch it.
+		if ( isset( $_POST['client_id'] ) ) {
+			$data['client_id'] = absint( $_POST['client_id'] );
+		}
 
 		$result = PLTT_Projects::update( $project_id, $data );
 
-		if ( $result ) {
+		if ( is_wp_error( $result ) ) {
+			// SEC-M2: use only the error code (not the raw message) in the redirect URL.
+			self::redirect_back( array( 'pltt_error' => $result->get_error_code() ) );
+		} elseif ( $result ) {
 			self::redirect_back( array( 'pltt_message' => 'project_updated' ) );
 		} else {
 			self::redirect_back( array( 'pltt_error' => 'project_update_failed' ) );

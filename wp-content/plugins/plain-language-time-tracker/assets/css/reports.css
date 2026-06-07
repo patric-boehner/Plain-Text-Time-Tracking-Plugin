@@ -587,7 +587,7 @@
 .pltt-threshold-icon {
 	font-size: 16px;
 	line-height: 1;
-	color: var(--pltt-warning);
+	color: var(--pltt-warning-text);
 }
 
 .pltt-threshold-labels {
