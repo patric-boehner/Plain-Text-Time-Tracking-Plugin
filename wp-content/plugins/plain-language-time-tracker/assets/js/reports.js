@@ -56,6 +56,13 @@
 		/**
 		 * Detect the step unit for navigation based on the current range.
 		 * Returns { unit: 'month'|'week'|'year'|'days', days: N }
+		 *
+		 * Preset ranges like "This Week"/"This Month"/"This Year" are PARTIAL —
+		 * they run from the period start through today, not to the period end.
+		 * We still treat those as week/month/year so stepping snaps to the full
+		 * adjacent period rather than sliding an odd-length window. Order matters:
+		 * week is checked before month so a week beginning on the 1st of a month
+		 * isn't misread as a month.
 		 */
 		function detectStep( from, to ) {
 			var f = parseDate( from );
@@ -63,19 +70,24 @@
 			var diffMs   = t - f;
 			var totalDays = Math.round( diffMs / 86400000 ) + 1;
 
-			// Full or partial month: starts on 1st of a month.
-			if ( f.getDate() === 1 ) {
-				return { unit: 'month' };
-			}
-
-			// Full week: exactly 7 days starting on the configured week-start day.
-			if ( totalDays === 7 && f.getDay() === weekStart ) {
+			// Week: starts on the configured week-start day and spans no more than
+			// 7 days (full "Last Week" = 7 days, partial "This Week" = fewer).
+			if ( f.getDay() === weekStart && totalDays <= 7 ) {
 				return { unit: 'week' };
 			}
 
-			// Full year: Jan 1 → Dec 31.
-			if ( f.getMonth() === 0 && f.getDate() === 1 && t.getMonth() === 11 && t.getDate() === 31 ) {
+			// Year: starts Jan 1 and extends beyond January (full year, or partial
+			// "This Year" = Jan 1 → today). A range confined to January is a month.
+			if ( f.getMonth() === 0 && f.getDate() === 1 &&
+				( t.getFullYear() > f.getFullYear() || t.getMonth() > 0 ) ) {
 				return { unit: 'year' };
+			}
+
+			// Month: starts on the 1st and stays within that same month (full month,
+			// or partial "This Month" = 1st → today).
+			if ( f.getDate() === 1 &&
+				t.getFullYear() === f.getFullYear() && t.getMonth() === f.getMonth() ) {
+				return { unit: 'month' };
 			}
 
 			return { unit: 'days', days: totalDays };
@@ -102,9 +114,12 @@
 			}
 
 			if ( step.unit === 'week' ) {
-				var offset = direction * 7;
-				var wFrom  = new Date( f.getFullYear(), f.getMonth(), f.getDate() + offset );
-				var wTo    = new Date( t.getFullYear(), t.getMonth(), t.getDate() + offset );
+				// `from` is guaranteed to sit on the week-start day, so shifting it
+				// by whole weeks and adding 6 days always yields a full week — even
+				// when the current range was a partial "This Week".
+				var offset  = direction * 7;
+				var wFrom   = new Date( f.getFullYear(), f.getMonth(), f.getDate() + offset );
+				var wTo     = new Date( wFrom.getFullYear(), wFrom.getMonth(), wFrom.getDate() + 6 );
 				return { from: fmtDate( wFrom ), to: fmtDate( wTo ) };
 			}
 
@@ -469,7 +484,14 @@
 
 			var hrsEl = document.getElementById( 'pltt-stat-billable-hours' );
 			if ( hrsEl ) {
-				hrsEl.textContent = PLTT.formatHours( plttReportStats.billableMinutes );
+				hrsEl.textContent = PLTT.formatDuration( plttReportStats.billableMinutes );
+				// Keep the decimal-hours hover hint (data-tip-rows) in sync with the figure.
+				if ( hrsEl.hasAttribute( 'data-tip-rows' ) ) {
+					hrsEl.setAttribute(
+						'data-tip-rows',
+						JSON.stringify( [ [ '', '= ' + PLTT.formatHours( plttReportStats.billableMinutes ) + ' h' ] ] )
+					);
+				}
 			}
 
 			var hrsChangeEl = document.getElementById( 'pltt-stat-hours-change' );

@@ -128,11 +128,31 @@ class PLTT_Reports {
 
 		$total_entries = $stats ? (int) $stats->total_count : 0;
 
-		// Previous period stats for comparison (Card 4).
-		$prev_period      = pltt_get_previous_period( $date_from, $date_to );
+		// Previous-period stats for the Billable Hours / Billable Amount comparison.
+		//
+		// Matched-slice: when the current period is still in progress (its range
+		// extends past today), comparing a full prior period against a partial
+		// current one manufactures alarming deltas — a half-week measured against a
+		// full week. So clip the prior period to the SAME number of elapsed days and
+		// drop the percentage; the cards show a plain "vs X same point last period"
+		// instead. A complete (fully past) period still compares in full.
+		$prev_period       = pltt_get_previous_period( $date_from, $date_to );
+		$prev_compare_to   = $prev_period['to'];
+		$is_partial_period = false;
+
+		$span_days = (int) floor( ( strtotime( $date_to ) - strtotime( $date_from ) ) / DAY_IN_SECONDS ) + 1;
+		if ( $today >= $date_from && $today < $date_to ) {
+			$elapsed_days      = (int) floor( ( strtotime( $today ) - strtotime( $date_from ) ) / DAY_IN_SECONDS ) + 1;
+			$elapsed_days      = max( 1, min( $span_days, $elapsed_days ) );
+			$is_partial_period = ( $elapsed_days < $span_days );
+			if ( $is_partial_period ) {
+				$prev_compare_to = gmdate( 'Y-m-d', strtotime( $prev_period['from'] ) + ( $elapsed_days - 1 ) * DAY_IN_SECONDS );
+			}
+		}
+
 		$prev_filter_args = array_merge( $filter_args, array(
 			'date_from' => $prev_period['from'],
-			'date_to'   => $prev_period['to'],
+			'date_to'   => $prev_compare_to,
 		) );
 		$prev_stats = PLTT_Entries::get_stats( $prev_filter_args );
 
@@ -170,88 +190,14 @@ class PLTT_Reports {
 		if ( 'summary' === $view ) {
 			$summary = PLTT_Entries::get_summary_by_project( $date_from, $date_to, $filter_args );
 
-			// Build chart buckets aligned to the active filter range, then fold daily totals into them.
-			$chart_bucket_size = pltt_resolve_bucket_size( $date_from, $date_to );
-			$chart_buckets     = pltt_build_chart_buckets( $date_from, $date_to, $chart_bucket_size );
-
-			if ( ! empty( $chart_buckets ) ) {
-				$daily_rows = PLTT_Entries::get_chart_daily_totals( $date_from, $date_to, $filter_args );
-
-				// Initialize totals on each bucket and build a key -> index map for O(1) lookup.
-				$bucket_index = array();
-				foreach ( $chart_buckets as $i => $bucket ) {
-					$chart_buckets[ $i ]['billable_minutes']    = 0;
-					$chart_buckets[ $i ]['client_flat_minutes'] = 0;
-					$chart_buckets[ $i ]['internal_minutes']    = 0;
-					$bucket_index[ $bucket['key'] ]             = $i;
-				}
-
-				foreach ( $daily_rows as $row ) {
-					$ymd = $row->entry_date;
-					if ( 'day' === $chart_bucket_size ) {
-						$key = $ymd;
-					} elseif ( 'month' === $chart_bucket_size ) {
-						$key = substr( $ymd, 0, 7 );
-					} else {
-						// Weekly: find the bucket whose start <= ymd <= end.
-						$key = null;
-						foreach ( $chart_buckets as $bucket ) {
-							if ( $ymd >= $bucket['start'] && $ymd <= $bucket['end'] ) {
-								$key = $bucket['key'];
-								break;
-							}
-						}
-					}
-
-					if ( null === $key || ! isset( $bucket_index[ $key ] ) ) {
-						continue;
-					}
-
-					$i = $bucket_index[ $key ];
-					$chart_buckets[ $i ]['billable_minutes']    += (int) $row->billable_minutes;
-					$chart_buckets[ $i ]['client_flat_minutes'] += (int) $row->client_flat_minutes;
-					$chart_buckets[ $i ]['internal_minutes']    += (int) $row->internal_minutes;
-				}
-
-				// Compute max + total minutes across buckets (for y-axis scale and average line).
-				// Average uses only buckets with logged time as the denominator, so empty
-				// days/weeks/months (weekends, leave, future days within the range) don't
-				// dilute the line.
-				$chart_total_minutes  = 0;
-				$chart_active_buckets = 0;
-				foreach ( $chart_buckets as $bucket ) {
-					$bucket_total = (int) $bucket['billable_minutes']
-						+ (int) $bucket['client_flat_minutes']
-						+ (int) $bucket['internal_minutes'];
-					if ( $bucket_total > $chart_max_minutes ) {
-						$chart_max_minutes = $bucket_total;
-					}
-					$chart_total_minutes += $bucket_total;
-					if ( $bucket_total > 0 ) {
-						$chart_active_buckets++;
-					}
-				}
-				$chart_avg_minutes = $chart_active_buckets > 0
-					? (int) round( $chart_total_minutes / $chart_active_buckets )
-					: 0;
-
-				// Identify which bucket (if any) contains today, for the "today" marker.
-				$today_ymd = pltt_get_current_date();
-				if ( $today_ymd >= $date_from && $today_ymd <= $date_to ) {
-					if ( 'day' === $chart_bucket_size ) {
-						$chart_today_key = $today_ymd;
-					} elseif ( 'month' === $chart_bucket_size ) {
-						$chart_today_key = substr( $today_ymd, 0, 7 );
-					} else {
-						// Weekly: today's week-start key, aligned to start_of_week.
-						$week_start_dow  = (int) get_option( 'start_of_week', 0 );
-						$today_dt        = new DateTimeImmutable( $today_ymd, wp_timezone() );
-						$today_dow       = (int) $today_dt->format( 'w' );
-						$shift           = ( $today_dow - $week_start_dow + 7 ) % 7;
-						$chart_today_key = $today_dt->modify( "-{$shift} days" )->format( 'Y-m-d' );
-					}
-				}
-			}
+			// Volume chart context (buckets + folded daily totals), shared with the
+			// Project Detail chart via pltt_build_period_chart_data().
+			$chart             = pltt_build_period_chart_data( $date_from, $date_to, $filter_args );
+			$chart_buckets     = $chart['buckets'];
+			$chart_bucket_size = $chart['bucket_size'];
+			$chart_max_minutes = $chart['max_minutes'];
+			$chart_avg_minutes = $chart['avg_minutes'];
+			$chart_today_key   = $chart['today_key'];
 
 			// For projects with a budget, fetch allocation-aware stats.
 			// Recurring: hours within the selected date range vs monthly allocation.

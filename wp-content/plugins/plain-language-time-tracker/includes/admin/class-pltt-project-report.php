@@ -52,11 +52,13 @@ class PLTT_Project_Report {
 	 *     @type string $default_group The grouping key to show first.
 	 * }
 	 */
-	public static function build( $project_id, $project, $client = null, $stats = null ) {
+	public static function build( $project_id, $project, $client = null, $stats = null, $window = null ) {
 		if ( null === $stats ) {
 			$stats = PLTT_Entries::get_stats( array( 'project_id' => $project_id ) );
 		}
 
+		// Lifetime entries — drive the swimlane (always the full arc) and the
+		// group-by toggle's dimension set.
 		$entries = PLTT_Entries::get_all(
 			array(
 				'project_id' => $project_id,
@@ -74,14 +76,57 @@ class PLTT_Project_Report {
 
 		$rate = (float) pltt_resolve_billable_rate( (int) $project->client_id, (int) $project_id );
 
-		$groupings = self::build_groupings( $entries, $tags_by_entry, $name_to_group );
+		// Lifetime groupings: the swimlane (always the full arc) and the toggle's
+		// dimension set/default both read from these.
+		$timeline_groupings = self::build_groupings( $entries, $tags_by_entry, $name_to_group );
+
+		// Windowed slice → stat cards + "Where the time went" bars + volume chart.
+		// For the full/lifetime view (every non-recurring project, and recurring
+		// projects in "Full" scope) the window is the whole span, so these collapse
+		// back to the all-time figures and nothing about today's behavior changes.
+		$is_windowed = is_array( $window )
+			&& 'period' === ( $window['scope'] ?? 'full' )
+			&& ! empty( $window['from'] )
+			&& ! empty( $window['to'] );
+
+		if ( $is_windowed ) {
+			$card_stats = PLTT_Entries::get_stats(
+				array(
+					'project_id' => $project_id,
+					'date_from'  => $window['from'],
+					'date_to'    => $window['to'],
+				)
+			);
+
+			$win_entries = array();
+			foreach ( $entries as $e ) {
+				if ( $e->entry_date >= $window['from'] && $e->entry_date <= $window['to'] ) {
+					$win_entries[] = $e;
+				}
+			}
+			$bar_groupings = self::build_groupings( $win_entries, $tags_by_entry, $name_to_group );
+		} else {
+			$card_stats    = $stats;
+			$bar_groupings = $timeline_groupings;
+		}
+
+		// Volume chart spans the active window (== lifetime span when not windowed).
+		$chart_from = is_array( $window ) && ! empty( $window['from'] ) ? $window['from'] : ( $stats->first_entry_date ?? '' );
+		$chart_to   = is_array( $window ) && ! empty( $window['to'] ) ? $window['to'] : ( $stats->last_entry_date ?? '' );
+		$chart      = ( $chart_from && $chart_to )
+			? pltt_build_period_chart_data( $chart_from, $chart_to, array( 'project_id' => (int) $project_id ) )
+			: null;
 
 		return array(
-			'has_entries'   => ( isset( $stats->total_minutes ) ? (int) $stats->total_minutes : 0 ) > 0,
-			'cards'         => self::build_cards( $project, $stats, $rate ),
-			'groupings'     => $groupings,
-			'default_group' => self::pick_default_group( $groupings ),
-			'axis'          => self::build_axis( $stats ),
+			'has_entries'        => ( isset( $stats->total_minutes ) ? (int) $stats->total_minutes : 0 ) > 0,
+			'cards'              => self::build_cards( $project, $card_stats, $rate, $window ),
+			'groupings'          => $bar_groupings,        // windowed — "Where the time went".
+			'timeline_groupings' => $timeline_groupings,   // lifetime — swimlane.
+			'default_group'      => self::pick_default_group( $timeline_groupings ),
+			'axis'               => self::build_axis( $stats ),
+			'budget_line'        => self::build_budget_line( $project, $stats, $entries, $rate ),
+			'chart'              => $chart,
+			'window'             => is_array( $window ) ? $window : null,
 		);
 	}
 
@@ -108,17 +153,18 @@ class PLTT_Project_Report {
 	 * as an em-dash.
 	 *
 	 * @param object      $project Project row.
-	 * @param object|null $stats   Aggregate stats.
+	 * @param object|null $stats   Aggregate stats (windowed to the active period when one is set).
 	 * @param float       $rate    Resolved hourly rate.
+	 * @param array|null  $window  Active period window (recurring period lens).
 	 * @return array
 	 */
-	private static function build_cards( $project, $stats, $rate ) {
+	private static function build_cards( $project, $stats, $rate, $window = null ) {
 		switch ( pltt_get_billing_type( $project ) ) {
 			case 'fixed':
 				$items = self::cards_fixed( $project, $stats, $rate );
 				break;
 			case 'recurring':
-				$items = self::cards_recurring( $project, $stats, $rate );
+				$items = self::cards_recurring( $project, $stats, $rate, $window );
 				break;
 			case 'none':
 				$items = self::cards_internal( $project, $stats );
@@ -281,12 +327,42 @@ class PLTT_Project_Report {
 	 * @param float       $rate    Resolved hourly rate.
 	 * @return array[]
 	 */
-	private static function cards_recurring( $project, $stats, $rate ) {
+	private static function cards_recurring( $project, $stats, $rate, $window = null ) {
 		$total_minutes = isset( $stats->total_minutes ) ? (int) $stats->total_minutes : 0;
-		$months        = self::months_between( $stats->first_entry_date ?? '', $stats->last_entry_date ?? '' );
-		$avg_minutes   = $months > 0 ? (int) round( $total_minutes / $months ) : $total_minutes;
 		$alloc_minutes = (int) round( self::num( $project->budget_hours ) * 60 );
 		$fee           = self::num( $project->budget_fee );
+
+		// Period view: a single billing period, so an "average per month" and a
+		// "months active" count are meaningless. Show the period's hours against
+		// the allocation directly, and drop the months card.
+		if ( is_array( $window ) && 'period' === ( $window['scope'] ?? 'full' ) ) {
+			$used = self::card( __( 'Hours', 'plain-language-time-tracker' ), pltt_format_duration( $total_minutes ) );
+			if ( $alloc_minutes > 0 ) {
+				$pct = (int) round( $total_minutes / $alloc_minutes * 100 );
+				/* translators: %s: monthly hour allocation. */
+				$used['value_suffix'] = sprintf( __( 'of %s', 'plain-language-time-tracker' ), pltt_format_duration( $alloc_minutes ) );
+				/* translators: %d: percent of the period's allocation used. */
+				$used['sub']          = sprintf( __( '%d%% of allocation', 'plain-language-time-tracker' ), $pct );
+				$used['attention']    = $pct > 100;
+			}
+
+			return array(
+				$used,
+				self::card(
+					__( 'Monthly fee', 'plain-language-time-tracker' ),
+					$fee > 0 ? pltt_format_currency_compact( $fee ) : '',
+					array(
+						'sub' => $alloc_minutes > 0
+							/* translators: %s: monthly hour allocation. */
+							? sprintf( __( '%s/mo', 'plain-language-time-tracker' ), pltt_format_duration( $alloc_minutes ) )
+							: '',
+					)
+				),
+			);
+		}
+
+		$months        = self::months_between( $stats->first_entry_date ?? '', $stats->last_entry_date ?? '' );
+		$avg_minutes   = $months > 0 ? (int) round( $total_minutes / $months ) : $total_minutes;
 
 		$avg = self::card( __( 'Avg / month', 'plain-language-time-tracker' ), pltt_format_duration( $avg_minutes ) );
 		if ( $alloc_minutes > 0 ) {
@@ -718,6 +794,68 @@ class PLTT_Project_Report {
 		$span = max( 1, $axis['end_ts'] - $axis['start_ts'] );
 		$pct  = ( strtotime( $date ) - $axis['start_ts'] ) / $span * 100;
 		return max( 0.0, min( 100.0, $pct ) );
+	}
+
+	/**
+	 * Budget-crossing line for the timeline overlay.
+	 *
+	 * The date where cumulative hours first reached the project's budget. This
+	 * is a fact about the project, not the active group-by — position is summed
+	 * across all entries in date order regardless of grouping, so the template
+	 * lands it once via axis_pct() and the line holds still as lanes regroup.
+	 *
+	 * Gated to fixed-budget projects that actually went over: hourly/internal
+	 * have no budget concept, and a project finishing under budget never crosses.
+	 * Retainers use the monthly, in-period threshold marker in the Reports entry
+	 * stream instead (pltt_compute_overage_threshold) — different surface, resets
+	 * each period — so they're excluded here.
+	 *
+	 * @param object      $project Project row.
+	 * @param object|null $stats   Aggregate stats.
+	 * @param array       $entries Project entries, oldest-first.
+	 * @param float       $rate    Resolved hourly rate.
+	 * @return array|null { date, overage_minutes } or null when no line applies.
+	 */
+	private static function build_budget_line( $project, $stats, $entries, $rate ) {
+		if ( 'fixed' !== pltt_get_billing_type( $project ) ) {
+			return null;
+		}
+
+		// Budgeted minutes: explicit hours, else fee ÷ rate. Mirrors cards_fixed().
+		if ( self::num( $project->budget_hours ) > 0 ) {
+			$budgeted_minutes = (int) round( self::num( $project->budget_hours ) * 60 );
+		} elseif ( self::num( $project->budget_fee ) > 0 && $rate > 0 ) {
+			$budgeted_minutes = (int) round( ( self::num( $project->budget_fee ) / $rate ) * 60 );
+		} else {
+			$budgeted_minutes = 0;
+		}
+		if ( $budgeted_minutes <= 0 ) {
+			return null;
+		}
+
+		$total_minutes = isset( $stats->total_minutes ) ? (int) $stats->total_minutes : 0;
+		if ( $total_minutes <= $budgeted_minutes ) {
+			return null; // Came in at or under budget — no crossing.
+		}
+
+		// First date where the running cumulative reaches the budget.
+		$cumulative = 0;
+		$cross_date = null;
+		foreach ( $entries as $e ) {
+			$cumulative += (int) $e->duration_minutes;
+			if ( $cumulative >= $budgeted_minutes ) {
+				$cross_date = $e->entry_date;
+				break;
+			}
+		}
+		if ( null === $cross_date ) {
+			return null;
+		}
+
+		return array(
+			'date'            => $cross_date,
+			'overage_minutes' => $total_minutes - $budgeted_minutes,
+		);
 	}
 
 	/**

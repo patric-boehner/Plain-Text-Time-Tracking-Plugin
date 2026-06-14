@@ -621,13 +621,14 @@ class PLTT_Entries {
 	 * @param string $date_to   Current range end (Y-m-d).
 	 * @param array  $args      Shared filters (client_id, project_id, tag + negates).
 	 *                          billable/billed are ignored here — the criteria are fixed.
-	 * @return object|null { entry_count, total_minutes, earliest, latest } or null.
+	 * @return object|null { entry_count, total_minutes, total_amount, earliest, latest } or null.
 	 */
 	public static function get_unbilled_outside_range_summary( $date_from, $date_to, $args = array() ) {
 		global $wpdb;
 
 		$entries_table  = PLTT_Database::get_table_name( 'time_entries' );
 		$projects_table = PLTT_Database::get_table_name( 'projects' );
+		$clients_table  = PLTT_Database::get_table_name( 'clients' );
 
 		$where = array(
 			'(e.entry_date < %s OR e.entry_date > %s)',
@@ -653,10 +654,12 @@ class PLTT_Entries {
 		$sql = "SELECT
 			COUNT(*) AS entry_count,
 			COALESCE(SUM(e.duration_minutes), 0) AS total_minutes,
+			COALESCE(SUM(COALESCE(e.billable_amount, ROUND(e.duration_minutes / 60.0 * COALESCE(p.hourly_rate, c.hourly_rate, 0), 2))), 0) AS total_amount,
 			MIN(e.entry_date) AS earliest,
 			MAX(e.entry_date) AS latest
 			FROM {$entries_table} e
 			LEFT JOIN {$projects_table} p ON e.project_id = p.id
+			LEFT JOIN {$clients_table} c ON e.client_id = c.id
 			WHERE " . implode( ' AND ', $where );
 
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.NotPrepared

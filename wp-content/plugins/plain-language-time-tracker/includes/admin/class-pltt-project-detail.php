@@ -42,9 +42,33 @@ class PLTT_Project_Detail {
 
 		$stats        = PLTT_Entries::get_stats( array( 'project_id' => $project_id ) );
 		$billing_type = pltt_get_billing_type( $project );
-		$subhead      = self::build_subhead( $project, $stats, $billing_type );
 		$list_url     = admin_url( 'admin.php?page=pltt-projects' );
-		$report       = PLTT_Project_Report::build( $project_id, $project, null, $stats );
+
+		// Period lens (recurring projects only): scope + period drive the cards,
+		// the "Where the time went" bars, and the volume chart. Read-only GET nav,
+		// no nonce — mirrors the Reports date nav.
+		// phpcs:disable WordPress.Security.NonceVerification.Recommended
+		$req_scope  = isset( $_GET['chart_scope'] ) ? sanitize_key( wp_unslash( $_GET['chart_scope'] ) ) : '';
+		$req_anchor = isset( $_GET['chart_period'] ) ? sanitize_text_field( wp_unslash( $_GET['chart_period'] ) ) : '';
+		// phpcs:enable WordPress.Security.NonceVerification.Recommended
+		$window = pltt_resolve_project_chart_window(
+			$billing_type,
+			isset( $project->recurring_period ) ? $project->recurring_period : '',
+			$stats->first_entry_date ?? '',
+			$stats->last_entry_date ?? '',
+			$req_scope,
+			$req_anchor
+		);
+
+		// In a period view the subhead reflects the selected period, not the
+		// lifetime span, and its entry count is that period's.
+		$is_period     = ( 'period' === ( $window['scope'] ?? 'full' ) );
+		$subhead_stats = $is_period
+			? PLTT_Entries::get_stats( array( 'project_id' => $project_id, 'date_from' => $window['from'], 'date_to' => $window['to'] ) )
+			: $stats;
+		$subhead = self::build_subhead( $project, $subhead_stats, $billing_type, $window );
+
+		$report = PLTT_Project_Report::build( $project_id, $project, null, $stats, $window );
 
 		include PLTT_PLUGIN_DIR . 'templates/project-detail.php';
 	}
@@ -56,11 +80,14 @@ class PLTT_Project_Detail {
 	 * omitted (e.g. a project with no entries shows just the type).
 	 *
 	 * @param object      $project      Project row.
-	 * @param object|null $stats        Aggregate stats from PLTT_Entries::get_stats().
+	 * @param object|null $stats        Aggregate stats from PLTT_Entries::get_stats()
+	 *                                  (windowed to the active period when one is set).
 	 * @param string      $billing_type Resolved billing type.
+	 * @param array|null  $window       Active period window; when scope is 'period'
+	 *                                  the date piece becomes the period label.
 	 * @return string Middot-joined, already-escaped-safe plain text (caller escapes).
 	 */
-	private static function build_subhead( $project, $stats, $billing_type ) {
+	private static function build_subhead( $project, $stats, $billing_type, $window = null ) {
 		$type_labels = array(
 			'hourly'    => __( 'Hourly', 'plain-language-time-tracker' ),
 			'recurring' => __( 'Monthly', 'plain-language-time-tracker' ),
@@ -70,12 +97,17 @@ class PLTT_Project_Detail {
 
 		$parts = array( $type_labels[ $billing_type ] ?? $type_labels['hourly'] );
 
-		$first = $stats->first_entry_date ?? '';
-		$last  = $stats->last_entry_date ?? '';
-		if ( $first && $last ) {
-			$first_fmt = date_i18n( 'M j, Y', strtotime( $first ) );
-			$last_fmt  = date_i18n( 'M j, Y', strtotime( $last ) );
-			$parts[]   = ( $first === $last ) ? $first_fmt : $first_fmt . ' – ' . $last_fmt;
+		if ( is_array( $window ) && 'period' === ( $window['scope'] ?? 'full' ) ) {
+			// Period view: show the period itself (e.g. "June 2026"), not the span.
+			$parts[] = $window['period_label'];
+		} else {
+			$first = $stats->first_entry_date ?? '';
+			$last  = $stats->last_entry_date ?? '';
+			if ( $first && $last ) {
+				$first_fmt = date_i18n( 'M j, Y', strtotime( $first ) );
+				$last_fmt  = date_i18n( 'M j, Y', strtotime( $last ) );
+				$parts[]   = ( $first === $last ) ? $first_fmt : $first_fmt . ' – ' . $last_fmt;
+			}
 		}
 
 		$count = isset( $stats->total_count ) ? (int) $stats->total_count : 0;
