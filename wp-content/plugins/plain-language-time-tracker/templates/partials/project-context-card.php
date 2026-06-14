@@ -58,7 +58,7 @@ if ( $has_alloc ) {
 			<?php if ( ! empty( $context_client ) ) : ?>
 				<span class="pltt-pcc-client"><?php echo esc_html( $context_client->name ); ?></span>
 			<?php endif; ?>
-			<span class="pltt-pcc-project"><?php echo esc_html( $project->name ); ?></span>
+			<a class="pltt-pcc-project" href="<?php echo esc_url( PLTT_Project_Detail::get_url( (int) $project->id ) ); ?>"><?php echo esc_html( $project->name ); ?></a>
 		</div>
 		<?php if ( $is_archived ) : ?>
 			<span class="pltt-badge pltt-pcc-badge"><?php esc_html_e( 'Archived', 'plain-language-time-tracker' ); ?></span>

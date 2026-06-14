@@ -1,0 +1,105 @@
+/**
+ * PlttTooltip — formatted hover/focus tooltip. Shared across screens.
+ *
+ * Pairs with assets/js/pltt-tooltip.js. One floating .pltt-tip card is reused
+ * for every trigger. Colors reference :root tokens from admin.css, so the card
+ * resolves them even though it is appended to <body>.
+ */
+.pltt-tip {
+	position: absolute;
+	z-index: 100000;
+	max-width: 280px;
+	padding: 9px 11px;
+	background: #1d2327; /* WP admin dark gray. */
+	color: #fff;
+	border-radius: var(--pltt-pd-radius, 6px);
+	box-shadow: 0 4px 18px rgba(0, 0, 0, 0.28);
+	font-size: 12px;
+	line-height: 1.45;
+	pointer-events: none;
+	opacity: 0;
+	transform: translateY(2px);
+	transition: opacity 0.12s ease, transform 0.12s ease;
+}
+
+.pltt-tip.is-visible {
+	opacity: 1;
+	transform: none;
+}
+
+.pltt-tip-head {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	margin-bottom: 6px;
+	font-weight: 600;
+}
+
+.pltt-tip-rows + .pltt-tip-head,
+.pltt-tip-head:only-child {
+	margin-bottom: 0;
+}
+
+.pltt-tip-dot {
+	flex: 0 0 auto;
+	width: 9px;
+	height: 9px;
+	border-radius: 50%;
+	background: var(--pltt-tip-dot, currentColor);
+}
+
+.pltt-tip-rows {
+	display: grid;
+	grid-template-columns: auto 1fr;
+	gap: 2px 14px;
+	margin: 0;
+}
+
+.pltt-tip-rows dt {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	color: rgba(255, 255, 255, 0.6);
+}
+
+.pltt-tip-rows dt .pltt-tip-dot {
+	width: 8px;
+	height: 8px;
+}
+
+.pltt-tip-rows dd {
+	margin: 0;
+	text-align: right;
+	font-variant-numeric: tabular-nums;
+}
+
+.pltt-tip-line {
+	grid-column: 1 / -1;
+	color: rgba(255, 255, 255, 0.85);
+}
+
+/* Arrow — horizontal position tracks the trigger center via --pltt-tip-arrow. */
+.pltt-tip::after {
+	content: "";
+	position: absolute;
+	left: var(--pltt-tip-arrow, 50%);
+	transform: translateX(-50%);
+	border: 6px solid transparent;
+}
+
+.pltt-tip[data-place="top"]::after {
+	top: 100%;
+	border-top-color: #1d2327;
+}
+
+.pltt-tip[data-place="bottom"]::after {
+	bottom: 100%;
+	border-bottom-color: #1d2327;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.pltt-tip {
+		transition: none;
+		transform: none;
+	}
+}

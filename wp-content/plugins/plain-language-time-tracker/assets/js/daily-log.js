@@ -118,7 +118,22 @@
 	}, plttData.autosaveDebounceMs || 1500 );
 
 	// Mark dirty and auto-save on input.
-	textarea.addEventListener( 'input', function() {
+	textarea.addEventListener( 'input', function( e ) {
+		// Fallback for the @ shortcut. The keydown handler below is the fast
+		// path, but it can be missed: if the footer script is still loading
+		// when the user types the first @, or on mobile/IME keyboards where
+		// e.key isn't reliably '@'. In those cases the literal @ lands here —
+		// strip it and insert a timestamp instead, matching keydown behavior.
+		if ( e.inputType === 'insertText' && e.data === '@' ) {
+			const pos = textarea.selectionStart; // Caret sits just after the @.
+			textarea.value =
+				textarea.value.substring( 0, pos - 1 ) +
+				textarea.value.substring( pos );
+			textarea.selectionStart = textarea.selectionEnd = pos - 1;
+			insertTimestamp(); // Handles its own markDirty()/autoSave().
+			return;
+		}
+
 		markDirty();
 		autoSave();
 	} );

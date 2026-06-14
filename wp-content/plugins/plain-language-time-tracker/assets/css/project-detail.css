@@ -289,6 +289,10 @@
 .pltt-timeline {
 	--tl-label-w: 150px;
 	--tl-lane-h: 24px;
+	/* Over-budget treatment (derived from the amber bar color #d97706). */
+	--pltt-overbudget-line: #b45309; /* burnt orange — the crossing rule */
+	/* --pltt-overbudget-wash: rgba( 217, 119, 6, 0.10 ); faint amber over-zone */
+	--pltt-overbudget-label: #b45309; /* amber-700 — axis label */
 }
 
 .pltt-tl-head {
@@ -334,6 +338,82 @@
 	bottom: 0;
 	width: 1px;
 	background: var(--pltt-border-faint);
+}
+
+/*
+ * Budget-crossing overlay — shares the gridline coordinate space (offset past
+ * the label column) so its percentages line up with the lanes. The wash sits
+ * behind the lanes; bars paint on top where they straddle the line.
+ */
+/*
+ * No z-index on the container: keeping it at auto avoids a stacking context, so
+ * the wash (below tracks) and the line (above tracks) resolve against the lanes
+ * directly. Wash z0 < track z1 < line z3.
+ */
+.pltt-tl-overlay {
+	position: absolute;
+	top: 0;
+	bottom: 0;
+	left: var(--tl-label-w);
+	right: 0;
+	pointer-events: none;
+}
+
+.pltt-tl-over-zone {
+	position: absolute;
+	top: 0;
+	bottom: 0;
+	right: 0;
+	z-index: 0;
+	background: var(--pltt-bg-overage);
+}
+
+.pltt-tl-budget-line {
+	position: absolute;
+	top: 0;
+	bottom: 0;
+	width: 11px; /* widened hit area; the rule is a centered 2px ::before */
+	transform: translateX(-50%);
+	z-index: 3;
+	pointer-events: auto;
+	cursor: help;
+}
+
+.pltt-tl-budget-line::before {
+	content: "";
+	position: absolute;
+	top: 0;
+	bottom: 0;
+	left: 50%;
+	width: 2px;
+	transform: translateX(-50%);
+	background: var(--pltt-overbudget-line);
+}
+
+/* "▾ over budget" marker on the month axis, anchored at the crossing. */
+.pltt-tl-over-label {
+	position: absolute;
+	top: 0;
+	display: inline-flex;
+	align-items: center;
+	gap: 3px;
+	font-size: 11px;
+	font-weight: 600;
+	white-space: nowrap;
+	color: var(--pltt-overbudget-label);
+	transform: translateX(-3px); /* nudge the caret onto the line */
+}
+
+/* Late crossings sit near the right edge — flip so the text flows left of the
+ * line (caret stays anchored on it) instead of clipping off-canvas. */
+.pltt-tl-over-label--flip {
+	flex-direction: row-reverse;
+	transform: translateX(calc(-100% + 3px));
+}
+
+.pltt-tl-over-caret {
+	color: var(--pltt-overbudget-line);
+	line-height: 1;
 }
 
 .pltt-tl-track {

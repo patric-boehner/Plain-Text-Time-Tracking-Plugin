@@ -37,7 +37,7 @@
 	--pltt-primary-light: #72aee6; /* Lighter admin blue: allocation overage segment */
 
 	/* Status */
-	--pltt-success:      #00a32a;
+	--pltt-success:      #2f9e63;
 	--pltt-warning:      #ecc251; /* Light gold: borders, bar fills, low-opacity tints */
 	--pltt-warning-text: #b45309; /* Dark amber: warning text/icons (AA contrast on light) */
 	--pltt-danger:      #d63638;
@@ -359,7 +359,18 @@
 
 .pltt-project-context-card .pltt-pcc-project {
 	font-size: 13px;
-	color: var(--pltt-text-muted);
+	color: var(--pltt-primary);
+}
+
+/* Project name links to its full report page. Reads as the muted subtitle until
+   hovered/focused, then takes the admin-blue link treatment. */
+a.pltt-pcc-project {
+	text-decoration: underline;
+}
+
+a.pltt-pcc-project:hover,
+a.pltt-pcc-project:focus {
+	text-decoration: none;
 }
 
 .pltt-project-context-card .pltt-pcc-badge {

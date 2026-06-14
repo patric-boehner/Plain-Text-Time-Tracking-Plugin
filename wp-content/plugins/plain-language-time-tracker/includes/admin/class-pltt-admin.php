@@ -364,15 +364,34 @@ class PLTT_Admin {
 		$projects_action = isset( $_GET['action'] ) ? sanitize_key( wp_unslash( $_GET['action'] ) ) : '';
 		if ( 'time-tracker_page_pltt-projects' === $hook && 'view' === $projects_action ) {
 			wp_enqueue_style(
-				'pltt-project-detail',
-				PLTT_PLUGIN_URL . 'assets/css/project-detail.css',
+				'pltt-tooltip',
+				PLTT_PLUGIN_URL . 'assets/css/pltt-tooltip.css',
 				array( 'pltt-admin' ),
 				$version
+			);
+			wp_enqueue_style(
+				'pltt-chart',
+				PLTT_PLUGIN_URL . 'assets/css/pltt-chart.css',
+				array( 'pltt-admin' ),
+				$version
+			);
+			wp_enqueue_style(
+				'pltt-project-detail',
+				PLTT_PLUGIN_URL . 'assets/css/project-detail.css',
+				array( 'pltt-admin', 'pltt-tooltip', 'pltt-chart' ),
+				$version
+			);
+			wp_enqueue_script(
+				'pltt-tooltip',
+				PLTT_PLUGIN_URL . 'assets/js/pltt-tooltip.js',
+				array(),
+				$version,
+				true
 			);
 			wp_enqueue_script(
 				'pltt-project-detail',
 				PLTT_PLUGIN_URL . 'assets/js/project-detail.js',
-				array( 'pltt-shared' ),
+				array( 'pltt-shared', 'pltt-tooltip' ),
 				$version,
 				true
 			);
@@ -382,6 +401,18 @@ class PLTT_Admin {
 			wp_enqueue_style(
 				'pltt-tag-picker',
 				PLTT_PLUGIN_URL . 'assets/css/tag-picker.css',
+				array( 'pltt-admin' ),
+				$version
+			);
+			wp_enqueue_style(
+				'pltt-tooltip',
+				PLTT_PLUGIN_URL . 'assets/css/pltt-tooltip.css',
+				array( 'pltt-admin' ),
+				$version
+			);
+			wp_enqueue_style(
+				'pltt-chart',
+				PLTT_PLUGIN_URL . 'assets/css/pltt-chart.css',
 				array( 'pltt-admin' ),
 				$version
 			);
@@ -399,9 +430,16 @@ class PLTT_Admin {
 				true
 			);
 			wp_enqueue_script(
+				'pltt-tooltip',
+				PLTT_PLUGIN_URL . 'assets/js/pltt-tooltip.js',
+				array(),
+				$version,
+				true
+			);
+			wp_enqueue_script(
 				'pltt-reports',
 				PLTT_PLUGIN_URL . 'assets/js/reports.js',
-				array( 'pltt-shared', 'pltt-tag-picker' ),
+				array( 'pltt-shared', 'pltt-tag-picker', 'pltt-tooltip' ),
 				$version,
 				true
 			);

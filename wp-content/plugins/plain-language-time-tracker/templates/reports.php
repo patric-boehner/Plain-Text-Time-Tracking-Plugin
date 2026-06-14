@@ -424,7 +424,7 @@ $tab_base_url = add_query_arg( $filter_params, admin_url( 'admin.php' ) );
 			<!-- Card 2: Total Hours -->
 			<div class="card">
 				<div class="card-label"><?php esc_html_e( 'Total Hours', 'plain-language-time-tracker' ); ?></div>
-				<div class="card-value"><?php echo esc_html( pltt_format_hours( $stats->total_minutes ) ); ?></div>
+				<div class="card-value" <?php echo pltt_decimal_hint_attrs( (int) $stats->total_minutes ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>><?php echo esc_html( pltt_format_duration( (int) $stats->total_minutes ) ); ?></div>
 				<?php if ( (int) $stats->total_minutes > 0 ) :
 					$client_pct   = (int) round( ( (int) $stats->client_total_minutes / (int) $stats->total_minutes ) * 100 );
 					$internal_pct = 100 - $client_pct; // derived so the two always sum to 100
@@ -432,12 +432,12 @@ $tab_base_url = add_query_arg( $filter_params, admin_url( 'admin.php' ) );
 					<div class="card-secondary pltt-card-breakdown">
 						<div class="pltt-card-breakdown-row">
 							<span class="pltt-card-breakdown-label"><?php esc_html_e( 'Client', 'plain-language-time-tracker' ); ?></span>
-							<span class="pltt-card-breakdown-value"><?php echo esc_html( pltt_format_hours( (int) $stats->client_total_minutes ) ); ?></span>
+							<span class="pltt-card-breakdown-value" <?php echo pltt_decimal_hint_attrs( (int) $stats->client_total_minutes ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>><?php echo esc_html( pltt_format_duration( (int) $stats->client_total_minutes ) ); ?></span>
 							<span class="pltt-card-breakdown-pct">(<?php echo esc_html( $client_pct ); ?>%)</span>
 						</div>
 						<div class="pltt-card-breakdown-row">
 							<span class="pltt-card-breakdown-label"><?php esc_html_e( 'Internal', 'plain-language-time-tracker' ); ?></span>
-							<span class="pltt-card-breakdown-value"><?php echo esc_html( pltt_format_hours( $internal_minutes ) ); ?></span>
+							<span class="pltt-card-breakdown-value" <?php echo pltt_decimal_hint_attrs( (int) $internal_minutes ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>><?php echo esc_html( pltt_format_duration( (int) $internal_minutes ) ); ?></span>
 							<span class="pltt-card-breakdown-pct">(<?php echo esc_html( $internal_pct ); ?>%)</span>
 						</div>
 					</div>
@@ -475,18 +475,28 @@ $tab_base_url = add_query_arg( $filter_params, admin_url( 'admin.php' ) );
 			?>
 			<div class="card">
 				<div class="card-label"><?php esc_html_e( 'Billable Hours', 'plain-language-time-tracker' ); ?></div>
-				<div class="card-value" id="pltt-stat-billable-hours"><?php echo esc_html( pltt_format_hours( $stats->billable_minutes ) ); ?></div>
+				<div class="card-value" id="pltt-stat-billable-hours" <?php echo pltt_decimal_hint_attrs( (int) $stats->billable_minutes ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>><?php echo esc_html( pltt_format_duration( (int) $stats->billable_minutes ) ); ?></div>
 				<div class="card-secondary">
-					<?php
-					printf(
-						esc_html__( 'vs. %s last period', 'plain-language-time-tracker' ),
-						esc_html( pltt_format_hours( $prev_hours_mins ) )
-					);
-					?>
-					&bull;
-					<span id="pltt-stat-hours-change" class="<?php echo esc_attr( $hours_change_class ); ?>">
-						<?php echo esc_html( $hours_change_icon . ' ' . number_format( abs( $hours_pct_change ), 0 ) . '%' ); ?>
-					</span>
+					<?php if ( $is_partial_period ) : ?>
+						<?php
+						printf(
+							/* translators: %s: billable time in the same elapsed slice of the prior period. */
+							esc_html__( 'vs. %s same point last period', 'plain-language-time-tracker' ),
+							esc_html( pltt_format_duration( $prev_hours_mins ) )
+						);
+						?>
+					<?php else : ?>
+						<?php
+						printf(
+							esc_html__( 'vs. %s last period', 'plain-language-time-tracker' ),
+							esc_html( pltt_format_duration( $prev_hours_mins ) )
+						);
+						?>
+						&bull;
+						<span id="pltt-stat-hours-change" class="<?php echo esc_attr( $hours_change_class ); ?>">
+							<?php echo esc_html( $hours_change_icon . ' ' . number_format( abs( $hours_pct_change ), 0 ) . '%' ); ?>
+						</span>
+					<?php endif; ?>
 				</div>
 			</div>
 
@@ -520,16 +530,26 @@ $tab_base_url = add_query_arg( $filter_params, admin_url( 'admin.php' ) );
 				<div class="card-label"><?php esc_html_e( 'Billable Amount', 'plain-language-time-tracker' ); ?></div>
 				<div class="card-value" id="pltt-stat-billable-amount"><?php echo esc_html( pltt_format_currency( $curr_amount ) ); ?></div>
 				<div class="card-secondary">
-					<?php
-					printf(
-						esc_html__( 'vs. %s last period', 'plain-language-time-tracker' ),
-						esc_html( pltt_format_currency( $prev_amount ) )
-					);
-					?>
-					&bull;
-					<span id="pltt-stat-amount-change" class="<?php echo esc_attr( $change_class ); ?>">
-						<?php echo esc_html( $change_icon . ' ' . number_format( abs( $pct_change ), 0 ) . '%' ); ?>
-					</span>
+					<?php if ( $is_partial_period ) : ?>
+						<?php
+						printf(
+							/* translators: %s: billable amount in the same elapsed slice of the prior period. */
+							esc_html__( 'vs. %s same point last period', 'plain-language-time-tracker' ),
+							esc_html( pltt_format_currency( $prev_amount ) )
+						);
+						?>
+					<?php else : ?>
+						<?php
+						printf(
+							esc_html__( 'vs. %s last period', 'plain-language-time-tracker' ),
+							esc_html( pltt_format_currency( $prev_amount ) )
+						);
+						?>
+						&bull;
+						<span id="pltt-stat-amount-change" class="<?php echo esc_attr( $change_class ); ?>">
+							<?php echo esc_html( $change_icon . ' ' . number_format( abs( $pct_change ), 0 ) . '%' ); ?>
+						</span>
+					<?php endif; ?>
 				</div>
 			</div>
 
@@ -540,153 +560,12 @@ $tab_base_url = add_query_arg( $filter_params, admin_url( 'admin.php' ) );
 
 
 	<?php
+	// Volume bar chart (Hours by day/week/month). Markup shared with the Project
+	// Detail report tab via templates/partials/chart-by-period.php.
 	if ( 'summary' === $view && ! empty( $chart_buckets ) && $chart_max_minutes > 0 ) :
-		$chart_titles = array(
-			'day'   => __( 'Hours by day', 'plain-language-time-tracker' ),
-			'week'  => __( 'Hours by week', 'plain-language-time-tracker' ),
-			'month' => __( 'Hours by month', 'plain-language-time-tracker' ),
-		);
-		$chart_caption_formats = array(
-			/* translators: %s: human-readable date range, e.g. "May 1–15, 2026". */
-			'day'   => __( 'Billable, client, and internal hours per day for %s.', 'plain-language-time-tracker' ),
-			/* translators: %s: human-readable date range. */
-			'week'  => __( 'Billable, client, and internal hours per week for %s.', 'plain-language-time-tracker' ),
-			/* translators: %s: human-readable date range. */
-			'month' => __( 'Billable, client, and internal hours per month for %s.', 'plain-language-time-tracker' ),
-		);
-		$chart_title   = $chart_titles[ $chart_bucket_size ];
-		$chart_caption = sprintf( $chart_caption_formats[ $chart_bucket_size ], pltt_format_date_range( $date_from, $date_to ) );
-		$chart_max_h   = $chart_max_minutes / 60;
-		// Round y-axis ceiling up to a nice number for the visible label.
-		if ( $chart_max_h <= 1 ) {
-			$y_ceiling = 1;
-		} elseif ( $chart_max_h <= 5 ) {
-			$y_ceiling = ceil( $chart_max_h );
-		} elseif ( $chart_max_h <= 20 ) {
-			$y_ceiling = ceil( $chart_max_h / 2 ) * 2;
-		} else {
-			$y_ceiling = ceil( $chart_max_h / 5 ) * 5;
-		}
-		$y_ceiling_mins = $y_ceiling * 60;
-		// Show per-bar value labels only when there's room (rough threshold).
-		$chart_show_values = count( $chart_buckets ) <= 14;
-		?>
-		<section class="pltt-chart-section" aria-labelledby="pltt-chart-title">
-			<header class="pltt-chart-header">
-				<h2 id="pltt-chart-title" class="pltt-chart-title"><?php echo esc_html( $chart_title ); ?></h2>
-				<ul class="pltt-chart-legend" aria-hidden="true">
-					<li><span class="pltt-chart-swatch pltt-chart-swatch-billable"></span><?php esc_html_e( 'Billable', 'plain-language-time-tracker' ); ?></li>
-					<li><span class="pltt-chart-swatch pltt-chart-swatch-client-flat"></span><?php esc_html_e( 'Client', 'plain-language-time-tracker' ); ?></li>
-					<li><span class="pltt-chart-swatch pltt-chart-swatch-internal"></span><?php esc_html_e( 'Internal', 'plain-language-time-tracker' ); ?></li>
-				</ul>
-			</header>
-
-			<figure class="pltt-chart" role="figure" aria-label="<?php echo esc_attr( $chart_caption ); ?>">
-				<div class="pltt-chart-canvas" aria-hidden="true">
-					<div class="pltt-chart-y-axis">
-						<span class="pltt-chart-y-label pltt-chart-y-label-top">
-							<?php
-							/* translators: %s: number of hours, e.g. "20". */
-							printf( esc_html__( '%sh', 'plain-language-time-tracker' ), esc_html( number_format( $y_ceiling, ( $y_ceiling < 2 ? 1 : 0 ) ) ) );
-							?>
-						</span>
-						<span class="pltt-chart-y-label pltt-chart-y-label-mid">
-						<?php
-						/* translators: %s: number of hours, e.g. "10". */
-						printf( esc_html__( '%sh', 'plain-language-time-tracker' ), esc_html( number_format( $y_ceiling * 0.5, ( $y_ceiling < 2 ? 1 : 0 ) ) ) );
-						?>
-					</span>
-						<span class="pltt-chart-y-label pltt-chart-y-label-bottom">0</span>
-					</div>
-					<div class="pltt-chart-plot">
-						<?php
-						$show_avg_line = count( $chart_buckets ) >= 2 && $chart_avg_minutes > 0 && $y_ceiling_mins > 0;
-						if ( $show_avg_line ) :
-							$avg_pct = $chart_avg_minutes / $y_ceiling_mins;
-							?>
-							<div class="pltt-chart-avg-line"
-								style="--avg-pct: <?php echo esc_attr( number_format( $avg_pct, 4, '.', '' ) ); ?>;"
-								title="<?php
-								echo esc_attr( sprintf(
-									/* translators: 1: formatted duration like "4h 30m"; 2: bucket label (day/week/month). */
-									__( 'Average per active %2$s: %1$s (empty %2$ss excluded)', 'plain-language-time-tracker' ),
-									pltt_format_duration( $chart_avg_minutes ),
-									$chart_bucket_size
-								) );
-								?>">
-								<span class="pltt-chart-avg-label">
-									<?php
-									/* translators: %s: formatted duration. */
-									printf( esc_html__( 'avg %s', 'plain-language-time-tracker' ), esc_html( pltt_format_duration( $chart_avg_minutes ) ) );
-									?>
-								</span>
-							</div>
-						<?php endif; ?>
-						<?php foreach ( $chart_buckets as $bucket ) :
-							$billable_pct    = $y_ceiling_mins > 0 ? ( $bucket['billable_minutes'] / $y_ceiling_mins ) : 0;
-							$client_flat_pct = $y_ceiling_mins > 0 ? ( $bucket['client_flat_minutes'] / $y_ceiling_mins ) : 0;
-							$internal_pct    = $y_ceiling_mins > 0 ? ( $bucket['internal_minutes'] / $y_ceiling_mins ) : 0;
-							$total_minutes   = $bucket['billable_minutes'] + $bucket['client_flat_minutes'] + $bucket['internal_minutes'];
-							$is_empty        = 0 === $total_minutes;
-							$is_today        = ! empty( $chart_today_key ) && $bucket['key'] === $chart_today_key;
-							$is_weekend      = ! empty( $bucket['is_weekend'] );
-
-							$col_classes = array( 'pltt-chart-col' );
-							if ( $is_empty )   $col_classes[] = 'pltt-chart-col-empty';
-							if ( $is_today )   $col_classes[] = 'pltt-chart-col-today';
-							if ( $is_weekend ) $col_classes[] = 'pltt-chart-col-weekend';
-							?>
-							<div class="<?php echo esc_attr( implode( ' ', $col_classes ) ); ?>"
-								style="--billable-pct: <?php echo esc_attr( number_format( $billable_pct, 4, '.', '' ) ); ?>; --client-flat-pct: <?php echo esc_attr( number_format( $client_flat_pct, 4, '.', '' ) ); ?>; --internal-pct: <?php echo esc_attr( number_format( $internal_pct, 4, '.', '' ) ); ?>;"
-								title="<?php
-								echo esc_attr( sprintf(
-									/* translators: 1: bucket label, 2: billable hours, 3: client (flat-fee) hours, 4: internal hours. */
-									__( '%1$s — %2$s billable, %3$s client, %4$s internal', 'plain-language-time-tracker' ),
-									$bucket['long'],
-									pltt_format_hours( $bucket['billable_minutes'] ),
-									pltt_format_hours( $bucket['client_flat_minutes'] ),
-									pltt_format_hours( $bucket['internal_minutes'] )
-								) );
-								?>">
-								<div class="pltt-chart-bar">
-									<?php if ( $chart_show_values && ! $is_empty ) : ?>
-										<span class="pltt-chart-value"><?php echo esc_html( pltt_format_duration( $total_minutes ) ); ?></span>
-									<?php endif; ?>
-									<span class="pltt-chart-seg pltt-chart-seg-internal"></span>
-									<span class="pltt-chart-seg pltt-chart-seg-client-flat"></span>
-									<span class="pltt-chart-seg pltt-chart-seg-billable"></span>
-								</div>
-							</div>
-						<?php endforeach; ?>
-					</div>
-				</div>
-
-				<div class="pltt-chart-x-axis" aria-hidden="true">
-					<div class="pltt-chart-x-spacer"></div>
-					<div class="pltt-chart-x-ticks">
-						<?php
-						// On dense daily views (typically a full month or longer), hide every
-						// other label to reduce x-axis clutter. Today's label always shows.
-						$skip_alt_labels = ( 'day' === $chart_bucket_size && count( $chart_buckets ) > 20 );
-						foreach ( $chart_buckets as $i => $bucket ) :
-							$tick_is_today = ! empty( $chart_today_key ) && $bucket['key'] === $chart_today_key;
-							$hide_label    = $skip_alt_labels && ( $i % 2 !== 0 ) && ! $tick_is_today;
-							?>
-							<span class="pltt-chart-x-tick<?php echo $tick_is_today ? ' pltt-chart-x-tick-today' : ''; ?>">
-								<span class="pltt-chart-x-label<?php echo $hide_label ? ' screen-reader-text' : ''; ?>">
-									<?php if ( ! empty( $bucket['short_top'] ) ) : ?>
-										<span class="pltt-chart-x-label-top"><?php echo esc_html( $bucket['short_top'] ); ?></span>
-									<?php endif; ?>
-									<span class="pltt-chart-x-label-bottom"><?php echo esc_html( $bucket['short'] ); ?></span>
-								</span>
-							</span>
-						<?php endforeach; ?>
-					</div>
-				</div>
-
-			</figure>
-		</section>
-	<?php endif; ?>
+		include PLTT_PLUGIN_DIR . 'templates/partials/chart-by-period.php';
+	endif;
+	?>
 
 	<div id="pltt-report-content" class="pltt-report-content">
 
@@ -721,12 +600,24 @@ $tab_base_url = add_query_arg( $filter_params, admin_url( 'admin.php' ) );
 					<span class="pltt-unbilled-notice-icon" aria-hidden="true">!</span>
 					<p class="pltt-unbilled-notice-body">
 						<?php
-						printf(
-							/* translators: 1: entry count phrase, e.g. "4 entries"; 2: total duration, e.g. "3h 15m". */
-							esc_html__( 'There\'s billable time outside your current date range — %1$s totaling %2$s', 'plain-language-time-tracker' ),
-							esc_html( sprintf( _n( '%s entry', '%s entries', (int) $unbilled_notice->entry_count, 'plain-language-time-tracker' ), number_format_i18n( (int) $unbilled_notice->entry_count ) ) ),
-							esc_html( pltt_format_duration( (int) $unbilled_notice->total_minutes ) )
-						);
+						$un_count_phrase = sprintf( _n( '%s entry', '%s entries', (int) $unbilled_notice->entry_count, 'plain-language-time-tracker' ), number_format_i18n( (int) $unbilled_notice->entry_count ) );
+						$un_amount       = isset( $unbilled_notice->total_amount ) ? (float) $unbilled_notice->total_amount : 0;
+						if ( $un_amount > 0 ) {
+							printf(
+								/* translators: 1: entry count phrase, e.g. "4 entries"; 2: total duration, e.g. "3h 15m"; 3: approximate dollar value, e.g. "$795.00". */
+								esc_html__( 'There\'s billable time outside your current date range — %1$s totaling %2$s (≈ %3$s not yet invoiced)', 'plain-language-time-tracker' ),
+								esc_html( $un_count_phrase ),
+								esc_html( pltt_format_duration( (int) $unbilled_notice->total_minutes ) ),
+								esc_html( pltt_format_currency( $un_amount ) )
+							);
+						} else {
+							printf(
+								/* translators: 1: entry count phrase, e.g. "4 entries"; 2: total duration, e.g. "3h 15m". */
+								esc_html__( 'There\'s billable time outside your current date range — %1$s totaling %2$s', 'plain-language-time-tracker' ),
+								esc_html( $un_count_phrase ),
+								esc_html( pltt_format_duration( (int) $unbilled_notice->total_minutes ) )
+							);
+						}
 						?>
 					</p>
 					<a href="<?php echo esc_url( $un_url ); ?>" class="pltt-unbilled-notice-action">
@@ -809,12 +700,16 @@ $tab_base_url = add_query_arg( $filter_params, admin_url( 'admin.php' ) );
 									elseif ( $has_fee_alloc ) :
 										$fee_rate            = pltt_resolve_billable_rate( (int) $row->client_id, (int) $row->project_id );
 										$budget_hrs_from_fee = $fee_rate > 0 ? ( (float) $row->budget_fee / $fee_rate ) : 0;
+										$fee_used_mins       = (float) $alloc_stats[ $row->project_id ]->total_minutes;
 										pltt_render_allocation_bar(
-											(float) $alloc_stats[ $row->project_id ]->total_minutes,
+											$fee_used_mins,
 											$budget_hrs_from_fee,
 											$billing_type,
 											array(
-												'spent_dollars'  => (float) $alloc_stats[ $row->project_id ]->billable_amount,
+												// Spent = value of time burned (hours × rate), matching the
+												// project context card. billable_amount is $0 for fixed-fee
+												// work since its entries are non-billable (1.9.5 model).
+												'spent_dollars'  => round( ( $fee_used_mins / 60.0 ) * $fee_rate, 2 ),
 												'budget_dollars' => (float) $row->budget_fee,
 											)
 										);

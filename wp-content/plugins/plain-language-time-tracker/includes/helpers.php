@@ -54,6 +54,25 @@ function pltt_format_hours( $minutes ) {
 }
 
 /**
+ * Build the PlttTooltip attributes for a decimal-hours hover hint.
+ *
+ * Figures are shown in h/m (easy to read), but the exact decimal-hours value is
+ * what gets typed into invoice line items. This attaches a hover/focus tooltip
+ * that reveals that decimal (e.g. "= 34.92 h") without cluttering the display.
+ * Returns a ready-to-echo, pre-escaped attribute string; echo it inside a tag.
+ *
+ * @param int $minutes Total minutes.
+ * @return string Escaped `data-pltt-tip` attribute string.
+ */
+function pltt_decimal_hint_attrs( $minutes ) {
+	/* translators: %s: exact hours as a decimal, e.g. "34.92". */
+	$line = sprintf( __( '= %s h', 'plain-language-time-tracker' ), pltt_format_hours( $minutes ) );
+	$rows = array( array( '', $line ) );
+
+	return 'data-pltt-tip data-tip-color="none" tabindex="0" data-tip-rows=\'' . esc_attr( wp_json_encode( $rows ) ) . '\'';
+}
+
+/**
  * Convert time string to minutes since midnight.
  *
  * @param string $time Time string (e.g., "9:15am", "14:30").
@@ -615,6 +634,299 @@ function pltt_build_chart_buckets( $date_from, $date_to, $bucket_size ) {
 		$cursor = $cursor->modify( '+7 days' );
 	}
 	return $buckets;
+}
+
+/**
+ * Build the volume-chart context for a date range and filter set.
+ *
+ * Resolves a bucket size (day/week/month) from the range length, lays out the
+ * buckets, folds verified daily totals into them, and computes the y-axis max,
+ * the active-bucket average, and which bucket holds "today". Shared by the
+ * Reports summary chart and the Project Detail volume chart so the two stay in
+ * lock-step (OPT-DUP).
+ *
+ * @param string $date_from   Start date (Y-m-d).
+ * @param string $date_to     End date (Y-m-d).
+ * @param array  $filter_args Entry filters passed to get_chart_daily_totals()
+ *                            (e.g. project_id, client_id, tag, billable, billed).
+ * @return array{
+ *     buckets:array, bucket_size:string, max_minutes:int, avg_minutes:int, today_key:string
+ * }
+ */
+function pltt_build_period_chart_data( $date_from, $date_to, $filter_args = array() ) {
+	$bucket_size = pltt_resolve_bucket_size( $date_from, $date_to );
+	$buckets     = pltt_build_chart_buckets( $date_from, $date_to, $bucket_size );
+
+	$max_minutes = 0;
+	$avg_minutes = 0;
+	$today_key   = '';
+
+	if ( empty( $buckets ) ) {
+		return compact( 'buckets', 'bucket_size', 'max_minutes', 'avg_minutes', 'today_key' );
+	}
+
+	$daily_rows = PLTT_Entries::get_chart_daily_totals( $date_from, $date_to, $filter_args );
+
+	// Initialize totals on each bucket and build a key -> index map for O(1) lookup.
+	$bucket_index = array();
+	foreach ( $buckets as $i => $bucket ) {
+		$buckets[ $i ]['billable_minutes']    = 0;
+		$buckets[ $i ]['client_flat_minutes'] = 0;
+		$buckets[ $i ]['internal_minutes']    = 0;
+		$bucket_index[ $bucket['key'] ]       = $i;
+	}
+
+	foreach ( $daily_rows as $row ) {
+		$ymd = $row->entry_date;
+		if ( 'day' === $bucket_size ) {
+			$key = $ymd;
+		} elseif ( 'month' === $bucket_size ) {
+			$key = substr( $ymd, 0, 7 );
+		} else {
+			// Weekly: find the bucket whose start <= ymd <= end.
+			$key = null;
+			foreach ( $buckets as $bucket ) {
+				if ( $ymd >= $bucket['start'] && $ymd <= $bucket['end'] ) {
+					$key = $bucket['key'];
+					break;
+				}
+			}
+		}
+
+		if ( null === $key || ! isset( $bucket_index[ $key ] ) ) {
+			continue;
+		}
+
+		$i = $bucket_index[ $key ];
+		$buckets[ $i ]['billable_minutes']    += (int) $row->billable_minutes;
+		$buckets[ $i ]['client_flat_minutes'] += (int) $row->client_flat_minutes;
+		$buckets[ $i ]['internal_minutes']    += (int) $row->internal_minutes;
+	}
+
+	// Max for the y-axis scale; average over only buckets with logged time so
+	// empty days/weeks/months (weekends, leave, future days) don't dilute it.
+	$total_minutes  = 0;
+	$active_buckets = 0;
+	foreach ( $buckets as $bucket ) {
+		$bucket_total = (int) $bucket['billable_minutes']
+			+ (int) $bucket['client_flat_minutes']
+			+ (int) $bucket['internal_minutes'];
+		if ( $bucket_total > $max_minutes ) {
+			$max_minutes = $bucket_total;
+		}
+		$total_minutes += $bucket_total;
+		if ( $bucket_total > 0 ) {
+			$active_buckets++;
+		}
+	}
+	$avg_minutes = $active_buckets > 0 ? (int) round( $total_minutes / $active_buckets ) : 0;
+
+	// Identify which bucket (if any) contains today, for the "today" marker.
+	$today_ymd = pltt_get_current_date();
+	if ( $today_ymd >= $date_from && $today_ymd <= $date_to ) {
+		if ( 'day' === $bucket_size ) {
+			$today_key = $today_ymd;
+		} elseif ( 'month' === $bucket_size ) {
+			$today_key = substr( $today_ymd, 0, 7 );
+		} else {
+			$week_start_dow = (int) get_option( 'start_of_week', 0 );
+			$today_dt       = new DateTimeImmutable( $today_ymd, wp_timezone() );
+			$today_dow      = (int) $today_dt->format( 'w' );
+			$shift          = ( $today_dow - $week_start_dow + 7 ) % 7;
+			$today_key      = $today_dt->modify( "-{$shift} days" )->format( 'Y-m-d' );
+		}
+	}
+
+	return compact( 'buckets', 'bucket_size', 'max_minutes', 'avg_minutes', 'today_key' );
+}
+
+/**
+ * Map a project recurring_period to a chart stepping unit.
+ *
+ * @param string $recurring_period '' | weekly | monthly | quarterly | yearly.
+ * @return string 'week' | 'month' | 'quarter' | 'year'.
+ */
+function pltt_chart_period_unit( $recurring_period ) {
+	switch ( $recurring_period ) {
+		case 'weekly':
+			return 'week';
+		case 'quarterly':
+			return 'quarter';
+		case 'yearly':
+			return 'year';
+		case 'monthly':
+		default:
+			return 'month';
+	}
+}
+
+/**
+ * Canonical start date of the period (of the given unit) that contains $date.
+ *
+ * @param DateTimeImmutable $date Any date inside the period.
+ * @param string            $unit 'week' | 'month' | 'quarter' | 'year'.
+ * @return DateTimeImmutable Period start (midnight).
+ */
+function pltt_period_start( DateTimeImmutable $date, $unit ) {
+	switch ( $unit ) {
+		case 'week':
+			$wsd   = (int) get_option( 'start_of_week', 0 );
+			$dow   = (int) $date->format( 'w' );
+			$shift = ( $dow - $wsd + 7 ) % 7;
+			return $date->modify( "-{$shift} days" );
+		case 'quarter':
+			$month  = (int) $date->format( 'n' );
+			$qstart = (int) ( floor( ( $month - 1 ) / 3 ) * 3 ) + 1;
+			return $date->setDate( (int) $date->format( 'Y' ), $qstart, 1 );
+		case 'year':
+			return $date->setDate( (int) $date->format( 'Y' ), 1, 1 );
+		case 'month':
+		default:
+			return $date->modify( 'first day of this month' );
+	}
+}
+
+/**
+ * Canonical end date of a period that starts at $start.
+ *
+ * @param DateTimeImmutable $start Period start.
+ * @param string            $unit  'week' | 'month' | 'quarter' | 'year'.
+ * @return DateTimeImmutable Period end (inclusive).
+ */
+function pltt_period_end( DateTimeImmutable $start, $unit ) {
+	switch ( $unit ) {
+		case 'week':
+			return $start->modify( '+6 days' );
+		case 'quarter':
+			return $start->modify( '+3 months -1 day' );
+		case 'year':
+			return $start->modify( '+1 year -1 day' );
+		case 'month':
+		default:
+			return $start->modify( 'last day of this month' );
+	}
+}
+
+/**
+ * Human label for a period that starts at $start.
+ *
+ * @param DateTimeImmutable $start Period start.
+ * @param string            $unit  'week' | 'month' | 'quarter' | 'year'.
+ * @return string e.g. "June 2026", "Q2 2026", "Week of Jun 9, 2026", "2026".
+ */
+function pltt_period_label( DateTimeImmutable $start, $unit ) {
+	switch ( $unit ) {
+		case 'week':
+			/* translators: %s: week start date, e.g. "Jun 9, 2026". */
+			return sprintf( __( 'Week of %s', 'plain-language-time-tracker' ), $start->format( 'M j, Y' ) );
+		case 'quarter':
+			$q = (int) ( floor( ( (int) $start->format( 'n' ) - 1 ) / 3 ) + 1 );
+			/* translators: 1: quarter number, 2: four-digit year. */
+			return sprintf( __( 'Q%1$d %2$s', 'plain-language-time-tracker' ), $q, $start->format( 'Y' ) );
+		case 'year':
+			return $start->format( 'Y' );
+		case 'month':
+		default:
+			return $start->format( 'F Y' );
+	}
+}
+
+/**
+ * Resolve the active period window for the Project Detail report.
+ *
+ * Recurring projects get a steppable per-period lens — the stat cards, the
+ * "Where the time went" bars, and the volume chart all reflect the chosen
+ * window, while the swimlane stays the full lifetime arc. Every other billing
+ * type stays on the full lifetime span with no control. Scope/period are driven
+ * by the chart_scope ('full'|'period') and chart_period (Y-m-d anchor) query
+ * args; anything out of range is clamped to the project's active span.
+ *
+ * @param string $billing_type     Resolved billing type (recurring/fixed/hourly/none).
+ * @param string $recurring_period Project recurring_period (drives the step unit).
+ * @param string $first_date       Project first entry date (Y-m-d).
+ * @param string $last_date        Project last entry date (Y-m-d).
+ * @param string $req_scope        Requested scope from the query ('full'|'period').
+ * @param string $req_anchor       Requested period anchor from the query (Y-m-d).
+ * @return array{
+ *     show_control:bool, scope:string, unit:string, from:string, to:string,
+ *     anchor:?string, prev_anchor:?string, next_anchor:?string, is_latest:bool,
+ *     period_label:string, can_step:bool
+ * }
+ */
+function pltt_resolve_project_chart_window( $billing_type, $recurring_period, $first_date, $last_date, $req_scope = '', $req_anchor = '' ) {
+	$unit = pltt_chart_period_unit( $recurring_period );
+
+	$full = array(
+		'show_control' => false,
+		'scope'        => 'full',
+		'unit'         => $unit,
+		'from'         => $first_date,
+		'to'           => $last_date,
+		'anchor'       => null,
+		'prev_anchor'  => null,
+		'next_anchor'  => null,
+		'is_latest'    => true,
+		'period_label' => '',
+		'can_step'     => false,
+	);
+
+	// Only recurring projects get the period lens; everything else is lifetime.
+	if ( 'recurring' !== $billing_type || ! $first_date || ! $last_date ) {
+		return $full;
+	}
+
+	$tz           = wp_timezone();
+	$first        = new DateTimeImmutable( $first_date, $tz );
+	$last         = new DateTimeImmutable( $last_date, $tz );
+	$first_pstart = pltt_period_start( $first, $unit );
+	$last_pstart  = pltt_period_start( $last, $unit );
+
+	// The control always shows for recurring projects (so you can switch to Full);
+	// stepping is only meaningful when the project spans more than one period.
+	$full['show_control'] = true;
+	$full['can_step']     = ( $first_pstart->format( 'Y-m-d' ) !== $last_pstart->format( 'Y-m-d' ) );
+
+	$scope = in_array( $req_scope, array( 'full', 'period' ), true ) ? $req_scope : 'period';
+	if ( 'full' === $scope ) {
+		return $full;
+	}
+
+	// Period scope: resolve the anchor (default = most recent active period).
+	$anchor = null;
+	if ( $req_anchor ) {
+		$parsed = DateTimeImmutable::createFromFormat( '!Y-m-d', $req_anchor, $tz );
+		if ( $parsed instanceof DateTimeImmutable ) {
+			$anchor = pltt_period_start( $parsed, $unit );
+		}
+	}
+	if ( null === $anchor ) {
+		$anchor = $last_pstart;
+	}
+	// Clamp to the project's active span of periods.
+	if ( $anchor < $first_pstart ) {
+		$anchor = $first_pstart;
+	}
+	if ( $anchor > $last_pstart ) {
+		$anchor = $last_pstart;
+	}
+
+	$pend = pltt_period_end( $anchor, $unit );
+	$prev = pltt_period_start( $anchor->modify( '-1 day' ), $unit );
+	$next = pltt_period_start( $pend->modify( '+1 day' ), $unit );
+
+	return array(
+		'show_control' => true,
+		'scope'        => 'period',
+		'unit'         => $unit,
+		'from'         => $anchor->format( 'Y-m-d' ),
+		'to'           => $pend->format( 'Y-m-d' ),
+		'anchor'       => $anchor->format( 'Y-m-d' ),
+		'prev_anchor'  => ( $prev >= $first_pstart ) ? $prev->format( 'Y-m-d' ) : null,
+		'next_anchor'  => ( $next <= $last_pstart ) ? $next->format( 'Y-m-d' ) : null,
+		'is_latest'    => ! ( $next <= $last_pstart ),
+		'period_label' => pltt_period_label( $anchor, $unit ),
+		'can_step'     => $full['can_step'],
+	);
 }
 
 /**
@@ -1494,17 +1806,29 @@ function pltt_render_allocation_bar( $alloc_mins, $budget_hours, $billing_type, 
 		$label = $label_override;
 	}
 
+	$hrs_unit  = __( 'hrs', 'plain-language-time-tracker' );
+	$used_hrs  = pltt_format_hours( $alloc_mins ) . ' ' . $hrs_unit;
 	if ( null !== $fee_args ) {
-		$tooltip = pltt_format_hours( $alloc_mins ) . ' ' . __( 'hrs', 'plain-language-time-tracker' )
-			. ' · ' . __( 'Spent:', 'plain-language-time-tracker' ) . ' ' . pltt_format_currency( $fee_args['spent_dollars'] )
-			. ' · ' . __( 'Budget:', 'plain-language-time-tracker' ) . ' ' . pltt_format_currency( $fee_args['budget_dollars'] );
+		$alloc_rows = array(
+			array( __( 'Used', 'plain-language-time-tracker' ), $used_hrs ),
+			array( __( 'Spent', 'plain-language-time-tracker' ), pltt_format_currency( $fee_args['spent_dollars'] ) ),
+			array( __( 'Budget', 'plain-language-time-tracker' ), pltt_format_currency( $fee_args['budget_dollars'] ) ),
+		);
 	} else {
-		$tooltip = pltt_format_hours( $alloc_mins ) . ' ' . __( 'hrs', 'plain-language-time-tracker' )
-			. ' · ' . __( 'Budget:', 'plain-language-time-tracker' ) . ' ' . pltt_format_hours( $budget_hours * 60 ) . ' ' . __( 'hrs', 'plain-language-time-tracker' );
+		$alloc_rows = array(
+			array( __( 'Used', 'plain-language-time-tracker' ), $used_hrs ),
+			array( __( 'Budget', 'plain-language-time-tracker' ), pltt_format_hours( $budget_hours * 60 ) . ' ' . $hrs_unit ),
+		);
 	}
 
 	?>
-	<div class="pltt-alloc-cell" title="<?php echo esc_attr( $tooltip ); ?>">
+	<div
+		class="pltt-alloc-cell"
+		data-pltt-tip
+		data-tip-title="<?php esc_attr_e( 'Allocation', 'plain-language-time-tracker' ); ?>"
+		data-tip-color="none"
+		data-tip-rows='<?php echo esc_attr( wp_json_encode( $alloc_rows ) ); ?>'
+	>
 		<div class="pltt-alloc-bar-wrap<?php echo $is_over ? ' pltt-alloc-over' : ''; ?>">
 			<span class="pltt-alloc-seg pltt-alloc-seg-within"
 				  style="width:<?php echo esc_attr( $within_seg_pct ); ?>%"></span>
