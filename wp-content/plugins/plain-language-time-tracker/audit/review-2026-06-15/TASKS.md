@@ -63,9 +63,9 @@ The post-freeze Project Detail report files are re-implementing money math that 
 
 | ID | Title | Locations | Fix | Effort | Status |
 |----|-------|-----------|-----|--------|--------|
-| OPT-DUP-A | Billable-amount math repeated 7× | helpers / review / ajax (`round((min/60)*rate,2)`) | Extract one `pltt_compute_billable_amount($minutes,$rate)` helper; replace all sites. | M | TODO |
-| OPT-DUP-B | `COALESCE(billable_amount, ROUND(...))` SQL 4× | `includes/database/class-pltt-entries.php:446,529,593,657` | Extract a shared SQL fragment/constant. Expands existing OPT-DUP11. | S | TODO |
-| OPT-DUP-C | Budget→allocation-minutes cascade 3× | `includes/helpers.php:1628`, `class-pltt-project-report.php:212,825` | Single helper. | M | TODO |
+| OPT-DUP-A | Billable-amount math repeated 7× | helpers / review / ajax (`round((min/60)*rate,2)`) | Extract one `pltt_compute_billable_amount($minutes,$rate)` helper; replace all sites. | M | **DONE** (v1.9.22) |
+| OPT-DUP-B | `COALESCE(billable_amount, ROUND(...))` SQL 4× | `includes/database/class-pltt-entries.php:446,529,593,657` | Extract a shared SQL fragment/constant. Expands existing OPT-DUP11. | S | **DONE** (v1.9.22) |
+| OPT-DUP-C | Budget→allocation-minutes cascade 3× | `includes/helpers.php:1628`, `class-pltt-project-report.php:212,825` | Single helper. | M | **DONE** (v1.9.22) |
 | OPT-DUP-D | verify-cap + nonce boilerplate (9×/6×) | form-handlers / admin | Extract a shared guard helper. Existing OPT-DUP3/4. | M | TODO |
 | OPT-DUP-E/F/G/I/J | Effective-rate calc 3×; per-period delta/arrow 2×; overage-dollar blocks 2×; `<option>` builder 3× (incl. review.js:1276); review.js twin-IIFE ~200 LOC modal dup | various — see raw | Consolidate per item. J is the largest (relates to the planned native-`<dialog>` refactor). | M–L | TODO |
 

@@ -1133,6 +1133,56 @@ function pltt_resolve_billable_rate( $client_id, $project_id, $clients_cache = a
 }
 
 /**
+ * Compute the billable dollar amount for a block of time.
+ *
+ * This is the plugin's canonical "minutes × rate → dollars" rule (OPT-DUP-A).
+ * Route every billable-amount snapshot through it so the rounding mode can't
+ * drift between call sites.
+ *
+ * SYNC: the SQL fallback in PLTT_Entries::billable_amount_expr() and the JS
+ * amount math in assets/js/reports.js must match this (round half-up, 2 dp).
+ *
+ * @param int   $minutes Duration in minutes.
+ * @param float $rate    Hourly rate.
+ * @return float Amount rounded to cents.
+ */
+function pltt_billable_amount( $minutes, $rate ) {
+	return round( ( (int) $minutes / 60.0 ) * (float) $rate, 2 );
+}
+
+/**
+ * Resolve a project's budgeted time in minutes.
+ *
+ * Canonical budget cascade (OPT-DUP-C): explicit budget_hours × 60, else
+ * budget_fee ÷ hourly rate × 60 when a positive rate is known, else 0. Keeps the
+ * hours-before-fee precedence in one place so the three report surfaces can't
+ * diverge.
+ *
+ * @param object     $project Project row (budget_hours, budget_fee, client_id, id).
+ * @param float|null $rate    Resolved hourly rate. When null and the fee path is
+ *                            needed, it is resolved via pltt_resolve_billable_rate().
+ * @return int Budgeted minutes (0 when no allocation can be determined).
+ */
+function pltt_budgeted_minutes( $project, $rate = null ) {
+	$budget_hours = isset( $project->budget_hours ) ? (float) $project->budget_hours : 0.0;
+	if ( $budget_hours > 0 ) {
+		return (int) round( $budget_hours * 60 );
+	}
+
+	$budget_fee = isset( $project->budget_fee ) ? (float) $project->budget_fee : 0.0;
+	if ( $budget_fee > 0 ) {
+		if ( null === $rate ) {
+			$rate = pltt_resolve_billable_rate( (int) $project->client_id, (int) $project->id );
+		}
+		if ( (float) $rate > 0 ) {
+			return (int) round( ( $budget_fee / (float) $rate ) * 60 );
+		}
+	}
+
+	return 0;
+}
+
+/**
  * Render the overage threshold marker row inside an entry table.
  *
  * Spans the full table width. Styled as chrome (dashed amber borders, warm
@@ -1348,7 +1398,7 @@ function pltt_render_entry_table( $entries, $options = array() ) {
 							} else {
 								// Fallback: resolve rate on-the-fly using the canonical helper.
 								$hourly_rate     = pltt_resolve_billable_rate( (int) $entry->client_id, (int) $entry->project_id, $clients_cache, $projects_cache );
-								$billable_amount = round( ( $entry->duration_minutes / 60.0 ) * $hourly_rate, 2 );
+								$billable_amount = pltt_billable_amount( $entry->duration_minutes, $hourly_rate );
 							}
 						}
 						?>
@@ -1600,16 +1650,8 @@ function pltt_compute_overage_threshold( $project, $filter_args ) {
 		return $out;
 	}
 
-	// Resolve allocation in minutes. Prefer explicit budget_hours.
-	$alloc_minutes = 0;
-	if ( ! empty( $project->budget_hours ) ) {
-		$alloc_minutes = (int) round( (float) $project->budget_hours * 60 );
-	} elseif ( ! empty( $project->budget_fee ) ) {
-		$rate = pltt_resolve_billable_rate( (int) $project->client_id, (int) $project->id );
-		if ( $rate > 0 ) {
-			$alloc_minutes = (int) round( ( (float) $project->budget_fee / $rate ) * 60 );
-		}
-	}
+	// Resolve allocation in minutes (canonical hours-before-fee cascade).
+	$alloc_minutes = pltt_budgeted_minutes( $project );
 
 	if ( $alloc_minutes <= 0 ) {
 		$out['reason'] = 'no_allocation';
@@ -1670,7 +1712,7 @@ function pltt_compute_overage_threshold( $project, $filter_args ) {
 				$marked_amount += (float) $e->billable_amount;
 			} else {
 				$rate           = pltt_resolve_billable_rate( (int) $e->client_id, (int) $e->project_id );
-				$marked_amount += round( ( $dur / 60.0 ) * $rate, 2 );
+				$marked_amount += pltt_billable_amount( $dur, $rate );
 			}
 		}
 
@@ -1714,7 +1756,7 @@ function pltt_compute_overage_threshold( $project, $filter_args ) {
 					$overage_amount += (float) $e->billable_amount;
 				} else {
 					$rate = pltt_resolve_billable_rate( (int) $e->client_id, (int) $e->project_id );
-					$overage_amount += round( ( $dur / 60.0 ) * $rate, 2 );
+					$overage_amount += pltt_billable_amount( $dur, $rate );
 				}
 			}
 		}

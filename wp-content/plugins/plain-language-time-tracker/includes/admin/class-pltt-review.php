@@ -250,7 +250,7 @@ class PLTT_Review {
 					// OPT-DUP5 / TRC-3: route through the canonical rate-resolution
 					// helper instead of duplicating the cascade.
 					$hourly_rate     = pltt_resolve_billable_rate( $client_id, $project_id, $clients_cache, $projects_cache );
-					$billable_amount = round( ( $entry->duration_minutes / 60.0 ) * $hourly_rate, 2 );
+					$billable_amount = pltt_billable_amount( $entry->duration_minutes, $hourly_rate );
 				}
 
 				// Add to summary totals.
@@ -407,12 +407,12 @@ class PLTT_Review {
 				if ( ! $was_verified || $rate_was_zero ) {
 					// Newly verified, or previously verified as non-billable (rate=0): resolve fresh.
 					$data['billable_rate']   = self::resolve_billable_rate( $data, $clients_cache, $projects_cache );
-					$data['billable_amount'] = round( ( $duration_minutes / 60.0 ) * $data['billable_rate'], 2 );
+					$data['billable_amount'] = pltt_billable_amount( $duration_minutes, $data['billable_rate'] );
 				} else {
 					// Already verified with a real rate: keep it, recalculate amount if duration changed.
 					if ( null !== $original->billable_rate ) {
 						$data['billable_rate']   = $original->billable_rate;
-						$data['billable_amount'] = round( ( $duration_minutes / 60.0 ) * $original->billable_rate, 2 );
+						$data['billable_amount'] = pltt_billable_amount( $duration_minutes, $original->billable_rate );
 					}
 				}
 			} else {
