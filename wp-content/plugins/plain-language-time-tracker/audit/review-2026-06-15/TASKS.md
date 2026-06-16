@@ -33,12 +33,12 @@ Effort: **S** = <1h, **M** = a few hours, **L** = half-day+.
 
 | ID | Title | File:line | Fix | Effort | Status |
 |----|-------|-----------|-----|--------|--------|
-| OPT-DEAD1 | Delete unused `PLTT_Tags::get_for_entry()` | `includes/database/class-pltt-tags.php:333` | Zero callers (grep-proven). Remove. | S | TODO |
-| OPT-DEAD2 | Delete unused `PLTT_Tags::set_group()` | `includes/database/class-pltt-tags.php:186` | Zero callers. Remove. | S | TODO |
-| OPT-DEAD3 | Delete unused `pltt_count_working_days()` | `includes/helpers.php:435` | Zero callers. Remove. | S | TODO |
-| OPT-DEAD4 | Remove dead `modal._refreshFocusTrap` | `assets/js/shared.js:148` | Exposed but never called. Remove. | S | TODO |
-| OPT-N-A | Drop duplicate windowed `get_stats()` | `includes/admin/class-pltt-project-detail.php:67` vs `class-pltt-project-report.php:93` | Same windowed stats computed twice per Project Detail render. Compute once, pass down. | S | TODO |
-| OPT-N-B | `get_all_groups()` runs twice per render | `includes/admin/class-pltt-project-report.php:81` & `:107` | Cache the result for the request / pass it. | S | TODO |
+| OPT-DEAD1 | Delete unused `PLTT_Tags::get_for_entry()` | `includes/database/class-pltt-tags.php:333` | Zero callers (grep-proven). Remove. | S | **DONE** (v1.9.21) |
+| OPT-DEAD2 | Delete unused `PLTT_Tags::set_group()` | `includes/database/class-pltt-tags.php:186` | Zero callers. Remove. | S | **DONE** (v1.9.21) |
+| OPT-DEAD3 | Delete unused `pltt_count_working_days()` | `includes/helpers.php:435` | Zero callers. Remove. | S | **DONE** (v1.9.21) |
+| OPT-DEAD4 | Remove dead `modal._refreshFocusTrap` | `assets/js/shared.js:148` | Exposed but never called. Remove. | S | **DONE** (v1.9.21) |
+| OPT-N-A | Drop duplicate windowed `get_stats()` | `includes/admin/class-pltt-project-detail.php:67` vs `class-pltt-project-report.php:93` | Same windowed stats computed twice per Project Detail render. Compute once, pass down. | S | **DONE** (v1.9.21) |
+| OPT-N-B | `get_all_groups()` runs twice per render | `includes/admin/class-pltt-project-report.php:81` & `:107` | Cache the result for the request / pass it. | S | **DONE** (v1.9.21) |
 
 ---
 
@@ -46,14 +46,14 @@ Effort: **S** = <1h, **M** = a few hours, **L** = half-day+.
 
 | ID | Sev | Title | File:line | Fix | Effort | Status |
 |----|-----|-------|-----------|-----|--------|--------|
-| TRC-UI3 | Low | Orphaned `bulk_assign_group` handler | `includes/api/class-pltt-form-handlers.php:39` | `handle_bulk_assign_group` (nonce `pltt_bulk_tag_group`) is registered + implemented but no UI emits its form/`tag_ids[]`/nonce. **Decide:** wire up the UI (part of in-progress tag-taxonomy work) OR remove the handler. Check [`project-tag-taxonomy-cleanup`] before deleting. | S | TODO |
-| TRC-UI1 | Low | Dead create-client fallback + nonce/action mismatch | `templates/clients.php:135-138` | Form defaults to `action=pltt_create_client` (no `admin_post` handler — AJAX-only) and its nonce field names `pltt_update_client`. Either add a real `admin_post` no-JS fallback handler with a matching nonce, or remove the misleading `action`/nonce so the form is honestly AJAX-only. | S | TODO |
-| TRC-UI2 | Low | Same dead fallback for create-project | `templates/projects.php:227-230` | `action=pltt_create_project`, no handler, nonce names `pltt_update_project`. Same fix as TRC-UI1. | S | TODO |
-| TRC-API2 | Low | `create_client` missing `is_wp_error()` guard | `includes/api/class-pltt-ajax.php:351` | Latent (inputs pre-validated). Add `is_wp_error()` guard before passing `Clients::create` return to `Clients::get()`. | S | TODO |
-| TRC-API3 | Low | `create_project` missing `is_wp_error()` guard | `includes/api/class-pltt-ajax.php:456` | Latent. Same shape as TRC-API2. | S | TODO |
-| SEC-L1 | Low | `wp_json_encode` without `JSON_HEX_TAG` in inline script | `templates/reports.php:377-390`, `templates/review.php:94` | A `</script>` in an admin-authored name could break out (self-XSS). Add `JSON_HEX_TAG \| JSON_HEX_AMP` flags. | S | TODO |
-| SEC-L3 | Low | Back-link copies raw `$_GET` (allowlisted) | `templates/reports.php:801` | Mitigated today by `esc_url()` + `wp_validate_redirect()`. Hardening only — explicitly sanitize each copied value by type. | S | TODO |
-| TRC-BIZ-DOC1 | Low | Docblock contradicts code on cache-miss fallback | `includes/helpers.php:1118-1120` (vs `:1137`, `:1145`) | `pltt_resolve_billable_rate()` docblock says a cache miss does NOT hit the DB; the code does. Fix the comment to match (DB fallback on miss). Doc-only. | S | TODO |
+| TRC-UI3 | Low | Orphaned `bulk_assign_group` handler | `includes/api/class-pltt-form-handlers.php:39` | `handle_bulk_assign_group` (nonce `pltt_bulk_tag_group`) is registered + implemented but no UI emits its form/`tag_ids[]`/nonce. **Decide:** wire up the UI (part of in-progress tag-taxonomy work) OR remove the handler. Check [`project-tag-taxonomy-cleanup`] before deleting. | S | **DONE** (v1.9.21) |
+| TRC-UI1 | Low | Dead create-client fallback + nonce/action mismatch | `templates/clients.php:135-138` | Form defaults to `action=pltt_create_client` (no `admin_post` handler — AJAX-only) and its nonce field names `pltt_update_client`. Either add a real `admin_post` no-JS fallback handler with a matching nonce, or remove the misleading `action`/nonce so the form is honestly AJAX-only. | S | **DONE** (v1.9.21) |
+| TRC-UI2 | Low | Same dead fallback for create-project | `templates/projects.php:227-230` | `action=pltt_create_project`, no handler, nonce names `pltt_update_project`. Same fix as TRC-UI1. | S | **DONE** (v1.9.21) |
+| TRC-API2 | Low | `create_client` missing `is_wp_error()` guard | `includes/api/class-pltt-ajax.php:351` | Latent (inputs pre-validated). Add `is_wp_error()` guard before passing `Clients::create` return to `Clients::get()`. | S | **DONE** (v1.9.21) |
+| TRC-API3 | Low | `create_project` missing `is_wp_error()` guard | `includes/api/class-pltt-ajax.php:456` | Latent. Same shape as TRC-API2. | S | **DONE** (v1.9.21) |
+| SEC-L1 | Low | `wp_json_encode` without `JSON_HEX_TAG` in inline script | `templates/reports.php:377-390`, `templates/review.php:94` | A `</script>` in an admin-authored name could break out (self-XSS). Add `JSON_HEX_TAG \| JSON_HEX_AMP` flags. | S | **DONE** (v1.9.21) |
+| SEC-L3 | Low | Back-link copies raw `$_GET` (allowlisted) | `templates/reports.php:801` | Mitigated today by `esc_url()` + `wp_validate_redirect()`. Hardening only — explicitly sanitize each copied value by type. | S | **DONE** (v1.9.21) |
+| TRC-BIZ-DOC1 | Low | Docblock contradicts code on cache-miss fallback | `includes/helpers.php:1118-1120` (vs `:1137`, `:1145`) | `pltt_resolve_billable_rate()` docblock says a cache miss does NOT hit the DB; the code does. Fix the comment to match (DB fallback on miss). Doc-only. | S | **DONE** (v1.9.21) |
 
 ---
 

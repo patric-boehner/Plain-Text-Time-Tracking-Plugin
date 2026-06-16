@@ -376,10 +376,12 @@ $tab_base_url = add_query_arg( $filter_params, admin_url( 'admin.php' ) );
 	<?php
 	wp_add_inline_script(
 		'pltt-reports',
-		'var plttProjectsByClient = ' . wp_json_encode( $projects_by_client ) . ';' .
-		'var plttClientNames = ' . wp_json_encode( $client_names ) . ';' .
-		'var plttAllTags = ' . wp_json_encode( $all_tags ) . ';' .
-		'var plttTagGroups = ' . wp_json_encode( PLTT_Tags::get_name_to_group_map() ) . ';' .
+		// SEC-L1: JSON_HEX_TAG/AMP so a "</script>" inside an admin-authored name
+		// can't break out of this inline <script>.
+		'var plttProjectsByClient = ' . wp_json_encode( $projects_by_client, JSON_HEX_TAG | JSON_HEX_AMP ) . ';' .
+		'var plttClientNames = ' . wp_json_encode( $client_names, JSON_HEX_TAG | JSON_HEX_AMP ) . ';' .
+		'var plttAllTags = ' . wp_json_encode( $all_tags, JSON_HEX_TAG | JSON_HEX_AMP ) . ';' .
+		'var plttTagGroups = ' . wp_json_encode( PLTT_Tags::get_name_to_group_map(), JSON_HEX_TAG | JSON_HEX_AMP ) . ';' .
 		'var plttReportStats = ' . wp_json_encode( array(
 			'billableMinutes' => $stats ? (int) $stats->billable_minutes : 0,
 			'billableAmount'  => $stats ? round( (float) $stats->billable_amount, 2 ) : 0,
@@ -798,7 +800,16 @@ $tab_base_url = add_query_arg( $filter_params, admin_url( 'admin.php' ) );
 					'paged',
 				) );
 				// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only query for building a back-link.
-				$return_url = add_query_arg( array_intersect_key( wp_unslash( $_GET ), $return_allowed ), admin_url( 'admin.php' ) );
+				$return_params = array_intersect_key( wp_unslash( $_GET ), $return_allowed );
+				// SEC-L3: sanitize each surviving value (keys are already allowlisted);
+				// drop any non-scalar so an array param can't slip into the back-link.
+				$return_params = array_map(
+					static function ( $value ) {
+						return is_scalar( $value ) ? sanitize_text_field( $value ) : '';
+					},
+					$return_params
+				);
+				$return_url = add_query_arg( $return_params, admin_url( 'admin.php' ) );
 				?>
 
 				<?php foreach ( $entries_by_date as $group_date => $group_entries ) :

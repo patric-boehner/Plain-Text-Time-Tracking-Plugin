@@ -68,7 +68,9 @@ class PLTT_Project_Detail {
 			: $stats;
 		$subhead = self::build_subhead( $project, $subhead_stats, $billing_type, $window );
 
-		$report = PLTT_Project_Report::build( $project_id, $project, null, $stats, $window );
+		// Pass $subhead_stats through as the windowed stats so build() reuses them
+		// instead of re-running the same windowed get_stats() (OPT-N-A).
+		$report = PLTT_Project_Report::build( $project_id, $project, null, $stats, $window, $subhead_stats );
 
 		include PLTT_PLUGIN_DIR . 'templates/project-detail.php';
 	}

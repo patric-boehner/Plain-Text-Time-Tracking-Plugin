@@ -225,7 +225,8 @@ if ( ! empty( $projects ) ) {
 	<div class="pltt-modal-content">
 		<h3 id="pltt-project-modal-title"><?php esc_html_e( 'Add Project', 'plain-language-time-tracker' ); ?></h3>
 		<form id="pltt-project-form" method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
-			<input type="hidden" name="action" id="pltt-project-form-action" value="pltt_create_project">
+			<?php // TRC-UI2: the only native submit is the update path; create is handled by AJAX (pltt_create_project). ?>
+			<input type="hidden" name="action" id="pltt-project-form-action" value="pltt_update_project">
 			<input type="hidden" id="pltt-edit-project-id" name="project_id" value="">
 			<?php wp_nonce_field( 'pltt_update_project', '_wpnonce', true, true ); ?>
 			<p>
@@ -504,7 +505,6 @@ if ( ! empty( $projects ) ) {
 			document.getElementById('pltt-project-status-group').classList.add('pltt-hidden');
 			document.getElementById('pltt-project-status').value = 'active';
 			document.getElementById('pltt-delete-project-btn').classList.remove('visible');
-			document.getElementById('pltt-project-form-action').value = 'pltt_create_project';
 			document.getElementById('pltt-project-billing-type').value = 'hourly';
 			applyBillingTypeUI('hourly', true);
 			PLTT.showModal('pltt-project-modal');

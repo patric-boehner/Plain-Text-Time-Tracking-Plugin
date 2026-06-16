@@ -351,17 +351,22 @@ class PLTT_Ajax {
 
 		$client_id = PLTT_Clients::create( $client_data );
 
-		if ( $client_id ) {
-			$client = PLTT_Clients::get( $client_id );
-			wp_send_json_success(
-				array(
-					'client'  => $client,
-					'message' => __( 'Client created.', 'plain-language-time-tracker' ),
-				)
-			);
-		} else {
-			wp_send_json_error( __( 'Failed to create client.', 'plain-language-time-tracker' ) );
+		// TRC-API2: a WP_Error is truthy — guard it before passing the id onward.
+		if ( is_wp_error( $client_id ) || ! $client_id ) {
+			$message = is_wp_error( $client_id )
+				? $client_id->get_error_message()
+				: __( 'Failed to create client.', 'plain-language-time-tracker' );
+			wp_send_json_error( $message );
+			return;
 		}
+
+		$client = PLTT_Clients::get( $client_id );
+		wp_send_json_success(
+			array(
+				'client'  => $client,
+				'message' => __( 'Client created.', 'plain-language-time-tracker' ),
+			)
+		);
 	}
 
 	/**
@@ -458,17 +463,22 @@ class PLTT_Ajax {
 
 		$project_id = PLTT_Projects::create( $project_data );
 
-		if ( $project_id ) {
-			$project = PLTT_Projects::get( $project_id );
-			wp_send_json_success(
-				array(
-					'project' => $project,
-					'message' => __( 'Project created.', 'plain-language-time-tracker' ),
-				)
-			);
-		} else {
-			wp_send_json_error( __( 'Failed to create project.', 'plain-language-time-tracker' ) );
+		// TRC-API3: a WP_Error is truthy — guard it before passing the id onward.
+		if ( is_wp_error( $project_id ) || ! $project_id ) {
+			$message = is_wp_error( $project_id )
+				? $project_id->get_error_message()
+				: __( 'Failed to create project.', 'plain-language-time-tracker' );
+			wp_send_json_error( $message );
+			return;
 		}
+
+		$project = PLTT_Projects::get( $project_id );
+		wp_send_json_success(
+			array(
+				'project' => $project,
+				'message' => __( 'Project created.', 'plain-language-time-tracker' ),
+			)
+		);
 	}
 
 	/**
