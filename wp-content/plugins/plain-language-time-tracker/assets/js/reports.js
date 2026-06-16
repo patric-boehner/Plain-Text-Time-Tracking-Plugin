@@ -473,6 +473,10 @@
 		 * Mirrors the PHP math in templates/reports.php so a refresh produces the
 		 * same numbers. No-op if the cards aren't on the page.
 		 *
+		 * SYNC (OPT-PERF-E / OPT-DUP-F): the pct-change + arrow logic below mirrors
+		 * pltt_pct_change_indicator() in includes/helpers.php — the ±5% neutral band
+		 * and the →/↑/↓ glyphs must stay identical to the PHP helper.
+		 *
 		 * @param {number} minDelta Signed change in billable minutes.
 		 * @param {number} amtDelta Signed change in billable dollars.
 		 */

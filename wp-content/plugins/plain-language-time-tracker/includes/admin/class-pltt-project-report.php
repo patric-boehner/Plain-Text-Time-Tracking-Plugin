@@ -212,11 +212,10 @@ class PLTT_Project_Report {
 	 */
 	private static function cards_fixed( $project, $stats, $rate ) {
 		$total_minutes = isset( $stats->total_minutes ) ? (int) $stats->total_minutes : 0;
-		$total_hours   = $total_minutes / 60;
 		$fee           = self::num( $project->budget_fee );
 
 		$budgeted_minutes = pltt_budgeted_minutes( $project, $rate );
-		$ehr              = ( $total_hours > 0 && $fee > 0 ) ? ( $fee / $total_hours ) : 0.0;
+		$ehr              = pltt_effective_rate( $fee, $total_minutes );
 
 		// Total hours + over/under budget.
 		$total = self::card( __( 'Total hours', 'plain-language-time-tracker' ), pltt_format_duration( $total_minutes ) );
@@ -281,11 +280,10 @@ class PLTT_Project_Report {
 	 */
 	private static function cards_hourly( $project, $stats, $rate ) {
 		$total_minutes    = isset( $stats->total_minutes ) ? (int) $stats->total_minutes : 0;
-		$total_hours      = $total_minutes / 60;
 		$billable_minutes = isset( $stats->billable_minutes ) ? (int) $stats->billable_minutes : 0;
 		$billable_amount  = isset( $stats->billable_amount ) ? (float) $stats->billable_amount : 0.0;
 		$unbilled         = isset( $stats->unbilled_billable_minutes ) ? (int) $stats->unbilled_billable_minutes : 0;
-		$ehr              = ( $total_hours > 0 && $billable_amount > 0 ) ? ( $billable_amount / $total_hours ) : 0.0;
+		$ehr              = pltt_effective_rate( $billable_amount, $total_minutes );
 
 		return array(
 			self::card( __( 'Total hours', 'plain-language-time-tracker' ), pltt_format_duration( $total_minutes ) ),

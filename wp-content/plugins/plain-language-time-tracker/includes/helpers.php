@@ -1210,6 +1210,68 @@ function pltt_budgeted_minutes( $project, $rate = null ) {
 }
 
 /**
+ * Effective hourly rate: dollars ÷ hours, or 0 when either side is non-positive.
+ *
+ * One rule for the "fee ÷ hours" (fixed budget) and "billable $ ÷ hours" (hourly)
+ * display cards (OPT-DUP-E), so the >0 guards can't drift between surfaces.
+ *
+ * @param float $amount  Dollar amount.
+ * @param int   $minutes Minutes worked.
+ * @return float Rate per hour (0.0 when amount or minutes is non-positive).
+ */
+function pltt_effective_rate( $amount, $minutes ) {
+	$amount  = (float) $amount;
+	$minutes = (int) $minutes;
+	return ( $minutes > 0 && $amount > 0 ) ? ( $amount / ( $minutes / 60 ) ) : 0.0;
+}
+
+/**
+ * The billable dollar amount for a single entry.
+ *
+ * Uses the stored snapshot (billable_amount) when present, else a live fallback
+ * of duration × resolved rate (OPT-DUP-G). Mirrors the SQL fallback in
+ * PLTT_Entries::billable_amount_expr().
+ *
+ * @param object $entry Entry row (billable_amount, duration_minutes, client_id, project_id).
+ * @return float
+ */
+function pltt_resolve_entry_amount( $entry ) {
+	if ( isset( $entry->billable_amount ) && null !== $entry->billable_amount && '' !== $entry->billable_amount ) {
+		return (float) $entry->billable_amount;
+	}
+	$rate = pltt_resolve_billable_rate( (int) $entry->client_id, (int) $entry->project_id );
+	return pltt_billable_amount( (int) $entry->duration_minutes, $rate );
+}
+
+/**
+ * Period-over-period change indicator for a stat card (OPT-DUP-F).
+ *
+ * Returns the percent change plus the matching CSS status class and arrow glyph.
+ * A zero prior value is treated as +100%. The ±5% neutral band and the glyphs
+ * live here so the Billable Hours and Billable Amount cards can't drift.
+ *
+ * SYNC: assets/js/reports.js updateBillableCards() mirrors this for the live
+ * inline-billable toggle — keep the threshold and glyphs in step.
+ *
+ * @param float $curr Current-period value.
+ * @param float $prev Prior-period value.
+ * @return array{pct:float,class:string,icon:string}
+ */
+function pltt_pct_change_indicator( $curr, $prev ) {
+	$curr = (float) $curr;
+	$prev = (float) $prev;
+	$pct  = $prev > 0 ? ( ( $curr - $prev ) / $prev * 100 ) : 100;
+
+	if ( abs( $pct ) < 5 ) {
+		return array( 'pct' => $pct, 'class' => 'status-neutral', 'icon' => '→' );
+	}
+	if ( $pct > 0 ) {
+		return array( 'pct' => $pct, 'class' => 'status-increase', 'icon' => '↑' );
+	}
+	return array( 'pct' => $pct, 'class' => 'status-decrease', 'icon' => '↓' );
+}
+
+/**
  * Render the overage threshold marker row inside an entry table.
  *
  * Spans the full table width. Styled as chrome (dashed amber borders, warm
@@ -1735,12 +1797,7 @@ function pltt_compute_overage_threshold( $project, $filter_args ) {
 
 		if ( ! empty( $e->billable ) && $dur > 0 ) {
 			$marked_minutes += $dur;
-			if ( null !== $e->billable_amount && '' !== $e->billable_amount ) {
-				$marked_amount += (float) $e->billable_amount;
-			} else {
-				$rate           = pltt_resolve_billable_rate( (int) $e->client_id, (int) $e->project_id );
-				$marked_amount += pltt_billable_amount( $dur, $rate );
-			}
+			$marked_amount  += pltt_resolve_entry_amount( $e );
 		}
 
 		$is_overage = false;
@@ -1779,12 +1836,7 @@ function pltt_compute_overage_threshold( $project, $filter_args ) {
 			// open question documented in project memory). Kept as-is intentionally
 			// so the billable flag stays the single source of truth for now.
 			if ( ! empty( $e->billable ) && $dur > 0 ) {
-				if ( null !== $e->billable_amount && '' !== $e->billable_amount ) {
-					$overage_amount += (float) $e->billable_amount;
-				} else {
-					$rate = pltt_resolve_billable_rate( (int) $e->client_id, (int) $e->project_id );
-					$overage_amount += pltt_billable_amount( $dur, $rate );
-				}
+				$overage_amount += pltt_resolve_entry_amount( $e );
 			}
 		}
 
