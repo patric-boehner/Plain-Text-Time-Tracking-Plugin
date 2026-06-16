@@ -101,12 +101,22 @@ class PLTT_Admin {
 	}
 
 	/**
-	 * Render the main page (Daily Log or Review based on screen param).
+	 * Gate a page render on the plugin capability; dies with a 403 otherwise.
+	 *
+	 * Shared by every render_*_page() method (OPT-DUP-D) so the capability copy
+	 * lives in one place.
 	 */
-	public static function render_page() {
+	private static function require_access() {
 		if ( ! pltt_user_can_access() ) {
 			wp_die( esc_html__( 'You do not have permission to access this page.', 'plain-language-time-tracker' ) );
 		}
+	}
+
+	/**
+	 * Render the main page (Daily Log or Review based on screen param).
+	 */
+	public static function render_page() {
+		self::require_access();
 
 		// Check which screen to show.
 		$screen = isset( $_GET['screen'] ) ? sanitize_text_field( wp_unslash( $_GET['screen'] ) ) : 'daily-log';
@@ -125,9 +135,7 @@ class PLTT_Admin {
 	 * Render the log archive page.
 	 */
 	public static function render_log_archive_page() {
-		if ( ! pltt_user_can_access() ) {
-			wp_die( esc_html__( 'You do not have permission to access this page.', 'plain-language-time-tracker' ) );
-		}
+		self::require_access();
 
 		PLTT_Log_Archive::render();
 	}
@@ -136,9 +144,7 @@ class PLTT_Admin {
 	 * Render the reports page.
 	 */
 	public static function render_reports_page() {
-		if ( ! pltt_user_can_access() ) {
-			wp_die( esc_html__( 'You do not have permission to access this page.', 'plain-language-time-tracker' ) );
-		}
+		self::require_access();
 
 		PLTT_Reports::render();
 	}
@@ -147,9 +153,7 @@ class PLTT_Admin {
 	 * Render the clients page.
 	 */
 	public static function render_clients_page() {
-		if ( ! pltt_user_can_access() ) {
-			wp_die( esc_html__( 'You do not have permission to access this page.', 'plain-language-time-tracker' ) );
-		}
+		self::require_access();
 
 		include PLTT_PLUGIN_DIR . 'templates/clients.php';
 	}
@@ -158,9 +162,7 @@ class PLTT_Admin {
 	 * Render the projects page.
 	 */
 	public static function render_projects_page() {
-		if ( ! pltt_user_can_access() ) {
-			wp_die( esc_html__( 'You do not have permission to access this page.', 'plain-language-time-tracker' ) );
-		}
+		self::require_access();
 
 		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only screen routing.
 		$action = isset( $_GET['action'] ) ? sanitize_key( wp_unslash( $_GET['action'] ) ) : '';
@@ -176,9 +178,7 @@ class PLTT_Admin {
 	 * Render the tags page.
 	 */
 	public static function render_tags_page() {
-		if ( ! pltt_user_can_access() ) {
-			wp_die( esc_html__( 'You do not have permission to access this page.', 'plain-language-time-tracker' ) );
-		}
+		self::require_access();
 
 		include PLTT_PLUGIN_DIR . 'templates/tags.php';
 	}

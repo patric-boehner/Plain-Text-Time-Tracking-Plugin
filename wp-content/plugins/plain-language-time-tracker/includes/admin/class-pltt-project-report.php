@@ -89,10 +89,7 @@ class PLTT_Project_Report {
 		// For the full/lifetime view (every non-recurring project, and recurring
 		// projects in "Full" scope) the window is the whole span, so these collapse
 		// back to the all-time figures and nothing about today's behavior changes.
-		$is_windowed = is_array( $window )
-			&& 'period' === ( $window['scope'] ?? 'full' )
-			&& ! empty( $window['from'] )
-			&& ! empty( $window['to'] );
+		$is_windowed = is_array( $window ) && ! empty( $window['is_period'] );
 
 		if ( $is_windowed ) {
 			// Reuse the caller's windowed stats when supplied (OPT-N-A); only query
@@ -337,7 +334,7 @@ class PLTT_Project_Report {
 		// Period view: a single billing period, so an "average per month" and a
 		// "months active" count are meaningless. Show the period's hours against
 		// the allocation directly, and drop the months card.
-		if ( is_array( $window ) && 'period' === ( $window['scope'] ?? 'full' ) ) {
+		if ( ! empty( $window['is_period'] ) ) {
 			$used = self::card( __( 'Hours', 'plain-language-time-tracker' ), pltt_format_duration( $total_minutes ) );
 			if ( $alloc_minutes > 0 ) {
 				$pct = (int) round( $total_minutes / $alloc_minutes * 100 );
