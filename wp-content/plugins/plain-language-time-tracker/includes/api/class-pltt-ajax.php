@@ -250,7 +250,7 @@ class PLTT_Ajax {
 				if ( $entry && $entry->duration_minutes > 0 ) {
 					$hourly_rate                    = pltt_resolve_billable_rate( (int) $entry->client_id, (int) $entry->project_id );
 					$update_data['billable_rate']   = $hourly_rate;
-					$update_data['billable_amount'] = round( ( $entry->duration_minutes / 60.0 ) * $hourly_rate, 2 );
+					$update_data['billable_amount'] = pltt_billable_amount( $entry->duration_minutes, $hourly_rate );
 				}
 			} else {
 				// Reset rate and amount when marking as non-billable.
@@ -609,7 +609,7 @@ class PLTT_Ajax {
 		if ( $billable && $duration > 0 ) {
 			$hourly_rate            = pltt_resolve_billable_rate( $client_id, $project_id );
 			$data['billable_rate']  = $hourly_rate;
-			$data['billable_amount'] = round( ( $duration / 60.0 ) * $hourly_rate, 2 );
+			$data['billable_amount'] = pltt_billable_amount( $duration, $hourly_rate );
 		} else {
 			$data['billable_rate']   = 0.00;
 			$data['billable_amount'] = 0.00;

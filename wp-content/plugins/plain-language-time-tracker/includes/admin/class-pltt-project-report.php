@@ -218,14 +218,7 @@ class PLTT_Project_Report {
 		$total_hours   = $total_minutes / 60;
 		$fee           = self::num( $project->budget_fee );
 
-		if ( self::num( $project->budget_hours ) > 0 ) {
-			$budgeted_hours = self::num( $project->budget_hours );
-		} elseif ( $fee > 0 && $rate > 0 ) {
-			$budgeted_hours = $fee / $rate;
-		} else {
-			$budgeted_hours = 0.0;
-		}
-		$budgeted_minutes = (int) round( $budgeted_hours * 60 );
+		$budgeted_minutes = pltt_budgeted_minutes( $project, $rate );
 		$ehr              = ( $total_hours > 0 && $fee > 0 ) ? ( $fee / $total_hours ) : 0.0;
 
 		// Total hours + over/under budget.
@@ -829,14 +822,8 @@ class PLTT_Project_Report {
 			return null;
 		}
 
-		// Budgeted minutes: explicit hours, else fee ÷ rate. Mirrors cards_fixed().
-		if ( self::num( $project->budget_hours ) > 0 ) {
-			$budgeted_minutes = (int) round( self::num( $project->budget_hours ) * 60 );
-		} elseif ( self::num( $project->budget_fee ) > 0 && $rate > 0 ) {
-			$budgeted_minutes = (int) round( ( self::num( $project->budget_fee ) / $rate ) * 60 );
-		} else {
-			$budgeted_minutes = 0;
-		}
+		// Budgeted minutes: explicit hours, else fee ÷ rate (canonical cascade).
+		$budgeted_minutes = pltt_budgeted_minutes( $project, $rate );
 		if ( $budgeted_minutes <= 0 ) {
 			return null;
 		}

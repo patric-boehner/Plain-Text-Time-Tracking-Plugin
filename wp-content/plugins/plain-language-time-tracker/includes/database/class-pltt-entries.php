@@ -392,6 +392,22 @@ class PLTT_Entries {
 	}
 
 	/**
+	 * SQL expression for a single entry's billable amount.
+	 *
+	 * Uses the stored snapshot (e.billable_amount) when present, else a live
+	 * fallback of duration × resolved rate rounded to cents. The fallback rate
+	 * cascade (project → client → 0) and rounding must stay in lock-step with the
+	 * PHP helpers pltt_resolve_billable_rate() and pltt_billable_amount() (OPT-DUP-B).
+	 * Relies on the fixed e/p/c table aliases used by the aggregate queries below;
+	 * it contains no user input and is safe to interpolate.
+	 *
+	 * @return string
+	 */
+	private static function billable_amount_expr() {
+		return 'COALESCE(e.billable_amount, ROUND(e.duration_minutes / 60.0 * COALESCE(p.hourly_rate, c.hourly_rate, 0), 2))';
+	}
+
+	/**
 	 * Get aggregate stats for a date range.
 	 *
 	 * Returns entry count, total/billable minutes, and verified count
@@ -432,6 +448,8 @@ class PLTT_Entries {
 			? "e.client_id != {$internal_client_id}"
 			: "LOWER(c.name) != 'internal'";
 
+		$amount = self::billable_amount_expr();
+
 		$sql = "SELECT
 			COUNT(*) AS total_count,
 			COALESCE(SUM(e.duration_minutes), 0) AS total_minutes,
@@ -440,7 +458,7 @@ class PLTT_Entries {
 			COALESCE(SUM(CASE WHEN ({$exclude_clause}) THEN e.duration_minutes ELSE 0 END), 0) AS client_total_minutes,
 			COALESCE(SUM(CASE WHEN ({$exclude_clause}) AND e.billable = 1 THEN e.duration_minutes ELSE 0 END), 0) AS client_billable_minutes,
 			SUM(CASE WHEN e.verified = 1 THEN 1 ELSE 0 END) AS verified_count,
-			COALESCE(SUM(CASE WHEN e.billable = 1 THEN COALESCE(e.billable_amount, ROUND(e.duration_minutes / 60.0 * COALESCE(p.hourly_rate, c.hourly_rate, 0), 2)) ELSE 0 END), 0) AS billable_amount,
+			COALESCE(SUM(CASE WHEN e.billable = 1 THEN {$amount} ELSE 0 END), 0) AS billable_amount,
 			COUNT(DISTINCT CASE WHEN ({$exclude_clause}) THEN e.project_id END) AS active_projects,
 			COUNT(DISTINCT CASE WHEN ({$exclude_clause}) THEN e.client_id END) AS active_clients,
 			MIN(e.entry_date) AS first_entry_date,
@@ -517,13 +535,15 @@ class PLTT_Entries {
 		$where   = array_merge( $where, $common['where'] );
 		$prepare = array_merge( $prepare, $common['prepare'] );
 
+		$amount = self::billable_amount_expr();
+
 		$sql = "SELECT
 			e.{$group_by} AS group_key,
 			COUNT(*) AS total_count,
 			COALESCE(SUM(e.duration_minutes), 0) AS total_minutes,
 			COALESCE(SUM(CASE WHEN e.billable = 1 THEN e.duration_minutes ELSE 0 END), 0) AS billable_minutes,
 			COALESCE(SUM(CASE WHEN e.billable = 1 AND COALESCE(e.billed, 0) = 0 THEN e.duration_minutes ELSE 0 END), 0) AS unbilled_billable_minutes,
-			COALESCE(SUM(CASE WHEN e.billable = 1 THEN COALESCE(e.billable_amount, ROUND(e.duration_minutes / 60.0 * COALESCE(p.hourly_rate, c.hourly_rate, 0), 2)) ELSE 0 END), 0) AS billable_amount,
+			COALESCE(SUM(CASE WHEN e.billable = 1 THEN {$amount} ELSE 0 END), 0) AS billable_amount,
 			MIN(e.entry_date) AS first_entry_date,
 			MAX(e.entry_date) AS last_entry_date
 			FROM {$entries_table} e
@@ -571,6 +591,7 @@ class PLTT_Entries {
 		$prepare = array_merge( $prepare, $common['prepare'] );
 
 		$where_sql = implode( ' AND ', $where );
+		$amount    = self::billable_amount_expr();
 
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
 		return $wpdb->get_results(
@@ -587,7 +608,7 @@ class PLTT_Entries {
 					c.name AS client_name,
 					SUM(e.duration_minutes) AS total_minutes,
 					COALESCE(SUM(CASE WHEN e.billable = 1 THEN e.duration_minutes ELSE 0 END), 0) AS billable_minutes,
-					COALESCE(SUM(CASE WHEN e.billable = 1 THEN COALESCE(e.billable_amount, ROUND(e.duration_minutes / 60.0 * COALESCE(p.hourly_rate, c.hourly_rate, 0), 2)) ELSE 0 END), 0) AS billable_amount,
+					COALESCE(SUM(CASE WHEN e.billable = 1 THEN {$amount} ELSE 0 END), 0) AS billable_amount,
 					COUNT(e.id) AS entry_count
 				FROM {$entries_table} e
 				LEFT JOIN {$projects_table} p ON e.project_id = p.id
@@ -648,10 +669,12 @@ class PLTT_Entries {
 		$where   = array_merge( $where, $common['where'] );
 		$prepare = array_merge( $prepare, $common['prepare'] );
 
+		$amount = self::billable_amount_expr();
+
 		$sql = "SELECT
 			COUNT(*) AS entry_count,
 			COALESCE(SUM(e.duration_minutes), 0) AS total_minutes,
-			COALESCE(SUM(COALESCE(e.billable_amount, ROUND(e.duration_minutes / 60.0 * COALESCE(p.hourly_rate, c.hourly_rate, 0), 2))), 0) AS total_amount,
+			COALESCE(SUM({$amount}), 0) AS total_amount,
 			MIN(e.entry_date) AS earliest,
 			MAX(e.entry_date) AS latest
 			FROM {$entries_table} e
