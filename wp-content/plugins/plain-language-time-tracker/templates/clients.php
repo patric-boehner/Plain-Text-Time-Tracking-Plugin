@@ -49,6 +49,7 @@ if ( ! empty( $clients ) ) {
 			),
 			array(
 				'invalid_client_id'    => __( 'Invalid client ID.', 'plain-language-time-tracker' ),
+				'missing_name'         => __( 'Please enter a client name.', 'plain-language-time-tracker' ),
 				'client_update_failed' => __( 'Failed to update client.', 'plain-language-time-tracker' ),
 				'client_delete_failed' => __( 'Failed to delete client.', 'plain-language-time-tracker' ),
 				'invalid_rate'         => __( 'Hourly rate must be between 0 and 10,000.', 'plain-language-time-tracker' ),
