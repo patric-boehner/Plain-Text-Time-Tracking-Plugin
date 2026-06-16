@@ -144,9 +144,9 @@ class PLTT_Ajax {
 		$validation = PLTT_Time_Parser::validate( $entries );
 
 		// Delete existing entries and create new ones in a transaction
-		// so a failure mid-loop doesn't leave partial data.
-		global $wpdb;
-		$wpdb->query( 'START TRANSACTION' );
+		// so a failure mid-loop doesn't leave partial data. PLTT_Entries::create()
+		// participates in this same nesting-aware transaction (TRC-DB23).
+		PLTT_Database::begin_transaction();
 
 		PLTT_Entries::delete_by_date( $date );
 
@@ -178,10 +178,10 @@ class PLTT_Ajax {
 		}
 
 		if ( $all_created ) {
-			$wpdb->query( 'COMMIT' );
+			PLTT_Database::commit_transaction();
 			PLTT_Daily_Log::mark_processed( $date );
 		} else {
-			$wpdb->query( 'ROLLBACK' );
+			PLTT_Database::rollback_transaction();
 			wp_send_json_error( __( 'Error saving entries. No changes were made.', 'plain-language-time-tracker' ) );
 			return;
 		}
@@ -237,11 +237,10 @@ class PLTT_Ajax {
 			}
 
 			// SEC-M6/TRC-7: wrap the read-compute-write in a transaction and route
-			// through PLTT_Entries::update() (which detects nested TX) so the
-			// duration_minutes value used to compute billable_amount can't drift
-			// between read and write.
-			global $wpdb;
-			$wpdb->query( 'START TRANSACTION' );
+			// through PLTT_Entries::update() (which joins this same nesting-aware
+			// transaction) so the duration_minutes value used to compute
+			// billable_amount can't drift between read and write.
+			PLTT_Database::begin_transaction();
 
 			$update_data = array( 'billable' => $int_value );
 
@@ -260,7 +259,11 @@ class PLTT_Ajax {
 			}
 
 			$result = PLTT_Entries::update( $entry_id, $update_data );
-			$wpdb->query( $result ? 'COMMIT' : 'ROLLBACK' );
+			if ( $result ) {
+				PLTT_Database::commit_transaction();
+			} else {
+				PLTT_Database::rollback_transaction();
+			}
 
 			if ( ! $result ) {
 				wp_send_json_error( __( 'Failed to update entry.', 'plain-language-time-tracker' ) );

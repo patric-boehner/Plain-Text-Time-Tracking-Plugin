@@ -21,59 +21,6 @@ class PLTT_Admin {
 	public static function init() {
 		add_action( 'admin_menu', array( __CLASS__, 'add_admin_menu' ) );
 		add_action( 'admin_enqueue_scripts', array( __CLASS__, 'enqueue_assets' ) );
-		add_action( 'admin_notices', array( __CLASS__, 'render_migration_notices' ) );
-		add_action( 'admin_post_pltt_dismiss_migration_1_9_5', array( __CLASS__, 'dismiss_migration_1_9_5_notice' ) );
-	}
-
-	/**
-	 * Surface one-time admin notices left behind by migrations.
-	 *
-	 * The 1.9.5 billable-model migration flips retainer / fixed-fee entries to
-	 * non-billable and writes a review log to wp-content/uploads. The link to
-	 * that log is held in pltt_migration_1_9_5_log_url until the user dismisses.
-	 */
-	public static function render_migration_notices() {
-		if ( ! pltt_user_can_access() ) {
-			return;
-		}
-
-		$log_url = get_option( 'pltt_migration_1_9_5_log_url' );
-		if ( empty( $log_url ) ) {
-			return;
-		}
-
-		$dismiss_url = wp_nonce_url(
-			add_query_arg( 'action', 'pltt_dismiss_migration_1_9_5', admin_url( 'admin-post.php' ) ),
-			'pltt_dismiss_migration_1_9_5'
-		);
-		?>
-		<div class="notice notice-info is-dismissible">
-			<p>
-				<strong><?php esc_html_e( 'Time Tracker:', 'plain-language-time-tracker' ); ?></strong>
-				<?php esc_html_e( 'Billable-model migration ran. Retainer and fixed-fee entries that were marked billable have been flipped to non-billable.', 'plain-language-time-tracker' ); ?>
-				<a href="<?php echo esc_url( $log_url ); ?>" target="_blank" rel="noopener noreferrer">
-					<?php esc_html_e( 'Download migration log', 'plain-language-time-tracker' ); ?>
-				</a>
-				— <?php esc_html_e( 'review invoiced entries that may need to be re-flipped manually.', 'plain-language-time-tracker' ); ?>
-				<a href="<?php echo esc_url( $dismiss_url ); ?>" class="button-link" style="margin-left: 8px;">
-					<?php esc_html_e( 'Dismiss', 'plain-language-time-tracker' ); ?>
-				</a>
-			</p>
-		</div>
-		<?php
-	}
-
-	/**
-	 * Handle the dismiss action for the 1.9.5 migration notice.
-	 */
-	public static function dismiss_migration_1_9_5_notice() {
-		if ( ! pltt_user_can_access() ) {
-			wp_die( esc_html__( 'You do not have permission to do this.', 'plain-language-time-tracker' ) );
-		}
-		check_admin_referer( 'pltt_dismiss_migration_1_9_5' );
-		delete_option( 'pltt_migration_1_9_5_log_url' );
-		wp_safe_redirect( wp_get_referer() ?: admin_url( 'admin.php?page=pltt-time-tracker' ) );
-		exit;
 	}
 
 	/**

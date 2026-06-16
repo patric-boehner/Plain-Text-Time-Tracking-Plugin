@@ -200,12 +200,10 @@ class PLTT_Entries {
 			return false;
 		}
 
-		// Start our own transaction only if the caller has not already opened one.
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
-		$own_transaction = ! (bool) $wpdb->get_var( 'SELECT @@in_transaction' );
-		if ( $own_transaction ) {
-			$wpdb->query( 'START TRANSACTION' );
-		}
+		// Nesting-aware transaction: only the outermost level hits the server, so
+		// calling this from within a caller's transaction (e.g. the save-entries
+		// loop) no longer prematurely commits it (TRC-DB23).
+		PLTT_Database::begin_transaction();
 
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
 		$result = $wpdb->insert(
@@ -215,9 +213,7 @@ class PLTT_Entries {
 		);
 
 		if ( ! $result ) {
-			if ( $own_transaction ) {
-				$wpdb->query( 'ROLLBACK' );
-			}
+			PLTT_Database::rollback_transaction();
 			return false;
 		}
 
@@ -229,8 +225,10 @@ class PLTT_Entries {
 			$sync_ok = PLTT_Tags::sync_entry_tags( $insert_id, $data['tags'] );
 		}
 
-		if ( $own_transaction ) {
-			$wpdb->query( $sync_ok ? 'COMMIT' : 'ROLLBACK' );
+		if ( $sync_ok ) {
+			PLTT_Database::commit_transaction();
+		} else {
+			PLTT_Database::rollback_transaction();
 		}
 
 		return $sync_ok ? $insert_id : false;
@@ -302,13 +300,10 @@ class PLTT_Entries {
 			return false;
 		}
 
-		// Only own the transaction if the caller has not already opened one
-		// (matches the pattern in create()).
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
-		$own_transaction = ! (bool) $wpdb->get_var( 'SELECT @@in_transaction' );
-		if ( $own_transaction ) {
-			$wpdb->query( 'START TRANSACTION' );
-		}
+		// Nesting-aware transaction (matches create()): only the outermost level
+		// hits the server, so a caller that already opened a transaction — e.g. the
+		// inline billable toggle — keeps a single atomic unit (TRC-DB23).
+		PLTT_Database::begin_transaction();
 
 		$result = true;
 
@@ -334,8 +329,10 @@ class PLTT_Entries {
 			$result = PLTT_Tags::sync_entry_tags( $id, $data['tags'] );
 		}
 
-		if ( $own_transaction ) {
-			$wpdb->query( $result ? 'COMMIT' : 'ROLLBACK' );
+		if ( $result ) {
+			PLTT_Database::commit_transaction();
+		} else {
+			PLTT_Database::rollback_transaction();
 		}
 
 		return $result;

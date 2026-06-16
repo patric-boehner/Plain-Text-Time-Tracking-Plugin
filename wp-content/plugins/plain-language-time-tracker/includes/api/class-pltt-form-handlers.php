@@ -109,7 +109,12 @@ class PLTT_Form_Handlers {
 
 		$result = PLTT_Clients::update( $client_id, $update_data );
 
-		if ( $result ) {
+		if ( is_wp_error( $result ) ) {
+			// TRC-API1: WP_Error is truthy — guard it before the success branch so a
+			// validation failure (e.g. empty name) isn't reported as "client_updated".
+			// SEC-M2: redirect with the error code only, never the raw message.
+			self::redirect_back( array( 'pltt_error' => $result->get_error_code() ) );
+		} elseif ( $result ) {
 			self::redirect_back( array( 'pltt_message' => 'client_updated' ) );
 		} else {
 			self::redirect_back( array( 'pltt_error' => 'client_update_failed' ) );
