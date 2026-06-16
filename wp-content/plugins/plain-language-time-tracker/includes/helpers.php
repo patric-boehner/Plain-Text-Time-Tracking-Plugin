@@ -627,6 +627,29 @@ function pltt_build_chart_buckets( $date_from, $date_to, $bucket_size ) {
  *     buckets:array, bucket_size:string, max_minutes:int, avg_minutes:int, today_key:string
  * }
  */
+/**
+ * Round a chart's max minutes up to a "nice" y-axis ceiling, in hours.
+ *
+ * Keeps the axis-scale rule out of the view (OPT-PERF-B): ≤1h → 1, ≤5h → next
+ * whole hour, ≤20h → next even hour, else → next multiple of 5.
+ *
+ * @param int $max_minutes Tallest bar's minutes.
+ * @return float Ceiling in hours (multiply by 60 for the minutes ceiling).
+ */
+function pltt_chart_y_ceiling( $max_minutes ) {
+	$max_hours = (int) $max_minutes / 60;
+	if ( $max_hours <= 1 ) {
+		return 1.0;
+	}
+	if ( $max_hours <= 5 ) {
+		return ceil( $max_hours );
+	}
+	if ( $max_hours <= 20 ) {
+		return ceil( $max_hours / 2 ) * 2;
+	}
+	return ceil( $max_hours / 5 ) * 5;
+}
+
 function pltt_build_period_chart_data( $date_from, $date_to, $filter_args = array() ) {
 	$bucket_size = pltt_resolve_bucket_size( $date_from, $date_to );
 	$buckets     = pltt_build_chart_buckets( $date_from, $date_to, $bucket_size );
@@ -681,10 +704,12 @@ function pltt_build_period_chart_data( $date_from, $date_to, $filter_args = arra
 	// empty days/weeks/months (weekends, leave, future days) don't dilute it.
 	$total_minutes  = 0;
 	$active_buckets = 0;
-	foreach ( $buckets as $bucket ) {
+	foreach ( $buckets as $i => $bucket ) {
 		$bucket_total = (int) $bucket['billable_minutes']
 			+ (int) $bucket['client_flat_minutes']
 			+ (int) $bucket['internal_minutes'];
+		// Store the per-bucket total so the view doesn't recompute it (OPT-PERF-C).
+		$buckets[ $i ]['total_minutes'] = $bucket_total;
 		if ( $bucket_total > $max_minutes ) {
 			$max_minutes = $bucket_total;
 		}
@@ -833,6 +858,7 @@ function pltt_resolve_project_chart_window( $billing_type, $recurring_period, $f
 	$full = array(
 		'show_control' => false,
 		'scope'        => 'full',
+		'is_period'    => false,
 		'unit'         => $unit,
 		'from'         => $first_date,
 		'to'           => $last_date,
@@ -891,6 +917,7 @@ function pltt_resolve_project_chart_window( $billing_type, $recurring_period, $f
 	return array(
 		'show_control' => true,
 		'scope'        => 'period',
+		'is_period'    => true,
 		'unit'         => $unit,
 		'from'         => $anchor->format( 'Y-m-d' ),
 		'to'           => $pend->format( 'Y-m-d' ),

@@ -5,11 +5,9 @@
  * Detail report tab.
  *
  * Expects in scope:
- *   $chart_buckets     array   Bucket descriptors from pltt_build_period_chart_data().
- *   $chart_bucket_size string  'day' | 'week' | 'month'.
- *   $chart_max_minutes int     Largest single-bucket total (y-axis scale).
- *   $chart_avg_minutes int     Mean over active buckets (average reference line).
- *   $chart_today_key   string  Bucket key holding today, '' if out of range.
+ *   $chart             array   The pltt_build_period_chart_data() return
+ *                              (buckets, bucket_size, max_minutes, avg_minutes,
+ *                              today_key). Unpacked into locals below.
  *   $date_from         string  Range start (Y-m-d) — for the figure caption.
  *   $date_to           string  Range end (Y-m-d).
  * Optional:
@@ -25,6 +23,14 @@
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
+
+// Unpack the single $chart array (pltt_build_period_chart_data() shape) into the
+// locals used below, so callers don't each repeat the unpack.
+$chart_buckets     = $chart['buckets'] ?? array();
+$chart_bucket_size = $chart['bucket_size'] ?? 'day';
+$chart_max_minutes = $chart['max_minutes'] ?? 0;
+$chart_avg_minutes = $chart['avg_minutes'] ?? 0;
+$chart_today_key   = $chart['today_key'] ?? '';
 
 // No buckets means no range to draw at all — nothing to render.
 if ( empty( $chart_buckets ) ) {
@@ -49,17 +55,8 @@ $chart_caption = sprintf( $chart_caption_formats[ $chart_bucket_size ], pltt_for
 
 $chart_has_data = ( $chart_max_minutes > 0 );
 
-$chart_max_h = $chart_max_minutes / 60;
-// Round y-axis ceiling up to a nice number for the visible label.
-if ( $chart_max_h <= 1 ) {
-	$y_ceiling = 1;
-} elseif ( $chart_max_h <= 5 ) {
-	$y_ceiling = ceil( $chart_max_h );
-} elseif ( $chart_max_h <= 20 ) {
-	$y_ceiling = ceil( $chart_max_h / 2 ) * 2;
-} else {
-	$y_ceiling = ceil( $chart_max_h / 5 ) * 5;
-}
+// Round y-axis ceiling up to a nice number for the visible label (OPT-PERF-B).
+$y_ceiling      = pltt_chart_y_ceiling( $chart_max_minutes );
 $y_ceiling_mins = $y_ceiling * 60;
 // Show per-bar value labels only when there's room (rough threshold).
 $chart_show_values = count( $chart_buckets ) <= 14;
@@ -144,7 +141,7 @@ $chart_show_values = count( $chart_buckets ) <= 14;
 						$billable_pct    = $y_ceiling_mins > 0 ? ( $bucket['billable_minutes'] / $y_ceiling_mins ) : 0;
 						$client_flat_pct = $y_ceiling_mins > 0 ? ( $bucket['client_flat_minutes'] / $y_ceiling_mins ) : 0;
 						$internal_pct    = $y_ceiling_mins > 0 ? ( $bucket['internal_minutes'] / $y_ceiling_mins ) : 0;
-						$total_minutes   = $bucket['billable_minutes'] + $bucket['client_flat_minutes'] + $bucket['internal_minutes'];
+						$total_minutes   = isset( $bucket['total_minutes'] ) ? $bucket['total_minutes'] : ( $bucket['billable_minutes'] + $bucket['client_flat_minutes'] + $bucket['internal_minutes'] );
 						$is_empty        = 0 === $total_minutes;
 						$is_today        = ! empty( $chart_today_key ) && $bucket['key'] === $chart_today_key;
 						$is_weekend      = ! empty( $bucket['is_weekend'] );

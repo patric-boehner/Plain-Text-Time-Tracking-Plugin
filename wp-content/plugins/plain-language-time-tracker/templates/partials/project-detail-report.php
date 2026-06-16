@@ -25,7 +25,7 @@ $default  = $report['default_group'];
 $window   = $report['window'] ?? null;
 
 $has_entries = ! empty( $report['has_entries'] );
-$is_period   = ( $window && 'period' === ( $window['scope'] ?? 'full' ) );
+$is_period   = ! empty( $window['is_period'] );
 ?>
 
 <?php if ( ! $has_entries ) : ?>
@@ -126,11 +126,7 @@ if ( $window && ! empty( $window['show_control'] ) ) :
 // Volume bar chart (Hours by day/week/month over the active window). Same
 // partial as the Reports summary chart.
 if ( ! empty( $report['chart'] ) && $window ) :
-	$chart_buckets     = $report['chart']['buckets'];
-	$chart_bucket_size = $report['chart']['bucket_size'];
-	$chart_max_minutes = $report['chart']['max_minutes'];
-	$chart_avg_minutes = $report['chart']['avg_minutes'];
-	$chart_today_key   = $report['chart']['today_key'];
+	$chart             = $report['chart'];
 	$date_from         = $window['from'];
 	$date_to           = $window['to'];
 	$chart_empty_label = $is_period ? $window['period_label'] : '';

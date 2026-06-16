@@ -50,6 +50,21 @@ class PLTT_Form_Handlers {
 	}
 
 	/**
+	 * Standard form-handler gate: capability check, then nonce verification.
+	 *
+	 * Every admin_post handler opens with this pair (OPT-DUP-D), so call
+	 * self::guard( 'pltt_xxx' ) instead of repeating both checks. Dies on failure.
+	 *
+	 * @param string $action Nonce action name.
+	 */
+	private static function guard( $action ) {
+		if ( ! pltt_user_can_access() ) {
+			wp_die( esc_html__( 'Unauthorized', 'plain-language-time-tracker' ), '', array( 'response' => 403 ) );
+		}
+		self::verify_nonce( $action );
+	}
+
+	/**
 	 * Redirect back to referer with query args.
 	 *
 	 * @param array $args Query arguments to add to redirect URL.
@@ -68,10 +83,7 @@ class PLTT_Form_Handlers {
 	 * Handle client update form submission.
 	 */
 	public static function handle_update_client() {
-		if ( ! pltt_user_can_access() ) {
-			wp_die( esc_html__( 'Unauthorized', 'plain-language-time-tracker' ), '', array( 'response' => 403 ) );
-		}
-		self::verify_nonce( 'pltt_update_client' );
+		self::guard( 'pltt_update_client' );
 
 		$client_id   = isset( $_POST['client_id'] ) ? absint( $_POST['client_id'] ) : 0;
 		$name        = isset( $_POST['name'] ) ? sanitize_text_field( wp_unslash( $_POST['name'] ) ) : '';
@@ -123,10 +135,7 @@ class PLTT_Form_Handlers {
 	 * Handle client deletion form submission.
 	 */
 	public static function handle_delete_client() {
-		if ( ! pltt_user_can_access() ) {
-			wp_die( esc_html__( 'Unauthorized', 'plain-language-time-tracker' ), '', array( 'response' => 403 ) );
-		}
-		self::verify_nonce( 'pltt_delete_client' );
+		self::guard( 'pltt_delete_client' );
 
 		$client_id = isset( $_POST['client_id'] ) ? absint( $_POST['client_id'] ) : 0;
 
@@ -150,10 +159,7 @@ class PLTT_Form_Handlers {
 	 * Handle project update form submission.
 	 */
 	public static function handle_update_project() {
-		if ( ! pltt_user_can_access() ) {
-			wp_die( esc_html__( 'Unauthorized', 'plain-language-time-tracker' ), '', array( 'response' => 403 ) );
-		}
-		self::verify_nonce( 'pltt_update_project' );
+		self::guard( 'pltt_update_project' );
 
 		$project_id  = isset( $_POST['project_id'] ) ? absint( $_POST['project_id'] ) : 0;
 		$name        = isset( $_POST['name'] ) ? sanitize_text_field( wp_unslash( $_POST['name'] ) ) : '';
@@ -245,10 +251,7 @@ class PLTT_Form_Handlers {
 	 * Handle project deletion.
 	 */
 	public static function handle_delete_project() {
-		if ( ! pltt_user_can_access() ) {
-			wp_die( esc_html__( 'Unauthorized', 'plain-language-time-tracker' ), '', array( 'response' => 403 ) );
-		}
-		self::verify_nonce( 'pltt_delete_project' );
+		self::guard( 'pltt_delete_project' );
 
 		$project_id = isset( $_POST['project_id'] ) ? absint( $_POST['project_id'] ) : 0;
 
@@ -272,10 +275,7 @@ class PLTT_Form_Handlers {
 	 * Handle tag creation.
 	 */
 	public static function handle_create_tag() {
-		if ( ! pltt_user_can_access() ) {
-			wp_die( esc_html__( 'Unauthorized', 'plain-language-time-tracker' ), '', array( 'response' => 403 ) );
-		}
-		self::verify_nonce( 'pltt_manage_tag' );
+		self::guard( 'pltt_manage_tag' );
 
 		$tag_name = isset( $_POST['tag_name'] ) ? sanitize_text_field( wp_unslash( $_POST['tag_name'] ) ) : '';
 		$tag_name = strtolower( trim( $tag_name ) );
@@ -315,10 +315,7 @@ class PLTT_Form_Handlers {
 	 * Handle tag rename.
 	 */
 	public static function handle_rename_tag() {
-		if ( ! pltt_user_can_access() ) {
-			wp_die( esc_html__( 'Unauthorized', 'plain-language-time-tracker' ), '', array( 'response' => 403 ) );
-		}
-		self::verify_nonce( 'pltt_manage_tag' );
+		self::guard( 'pltt_manage_tag' );
 
 		$tag_id  = isset( $_POST['tag_id'] ) ? absint( $_POST['tag_id'] ) : 0;
 		$new_tag = isset( $_POST['tag_name'] ) ? sanitize_text_field( wp_unslash( $_POST['tag_name'] ) ) : '';
@@ -364,10 +361,7 @@ class PLTT_Form_Handlers {
 	 * Handle tag deletion.
 	 */
 	public static function handle_delete_tag() {
-		if ( ! pltt_user_can_access() ) {
-			wp_die( esc_html__( 'Unauthorized', 'plain-language-time-tracker' ), '', array( 'response' => 403 ) );
-		}
-		self::verify_nonce( 'pltt_manage_tag' );
+		self::guard( 'pltt_manage_tag' );
 
 		$tag_id = isset( $_POST['tag_id'] ) ? absint( $_POST['tag_id'] ) : 0;
 
@@ -392,10 +386,7 @@ class PLTT_Form_Handlers {
 	 * Handle save entries form submission from review screen.
 	 */
 	public static function handle_save_entries() {
-		if ( ! pltt_user_can_access() ) {
-			wp_die( esc_html__( 'Unauthorized', 'plain-language-time-tracker' ), '', array( 'response' => 403 ) );
-		}
-		self::verify_nonce( 'pltt_save_entries' );
+		self::guard( 'pltt_save_entries' );
 
 		// SEC-M3: strict date — this handler writes to entries scoped by date.
 		$date = isset( $_POST['date'] ) ? pltt_sanitize_date_strict( wp_unslash( $_POST['date'] ) ) : '';

@@ -62,7 +62,7 @@ class PLTT_Project_Detail {
 
 		// In a period view the subhead reflects the selected period, not the
 		// lifetime span, and its entry count is that period's.
-		$is_period     = ( 'period' === ( $window['scope'] ?? 'full' ) );
+		$is_period     = ! empty( $window['is_period'] );
 		$subhead_stats = $is_period
 			? PLTT_Entries::get_stats( array( 'project_id' => $project_id, 'date_from' => $window['from'], 'date_to' => $window['to'] ) )
 			: $stats;
@@ -99,7 +99,7 @@ class PLTT_Project_Detail {
 
 		$parts = array( $type_labels[ $billing_type ] ?? $type_labels['hourly'] );
 
-		if ( is_array( $window ) && 'period' === ( $window['scope'] ?? 'full' ) ) {
+		if ( ! empty( $window['is_period'] ) ) {
 			// Period view: show the period itself (e.g. "June 2026"), not the span.
 			$parts[] = $window['period_label'];
 		} else {

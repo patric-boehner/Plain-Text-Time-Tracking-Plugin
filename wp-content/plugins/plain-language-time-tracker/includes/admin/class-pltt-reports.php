@@ -180,24 +180,15 @@ class PLTT_Reports {
 		// Allocation stats for the summary table — always the full picture, not filtered by date.
 		$alloc_stats = array();
 
-		// Chart data (summary view only). Populated below.
-		$chart_buckets     = array();
-		$chart_bucket_size = 'day';
-		$chart_max_minutes = 0;
-		$chart_avg_minutes = 0;
-		$chart_today_key   = '';
+		// Chart data (summary view only). Populated below; the partial unpacks it.
+		$chart = null;
 
 		if ( 'summary' === $view ) {
 			$summary = PLTT_Entries::get_summary_by_project( $date_from, $date_to, $filter_args );
 
 			// Volume chart context (buckets + folded daily totals), shared with the
 			// Project Detail chart via pltt_build_period_chart_data().
-			$chart             = pltt_build_period_chart_data( $date_from, $date_to, $filter_args );
-			$chart_buckets     = $chart['buckets'];
-			$chart_bucket_size = $chart['bucket_size'];
-			$chart_max_minutes = $chart['max_minutes'];
-			$chart_avg_minutes = $chart['avg_minutes'];
-			$chart_today_key   = $chart['today_key'];
+			$chart = pltt_build_period_chart_data( $date_from, $date_to, $filter_args );
 
 			// For projects with a budget, fetch allocation-aware stats.
 			// Recurring: hours within the selected date range vs monthly allocation.

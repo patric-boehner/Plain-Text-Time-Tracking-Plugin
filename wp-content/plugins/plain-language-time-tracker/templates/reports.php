@@ -564,7 +564,7 @@ $tab_base_url = add_query_arg( $filter_params, admin_url( 'admin.php' ) );
 	<?php
 	// Volume bar chart (Hours by day/week/month). Markup shared with the Project
 	// Detail report tab via templates/partials/chart-by-period.php.
-	if ( 'summary' === $view && ! empty( $chart_buckets ) && $chart_max_minutes > 0 ) :
+	if ( 'summary' === $view && ! empty( $chart['buckets'] ) && ( $chart['max_minutes'] ?? 0 ) > 0 ) :
 		include PLTT_PLUGIN_DIR . 'templates/partials/chart-by-period.php';
 	endif;
 	?>
