@@ -140,8 +140,8 @@ class PLTT_Tags {
 		$data    = array( 'name' => $new_name );
 		$formats = array( '%s' );
 		if ( false !== $group_name ) {
-			// Caller wants to set/clear the group. set_group() handles NULL writes
-			// (wpdb->update can't write NULL via the value array).
+			// Caller wants to set/clear the group. A clear is deferred to a separate
+			// query because wpdb->update can't write NULL via the value array.
 			$normalized = self::normalize_group_name( $group_name );
 			if ( null === $normalized ) {
 				// Defer the NULL write to a separate call after the name update.
@@ -171,39 +171,6 @@ class PLTT_Tags {
 		if ( $clear_group ) {
 			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.NotPrepared
 			$wpdb->query( $wpdb->prepare( "UPDATE {$table} SET group_name = NULL WHERE id = %d", $id ) );
-		}
-
-		return true;
-	}
-
-	/**
-	 * Set the group for a single tag. Pass null or '' to clear.
-	 *
-	 * @param int         $id         Tag ID.
-	 * @param string|null $group_name Group name, or null/empty to clear.
-	 * @return bool True on success.
-	 */
-	public static function set_group( $id, $group_name ) {
-		global $wpdb;
-		$table      = PLTT_Database::get_table_name( 'tags' );
-		$normalized = self::normalize_group_name( $group_name );
-
-		if ( null === $normalized ) {
-			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.NotPrepared
-			$result = $wpdb->query( $wpdb->prepare( "UPDATE {$table} SET group_name = NULL WHERE id = %d", $id ) );
-		} else {
-			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
-			$result = $wpdb->update(
-				$table,
-				array( 'group_name' => $normalized ),
-				array( 'id' => $id ),
-				array( '%s' ),
-				array( '%d' )
-			);
-		}
-
-		if ( false === $result ) {
-			return false;
 		}
 
 		return true;
@@ -322,29 +289,6 @@ class PLTT_Tags {
 		}
 
 		return false;
-	}
-
-	/**
-	 * Get tag names for a single entry.
-	 *
-	 * @param int $entry_id Entry ID.
-	 * @return array Array of tag name strings.
-	 */
-	public static function get_for_entry( $entry_id ) {
-		global $wpdb;
-		$tags_table       = PLTT_Database::get_table_name( 'tags' );
-		$entry_tags_table = PLTT_Database::get_table_name( 'entry_tags' );
-
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
-		return $wpdb->get_col(
-			$wpdb->prepare(
-				"SELECT t.name FROM {$tags_table} t
-				INNER JOIN {$entry_tags_table} et ON t.id = et.tag_id
-				WHERE et.entry_id = %d
-				ORDER BY t.name ASC",
-				$entry_id
-			)
-		);
 	}
 
 	/**

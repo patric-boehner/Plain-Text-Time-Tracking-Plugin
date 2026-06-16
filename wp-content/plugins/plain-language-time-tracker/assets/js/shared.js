@@ -144,9 +144,6 @@ const PLTT = {
 				trapLast  = els[els.length - 1];
 			};
 
-			// Expose refresh so callers can call modal._refreshFocusTrap() if they mutate content.
-			modal._refreshFocusTrap = refreshFocusTrap;
-
 			if ( !modal.dataset.focusTrapBound ) {
 				modal.dataset.focusTrapBound = 'true';
 				modal.addEventListener( 'keydown', function( e ) {

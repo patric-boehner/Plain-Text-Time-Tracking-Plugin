@@ -134,7 +134,8 @@ if ( ! empty( $clients ) ) {
 	<div class="pltt-modal-content">
 		<h3 id="pltt-client-modal-title"><?php esc_html_e( 'Add Client', 'plain-language-time-tracker' ); ?></h3>
 		<form id="pltt-client-form" method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
-			<input type="hidden" name="action" id="pltt-client-form-action" value="pltt_create_client">
+			<?php // TRC-UI1: the only native submit is the update path; create is handled by AJAX (pltt_create_client). ?>
+			<input type="hidden" name="action" id="pltt-client-form-action" value="pltt_update_client">
 			<input type="hidden" id="pltt-edit-client-id" name="client_id" value="">
 			<?php wp_nonce_field( 'pltt_update_client', '_wpnonce', true, true ); ?>
 			<p>
@@ -193,7 +194,6 @@ if ( ! empty( $clients ) ) {
 		document.getElementById('pltt-client-description').value = '';
 		document.getElementById('pltt-client-rate').value = '';
 		document.getElementById('pltt-delete-client-btn').classList.remove('visible');
-		document.getElementById('pltt-client-form-action').value = 'pltt_create_client';
 		PLTT.showModal('pltt-client-modal');
 	});
 

@@ -426,32 +426,6 @@ function pltt_format_currency_compact( $amount ) {
 }
 
 /**
- * Count working days (weekdays only) between two dates, inclusive.
- *
- * @param string $date_from Start date (Y-m-d format).
- * @param string $date_to   End date (Y-m-d format).
- * @return int Number of weekdays (Monday-Friday) in the range.
- */
-function pltt_count_working_days( $date_from, $date_to ) {
-	$start = new DateTimeImmutable( $date_from, wp_timezone() );
-	$end   = new DateTimeImmutable( $date_to, wp_timezone() );
-	$end   = $end->modify( '+1 day' );
-
-	$interval = new DateInterval( 'P1D' );
-	$period   = new DatePeriod( $start, $interval, $end );
-
-	$working_days = 0;
-	foreach ( $period as $date ) {
-		$day_of_week = (int) $date->format( 'N' );
-		if ( $day_of_week <= 5 ) {
-			$working_days++;
-		}
-	}
-
-	return $working_days;
-}
-
-/**
  * Calculate the previous period dates for comparison.
  *
  * Given a date range, returns the equivalent previous period (same duration, shifted back).
@@ -1115,8 +1089,9 @@ function pltt_validate_hourly_rate( $rate ) {
  * Resolution order: project rate → client rate → PLTT_DEFAULT_HOURLY_RATE → $0.
  *
  * Accepts optional pre-loaded caches (id-keyed object maps) to avoid extra DB queries.
- * If a cache is provided but the ID is not found in it, the DB is NOT queried as a fallback —
- * pass empty arrays to have this function load from DB on-demand.
+ * On a cache MISS (or when no cache is passed) the rate is loaded from the DB via
+ * PLTT_Projects::get() / PLTT_Clients::get() — supplying a cache is an optimization,
+ * not a guarantee that the DB is never hit (TRC-BIZ-DOC1).
  *
  * OPT-M3: Consolidates duplicate rate logic from PLTT_Ajax::update_entry_field()
  * and PLTT_Review::resolve_billable_rate() into a single canonical implementation.

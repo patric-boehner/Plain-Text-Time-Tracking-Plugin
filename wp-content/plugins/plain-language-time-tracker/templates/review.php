@@ -91,7 +91,8 @@ foreach ( $entries as $entry ) {
 	<?php endif; ?>
 </div>
 
-<?php wp_add_inline_script( 'pltt-review', 'var plttAllTags = ' . wp_json_encode( $all_tags ) . ';var plttTagGroups = ' . wp_json_encode( PLTT_Tags::get_name_to_group_map() ) . ';', 'before' ); ?>
+<?php // SEC-L1: JSON_HEX_TAG/AMP so a "</script>" inside a tag/group name can't break out of the inline <script>. ?>
+<?php wp_add_inline_script( 'pltt-review', 'var plttAllTags = ' . wp_json_encode( $all_tags, JSON_HEX_TAG | JSON_HEX_AMP ) . ';var plttTagGroups = ' . wp_json_encode( PLTT_Tags::get_name_to_group_map(), JSON_HEX_TAG | JSON_HEX_AMP ) . ';', 'before' ); ?>
 
 <!-- New Client Modal -->
 <div id="pltt-client-modal" class="pltt-modal pltt-hidden" role="dialog" aria-modal="true" aria-labelledby="pltt-review-client-modal-title">

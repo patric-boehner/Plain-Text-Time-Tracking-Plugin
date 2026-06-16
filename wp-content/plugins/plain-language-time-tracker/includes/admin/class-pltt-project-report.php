@@ -42,17 +42,20 @@ class PLTT_Project_Report {
 	/**
 	 * Build the full Report-tab dataset for a project.
 	 *
-	 * @param int         $project_id Project ID.
-	 * @param object      $project    Project row.
-	 * @param object|null $client     Owning client (unused directly; reserved).
-	 * @param object|null $stats      Pre-loaded PLTT_Entries::get_stats() result; loaded if null.
+	 * @param int         $project_id    Project ID.
+	 * @param object      $project       Project row.
+	 * @param object|null $client        Owning client (unused directly; reserved).
+	 * @param object|null $stats         Pre-loaded lifetime PLTT_Entries::get_stats() result; loaded if null.
+	 * @param array|null  $window        Active period window (recurring period lens), or null.
+	 * @param object|null $windowed_stats Pre-loaded windowed stats for $window, to reuse instead of
+	 *                                   re-querying (OPT-N-A: render() already computes these for the subhead).
 	 * @return array {
 	 *     @type array  $cards         Stat-card figures.
 	 *     @type array  $groupings     Map of grouping key => grouping data (buckets, etc.).
 	 *     @type string $default_group The grouping key to show first.
 	 * }
 	 */
-	public static function build( $project_id, $project, $client = null, $stats = null, $window = null ) {
+	public static function build( $project_id, $project, $client = null, $stats = null, $window = null, $windowed_stats = null ) {
 		if ( null === $stats ) {
 			$stats = PLTT_Entries::get_stats( array( 'project_id' => $project_id ) );
 		}
@@ -73,12 +76,14 @@ class PLTT_Project_Report {
 		}
 		$tags_by_entry = PLTT_Tags::get_for_entries( $entry_ids );
 		$name_to_group = PLTT_Tags::get_name_to_group_map();
+		// Load the group list once and feed both build_groupings() calls (OPT-N-B).
+		$group_names   = PLTT_Tags::get_all_groups();
 
 		$rate = (float) pltt_resolve_billable_rate( (int) $project->client_id, (int) $project_id );
 
 		// Lifetime groupings: the swimlane (always the full arc) and the toggle's
 		// dimension set/default both read from these.
-		$timeline_groupings = self::build_groupings( $entries, $tags_by_entry, $name_to_group );
+		$timeline_groupings = self::build_groupings( $entries, $tags_by_entry, $name_to_group, $group_names );
 
 		// Windowed slice → stat cards + "Where the time went" bars + volume chart.
 		// For the full/lifetime view (every non-recurring project, and recurring
@@ -90,13 +95,17 @@ class PLTT_Project_Report {
 			&& ! empty( $window['to'] );
 
 		if ( $is_windowed ) {
-			$card_stats = PLTT_Entries::get_stats(
-				array(
-					'project_id' => $project_id,
-					'date_from'  => $window['from'],
-					'date_to'    => $window['to'],
-				)
-			);
+			// Reuse the caller's windowed stats when supplied (OPT-N-A); only query
+			// when called without them.
+			$card_stats = ( null !== $windowed_stats )
+				? $windowed_stats
+				: PLTT_Entries::get_stats(
+					array(
+						'project_id' => $project_id,
+						'date_from'  => $window['from'],
+						'date_to'    => $window['to'],
+					)
+				);
 
 			$win_entries = array();
 			foreach ( $entries as $e ) {
@@ -104,7 +113,7 @@ class PLTT_Project_Report {
 					$win_entries[] = $e;
 				}
 			}
-			$bar_groupings = self::build_groupings( $win_entries, $tags_by_entry, $name_to_group );
+			$bar_groupings = self::build_groupings( $win_entries, $tags_by_entry, $name_to_group, $group_names );
 		} else {
 			$card_stats    = $stats;
 			$bar_groupings = $timeline_groupings;
@@ -480,11 +489,10 @@ class PLTT_Project_Report {
 	 * @param array $entries       Entry rows (ASC by date).
 	 * @param array $tags_by_entry entry_id => [tag names].
 	 * @param array $name_to_group tag name => group name (grouped tags only).
+	 * @param array $group_names   All tag group names (loaded once by the caller; OPT-N-B).
 	 * @return array Map of grouping key => grouping data. Only exposed groupings are returned.
 	 */
-	private static function build_groupings( $entries, $tags_by_entry, $name_to_group ) {
-		$group_names = PLTT_Tags::get_all_groups();
-
+	private static function build_groupings( $entries, $tags_by_entry, $name_to_group, $group_names ) {
 		$candidate_keys = $group_names;
 		$candidate_keys[] = self::UNGROUPED;
 
