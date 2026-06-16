@@ -162,9 +162,7 @@ class PLTT_Reports {
 			: 0;
 
 		// Overall Effective Hourly Rate (Card 5).
-		$overall_ehr = $stats && $stats->total_minutes > 0 && (float) $stats->billable_amount > 0
-			? (float) $stats->billable_amount / ( $stats->total_minutes / 60 )
-			: 0;
+		$overall_ehr = $stats ? pltt_effective_rate( $stats->billable_amount, $stats->total_minutes ) : 0;
 
 		// Top projects for the period (Card 1) — up to 2 highest-hours client-facing projects.
 		$top_projects = $total_entries > 0

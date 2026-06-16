@@ -458,22 +458,10 @@ $tab_base_url = add_query_arg( $filter_params, admin_url( 'admin.php' ) );
 			$prev_hours_mins = $prev_stats ? (int) $prev_stats->billable_minutes : 0;
 			$curr_hours_mins = (int) $stats->billable_minutes;
 
-			if ( $prev_hours_mins > 0 ) {
-				$hours_pct_change = ( $curr_hours_mins - $prev_hours_mins ) / $prev_hours_mins * 100;
-			} else {
-				$hours_pct_change = 100;
-			}
-
-			if ( abs( $hours_pct_change ) < 5 ) {
-				$hours_change_class = 'status-neutral';
-				$hours_change_icon  = '→';
-			} elseif ( $hours_pct_change > 0 ) {
-				$hours_change_class = 'status-increase';
-				$hours_change_icon  = '↑';
-			} else {
-				$hours_change_class = 'status-decrease';
-				$hours_change_icon  = '↓';
-			}
+			$hours_change       = pltt_pct_change_indicator( $curr_hours_mins, $prev_hours_mins );
+			$hours_pct_change   = $hours_change['pct'];
+			$hours_change_class = $hours_change['class'];
+			$hours_change_icon  = $hours_change['icon'];
 			?>
 			<div class="card">
 				<div class="card-label"><?php esc_html_e( 'Billable Hours', 'plain-language-time-tracker' ); ?></div>
@@ -511,22 +499,10 @@ $tab_base_url = add_query_arg( $filter_params, admin_url( 'admin.php' ) );
 			$curr_amount  = (float) $stats->billable_amount;
 			$amount_shown = $curr_amount > 0;
 
-			if ( $prev_amount > 0 ) {
-				$pct_change = ( $curr_amount - $prev_amount ) / $prev_amount * 100;
-			} else {
-				$pct_change = 100;
-			}
-
-			if ( abs( $pct_change ) < 5 ) {
-				$change_class = 'status-neutral';
-				$change_icon  = '→';
-			} elseif ( $pct_change > 0 ) {
-				$change_class = 'status-increase';
-				$change_icon  = '↑';
-			} else {
-				$change_class = 'status-decrease';
-				$change_icon  = '↓';
-			}
+			$amount_change = pltt_pct_change_indicator( $curr_amount, $prev_amount );
+			$pct_change    = $amount_change['pct'];
+			$change_class  = $amount_change['class'];
+			$change_icon   = $amount_change['icon'];
 			?>
 			<div class="card<?php echo $amount_shown ? '' : ' pltt-hidden'; ?>" id="pltt-stat-amount-card">
 				<div class="card-label"><?php esc_html_e( 'Billable Amount', 'plain-language-time-tracker' ); ?></div>
