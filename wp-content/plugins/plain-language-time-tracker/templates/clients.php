@@ -177,14 +177,7 @@ if ( ! empty( $clients ) ) {
 (function() {
 	'use strict';
 
-	// Clean up URL parameters after displaying notices.
-	if (window.location.search.includes('pltt_message') || window.location.search.includes('pltt_error')) {
-		var url = new URL(window.location.href);
-		url.searchParams.delete('pltt_message');
-		url.searchParams.delete('pltt_error');
-		url.searchParams.delete('pltt_error_message');
-		window.history.replaceState({}, '', url.toString());
-	}
+	// Notice params are stripped from the URL by PLTT.cleanNoticeParams() in shared.js.
 
 	// Add Client button.
 	document.getElementById('pltt-add-client-btn').addEventListener('click', function() {

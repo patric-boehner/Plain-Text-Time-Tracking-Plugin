@@ -68,6 +68,7 @@ The post-freeze Project Detail report files are re-implementing money math that 
 | OPT-DUP-C | Budget→allocation-minutes cascade 3× | `includes/helpers.php:1628`, `class-pltt-project-report.php:212,825` | Single helper. | M | **DONE** (v1.9.22) |
 | OPT-DUP-D | verify-cap + nonce boilerplate (9×/6×) | form-handlers / admin | Extract a shared guard helper. Existing OPT-DUP3/4. | M | **DONE** (v1.9.23) — `PLTT_Form_Handlers::guard($action)` (cap+nonce, 8 handlers) and `PLTT_Admin::require_access()` (6 render methods). |
 | OPT-DUP-E/F/G/I/J | Effective-rate calc 3×; per-period delta/arrow 2×; overage-dollar blocks 2×; `<option>` builder 3× (incl. review.js:1276); review.js twin-IIFE ~200 LOC modal dup | various — see raw | Consolidate per item. J is the largest (relates to the planned native-`<dialog>` refactor). | M–L | **E/F/G DONE** (v1.9.24) — `pltt_effective_rate()`, `pltt_pct_change_indicator()`, `pltt_resolve_entry_amount()`. **I/J still TODO** (JS `<option>` builder + review.js twin IIFEs). |
+| OPT-DUP2 | URL notice-cleanup script duplicated 5× | clients/projects/tags/daily-log templates + project-detail.js | Extract one shared helper. | M | **DONE** (v1.9.25) — `PLTT.cleanNoticeParams()` in shared.js, auto-run on DOMContentLoaded; 5 copies removed. |
 
 ---
 

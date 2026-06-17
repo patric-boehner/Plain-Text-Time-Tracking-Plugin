@@ -1,28 +1,11 @@
 /**
- * Project detail page (report only) — notice cleanup + "Where the time went"
- * group-by switching. Settings are edited via the modal on the Projects list.
+ * Project detail page (report only) — "Where the time went" group-by switching.
+ * Settings are edited via the modal on the Projects list.
  *
  * Vanilla JS, no dependencies.
  */
 (function () {
 	'use strict';
-
-	/* --------------------------------------------------------------------- */
-	/* Notice query-param cleanup                                            */
-	/* --------------------------------------------------------------------- */
-	function cleanNoticeParams() {
-		if (
-			window.location.search.indexOf('pltt_message') === -1 &&
-			window.location.search.indexOf('pltt_error') === -1
-		) {
-			return;
-		}
-		var url = new URL(window.location.href);
-		url.searchParams.delete('pltt_message');
-		url.searchParams.delete('pltt_error');
-		url.searchParams.delete('pltt_error_message');
-		window.history.replaceState({}, '', url.toString());
-	}
 
 	/* --------------------------------------------------------------------- */
 	/* "Where the time went" / timeline group-by switch                      */
@@ -61,7 +44,7 @@
 
 	/* --------------------------------------------------------------------- */
 	function init() {
-		cleanNoticeParams();
+		// Notice params are stripped by PLTT.cleanNoticeParams() in shared.js.
 		initGroupBy();
 	}
 

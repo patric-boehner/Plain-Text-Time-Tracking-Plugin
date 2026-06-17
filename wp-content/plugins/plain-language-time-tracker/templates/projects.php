@@ -481,14 +481,7 @@ if ( ! empty( $projects ) ) {
 		}
 	}
 
-	// Clean up URL parameters after displaying notices.
-	if (window.location.search.includes('pltt_message') || window.location.search.includes('pltt_error')) {
-		var url = new URL(window.location.href);
-		url.searchParams.delete('pltt_message');
-		url.searchParams.delete('pltt_error');
-		url.searchParams.delete('pltt_error_message');
-		window.history.replaceState({}, '', url.toString());
-	}
+	// Notice params are stripped from the URL by PLTT.cleanNoticeParams() in shared.js.
 
 	// Add Project button.
 	var addProjectBtn = document.getElementById('pltt-add-project-btn');

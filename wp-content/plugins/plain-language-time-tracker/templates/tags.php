@@ -150,13 +150,7 @@ if ( ! empty( $ungrouped_tags ) ) {
 (function() {
 	'use strict';
 
-	// Clean up URL parameters after displaying notices.
-	if (window.location.search.includes('pltt_message') || window.location.search.includes('pltt_error')) {
-		var url = new URL(window.location.href);
-		url.searchParams.delete('pltt_message');
-		url.searchParams.delete('pltt_error');
-		window.history.replaceState({}, '', url.toString());
-	}
+	// Notice params are stripped from the URL by PLTT.cleanNoticeParams() in shared.js.
 
 	var groupSelect = document.getElementById('pltt-tag-group-select');
 	var groupNewInput = document.getElementById('pltt-tag-group-new');
