@@ -263,11 +263,32 @@ const PLTT = {
 		}
 
 		return hours + ':' + minutes + period;
+	},
+
+	/**
+	 * Strip one-time notice params from the address bar after the page renders, so
+	 * a reload doesn't re-show the admin notice. No-op when none are present.
+	 * (OPT-DUP2: replaces the inline copies in clients/projects/tags/daily-log and
+	 * project-detail.js.)
+	 */
+	cleanNoticeParams: function() {
+		const search = window.location.search;
+		if ( search.indexOf( 'pltt_message' ) === -1 && search.indexOf( 'pltt_error' ) === -1 ) {
+			return;
+		}
+		const url = new URL( window.location.href );
+		url.searchParams.delete( 'pltt_message' );
+		url.searchParams.delete( 'pltt_error' );
+		url.searchParams.delete( 'pltt_error_message' );
+		window.history.replaceState( {}, '', url.toString() );
 	}
 };
 
 // Initialize modal close buttons.
 document.addEventListener( 'DOMContentLoaded', function() {
+	// Drop one-time notice params from the URL (OPT-DUP2).
+	PLTT.cleanNoticeParams();
+
 	// Initialize currency inputs.
 	PLTT.initCurrencyInputs( document );
 
