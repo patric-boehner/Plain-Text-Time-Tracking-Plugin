@@ -374,6 +374,9 @@ $tab_base_url = add_query_arg( $filter_params, admin_url( 'admin.php' ) );
 	</form>
 
 	<?php
+	// Reuse the map already loaded for the tag filter dropdown above (OPT-DUP8/N4),
+	// falling back to a fresh load if that dropdown was skipped.
+	$tag_group_map = isset( $tag_group_map ) ? $tag_group_map : PLTT_Tags::get_name_to_group_map();
 	wp_add_inline_script(
 		'pltt-reports',
 		// SEC-L1: JSON_HEX_TAG/AMP so a "</script>" inside an admin-authored name
@@ -381,7 +384,7 @@ $tab_base_url = add_query_arg( $filter_params, admin_url( 'admin.php' ) );
 		'var plttProjectsByClient = ' . wp_json_encode( $projects_by_client, JSON_HEX_TAG | JSON_HEX_AMP ) . ';' .
 		'var plttClientNames = ' . wp_json_encode( $client_names, JSON_HEX_TAG | JSON_HEX_AMP ) . ';' .
 		'var plttAllTags = ' . wp_json_encode( $all_tags, JSON_HEX_TAG | JSON_HEX_AMP ) . ';' .
-		'var plttTagGroups = ' . wp_json_encode( PLTT_Tags::get_name_to_group_map(), JSON_HEX_TAG | JSON_HEX_AMP ) . ';' .
+		'var plttTagGroups = ' . wp_json_encode( $tag_group_map, JSON_HEX_TAG | JSON_HEX_AMP ) . ';' .
 		'var plttReportStats = ' . wp_json_encode( array(
 			'billableMinutes' => $stats ? (int) $stats->billable_minutes : 0,
 			'billableAmount'  => $stats ? round( (float) $stats->billable_amount, 2 ) : 0,

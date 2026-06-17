@@ -69,6 +69,8 @@ The post-freeze Project Detail report files are re-implementing money math that 
 | OPT-DUP-D | verify-cap + nonce boilerplate (9×/6×) | form-handlers / admin | Extract a shared guard helper. Existing OPT-DUP3/4. | M | **DONE** (v1.9.23) — `PLTT_Form_Handlers::guard($action)` (cap+nonce, 8 handlers) and `PLTT_Admin::require_access()` (6 render methods). |
 | OPT-DUP-E/F/G/I/J | Effective-rate calc 3×; per-period delta/arrow 2×; overage-dollar blocks 2×; `<option>` builder 3× (incl. review.js:1276); review.js twin-IIFE ~200 LOC modal dup | various — see raw | Consolidate per item. J is the largest (relates to the planned native-`<dialog>` refactor). | M–L | **E/F/G DONE** (v1.9.24) — `pltt_effective_rate()`, `pltt_pct_change_indicator()`, `pltt_resolve_entry_amount()`. **I/J still TODO** (JS `<option>` builder + review.js twin IIFEs). |
 | OPT-DUP2 | URL notice-cleanup script duplicated 5× | clients/projects/tags/daily-log templates + project-detail.js | Extract one shared helper. | M | **DONE** (v1.9.25) — `PLTT.cleanNoticeParams()` in shared.js, auto-run on DOMContentLoaded; 5 copies removed. |
+| OPT-DUP8/N4 | `get_name_to_group_map()` called 2× per Reports render | `templates/reports.php:319,384` | Cache in a local. | S | **DONE** (v1.9.26) — reused once; verified 2→1 query in both views. |
+| OPT-S8 | Reports view whitelist duplicated | `class-pltt-reports.php` | Promote to a const. | S | **DONE** (v1.9.26) — `PLTT_Reports::VIEWS` + `DEFAULT_VIEW`. |
 
 ---
 
