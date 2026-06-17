@@ -57,16 +57,20 @@ The plugin:
 - **Confidence scoring** - Shows how certain the system is about predictions
 
 ### Financial Tracking
-- **Three-tier rates** - System default ($100/hr) → Client rate → Project rate
+- **Three-tier rates** - Project rate → Client rate → System default ($100/hr)
 - **Rate snapshots** - Locks rates at verification time for historical accuracy
-- **Billable tracking** - Mark entries as billable/non-billable
-- **Billable hours & amounts** - Automatic calculations in reports
+- **Project types** - Hourly, Retainer (recurring allocation), Fixed Fee (budget), and Internal
+- **Honest billable flag** - "Billable" means *generates invoiceable dollars from time × rate*; retainer-within-allocation, fixed-fee, and internal work default to non-billable
+- **Retainer & budget tracking** - Allocation/budget bars with amber over-allocation treatment
+- **Billable hours & amounts** - Automatic calculations in reports, with effective-hourly-rate (EHR)
 
 ### Organization & Reporting
 - **Client & Project management** - Two-column admin screen with inline editing
 - **Project lifecycle** - Active (appears in predictions) vs Archived (reporting only)
-- **Tag system** - Use #hashtags anywhere in descriptions
+- **Project Detail page** - Per-project Report + Settings tabs, stat cards, "where the time went" bars, and a CSS swimlane timeline
+- **Tag system** - Use #hashtags anywhere in descriptions; tags can be organized into groups
 - **Flexible filtering** - Reports by date range, client, project, tags, billable status
+- **Charts** - Hours-by-day volume chart with billable/non-billable/internal encoding
 - **Log history** - Chronological archive of all daily logs
 
 ### Dual-Purpose Tool
@@ -132,16 +136,18 @@ Click **Process Notes** button
 **Time Tracker → Clients & Projects**
 
 - Add clients with optional hourly rates
-- Create projects under clients
+- Create projects under clients (Hourly, Retainer, Fixed Fee, or Internal)
 - Archive completed projects (excluded from predictions)
 - System learns aliases from your corrections
+- Open a project to its detail page for per-project reporting and settings
 
 ### 4. View Reports
 **Time Tracker → Reports**
 
 - Filter by date range, client, project, tags, billable status
-- View summary cards (total hours, billable hours, amounts)
-- Edit individual entries inline
+- Summary and detailed views, with an hours-by-day chart
+- Summary cards: hours, billable hours/amount, and effective hourly rate
+- Edit Tags, Billable, and Invoiced inline (saves immediately via AJAX)
 - Export to CSV _(planned)_
 
 ---
@@ -212,11 +218,12 @@ Read the full philosophy document: [design-philosophy.md](design-philosophy.md)
 - **Rate snapshots** - Historical accuracy preserved even if rates change
 
 ### Database Schema:
-- `pltt_clients` - Client information and default rates
-- `pltt_projects` - Projects with status (active/archived) and rates
+- `pltt_clients` - Client information, default rates, internal flag
+- `pltt_projects` - Projects with status (active/archived), rates, recurring period, and budget (hours/fee)
 - `pltt_time_entries` - Time entries with snapshots of billable rates
 - `pltt_aliases` - Learned alias mappings with confidence scores
 - `pltt_daily_logs` - Raw daily logs for history/reference
+- `pltt_tags` / `pltt_entry_tags` - Tags (optionally grouped) and their entry associations
 
 See [development-notes.md](development-notes.md) for development preferences and patterns.
 
@@ -226,18 +233,17 @@ For detailed feature documentation and data model: [PROJECT.md](PROJECT.md)
 
 ## Status
 
-**Current Version:** 1.5.0 (DB Version: 1.6.0)
+**Current Version:** 1.9.27 (DB Version: 1.9.5)
 
-The plugin is **functionally complete** for its core use case. All planned features are implemented and working.
+The plugin is **functionally complete** for its core use case and in active daily use. All planned features are implemented and working.
 
 ### Backburnered Ideas
 Features that might be added if genuine need emerges from actual use:
 
 - CSV export for billing/spreadsheet integration
-- Settings page for configuring defaults
 - Calendar view showing patterns and gaps
-- Bulk entry updates
-- Advanced filtering options
+- Bulk entry updates across multiple entries
+- Advanced filtering options (negative filters, etc.)
 
 See [PROJECT.md](PROJECT.md) for full feature list and wishlist.
 
