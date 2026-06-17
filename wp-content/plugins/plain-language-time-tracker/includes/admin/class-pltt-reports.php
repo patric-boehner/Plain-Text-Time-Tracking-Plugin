@@ -21,12 +21,18 @@ class PLTT_Reports {
 	const PER_PAGE = PLTT_ENTRIES_PER_PAGE;
 
 	/**
+	 * Valid `view` values and the default (OPT-S8: single source of truth).
+	 */
+	const VIEWS        = array( 'summary', 'detailed' );
+	const DEFAULT_VIEW = 'summary';
+
+	/**
 	 * Render the Reports screen.
 	 */
 	public static function render() {
 		$date_from  = isset( $_GET['from'] ) ? pltt_sanitize_date( wp_unslash( $_GET['from'] ) ) : current_time( 'Y-m-01' );
 		$date_to    = isset( $_GET['to'] ) ? pltt_sanitize_date( wp_unslash( $_GET['to'] ) ) : pltt_get_current_date();
-		$view       = isset( $_GET['view'] ) ? sanitize_text_field( wp_unslash( $_GET['view'] ) ) : 'summary';
+		$view       = isset( $_GET['view'] ) ? sanitize_text_field( wp_unslash( $_GET['view'] ) ) : self::DEFAULT_VIEW;
 		$client_id  = isset( $_GET['client_id'] ) ? absint( $_GET['client_id'] ) : 0;
 		$project_id = isset( $_GET['project_id'] ) ? absint( $_GET['project_id'] ) : 0;
 		$tag        = isset( $_GET['tag'] ) ? sanitize_text_field( wp_unslash( $_GET['tag'] ) ) : '';
@@ -39,8 +45,8 @@ class PLTT_Reports {
 		$tag_negate     = ! empty( $_GET['tag_negate'] ) ? 1 : 0;
 
 		// Whitelist valid views.
-		if ( ! in_array( $view, array( 'detailed', 'summary' ), true ) ) {
-			$view = 'summary';
+		if ( ! in_array( $view, self::VIEWS, true ) ) {
+			$view = self::DEFAULT_VIEW;
 		}
 
 		// Build filter args shared across all queries.
