@@ -61,12 +61,15 @@ class PLTT_Project_Report {
 		}
 
 		// Lifetime entries — drive the swimlane (always the full arc) and the
-		// group-by toggle's dimension set.
+		// group-by toggle's dimension set. Only id/date/duration are read here, so
+		// request just those instead of every column (OPT-N-C); tags are loaded
+		// separately by id below.
 		$entries = PLTT_Entries::get_all(
 			array(
 				'project_id' => $project_id,
 				'orderby'    => 'entry_date',
 				'order'      => 'ASC',
+				'fields'     => array( 'id', 'entry_date', 'duration_minutes' ),
 			)
 		);
 

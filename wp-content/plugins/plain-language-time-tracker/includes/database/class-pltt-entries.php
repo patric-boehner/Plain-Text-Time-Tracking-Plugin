@@ -58,6 +58,7 @@ class PLTT_Entries {
 			'order'          => 'DESC',
 			'limit'          => 0,
 			'offset'         => 0,
+			'fields'         => array(), // Optional column allowlist; empty = SELECT *.
 		);
 		$args     = wp_parse_args( $args, $defaults );
 
@@ -92,7 +93,23 @@ class PLTT_Entries {
 			$prepare[] = $args['verified'] ? 1 : 0;
 		}
 
-		$sql = "SELECT * FROM {$table}";
+		// Optional lean column list (OPT-N-C). Intersect the request against a known
+		// allowlist so only real column names — never user input — reach the SQL.
+		$select = '*';
+		if ( ! empty( $args['fields'] ) ) {
+			$allowed_cols = array(
+				'id', 'entry_date', 'start_time', 'end_time', 'duration_minutes',
+				'raw_text', 'description', 'client_id', 'project_id', 'verified',
+				'billable', 'billable_rate', 'billable_amount', 'billed',
+				'created_at', 'updated_at',
+			);
+			$requested = array_values( array_intersect( (array) $args['fields'], $allowed_cols ) );
+			if ( ! empty( $requested ) ) {
+				$select = implode( ', ', $requested );
+			}
+		}
+
+		$sql = "SELECT {$select} FROM {$table}";
 
 		if ( ! empty( $where ) ) {
 			$sql .= ' WHERE ' . implode( ' AND ', $where );

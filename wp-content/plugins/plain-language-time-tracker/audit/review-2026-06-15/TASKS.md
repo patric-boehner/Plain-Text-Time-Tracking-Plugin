@@ -89,7 +89,7 @@ The post-freeze Project Detail report files are re-implementing money math that 
 
 | ID | Title | Where | Fix | Effort | Status |
 |----|-------|-------|-----|--------|--------|
-| OPT-N-C | `SELECT *` over full-lifetime entries | `class-pltt-project-report.php:62` | Select only needed columns. | S | TODO |
+| OPT-N-C | `SELECT *` over full-lifetime entries | `class-pltt-project-report.php:62` | Select only needed columns. | S | **DONE** (v1.9.27) — added `fields` allowlist to `PLTT_Entries::get_all()`; Project Detail requests only id/entry_date/duration_minutes. Render byte-identical (verified lean vs full-cols). |
 | OPT-N-D | `PLTT_Entries::get()` called twice in save | `includes/api/class-pltt-ajax.php:605,618` | Reuse the first fetch. | S | TODO |
 | OPT-N-E | Per-row client/project `get()` in render | render_entry_row path | Use bulk loaders (`get_multiple`). | S | TODO |
 | OPT-PERF-A | `is_period` re-derived 3× (drift risk) | Project Detail render | Compute once. | S | **DONE** (v1.9.23) — resolver returns explicit `is_period`; 4 derivations now read it. Same batch also landed OPT-PERF-B (`pltt_chart_y_ceiling()` helper, parity-verified), OPT-PERF-C (per-bucket total stored in `pltt_build_period_chart_data`; the format_duration/num dups were already gone via OPT-DUP-C), and the chart-context unpack dedup (the `chart-by-period.php` partial now takes a single `$chart` array). |
