@@ -25,6 +25,18 @@ if ( ! empty( $projects ) ) {
 	$project_ids         = wp_list_pluck( $projects, 'id' );
 	$project_stats_by_id = PLTT_Entries::get_stats_grouped_by( 'project_id', array( 'project_ids' => $project_ids ) );
 }
+
+// Bulk-load project aliases grouped by project for the settings chip manager.
+$aliases_by_project = array();
+foreach ( PLTT_Aliases::get_all() as $pltt_alias ) {
+	if ( ! empty( $pltt_alias->project_id ) ) {
+		$aliases_by_project[ (int) $pltt_alias->project_id ][] = array(
+			'id'   => (int) $pltt_alias->id,
+			'text' => $pltt_alias->alias_text,
+			'use'  => (int) $pltt_alias->use_count,
+		);
+	}
+}
 ?>
 
 <div class="wrap pltt-wrap">
@@ -160,7 +172,7 @@ if ( ! empty( $projects ) ) {
 
 						$view_url = PLTT_Project_Detail::get_url( $project->id );
 						?>
-						<tr<?php echo $row_class ? ' class="' . esc_attr( $row_class ) . '"' : ''; ?> data-project-id="<?php echo esc_attr( $project->id ); ?>" data-unbilled-minutes="<?php echo esc_attr( $project_unbilled_minutes ); ?>" data-name="<?php echo esc_attr( $project->name ); ?>" data-client-id="<?php echo esc_attr( $project->client_id ); ?>" data-status="<?php echo esc_attr( $project->status ); ?>" data-rate="<?php echo esc_attr( $project->hourly_rate ?? '' ); ?>" data-billability-default="<?php echo esc_attr( $project->billability_default ?? '1' ); ?>" data-recurring-period="<?php echo esc_attr( $project->recurring_period ?? '' ); ?>" data-billing-type="<?php echo esc_attr( $billing_type ); ?>" data-budget-hours="<?php echo esc_attr( $project->budget_hours ?? '' ); ?>" data-budget-fee="<?php echo esc_attr( $project->budget_fee ?? '' ); ?>" data-entry-count="<?php echo esc_attr( $project_entry_count ); ?>">
+						<tr<?php echo $row_class ? ' class="' . esc_attr( $row_class ) . '"' : ''; ?> data-project-id="<?php echo esc_attr( $project->id ); ?>" data-unbilled-minutes="<?php echo esc_attr( $project_unbilled_minutes ); ?>" data-name="<?php echo esc_attr( $project->name ); ?>" data-client-id="<?php echo esc_attr( $project->client_id ); ?>" data-status="<?php echo esc_attr( $project->status ); ?>" data-rate="<?php echo esc_attr( $project->hourly_rate ?? '' ); ?>" data-billability-default="<?php echo esc_attr( $project->billability_default ?? '1' ); ?>" data-recurring-period="<?php echo esc_attr( $project->recurring_period ?? '' ); ?>" data-billing-type="<?php echo esc_attr( $billing_type ); ?>" data-budget-hours="<?php echo esc_attr( $project->budget_hours ?? '' ); ?>" data-budget-fee="<?php echo esc_attr( $project->budget_fee ?? '' ); ?>" data-entry-count="<?php echo esc_attr( $project_entry_count ); ?>" data-aliases="<?php echo esc_attr( wp_json_encode( $aliases_by_project[ $project->id ] ?? array() ) ); ?>">
 							<td>
 								<strong><a href="<?php echo esc_url( $view_url ); ?>"><?php echo esc_html( $project->name ); ?></a></strong>
 								<?php if ( 'archived' === $project->status && 'status' !== $group_mode ) : ?>
@@ -308,6 +320,17 @@ if ( ! empty( $projects ) ) {
 				<small class="description" id="pltt-nonbillable-description"><?php esc_html_e( 'Entries default to non-billable. Can be overridden per entry.', 'plain-language-time-tracker' ); ?></small>
 			</p>
 
+			<hr class="pltt-form-separator">
+			<p>
+				<label for="pltt-project-alias-input"><?php esc_html_e( 'Aliases (optional)', 'plain-language-time-tracker' ); ?></label>
+				<span class="pltt-alias-field-hint"><?php esc_html_e( 'Shorthand in your notes that maps to this project. Type and press Enter; matches at full confidence.', 'plain-language-time-tracker' ); ?></span>
+				<div class="pltt-alias-chips" data-alias-chips data-remove-label="<?php esc_attr_e( 'Remove alias', 'plain-language-time-tracker' ); ?>">
+					<div class="pltt-alias-chip-list"></div>
+					<input type="text" id="pltt-project-alias-input" class="pltt-alias-input" placeholder="<?php esc_attr_e( 'Add alias…', 'plain-language-time-tracker' ); ?>" autocomplete="off">
+					<div class="pltt-alias-hidden"></div>
+				</div>
+			</p>
+
 			<div id="pltt-project-status-group" class="pltt-hidden">
 				<hr class="pltt-form-separator">
 				<p>
@@ -354,6 +377,10 @@ if ( ! empty( $projects ) ) {
 	'use strict';
 
 	function el(id) { return document.getElementById(id); }
+
+	var projectChips = window.PlttAliasChips
+		? PlttAliasChips.create(document.querySelector('#pltt-project-form [data-alias-chips]'))
+		: null;
 
 	var BILLING_DESCRIPTIONS = {
 		rate: {
@@ -500,6 +527,7 @@ if ( ! empty( $projects ) ) {
 			document.getElementById('pltt-delete-project-btn').classList.remove('visible');
 			document.getElementById('pltt-project-billing-type').value = 'hourly';
 			applyBillingTypeUI('hourly', true);
+			if (projectChips) projectChips.clear();
 			PLTT.showModal('pltt-project-modal');
 		});
 	}
@@ -538,6 +566,11 @@ if ( ! empty( $projects ) ) {
 			var billingType = row.dataset.billingType || 'hourly';
 			applyBillingTypeUI(billingType, false);
 			document.getElementById('pltt-project-non-billable').checked = row.dataset.billabilityDefault === '0';
+			if (projectChips) {
+				var projectAliases = [];
+				try { projectAliases = JSON.parse(row.dataset.aliases || '[]'); } catch (err) { projectAliases = []; }
+				projectChips.setExisting(projectAliases);
+			}
 
 			document.getElementById('pltt-project-status-group').classList.remove('pltt-hidden');
 			document.getElementById('pltt-project-status').value = isArchived ? 'archived' : 'active';
@@ -595,7 +628,9 @@ if ( ! empty( $projects ) ) {
 			const recurringPeriod = document.getElementById('pltt-project-recurring-period').value;
 			const nonBillable = document.getElementById('pltt-project-non-billable').checked ? '1' : '0';
 
-			PLTT.ajax('pltt_create_project', { client_id: clientId, name: name, hourly_rate: hourlyRate, budget_hours: budgetHours, budget_fee: budgetFee, recurring_period: recurringPeriod, non_billable: nonBillable }, function(response) {
+			const aliasesJson = projectChips ? JSON.stringify(projectChips.getAdditions()) : '[]';
+
+			PLTT.ajax('pltt_create_project', { client_id: clientId, name: name, hourly_rate: hourlyRate, budget_hours: budgetHours, budget_fee: budgetFee, recurring_period: recurringPeriod, non_billable: nonBillable, aliases_json: aliasesJson }, function(response) {
 				if (response.success) {
 					window.location.href = window.location.pathname + '?page=pltt-projects&pltt_message=project_created';
 				} else {

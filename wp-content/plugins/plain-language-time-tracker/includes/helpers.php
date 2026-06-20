@@ -955,6 +955,52 @@ function pltt_flush_alias_cache() {
 }
 
 /**
+ * Apply alias chip-manager changes for a client or project settings form.
+ *
+ * Seeds added aliases at full confidence and prunes removed ones. Removals are
+ * scoped to the entity being edited so a stale or forged form can't delete an
+ * alias that belongs to a different client/project.
+ *
+ * @param array    $add        Alias texts to seed.
+ * @param array    $remove     Alias IDs to prune.
+ * @param int      $client_id  Owning client ID (also the project's parent).
+ * @param int|null $project_id Owning project ID, or null for a client alias.
+ */
+function pltt_apply_alias_chip_changes( $add, $remove, $client_id, $project_id = null ) {
+	$client_id  = absint( $client_id );
+	$project_id = ! empty( $project_id ) ? absint( $project_id ) : null;
+
+	if ( is_array( $add ) ) {
+		foreach ( $add as $text ) {
+			$text = sanitize_text_field( $text );
+			if ( '' !== $text ) {
+				PLTT_Aliases::seed( $text, $client_id, $project_id );
+			}
+		}
+	}
+
+	if ( is_array( $remove ) ) {
+		foreach ( $remove as $alias_id ) {
+			$alias_id = absint( $alias_id );
+			$existing = $alias_id ? PLTT_Aliases::get( $alias_id ) : null;
+			if ( ! $existing ) {
+				continue;
+			}
+
+			if ( null !== $project_id ) {
+				// Project alias: must belong to this project.
+				if ( (int) $existing->project_id === $project_id ) {
+					PLTT_Aliases::delete( $alias_id );
+				}
+			} elseif ( (int) $existing->client_id === $client_id && empty( $existing->project_id ) ) {
+				// Client-level alias: must belong to this client and carry no project.
+				PLTT_Aliases::delete( $alias_id );
+			}
+		}
+	}
+}
+
+/**
  * Render tag badges for a comma-separated tags string or array.
  *
  * Outputs badge spans for each tag, or an em-dash if empty.

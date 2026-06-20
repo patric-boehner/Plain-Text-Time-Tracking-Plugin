@@ -175,6 +175,137 @@ class PLTT_Aliases {
 	}
 
 	/**
+	 * Seed (or repoint) an alias at full confidence.
+	 *
+	 * Used by the settings chip manager: a user-supplied shorthand should match
+	 * immediately, so it lands at confidence 1.00. Idempotent on alias_text —
+	 * if the text already exists (e.g. the learner discovered it), it's
+	 * repointed to the seeded target and lifted to full confidence rather than
+	 * duplicated (alias_text is UNIQUE).
+	 *
+	 * @param string   $alias_text Shorthand text.
+	 * @param int|null $client_id  Client to map to.
+	 * @param int|null $project_id Project to map to (also pass its client_id).
+	 * @return int|false Alias ID or false on failure.
+	 */
+	public static function seed( $alias_text, $client_id = null, $project_id = null ) {
+		global $wpdb;
+		$table      = PLTT_Database::get_table_name( 'aliases' );
+		$alias_text = sanitize_text_field( $alias_text );
+
+		if ( '' === $alias_text ) {
+			return false;
+		}
+
+		$client_id  = ! empty( $client_id ) ? absint( $client_id ) : null;
+		$project_id = ! empty( $project_id ) ? absint( $project_id ) : null;
+
+		$existing = self::get_by_text( $alias_text );
+
+		if ( $existing ) {
+			$data    = array( 'confidence' => 1.00 );
+			$formats = array( '%f' );
+			if ( null !== $client_id ) {
+				$data['client_id'] = $client_id;
+				$formats[]         = '%d';
+			}
+			if ( null !== $project_id ) {
+				$data['project_id'] = $project_id;
+				$formats[]          = '%d';
+			}
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
+			$wpdb->update( $table, $data, array( 'id' => $existing->id ), $formats, array( '%d' ) );
+			pltt_flush_alias_cache();
+			return (int) $existing->id;
+		}
+
+		$insert  = array(
+			'alias_text' => $alias_text,
+			'confidence' => 1.00,
+			'use_count'  => 0,
+			'last_used'  => current_time( 'mysql' ),
+		);
+		$formats = array( '%s', '%f', '%d', '%s' );
+		// Omit nullable FKs when absent so wpdb doesn't write 0 instead of NULL.
+		if ( null !== $client_id ) {
+			$insert['client_id'] = $client_id;
+			$formats[]           = '%d';
+		}
+		if ( null !== $project_id ) {
+			$insert['project_id'] = $project_id;
+			$formats[]            = '%d';
+		}
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
+		$result = $wpdb->insert( $table, $insert, $formats );
+		if ( $result ) {
+			pltt_flush_alias_cache();
+			return (int) $wpdb->insert_id;
+		}
+
+		return false;
+	}
+
+	/**
+	 * Get the client-level aliases for a client (project aliases excluded).
+	 *
+	 * @param int $client_id Client ID.
+	 * @return array Alias objects, most-used first.
+	 */
+	public static function get_for_client( $client_id ) {
+		global $wpdb;
+		$table = PLTT_Database::get_table_name( 'aliases' );
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+		return $wpdb->get_results(
+			$wpdb->prepare(
+				"SELECT * FROM {$table} WHERE client_id = %d AND project_id IS NULL ORDER BY use_count DESC, alias_text ASC",
+				absint( $client_id )
+			)
+		);
+	}
+
+	/**
+	 * Get the aliases bound to a project.
+	 *
+	 * @param int $project_id Project ID.
+	 * @return array Alias objects, most-used first.
+	 */
+	public static function get_for_project( $project_id ) {
+		global $wpdb;
+		$table = PLTT_Database::get_table_name( 'aliases' );
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+		return $wpdb->get_results(
+			$wpdb->prepare(
+				"SELECT * FROM {$table} WHERE project_id = %d ORDER BY use_count DESC, alias_text ASC",
+				absint( $project_id )
+			)
+		);
+	}
+
+	/**
+	 * Delete an alias (chip-manager prune).
+	 *
+	 * @param int $id Alias ID.
+	 * @return int|false Rows deleted or false.
+	 */
+	public static function delete( $id ) {
+		global $wpdb;
+		$table = PLTT_Database::get_table_name( 'aliases' );
+		$id    = absint( $id );
+
+		if ( ! $id ) {
+			return false;
+		}
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
+		$result = $wpdb->delete( $table, array( 'id' => $id ), array( '%d' ) );
+		pltt_flush_alias_cache();
+		return $result;
+	}
+
+	/**
 	 * Record a usage of an alias.
 	 *
 	 * @param int  $id         Alias ID.

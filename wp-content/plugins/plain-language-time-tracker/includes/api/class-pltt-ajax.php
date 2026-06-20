@@ -363,6 +363,10 @@ class PLTT_Ajax {
 			return;
 		}
 
+		// Seed any aliases supplied from the chip manager.
+		$seed_aliases = isset( $_POST['aliases_json'] ) ? json_decode( wp_unslash( $_POST['aliases_json'] ), true ) : array();
+		pltt_apply_alias_chip_changes( $seed_aliases, array(), $client_id );
+
 		$client = PLTT_Clients::get( $client_id );
 		wp_send_json_success(
 			array(
@@ -474,6 +478,10 @@ class PLTT_Ajax {
 			wp_send_json_error( $message );
 			return;
 		}
+
+		// Seed any aliases supplied from the chip manager (project alias carries its parent client).
+		$seed_aliases = isset( $_POST['aliases_json'] ) ? json_decode( wp_unslash( $_POST['aliases_json'] ), true ) : array();
+		pltt_apply_alias_chip_changes( $seed_aliases, array(), $client_id, $project_id );
 
 		$project = PLTT_Projects::get( $project_id );
 		wp_send_json_success(
