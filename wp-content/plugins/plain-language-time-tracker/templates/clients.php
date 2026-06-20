@@ -22,6 +22,19 @@ foreach ( $projects as $project ) {
 	$projects_by_client[ $project->client_id ][] = $project;
 }
 
+// Bulk-load client-level aliases (project aliases excluded), grouped by client,
+// for the settings chip manager.
+$aliases_by_client = array();
+foreach ( PLTT_Aliases::get_all() as $pltt_alias ) {
+	if ( ! empty( $pltt_alias->client_id ) && empty( $pltt_alias->project_id ) ) {
+		$aliases_by_client[ (int) $pltt_alias->client_id ][] = array(
+			'id'   => (int) $pltt_alias->id,
+			'text' => $pltt_alias->alias_text,
+			'use'  => (int) $pltt_alias->use_count,
+		);
+	}
+}
+
 // OPT-N1: bulk-load all per-client stats in one query instead of N×get_stats().
 $entry_counts_by_client = array();
 $client_stats_by_id     = array();
@@ -98,7 +111,7 @@ if ( ! empty( $clients ) ) {
 					}
 					$view_url = add_query_arg( $view_args, admin_url( 'admin.php' ) );
 					?>
-					<tr data-client-id="<?php echo esc_attr( $client->id ); ?>" data-name="<?php echo esc_attr( $client->name ); ?>" data-description="<?php echo esc_attr( $client->description ); ?>" data-rate="<?php echo esc_attr( $client->hourly_rate ?? '' ); ?>" data-projects-count="<?php echo esc_attr( $client_proj_count ); ?>" data-entry-count="<?php echo esc_attr( $client_entry_count ); ?>">
+					<tr data-client-id="<?php echo esc_attr( $client->id ); ?>" data-name="<?php echo esc_attr( $client->name ); ?>" data-description="<?php echo esc_attr( $client->description ); ?>" data-rate="<?php echo esc_attr( $client->hourly_rate ?? '' ); ?>" data-projects-count="<?php echo esc_attr( $client_proj_count ); ?>" data-entry-count="<?php echo esc_attr( $client_entry_count ); ?>" data-aliases="<?php echo esc_attr( wp_json_encode( $aliases_by_client[ $client->id ] ?? array() ) ); ?>">
 						<td>
 							<strong><?php echo esc_html( $client->name ); ?></strong>
 							<?php if ( $client->description ) : ?>
@@ -153,6 +166,15 @@ if ( ! empty( $clients ) ) {
 				<input type="text" inputmode="decimal" id="pltt-client-rate" name="hourly_rate" class="widefat pltt-currency-input" placeholder="0.00">
 			</div>
 			</p>
+			<p>
+				<label for="pltt-client-alias-input"><?php esc_html_e( 'Aliases (optional)', 'plain-language-time-tracker' ); ?></label>
+				<span class="pltt-alias-field-hint"><?php esc_html_e( 'Shorthand in your notes that maps to this client. Type and press Enter; matches at full confidence.', 'plain-language-time-tracker' ); ?></span>
+				<div class="pltt-alias-chips" data-alias-chips data-remove-label="<?php esc_attr_e( 'Remove alias', 'plain-language-time-tracker' ); ?>">
+					<div class="pltt-alias-chip-list"></div>
+					<input type="text" id="pltt-client-alias-input" class="pltt-alias-input" placeholder="<?php esc_attr_e( 'Add alias…', 'plain-language-time-tracker' ); ?>" autocomplete="off">
+					<div class="pltt-alias-hidden"></div>
+				</div>
+			</p>
 			<div class="pltt-modal-actions">
 				<div class="pltt-modal-actions-left">
 					<button type="button" id="pltt-delete-client-btn" class="button button-link-delete pltt-modal-delete-btn"><?php esc_html_e( 'Delete', 'plain-language-time-tracker' ); ?></button>
@@ -179,6 +201,10 @@ if ( ! empty( $clients ) ) {
 
 	// Notice params are stripped from the URL by PLTT.cleanNoticeParams() in shared.js.
 
+	var clientChips = window.PlttAliasChips
+		? PlttAliasChips.create( document.querySelector( '#pltt-client-form [data-alias-chips]' ) )
+		: null;
+
 	// Add Client button.
 	document.getElementById('pltt-add-client-btn').addEventListener('click', function() {
 		document.getElementById('pltt-client-modal-title').textContent = '<?php echo esc_js( __( 'Add Client', 'plain-language-time-tracker' ) ); ?>';
@@ -186,6 +212,7 @@ if ( ! empty( $clients ) ) {
 		document.getElementById('pltt-client-name').value = '';
 		document.getElementById('pltt-client-description').value = '';
 		document.getElementById('pltt-client-rate').value = '';
+		if (clientChips) clientChips.clear();
 		document.getElementById('pltt-delete-client-btn').classList.remove('visible');
 		PLTT.showModal('pltt-client-modal');
 	});
@@ -201,6 +228,11 @@ if ( ! empty( $clients ) ) {
 			document.getElementById('pltt-client-name').value = row.dataset.name;
 			document.getElementById('pltt-client-description').value = row.dataset.description || '';
 			document.getElementById('pltt-client-rate').value = row.dataset.rate || '';
+			if (clientChips) {
+				var clientAliases = [];
+				try { clientAliases = JSON.parse(row.dataset.aliases || '[]'); } catch (err) { clientAliases = []; }
+				clientChips.setExisting(clientAliases);
+			}
 			var deleteBtn = document.getElementById('pltt-delete-client-btn');
 			if (isDeletable) {
 				deleteBtn.classList.add('visible');
@@ -235,7 +267,9 @@ if ( ! empty( $clients ) ) {
 			const description = document.getElementById('pltt-client-description').value.trim();
 			const hourlyRate = document.getElementById('pltt-client-rate').value;
 
-			PLTT.ajax('pltt_create_client', { name: name, description: description, hourly_rate: hourlyRate }, function(response) {
+			const aliasesJson = clientChips ? JSON.stringify(clientChips.getAdditions()) : '[]';
+
+			PLTT.ajax('pltt_create_client', { name: name, description: description, hourly_rate: hourlyRate, aliases_json: aliasesJson }, function(response) {
 				if (response.success) {
 					window.location.href = window.location.pathname + '?page=pltt-clients&pltt_message=client_created';
 				} else {

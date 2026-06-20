@@ -307,6 +307,24 @@ class PLTT_Admin {
 			);
 		}
 
+		// Alias chip manager — on the clients and projects roster screens (where
+		// the create/edit modal with the aliases field lives).
+		if ( 'time-tracker_page_pltt-clients' === $hook || 'time-tracker_page_pltt-projects' === $hook ) {
+			wp_enqueue_style(
+				'pltt-alias-chips',
+				PLTT_PLUGIN_URL . 'assets/css/alias-chips.css',
+				array( 'pltt-admin' ),
+				$version
+			);
+			wp_enqueue_script(
+				'pltt-alias-chips',
+				PLTT_PLUGIN_URL . 'assets/js/alias-chips.js',
+				array( 'pltt-shared' ),
+				$version,
+				true
+			);
+		}
+
 		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only asset routing.
 		$projects_action = isset( $_GET['action'] ) ? sanitize_key( wp_unslash( $_GET['action'] ) ) : '';
 		if ( 'time-tracker_page_pltt-projects' === $hook && 'view' === $projects_action ) {

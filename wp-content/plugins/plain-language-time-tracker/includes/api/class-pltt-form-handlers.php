@@ -124,7 +124,15 @@ class PLTT_Form_Handlers {
 			// validation failure (e.g. empty name) isn't reported as "client_updated".
 			// SEC-M2: redirect with the error code only, never the raw message.
 			self::redirect_back( array( 'pltt_error' => $result->get_error_code() ) );
-		} elseif ( $result ) {
+		}
+
+		// Apply alias chip-manager changes (seed adds, prune removes). Independent
+		// of whether other client fields changed.
+		$alias_add    = isset( $_POST['aliases_add'] ) ? (array) wp_unslash( $_POST['aliases_add'] ) : array();
+		$alias_remove = isset( $_POST['aliases_remove'] ) ? (array) wp_unslash( $_POST['aliases_remove'] ) : array();
+		pltt_apply_alias_chip_changes( $alias_add, $alias_remove, $client_id );
+
+		if ( $result || ! empty( $alias_add ) || ! empty( $alias_remove ) ) {
 			self::redirect_back( array( 'pltt_message' => 'client_updated' ) );
 		} else {
 			self::redirect_back( array( 'pltt_error' => 'client_update_failed' ) );
@@ -240,7 +248,19 @@ class PLTT_Form_Handlers {
 		if ( is_wp_error( $result ) ) {
 			// SEC-M2: use only the error code (not the raw message) in the redirect URL.
 			self::redirect_back( array( 'pltt_error' => $result->get_error_code() ) );
-		} elseif ( $result ) {
+		}
+
+		// Apply alias chip-manager changes. Project aliases carry the project's
+		// parent client; read it post-update so a client reassignment is honored.
+		$alias_add    = isset( $_POST['aliases_add'] ) ? (array) wp_unslash( $_POST['aliases_add'] ) : array();
+		$alias_remove = isset( $_POST['aliases_remove'] ) ? (array) wp_unslash( $_POST['aliases_remove'] ) : array();
+		if ( ! empty( $alias_add ) || ! empty( $alias_remove ) ) {
+			$project      = PLTT_Projects::get( $project_id );
+			$owner_client = $project ? (int) $project->client_id : 0;
+			pltt_apply_alias_chip_changes( $alias_add, $alias_remove, $owner_client, $project_id );
+		}
+
+		if ( $result || ! empty( $alias_add ) || ! empty( $alias_remove ) ) {
 			self::redirect_back( array( 'pltt_message' => 'project_updated' ) );
 		} else {
 			self::redirect_back( array( 'pltt_error' => 'project_update_failed' ) );

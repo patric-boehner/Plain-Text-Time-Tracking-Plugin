@@ -1,0 +1,98 @@
+/**
+ * Alias chip manager (client/project settings forms).
+ *
+ * @package PlainLanguageTimeTracker
+ */
+
+.pltt-alias-chips {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 6px;
+	padding: 6px;
+	border: 1px solid #8c8f94;
+	border-radius: 4px;
+	background: #fff;
+	min-height: 36px;
+}
+
+.pltt-alias-chips:focus-within {
+	border-color: #2271b1;
+	box-shadow: 0 0 0 1px #2271b1;
+}
+
+.pltt-alias-chip-list {
+	display: contents;
+}
+
+.pltt-alias-chip {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	padding: 2px 4px 2px 8px;
+	border-radius: 12px;
+	background: #f0f0f1;
+	border: 1px solid #dcdcde;
+	font-size: 12px;
+	line-height: 1.6;
+	white-space: nowrap;
+}
+
+/* Seeded-this-session chips read slightly stronger than learned ones. */
+.pltt-alias-chip.is-new {
+	background: #e6f0f7;
+	border-color: #bcd6ea;
+}
+
+.pltt-alias-chip-text {
+	font-weight: 500;
+}
+
+.pltt-alias-chip-use {
+	color: #646970;
+	font-variant-numeric: tabular-nums;
+}
+
+.pltt-alias-chip-remove {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 16px;
+	height: 16px;
+	padding: 0;
+	border: 0;
+	border-radius: 50%;
+	background: transparent;
+	color: #646970;
+	font-size: 14px;
+	line-height: 1;
+	cursor: pointer;
+}
+
+.pltt-alias-chip-remove:hover,
+.pltt-alias-chip-remove:focus {
+	background: #d63638;
+	color: #fff;
+}
+
+.pltt-alias-input {
+	flex: 1 1 120px;
+	min-width: 120px;
+	border: 0 !important;
+	outline: 0;
+	box-shadow: none !important;
+	padding: 2px 4px;
+	font-size: 13px;
+	background: transparent;
+}
+
+.pltt-alias-hidden {
+	display: none;
+}
+
+.pltt-alias-field-hint {
+	display: block;
+	margin-top: 4px;
+	color: #646970;
+	font-size: 12px;
+}
