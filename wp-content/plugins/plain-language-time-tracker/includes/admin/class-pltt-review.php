@@ -320,7 +320,7 @@ class PLTT_Review {
 		$clients_cache  = PLTT_Clients::get_multiple( $client_ids );
 		$projects_cache = PLTT_Projects::get_multiple( $project_ids );
 
-		// OPT-L7: Pre-load all tags once so learn_client_alias() doesn't re-query per entry.
+		// OPT-L7: Pre-load all tags once so learn_alias() doesn't re-query per entry.
 		$all_tag_names = array_column( PLTT_Tags::get_all(), 'name' );
 
 		foreach ( $entries as $entry_data ) {
@@ -426,9 +426,9 @@ class PLTT_Review {
 			if ( false !== $result ) {
 				++$saved_count;
 
-				// Learn client aliases from user's selection.
+				// Learn client + project aliases from the user's selection.
 				if ( $original ) {
-					self::learn_client_alias( $original, $data, $all_tag_names );
+					self::learn_alias( $original, $data, $all_tag_names, $projects_cache );
 				}
 			} else {
 				++$error_count;
@@ -472,50 +472,126 @@ class PLTT_Review {
 	}
 
 	/**
-	 * Learn client aliases from user's selection.
+	 * Learn client + project aliases from the user's selection.
 	 *
-	 * Compares the predicted client (before save) with the user's choice to
-	 * update alias confidence. Also creates new aliases from text patterns
-	 * when the user selects a client.
+	 * Scores the aliases that drove the prediction against the user's choice
+	 * (the project-bearing alias on project accuracy, the client-bearing alias
+	 * on client accuracy) and creates new aliases from text patterns. New
+	 * tokens become client aliases, except tokens that are part of the chosen
+	 * project's name — those bind to the project, giving future entries a
+	 * direct alias-to-project hit. Gating project binding on the project name
+	 * keeps a client-name token (reused across a client's projects) from being
+	 * poisoned to a single project.
 	 *
-	 * @param object     $original   Original entry from database (before save).
-	 * @param array      $saved      Saved data with user's selections.
-	 * @param array|null $known_tags Pre-loaded tag names to pass to extract_potential() (OPT-L7).
+	 * @param object     $original       Original entry from database (before save).
+	 * @param array      $saved          Saved data with user's selections.
+	 * @param array|null $known_tags     Pre-loaded tag names to pass to extract_potential() (OPT-L7).
+	 * @param array      $projects_cache Pre-loaded projects (id => object) to avoid a per-entry query.
 	 */
-	private static function learn_client_alias( $original, $saved, $known_tags = null ) {
+	private static function learn_alias( $original, $saved, $known_tags = null, $projects_cache = array() ) {
 		$text = trim( ( $original->description ?? '' ) . ' ' . ( $original->raw_text ?? '' ) );
 
 		if ( empty( $text ) ) {
 			return;
 		}
 
-		$saved_client = ! empty( $saved['client_id'] ) ? (int) $saved['client_id'] : 0;
+		$saved_client  = ! empty( $saved['client_id'] ) ? (int) $saved['client_id'] : 0;
+		$saved_project = ! empty( $saved['project_id'] ) ? (int) $saved['project_id'] : 0;
 
-		// Re-derive the alias match to find which alias (if any) predicted the client.
-		$alias_match = PLTT_Aliases::get_best_client_match( $text );
-
-		if ( $alias_match ) {
-			$predicted_client = (int) $alias_match->client_id;
-			$was_correct      = ( $predicted_client === $saved_client );
-			PLTT_Aliases::record_usage( $alias_match->id, $was_correct );
+		// Score the prediction drivers. Judge a project-bearing alias on project
+		// accuracy (its job) and a client-bearing alias on client accuracy. When
+		// the same row drives both, score it once (on the project) so use_count
+		// isn't double-incremented.
+		$project_match = PLTT_Aliases::get_best_project_match( $text );
+		if ( $project_match ) {
+			$project_correct = ( $saved_project > 0 && (int) $project_match->project_id === $saved_project );
+			PLTT_Aliases::record_usage( $project_match->id, $project_correct );
 		}
 
-		// Create new client aliases from text patterns.
-		if ( $saved_client > 0 ) {
-			// OPT-L7: Pass pre-loaded tag names to avoid a DB call per entry.
-			$potentials = PLTT_Aliases::extract_potential( $text, $known_tags );
+		$client_match = PLTT_Aliases::get_best_client_match( $text );
+		if ( $client_match && ( ! $project_match || (int) $client_match->id !== (int) $project_match->id ) ) {
+			$client_correct = ( (int) $client_match->client_id === $saved_client );
+			PLTT_Aliases::record_usage( $client_match->id, $client_correct );
+		}
 
-			foreach ( $potentials as $potential ) {
-				$existing = PLTT_Aliases::get_by_text( $potential );
-				if ( ! $existing ) {
-					PLTT_Aliases::create(
-						array(
-							'alias_text' => $potential,
-							'client_id'  => $saved_client,
-						)
-					);
+		if ( $saved_client <= 0 ) {
+			return;
+		}
+
+		// Name tokens distinctive to the chosen project — the only new tokens we
+		// bind to it. A token shared by several projects' names is a poor signal.
+		$project_tokens = array();
+		if ( $saved_project > 0 ) {
+			$project = $projects_cache[ $saved_project ] ?? PLTT_Projects::get( $saved_project );
+			if ( $project && ! empty( $project->name ) ) {
+				$project_tokens = self::distinctive_project_tokens( $project );
+			}
+		}
+
+		// Create new aliases from text patterns.
+		// OPT-L7: Pass pre-loaded tag names to avoid a DB call per entry.
+		$potentials = PLTT_Aliases::extract_potential( $text, $known_tags );
+
+		foreach ( $potentials as $potential ) {
+			if ( PLTT_Aliases::get_by_text( $potential ) ) {
+				continue; // Don't clobber an existing alias's learned target/confidence.
+			}
+
+			$alias_data = array(
+				'alias_text' => $potential,
+				'client_id'  => $saved_client,
+			);
+
+			// Bind to the project only when this token is part of the project name.
+			if ( $saved_project > 0 && in_array( strtolower( $potential ), $project_tokens, true ) ) {
+				$alias_data['project_id'] = $saved_project;
+			}
+
+			PLTT_Aliases::create( $alias_data );
+		}
+	}
+
+	/**
+	 * Break a name into lowercased word tokens (3+ letters) for alias matching.
+	 *
+	 * @param string $name Name to tokenize.
+	 * @return array Lowercased word tokens.
+	 */
+	private static function tokenize_name( $name ) {
+		preg_match_all( '/[A-Za-z]{3,}/', $name, $matches );
+		return ! empty( $matches[0] ) ? array_map( 'strtolower', $matches[0] ) : array();
+	}
+
+	/**
+	 * Name tokens that are distinctive to a single project.
+	 *
+	 * A token shared by several projects' names (e.g. "website", "care") is a
+	 * poor project signal, so only tokens unique to this one project across all
+	 * active projects are returned. The token→projects map is built once per
+	 * request.
+	 *
+	 * @param object $project Project object (needs id, name).
+	 * @return array Lowercased distinctive tokens for this project.
+	 */
+	private static function distinctive_project_tokens( $project ) {
+		static $token_projects = null;
+
+		if ( null === $token_projects ) {
+			$token_projects = array();
+			foreach ( PLTT_Projects::get_all( array( 'status' => 'active' ) ) as $p ) {
+				foreach ( array_unique( self::tokenize_name( $p->name ) ) as $tok ) {
+					$token_projects[ $tok ][ (int) $p->id ] = true;
 				}
 			}
 		}
+
+		$distinctive = array();
+		foreach ( array_unique( self::tokenize_name( $project->name ) ) as $tok ) {
+			if ( isset( $token_projects[ $tok ] ) && 1 === count( $token_projects[ $tok ] ) ) {
+				$distinctive[] = $tok;
+			}
+		}
+
+		return $distinctive;
 	}
 }
