@@ -259,10 +259,13 @@ class PLTT_Time_Parser {
 	/**
 	 * Apply alias predictions to entries.
 	 *
-	 * Predicts clients only. Projects are presented ranked by recent use in the UI.
+	 * Predicts the client from the best client-bearing alias, and — via a
+	 * direct alias-to-project hit — the project from the best project-bearing
+	 * alias. When no alias resolves a project, the review screen still falls
+	 * back to its most-recent-active-project recency ordering.
 	 *
 	 * @param array $entries Array of entries.
-	 * @return array Entries with predicted client_id.
+	 * @return array Entries with predicted client_id and (when hit) project_id.
 	 */
 	public static function apply_predictions( $entries ) {
 		foreach ( $entries as &$entry ) {
@@ -270,12 +273,32 @@ class PLTT_Time_Parser {
 			$raw_text    = $entry['raw_text'] ?? '';
 			$text        = $description . ' ' . $raw_text;
 
-			// Try to find client match.
-			$alias_match = PLTT_Aliases::get_best_client_match( $text );
+			// Client from the best client-bearing alias.
+			$client_match = PLTT_Aliases::get_best_client_match( $text );
 
-			if ( $alias_match && ! empty( $alias_match->client_id ) ) {
-				$entry['predicted_client_id'] = $alias_match->client_id;
-				$entry['client_confidence']   = $alias_match->confidence;
+			if ( $client_match && ! empty( $client_match->client_id ) ) {
+				$entry['predicted_client_id'] = $client_match->client_id;
+				$entry['client_confidence']   = $client_match->confidence;
+			}
+
+			// Direct alias-to-project hit. Only accept it when it agrees with
+			// the predicted client (or no client was predicted) so the two
+			// predictions can't contradict; a lone project alias also supplies
+			// its parent client.
+			$project_match = PLTT_Aliases::get_best_project_match( $text );
+
+			if ( $project_match && ! empty( $project_match->project_id ) ) {
+				$predicted_client = (int) ( $entry['predicted_client_id'] ?? 0 );
+
+				if ( ! $predicted_client || (int) $project_match->client_id === $predicted_client ) {
+					$entry['predicted_project_id'] = $project_match->project_id;
+					$entry['project_confidence']   = $project_match->confidence;
+
+					if ( ! $predicted_client && ! empty( $project_match->client_id ) ) {
+						$entry['predicted_client_id'] = $project_match->client_id;
+						$entry['client_confidence']   = $project_match->confidence;
+					}
+				}
 			}
 		}
 

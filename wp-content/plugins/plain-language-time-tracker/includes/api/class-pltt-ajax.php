@@ -152,7 +152,9 @@ class PLTT_Ajax {
 
 		$all_created = true;
 
-		// Only client is predicted; project is chosen by user on the review screen.
+		// Persist the parser's predictions: client always, and project when a
+		// direct alias-to-project hit resolved one. Both are still editable on
+		// the review screen; an unconfirmed project is just a pre-fill.
 		foreach ( $entries as $entry ) {
 			$result = PLTT_Entries::create(
 				array(
@@ -163,6 +165,7 @@ class PLTT_Ajax {
 					'raw_text'         => $entry['raw_text'] ?? '',
 					'description'      => $entry['description'] ?? '',
 					'client_id'        => $entry['predicted_client_id'] ?? null,
+					'project_id'       => $entry['predicted_project_id'] ?? null,
 					'tags'             => $entry['tags'] ?? '',
 				)
 			);

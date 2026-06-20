@@ -258,6 +258,28 @@ class PLTT_Aliases {
 	}
 
 	/**
+	 * Get best project match for text.
+	 *
+	 * Returns the highest-confidence matching alias that carries a project_id —
+	 * a "direct alias-to-project hit." Project aliases also carry their parent
+	 * client_id, so the caller can resolve both from one row.
+	 *
+	 * @param string $text Text to search.
+	 * @return object|null Best matching project-bearing alias or null.
+	 */
+	public static function get_best_project_match( $text ) {
+		$matches = self::find_in_text( $text );
+
+		foreach ( $matches as $match ) {
+			if ( ! empty( $match->project_id ) ) {
+				return $match;
+			}
+		}
+
+		return null;
+	}
+
+	/**
 	 * Extract potential aliases from text.
 	 *
 	 * Finds acronyms (2-5 uppercase letters) and capitalized words.
