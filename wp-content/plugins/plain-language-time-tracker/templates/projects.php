@@ -378,9 +378,15 @@ foreach ( PLTT_Aliases::get_all() as $pltt_alias ) {
 
 	function el(id) { return document.getElementById(id); }
 
-	var projectChips = window.PlttAliasChips
-		? PlttAliasChips.create(document.querySelector('#pltt-project-form [data-alias-chips]'))
-		: null;
+	// Created lazily: this inline script runs during body parse, before the
+	// footer-enqueued alias-chips.js has defined window.PlttAliasChips.
+	var projectChips = null;
+	function getProjectChips() {
+		if (!projectChips && window.PlttAliasChips) {
+			projectChips = PlttAliasChips.create(document.querySelector('#pltt-project-form [data-alias-chips]'));
+		}
+		return projectChips;
+	}
 
 	var BILLING_DESCRIPTIONS = {
 		rate: {
@@ -527,7 +533,8 @@ foreach ( PLTT_Aliases::get_all() as $pltt_alias ) {
 			document.getElementById('pltt-delete-project-btn').classList.remove('visible');
 			document.getElementById('pltt-project-billing-type').value = 'hourly';
 			applyBillingTypeUI('hourly', true);
-			if (projectChips) projectChips.clear();
+			var addProjectChips = getProjectChips();
+			if (addProjectChips) addProjectChips.clear();
 			PLTT.showModal('pltt-project-modal');
 		});
 	}
@@ -566,10 +573,11 @@ foreach ( PLTT_Aliases::get_all() as $pltt_alias ) {
 			var billingType = row.dataset.billingType || 'hourly';
 			applyBillingTypeUI(billingType, false);
 			document.getElementById('pltt-project-non-billable').checked = row.dataset.billabilityDefault === '0';
-			if (projectChips) {
+			var editProjectChips = getProjectChips();
+			if (editProjectChips) {
 				var projectAliases = [];
 				try { projectAliases = JSON.parse(row.dataset.aliases || '[]'); } catch (err) { projectAliases = []; }
-				projectChips.setExisting(projectAliases);
+				editProjectChips.setExisting(projectAliases);
 			}
 
 			document.getElementById('pltt-project-status-group').classList.remove('pltt-hidden');
@@ -628,7 +636,8 @@ foreach ( PLTT_Aliases::get_all() as $pltt_alias ) {
 			const recurringPeriod = document.getElementById('pltt-project-recurring-period').value;
 			const nonBillable = document.getElementById('pltt-project-non-billable').checked ? '1' : '0';
 
-			const aliasesJson = projectChips ? JSON.stringify(projectChips.getAdditions()) : '[]';
+			const submitProjectChips = getProjectChips();
+			const aliasesJson = submitProjectChips ? JSON.stringify(submitProjectChips.getAdditions()) : '[]';
 
 			PLTT.ajax('pltt_create_project', { client_id: clientId, name: name, hourly_rate: hourlyRate, budget_hours: budgetHours, budget_fee: budgetFee, recurring_period: recurringPeriod, non_billable: nonBillable, aliases_json: aliasesJson }, function(response) {
 				if (response.success) {

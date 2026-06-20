@@ -201,9 +201,15 @@ if ( ! empty( $clients ) ) {
 
 	// Notice params are stripped from the URL by PLTT.cleanNoticeParams() in shared.js.
 
-	var clientChips = window.PlttAliasChips
-		? PlttAliasChips.create( document.querySelector( '#pltt-client-form [data-alias-chips]' ) )
-		: null;
+	// Created lazily: this inline script runs during body parse, before the
+	// footer-enqueued alias-chips.js has defined window.PlttAliasChips.
+	var clientChips = null;
+	function getClientChips() {
+		if ( ! clientChips && window.PlttAliasChips ) {
+			clientChips = PlttAliasChips.create( document.querySelector( '#pltt-client-form [data-alias-chips]' ) );
+		}
+		return clientChips;
+	}
 
 	// Add Client button.
 	document.getElementById('pltt-add-client-btn').addEventListener('click', function() {
@@ -212,7 +218,8 @@ if ( ! empty( $clients ) ) {
 		document.getElementById('pltt-client-name').value = '';
 		document.getElementById('pltt-client-description').value = '';
 		document.getElementById('pltt-client-rate').value = '';
-		if (clientChips) clientChips.clear();
+		var addClientChips = getClientChips();
+		if (addClientChips) addClientChips.clear();
 		document.getElementById('pltt-delete-client-btn').classList.remove('visible');
 		PLTT.showModal('pltt-client-modal');
 	});
@@ -228,10 +235,11 @@ if ( ! empty( $clients ) ) {
 			document.getElementById('pltt-client-name').value = row.dataset.name;
 			document.getElementById('pltt-client-description').value = row.dataset.description || '';
 			document.getElementById('pltt-client-rate').value = row.dataset.rate || '';
-			if (clientChips) {
+			var editClientChips = getClientChips();
+			if (editClientChips) {
 				var clientAliases = [];
 				try { clientAliases = JSON.parse(row.dataset.aliases || '[]'); } catch (err) { clientAliases = []; }
-				clientChips.setExisting(clientAliases);
+				editClientChips.setExisting(clientAliases);
 			}
 			var deleteBtn = document.getElementById('pltt-delete-client-btn');
 			if (isDeletable) {
@@ -267,7 +275,8 @@ if ( ! empty( $clients ) ) {
 			const description = document.getElementById('pltt-client-description').value.trim();
 			const hourlyRate = document.getElementById('pltt-client-rate').value;
 
-			const aliasesJson = clientChips ? JSON.stringify(clientChips.getAdditions()) : '[]';
+			const submitClientChips = getClientChips();
+			const aliasesJson = submitClientChips ? JSON.stringify(submitClientChips.getAdditions()) : '[]';
 
 			PLTT.ajax('pltt_create_client', { name: name, description: description, hourly_rate: hourlyRate, aliases_json: aliasesJson }, function(response) {
 				if (response.success) {
