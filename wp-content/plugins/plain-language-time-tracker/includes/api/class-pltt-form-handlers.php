@@ -324,6 +324,9 @@ class PLTT_Form_Handlers {
 		$result = PLTT_Tags::create( $tag_name, $group_name );
 
 		if ( $result ) {
+			// Seed any keyword chips supplied for the new tag.
+			$kw_add = isset( $_POST['aliases_add'] ) ? (array) wp_unslash( $_POST['aliases_add'] ) : array();
+			pltt_apply_tag_keyword_changes( $kw_add, array(), (int) $result );
 			wp_safe_redirect( add_query_arg( 'pltt_message', 'tag_created', $redirect_url ) );
 		} else {
 			wp_safe_redirect( add_query_arg( 'pltt_error', 'tag_create_failed', $redirect_url ) );
@@ -369,7 +372,12 @@ class PLTT_Form_Handlers {
 
 		$success = PLTT_Tags::rename( $tag_id, $new_tag, $group_arg );
 
-		if ( $success ) {
+		// Apply keyword chip changes (seed adds, prune removes scoped to this tag).
+		$kw_add    = isset( $_POST['aliases_add'] ) ? (array) wp_unslash( $_POST['aliases_add'] ) : array();
+		$kw_remove = isset( $_POST['aliases_remove'] ) ? (array) wp_unslash( $_POST['aliases_remove'] ) : array();
+		pltt_apply_tag_keyword_changes( $kw_add, $kw_remove, $tag_id );
+
+		if ( $success || ! empty( $kw_add ) || ! empty( $kw_remove ) ) {
 			wp_safe_redirect( add_query_arg( 'pltt_message', 'tag_renamed', $redirect_url ) );
 		} else {
 			wp_safe_redirect( add_query_arg( 'pltt_error', 'tag_rename_failed', $redirect_url ) );

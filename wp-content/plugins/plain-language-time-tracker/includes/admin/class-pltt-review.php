@@ -321,7 +321,16 @@ class PLTT_Review {
 		$projects_cache = PLTT_Projects::get_multiple( $project_ids );
 
 		// OPT-L7: Pre-load all tags once so learn_alias() doesn't re-query per entry.
-		$all_tag_names = array_column( PLTT_Tags::get_all(), 'name' );
+		$all_tags_objs = PLTT_Tags::get_all();
+		$all_tag_names = array_column( $all_tags_objs, 'name' );
+
+		// Preload tag keyword seeds + an id=>name map once for the prune-signal
+		// usage bump (a seeded keyword that fired and whose tag was kept).
+		$tag_alias_rows = PLTT_Tag_Aliases::get_all();
+		$tag_id_to_name = array();
+		foreach ( $all_tags_objs as $tag_obj ) {
+			$tag_id_to_name[ (int) $tag_obj->id ] = strtolower( $tag_obj->name );
+		}
 
 		foreach ( $entries as $entry_data ) {
 			$entry_id = ! empty( $entry_data['id'] ) ? absint( $entry_data['id'] ) : 0;
@@ -429,6 +438,12 @@ class PLTT_Review {
 				// Learn client + project aliases from the user's selection.
 				if ( $original ) {
 					self::learn_alias( $original, $data, $all_tag_names, $projects_cache );
+
+					// Bump the prune signal for seeded keywords that fired on this
+					// entry and whose tag was kept in the saved tags.
+					if ( ! empty( $tag_alias_rows ) ) {
+						self::record_tag_keyword_usage( $original, $data['tags'] ?? '', $tag_alias_rows, $tag_id_to_name );
+					}
 				}
 			} else {
 				++$error_count;
@@ -593,5 +608,36 @@ class PLTT_Review {
 		}
 
 		return $distinctive;
+	}
+
+	/**
+	 * Bump use_count for seeded keywords confirmed on a saved entry.
+	 *
+	 * A keyword counts as "used" when it appears in the entry text and the tag
+	 * it predicts survived into the saved tags. This is the prune signal — no
+	 * confidence/learning, just a usefulness counter.
+	 *
+	 * @param object $original        Original entry (description + raw_text).
+	 * @param string $saved_tags_csv  Comma-separated saved tag names.
+	 * @param array  $tag_alias_rows  Pre-loaded keyword seed rows.
+	 * @param array  $tag_id_to_name  Map of tag id => lowercase name.
+	 */
+	private static function record_tag_keyword_usage( $original, $saved_tags_csv, $tag_alias_rows, $tag_id_to_name ) {
+		$text = trim( ( $original->description ?? '' ) . ' ' . ( $original->raw_text ?? '' ) );
+		if ( '' === $text || '' === trim( (string) $saved_tags_csv ) ) {
+			return;
+		}
+
+		$saved = array_filter( array_map( 'trim', array_map( 'strtolower', explode( ',', $saved_tags_csv ) ) ) );
+		if ( empty( $saved ) ) {
+			return;
+		}
+
+		foreach ( PLTT_Tag_Aliases::match( $text, $tag_alias_rows ) as $row ) {
+			$name = $tag_id_to_name[ (int) $row->tag_id ] ?? '';
+			if ( '' !== $name && in_array( $name, $saved, true ) ) {
+				PLTT_Tag_Aliases::record_usage( $row->id );
+			}
+		}
 	}
 }

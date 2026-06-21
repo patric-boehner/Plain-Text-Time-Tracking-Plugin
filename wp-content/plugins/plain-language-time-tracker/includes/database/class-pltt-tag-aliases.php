@@ -21,6 +21,20 @@ if ( ! defined( 'ABSPATH' ) ) {
 class PLTT_Tag_Aliases {
 
 	/**
+	 * Get a tag-alias row by ID.
+	 *
+	 * @param int $id Row ID.
+	 * @return object|null Row or null.
+	 */
+	public static function get( $id ) {
+		global $wpdb;
+		$table = PLTT_Database::get_table_name( 'tag_aliases' );
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+		return $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$table} WHERE id = %d", absint( $id ) ) );
+	}
+
+	/**
 	 * Get a tag-alias row by keyword (case-insensitive).
 	 *
 	 * @param string $keyword Keyword text.
