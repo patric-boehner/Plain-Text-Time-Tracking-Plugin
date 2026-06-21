@@ -1001,6 +1001,43 @@ function pltt_apply_alias_chip_changes( $add, $remove, $client_id, $project_id =
 }
 
 /**
+ * Apply tag keyword chip-manager changes for the Tags settings form.
+ *
+ * Seeds added keywords (keyword -> tag) and prunes removed ones. Removals are
+ * scoped to the tag being edited so a stale/forged form can't delete a keyword
+ * bound to a different tag. Mirrors pltt_apply_alias_chip_changes().
+ *
+ * @param array $add    Keyword texts to seed.
+ * @param array $remove Tag-alias row IDs to prune.
+ * @param int   $tag_id Owning tag ID.
+ */
+function pltt_apply_tag_keyword_changes( $add, $remove, $tag_id ) {
+	$tag_id = absint( $tag_id );
+	if ( ! $tag_id ) {
+		return;
+	}
+
+	if ( is_array( $add ) ) {
+		foreach ( $add as $keyword ) {
+			$keyword = sanitize_text_field( $keyword );
+			if ( '' !== $keyword ) {
+				PLTT_Tag_Aliases::seed( $keyword, $tag_id );
+			}
+		}
+	}
+
+	if ( is_array( $remove ) ) {
+		foreach ( $remove as $row_id ) {
+			$row_id   = absint( $row_id );
+			$existing = $row_id ? PLTT_Tag_Aliases::get( $row_id ) : null;
+			if ( $existing && (int) $existing->tag_id === $tag_id ) {
+				PLTT_Tag_Aliases::delete( $row_id );
+			}
+		}
+	}
+}
+
+/**
  * Render tag badges for a comma-separated tags string or array.
  *
  * Outputs badge spans for each tag, or an em-dash if empty.

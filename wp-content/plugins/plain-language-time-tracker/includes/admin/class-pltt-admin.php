@@ -307,9 +307,9 @@ class PLTT_Admin {
 			);
 		}
 
-		// Alias chip manager — on the clients and projects roster screens (where
-		// the create/edit modal with the aliases field lives).
-		if ( 'time-tracker_page_pltt-clients' === $hook || 'time-tracker_page_pltt-projects' === $hook ) {
+		// Alias/keyword chip manager — clients & projects (alias seeding) and tags
+		// (keyword seeding) all use the same widget in their create/edit modal.
+		if ( 'time-tracker_page_pltt-clients' === $hook || 'time-tracker_page_pltt-projects' === $hook || 'time-tracker_page_pltt-tags' === $hook ) {
 			wp_enqueue_style(
 				'pltt-alias-chips',
 				PLTT_PLUGIN_URL . 'assets/css/alias-chips.css',

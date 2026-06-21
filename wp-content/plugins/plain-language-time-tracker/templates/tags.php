@@ -13,6 +13,16 @@ if ( ! defined( 'ABSPATH' ) ) {
 $all_tags        = PLTT_Tags::get_all_with_counts();
 $existing_groups = PLTT_Tags::get_all_groups();
 
+// Bulk-load keyword seeds grouped by tag for the settings chip manager.
+$keywords_by_tag = array();
+foreach ( PLTT_Tag_Aliases::get_all() as $pltt_kw ) {
+	$keywords_by_tag[ (int) $pltt_kw->tag_id ][] = array(
+		'id'   => (int) $pltt_kw->id,
+		'text' => $pltt_kw->keyword,
+		'use'  => (int) $pltt_kw->use_count,
+	);
+}
+
 // Build group buckets so the page renders one table per group.
 $tag_groups     = array();
 $ungrouped_tags = array();
@@ -88,7 +98,7 @@ if ( ! empty( $ungrouped_tags ) ) {
 					</thead>
 					<tbody>
 						<?php foreach ( $section['tags'] as $tag ) : ?>
-							<tr data-tag-id="<?php echo esc_attr( $tag->id ); ?>" data-tag-name="<?php echo esc_attr( $tag->name ); ?>" data-tag-group="<?php echo esc_attr( $tag->group_name ?? '' ); ?>">
+							<tr data-tag-id="<?php echo esc_attr( $tag->id ); ?>" data-tag-name="<?php echo esc_attr( $tag->name ); ?>" data-tag-group="<?php echo esc_attr( $tag->group_name ?? '' ); ?>" data-keywords="<?php echo esc_attr( wp_json_encode( $keywords_by_tag[ $tag->id ] ?? array() ) ); ?>">
 								<td>
 									<span class="pltt-badge pltt-badge-tag"><?php echo esc_html( ucfirst( $tag->name ) ); ?></span>
 									<div class="row-actions">
@@ -138,6 +148,15 @@ if ( ! empty( $ungrouped_tags ) ) {
 				<!-- Actual value posted to the server: -->
 				<input type="hidden" id="pltt-tag-group" name="group_name" value="">
 			</p>
+			<p>
+				<label for="pltt-tag-keyword-input"><?php esc_html_e( 'Keywords (optional)', 'plain-language-time-tracker' ); ?></label>
+				<span class="pltt-alias-field-hint"><?php esc_html_e( 'Words or phrases in your notes that should pre-fill this tag. Type and press Enter.', 'plain-language-time-tracker' ); ?></span>
+				<div class="pltt-alias-chips" data-alias-chips data-remove-label="<?php esc_attr_e( 'Remove keyword', 'plain-language-time-tracker' ); ?>">
+					<div class="pltt-alias-chip-list"></div>
+					<input type="text" id="pltt-tag-keyword-input" class="pltt-alias-input" placeholder="<?php esc_attr_e( 'Add keyword…', 'plain-language-time-tracker' ); ?>" autocomplete="off">
+					<div class="pltt-alias-hidden"></div>
+				</div>
+			</p>
 			<p class="pltt-modal-actions">
 				<button type="submit" id="pltt-save-tag-btn" class="button button-primary"><?php esc_html_e( 'Save', 'plain-language-time-tracker' ); ?></button>
 				<button type="button" class="pltt-modal-close button"><?php esc_html_e( 'Cancel', 'plain-language-time-tracker' ); ?></button>
@@ -155,6 +174,16 @@ if ( ! empty( $ungrouped_tags ) ) {
 	var groupSelect = document.getElementById('pltt-tag-group-select');
 	var groupNewInput = document.getElementById('pltt-tag-group-new');
 	var groupHidden = document.getElementById('pltt-tag-group');
+
+	// Created lazily: this inline script runs during body parse, before the
+	// footer-enqueued alias-chips.js has defined window.PlttAliasChips.
+	var tagChips = null;
+	function getTagChips() {
+		if (!tagChips && window.PlttAliasChips) {
+			tagChips = PlttAliasChips.create(document.querySelector('#pltt-tag-form [data-alias-chips]'));
+		}
+		return tagChips;
+	}
 
 	/**
 	 * Sync the hidden group input from the select / new-group input pair.
@@ -221,6 +250,8 @@ if ( ! empty( $ungrouped_tags ) ) {
 		document.getElementById('pltt-tag-id').value = '';
 		document.getElementById('pltt-tag-name').value = '';
 		applyGroupToModal('');
+		var addTagChips = getTagChips();
+		if (addTagChips) addTagChips.clear();
 		document.getElementById('pltt-tag-form-action').value = 'pltt_create_tag';
 		PLTT.showModal('pltt-tag-modal');
 	});
@@ -234,6 +265,12 @@ if ( ! empty( $ungrouped_tags ) ) {
 			document.getElementById('pltt-tag-id').value = row.dataset.tagId;
 			document.getElementById('pltt-tag-name').value = row.dataset.tagName;
 			applyGroupToModal(row.dataset.tagGroup || '');
+			var renameTagChips = getTagChips();
+			if (renameTagChips) {
+				var tagKeywords = [];
+				try { tagKeywords = JSON.parse(row.dataset.keywords || '[]'); } catch (err) { tagKeywords = []; }
+				renameTagChips.setExisting(tagKeywords);
+			}
 			document.getElementById('pltt-tag-form-action').value = 'pltt_rename_tag';
 			PLTT.showModal('pltt-tag-modal');
 		});
