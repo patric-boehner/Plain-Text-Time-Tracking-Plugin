@@ -248,19 +248,7 @@ class PLTT_Form_Handlers {
 		if ( is_wp_error( $result ) ) {
 			// SEC-M2: use only the error code (not the raw message) in the redirect URL.
 			self::redirect_back( array( 'pltt_error' => $result->get_error_code() ) );
-		}
-
-		// Apply alias chip-manager changes. Project aliases carry the project's
-		// parent client; read it post-update so a client reassignment is honored.
-		$alias_add    = isset( $_POST['aliases_add'] ) ? (array) wp_unslash( $_POST['aliases_add'] ) : array();
-		$alias_remove = isset( $_POST['aliases_remove'] ) ? (array) wp_unslash( $_POST['aliases_remove'] ) : array();
-		if ( ! empty( $alias_add ) || ! empty( $alias_remove ) ) {
-			$project      = PLTT_Projects::get( $project_id );
-			$owner_client = $project ? (int) $project->client_id : 0;
-			pltt_apply_alias_chip_changes( $alias_add, $alias_remove, $owner_client, $project_id );
-		}
-
-		if ( $result || ! empty( $alias_add ) || ! empty( $alias_remove ) ) {
+		} elseif ( $result ) {
 			self::redirect_back( array( 'pltt_message' => 'project_updated' ) );
 		} else {
 			self::redirect_back( array( 'pltt_error' => 'project_update_failed' ) );
