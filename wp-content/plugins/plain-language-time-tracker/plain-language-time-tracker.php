@@ -49,6 +49,7 @@ function pltt_load_dependencies() {
 	require_once PLTT_PLUGIN_DIR . 'includes/database/class-pltt-tags.php';
 	require_once PLTT_PLUGIN_DIR . 'includes/database/class-pltt-entries.php';
 	require_once PLTT_PLUGIN_DIR . 'includes/database/class-pltt-aliases.php';
+	require_once PLTT_PLUGIN_DIR . 'includes/database/class-pltt-tag-aliases.php';
 
 	// Parser.
 	require_once PLTT_PLUGIN_DIR . 'includes/parser/class-pltt-time-parser.php';
