@@ -494,3 +494,72 @@
 		flex: 1 1 calc(50% - 12px);
 	}
 }
+
+/* === Finalize screen: resolution states (confident / guessed / unset) === */
+
+.pltt-finalize-status {
+	display: inline-flex;
+	align-items: center;
+	gap: 8px;
+	margin: 0 0 12px;
+	padding: 6px 14px;
+	border-radius: 16px;
+	font-size: 13px;
+	font-weight: 500;
+}
+
+.pltt-finalize-status-dot {
+	flex: 0 0 auto;
+	width: 9px;
+	height: 9px;
+	border-radius: 50%;
+}
+
+.pltt-finalize-status.is-pending {
+	background: #fcf3e6;
+	border: 1px solid #f0d9a8;
+	color: #8a6116;
+}
+
+.pltt-finalize-status.is-pending .pltt-finalize-status-dot {
+	background: #d9a020;
+}
+
+.pltt-finalize-status.is-clear {
+	background: #e6f4ea;
+	border: 1px solid #b7dcc0;
+	color: #1c6b2e;
+}
+
+.pltt-finalize-status.is-clear .pltt-finalize-status-dot {
+	background: #2ea043;
+}
+
+/* Unset row — the loudest outstanding item: amber tint + left rule. */
+.pltt-review-table tr[data-resolution-state="unset"] td {
+	background: #fdf6ea;
+}
+
+.pltt-review-table tr[data-resolution-state="unset"] td:first-child {
+	box-shadow: inset 3px 0 0 #d9a020;
+}
+
+/* Guessed project — dashed control + amber dot. Confident is solid, no dot. */
+.pltt-project-state-dot {
+	display: none;
+	width: 8px;
+	height: 8px;
+	margin-left: 6px;
+	border-radius: 50%;
+	background: #d9a020;
+	vertical-align: middle;
+}
+
+.pltt-review-table tr[data-resolution-state="guessed"] .pltt-project-state-dot {
+	display: inline-block;
+}
+
+.pltt-review-table tr[data-resolution-state="guessed"] .pltt-project-select {
+	border-style: dashed;
+	border-color: #d9a020;
+}

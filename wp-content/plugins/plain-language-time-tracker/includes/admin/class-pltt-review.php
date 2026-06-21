@@ -48,6 +48,11 @@ class PLTT_Review {
 			$extra_project_ids_by_client
 		);
 
+		// Resolution states (confident/guessed/unset) + header counts for the
+		// finalize screen. Enriches each entry in place with 'resolution_state'
+		// and fills a guessed project from recency.
+		$resolution_counts = self::compute_resolution_states( $entries, $projects_by_client );
+
 		// Load daily log for notes reference.
 		$log = PLTT_Daily_Log::get_log( $date );
 
@@ -56,6 +61,76 @@ class PLTT_Review {
 		sort( $all_tags );
 
 		include PLTT_PLUGIN_DIR . 'templates/review.php';
+	}
+
+	/**
+	 * Compute the finalize-screen resolution state for each entry.
+	 *
+	 * - confident: an alias resolved the project (project already set).
+	 * - guessed:   client resolved but no project alias — fill the project from
+	 *              the client's most-recent active project (a soft guess).
+	 * - unset:     nothing resolved — the genuine blocker.
+	 *
+	 * Enriches each entry in place ('resolution_state', and a filled
+	 * 'predicted_project_id' for guesses) and returns the header counts. Green
+	 * state = no unset AND no unconfirmed guess; untagged never blocks green.
+	 *
+	 * @param array $entries            Entries (modified in place).
+	 * @param array $projects_by_client client_id => [projects], recency-ordered.
+	 * @return array Counts: needs_assigning, to_confirm, untagged, total.
+	 */
+	private static function compute_resolution_states( array &$entries, array $projects_by_client ) {
+		$counts = array(
+			'needs_assigning' => 0,
+			'to_confirm'      => 0,
+			'untagged'        => 0,
+			'total'           => count( $entries ),
+		);
+
+		foreach ( $entries as &$entry ) {
+			$client_id  = (int) ( $entry['predicted_client_id'] ?? 0 );
+			$project_id = (int) ( $entry['predicted_project_id'] ?? 0 );
+
+			if ( $project_id > 0 ) {
+				$entry['resolution_state'] = 'confident';
+			} elseif ( $client_id > 0 ) {
+				$guess = self::most_recent_active_project( $client_id, $projects_by_client );
+				$entry['resolution_state'] = 'guessed';
+				if ( $guess > 0 ) {
+					$entry['predicted_project_id'] = $guess;
+					++$counts['to_confirm'];
+				}
+			} else {
+				$entry['resolution_state'] = 'unset';
+				++$counts['needs_assigning'];
+			}
+
+			if ( '' === trim( (string) ( $entry['tags'] ?? '' ) ) ) {
+				++$counts['untagged'];
+			}
+		}
+		unset( $entry );
+
+		return $counts;
+	}
+
+	/**
+	 * Most-recent active project for a client, from the recency-ordered map.
+	 *
+	 * @param int   $client_id          Client ID.
+	 * @param array $projects_by_client client_id => [projects], recency-ordered.
+	 * @return int Project ID, or 0 if none.
+	 */
+	private static function most_recent_active_project( $client_id, array $projects_by_client ) {
+		if ( empty( $projects_by_client[ $client_id ] ) ) {
+			return 0;
+		}
+		foreach ( $projects_by_client[ $client_id ] as $project ) {
+			if ( 'archived' !== $project->status ) {
+				return (int) $project->id;
+			}
+		}
+		return 0;
 	}
 
 	/**

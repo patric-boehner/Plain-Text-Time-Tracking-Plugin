@@ -17,7 +17,42 @@
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
+
+// Finalize status pill: nudge-don't-block. Green (clear) when nothing is unset
+// and no guess is unconfirmed; untagged is an informational count only.
+$rc = isset( $resolution_counts ) ? $resolution_counts : array(
+	'needs_assigning' => 0,
+	'to_confirm'      => 0,
+	'untagged'        => 0,
+);
+$rc_clear   = 0 === (int) $rc['needs_assigning'] && 0 === (int) $rc['to_confirm'];
+$pill_parts = array();
+if ( $rc['needs_assigning'] > 0 ) {
+	/* translators: %d: number of entries with no client/project assigned */
+	$pill_parts[] = sprintf( _n( '%d needs assigning', '%d need assigning', $rc['needs_assigning'], 'plain-language-time-tracker' ), $rc['needs_assigning'] );
+}
+if ( $rc['to_confirm'] > 0 ) {
+	/* translators: %d: number of guessed projects to confirm */
+	$pill_parts[] = sprintf( _n( '%d to confirm', '%d to confirm', $rc['to_confirm'], 'plain-language-time-tracker' ), $rc['to_confirm'] );
+}
+if ( $rc['untagged'] > 0 ) {
+	/* translators: %d: number of untagged entries */
+	$pill_parts[] = sprintf( _n( '%d untagged', '%d untagged', $rc['untagged'], 'plain-language-time-tracker' ), $rc['untagged'] );
+}
 ?>
+<div id="pltt-finalize-status" class="pltt-finalize-status <?php echo $rc_clear ? 'is-clear' : 'is-pending'; ?>"
+	data-needs-assigning="<?php echo esc_attr( $rc['needs_assigning'] ); ?>"
+	data-to-confirm="<?php echo esc_attr( $rc['to_confirm'] ); ?>"
+	data-untagged="<?php echo esc_attr( $rc['untagged'] ); ?>">
+	<span class="pltt-finalize-status-dot" aria-hidden="true"></span>
+	<span class="pltt-finalize-status-text">
+		<?php
+		echo $rc_clear
+			? esc_html__( 'All set — ready to save', 'plain-language-time-tracker' )
+			: esc_html( implode( ' · ', $pill_parts ) );
+		?>
+	</span>
+</div>
 <form id="pltt-review-form" method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
 	<input type="hidden" name="action" value="pltt_save_entries">
 	<input type="hidden" name="date" value="<?php echo esc_attr( $date ); ?>">
@@ -70,7 +105,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 					$warning_tooltip = implode( ' ', $reasons );
 				}
 				?>
-				<tr class="<?php echo esc_attr( implode( ' ', $row_classes ) ); ?>" data-entry-id="<?php echo esc_attr( $entry_id ); ?>" data-index="<?php echo esc_attr( $index ); ?>" data-original-project-id="<?php echo esc_attr( $predicted_project ); ?>">
+				<tr class="<?php echo esc_attr( implode( ' ', $row_classes ) ); ?>" data-entry-id="<?php echo esc_attr( $entry_id ); ?>" data-index="<?php echo esc_attr( $index ); ?>" data-original-project-id="<?php echo esc_attr( $predicted_project ); ?>" data-resolution-state="<?php echo esc_attr( $entry['resolution_state'] ?? '' ); ?>">
 					<td class="pltt-warning-cell">
 						<?php if ( $has_warning ) : ?>
 							<span class="pltt-warning-indicator dashicons dashicons-warning" role="img" aria-label="<?php echo esc_attr( $warning_tooltip ); ?>" title="<?php echo esc_attr( $warning_tooltip ); ?>"></span>
@@ -185,6 +220,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 							<?php endif; ?>
 							<option value="new">+ <?php esc_html_e( 'Add new project...', 'plain-language-time-tracker' ); ?></option>
 						</select>
+						<span class="pltt-project-state-dot" aria-hidden="true" title="<?php esc_attr_e( 'Guessed from your most recent project — confirm or change', 'plain-language-time-tracker' ); ?>"></span>
 					</td>
 					<td>
 						<div class="pltt-tag-input-wrap">
