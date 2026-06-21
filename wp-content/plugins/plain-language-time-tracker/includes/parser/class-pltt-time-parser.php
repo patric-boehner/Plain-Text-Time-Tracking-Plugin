@@ -268,6 +268,16 @@ class PLTT_Time_Parser {
 	 * @return array Entries with predicted client_id and (when hit) project_id.
 	 */
 	public static function apply_predictions( $entries ) {
+		// Preload seeded keyword->tag rows and a tag id=>name map once, so tag
+		// prediction across the whole log costs no per-entry queries.
+		$tag_alias_rows  = PLTT_Tag_Aliases::get_all();
+		$tag_names_by_id = array();
+		if ( ! empty( $tag_alias_rows ) ) {
+			foreach ( PLTT_Tags::get_all() as $tag_obj ) {
+				$tag_names_by_id[ (int) $tag_obj->id ] = $tag_obj->name;
+			}
+		}
+
 		foreach ( $entries as &$entry ) {
 			$description = $entry['description'] ?? '';
 			$raw_text    = $entry['raw_text'] ?? '';
@@ -298,6 +308,24 @@ class PLTT_Time_Parser {
 						$entry['predicted_client_id'] = $project_match->client_id;
 						$entry['client_confidence']   = $project_match->confidence;
 					}
+				}
+			}
+
+			// Tags: pre-fill from seeded keyword matches, merged with any tags
+			// already extracted from hashtags. De-duped case-insensitively.
+			if ( ! empty( $tag_alias_rows ) ) {
+				$matched_tag_aliases = PLTT_Tag_Aliases::match( $text, $tag_alias_rows );
+				if ( ! empty( $matched_tag_aliases ) ) {
+					$tags     = array_filter( array_map( 'trim', explode( ',', $entry['tags'] ?? '' ) ) );
+					$tags_low = array_map( 'strtolower', $tags );
+					foreach ( $matched_tag_aliases as $ta_row ) {
+						$tag_name = $tag_names_by_id[ (int) $ta_row->tag_id ] ?? '';
+						if ( '' !== $tag_name && ! in_array( strtolower( $tag_name ), $tags_low, true ) ) {
+							$tags[]     = $tag_name;
+							$tags_low[] = strtolower( $tag_name );
+						}
+					}
+					$entry['tags'] = implode( ', ', $tags );
 				}
 			}
 		}

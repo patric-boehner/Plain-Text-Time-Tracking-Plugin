@@ -20,7 +20,7 @@ class PLTT_Database {
 	 *
 	 * @var string
 	 */
-	const DB_VERSION = '1.9.5';
+	const DB_VERSION = '1.9.6';
 
 	/**
 	 * Get the full table name with WordPress prefix.
@@ -243,6 +243,25 @@ class PLTT_Database {
 			KEY tag_id (tag_id)
 		) {$charset_collate};";
 		dbDelta( $sql_entry_tags );
+
+		// Tag-alias seeding table: deterministic keyword -> tag mapping that lets
+		// the parser pre-fill tags. Lean by design (no confidence/learning yet);
+		// use_count is just the prune signal. UNIQUE(keyword): one keyword maps
+		// to one tag, repointed on re-seed.
+		$table_tag_aliases = self::get_table_name( 'tag_aliases' );
+		$sql_tag_aliases   = "CREATE TABLE {$table_tag_aliases} (
+			id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+			keyword varchar(100) NOT NULL,
+			tag_id bigint(20) unsigned NOT NULL,
+			use_count int unsigned NOT NULL DEFAULT 0,
+			last_used datetime,
+			created_at datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			updated_at datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+			PRIMARY KEY (id),
+			UNIQUE KEY keyword (keyword),
+			KEY tag_id (tag_id)
+		) {$charset_collate};";
+		dbDelta( $sql_tag_aliases );
 	}
 
 	/**
@@ -626,6 +645,7 @@ class PLTT_Database {
 		$tables = array(
 			'entry_tags',
 			'tags',
+			'tag_aliases',
 			'time_entries',
 			'projects',
 			'clients',
