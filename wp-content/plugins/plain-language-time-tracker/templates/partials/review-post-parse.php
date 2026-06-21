@@ -61,7 +61,19 @@ if ( $rc['untagged'] > 0 ) {
 		<input type="hidden" name="return_to" value="<?php echo esc_attr( $return_to ); ?>">
 	<?php endif; ?>
 	<?php wp_nonce_field( 'pltt_save_entries', '_wpnonce', true, true ); ?>
-	<table class="pltt-review-table widefat">
+	<?php
+	// The first (status) column carries the AM/PM warning icon and the
+	// needs-review dot. Hide it entirely when nothing in the table uses it.
+	$show_status_col = false;
+	foreach ( $entries as $status_entry ) {
+		$status_state = $status_entry['resolution_state'] ?? '';
+		if ( ! empty( $status_entry['warnings'] ) || 'guessed' === $status_state || 'unset' === $status_state ) {
+			$show_status_col = true;
+			break;
+		}
+	}
+	?>
+	<table class="pltt-review-table widefat<?php echo $show_status_col ? '' : ' pltt-no-status-col'; ?>">
 		<thead>
 			<tr>
 				<th class="pltt-col-warning" scope="col"><span class="screen-reader-text"><?php esc_html_e( 'Status', 'plain-language-time-tracker' ); ?></span></th>
@@ -109,6 +121,13 @@ if ( $rc['untagged'] > 0 ) {
 					<td class="pltt-warning-cell">
 						<?php if ( $has_warning ) : ?>
 							<span class="pltt-warning-indicator dashicons dashicons-warning" role="img" aria-label="<?php echo esc_attr( $warning_tooltip ); ?>" title="<?php echo esc_attr( $warning_tooltip ); ?>"></span>
+						<?php elseif ( in_array( $entry['resolution_state'] ?? '', array( 'guessed', 'unset' ), true ) ) : ?>
+							<?php
+							$status_label = 'unset' === $entry['resolution_state']
+								? __( 'Needs a client and project', 'plain-language-time-tracker' )
+								: __( 'Project guessed from your most recent — confirm or change', 'plain-language-time-tracker' );
+							?>
+							<span class="pltt-status-dot pltt-status-<?php echo esc_attr( $entry['resolution_state'] ); ?>" role="img" aria-label="<?php echo esc_attr( $status_label ); ?>" title="<?php echo esc_attr( $status_label ); ?>"></span>
 						<?php endif; ?>
 					</td>
 					<td class="pltt-time-cell">
@@ -220,7 +239,6 @@ if ( $rc['untagged'] > 0 ) {
 							<?php endif; ?>
 							<option value="new">+ <?php esc_html_e( 'Add new project...', 'plain-language-time-tracker' ); ?></option>
 						</select>
-						<span class="pltt-project-state-dot" aria-hidden="true" title="<?php esc_attr_e( 'Guessed from your most recent project — confirm or change', 'plain-language-time-tracker' ); ?>"></span>
 					</td>
 					<td>
 						<div class="pltt-tag-input-wrap">

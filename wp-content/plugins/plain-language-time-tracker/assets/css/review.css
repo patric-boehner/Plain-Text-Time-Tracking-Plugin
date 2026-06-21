@@ -544,22 +544,28 @@
 	box-shadow: inset 3px 0 0 #d9a020;
 }
 
-/* Guessed project — dashed control + amber dot. Confident is solid, no dot. */
-.pltt-project-state-dot {
-	display: none;
+/* Needs-review dot in the status column (guessed / unset). */
+.pltt-status-dot {
+	display: inline-block;
 	width: 8px;
 	height: 8px;
-	margin-left: 6px;
 	border-radius: 50%;
 	background: #d9a020;
 	vertical-align: middle;
 }
 
-.pltt-review-table tr[data-resolution-state="guessed"] .pltt-project-state-dot {
-	display: inline-block;
+.pltt-status-dot.pltt-status-unset {
+	background: #d9821f;
 }
 
+/* Guessed project — dashed select (inline cue alongside the status dot). */
 .pltt-review-table tr[data-resolution-state="guessed"] .pltt-project-select {
 	border-style: dashed;
 	border-color: #d9a020;
+}
+
+/* Hide the status column entirely when nothing in the table needs it. */
+.pltt-review-table.pltt-no-status-col .pltt-col-warning,
+.pltt-review-table.pltt-no-status-col .pltt-warning-cell {
+	display: none;
 }
