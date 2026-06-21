@@ -266,25 +266,6 @@ class PLTT_Aliases {
 	}
 
 	/**
-	 * Get the aliases bound to a project.
-	 *
-	 * @param int $project_id Project ID.
-	 * @return array Alias objects, most-used first.
-	 */
-	public static function get_for_project( $project_id ) {
-		global $wpdb;
-		$table = PLTT_Database::get_table_name( 'aliases' );
-
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
-		return $wpdb->get_results(
-			$wpdb->prepare(
-				"SELECT * FROM {$table} WHERE project_id = %d ORDER BY use_count DESC, alias_text ASC",
-				absint( $project_id )
-			)
-		);
-	}
-
-	/**
 	 * Delete an alias (chip-manager prune).
 	 *
 	 * @param int $id Alias ID.
