@@ -67,7 +67,9 @@ class PLTT_Admin {
 		}
 		// phpcs:enable WordPress.Security.NonceVerification.Recommended
 
-		wp_safe_redirect( pltt_get_admin_url( 'daily-log', $args ) );
+		// Land on the entries section — Today leads with the journal capture box,
+		// but a review/edit link means the user wants the entries.
+		wp_safe_redirect( pltt_get_admin_url( 'daily-log', $args ) . '#pltt-entries' );
 		exit;
 	}
 

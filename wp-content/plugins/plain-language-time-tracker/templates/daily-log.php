@@ -152,7 +152,7 @@ $return_to     = $return_to_raw ? wp_validate_redirect( $return_to_raw, '' ) : '
 	</div>
 
 	<?php if ( $has_entries ) : ?>
-		<div class="pltt-existing-entries">
+		<div class="pltt-existing-entries" id="pltt-entries">
 			<h3><?php esc_html_e( 'Recorded Entries', 'plain-language-time-tracker' ); ?></h3>
 
 			<input type="hidden" id="pltt-entry-date" value="<?php echo esc_attr( $date ); ?>">
