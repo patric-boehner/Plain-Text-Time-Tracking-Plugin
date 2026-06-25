@@ -162,13 +162,8 @@ if ( ! defined( 'ABSPATH' ) ) {
 										</a>
 										<div class="row-actions">
 											<a href="<?php echo esc_url( pltt_get_admin_url( 'daily-log', array( 'date' => $log->log_date ) ) ); ?>">
-											<?php esc_html_e( 'View Log', 'plain-language-time-tracker' ); ?>
+												<?php esc_html_e( 'View', 'plain-language-time-tracker' ); ?>
 											</a>
-											<?php if ( (int) $log->entry_count > 0 ) : ?>
-												| <a href="<?php echo esc_url( pltt_get_admin_url( 'review', array( 'date' => $log->log_date ) ) ); ?>">
-													<?php esc_html_e( 'Review Entries', 'plain-language-time-tracker' ); ?>
-												</a>
-											<?php endif; ?>
 											| <a href="#" class="pltt-delete-log submitdelete" role="button">
 												<?php esc_html_e( 'Delete', 'plain-language-time-tracker' ); ?>
 											</a>

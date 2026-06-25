@@ -21,10 +21,37 @@ class PLTT_Review {
 	public static function render() {
 		$date = isset( $_GET['date'] ) ? pltt_sanitize_date( wp_unslash( $_GET['date'] ) ) : pltt_get_current_date();
 
-		// Always load entries from database - never re-parse.
+		// Shared editor context: entries, clients, projects_by_client, all_tags.
+		$ctx                = self::get_editor_context( $date );
+		$entries            = $ctx['entries'];
+		$summary            = $ctx['summary'];
+		$clients            = $ctx['clients'];
+		$projects_by_client = $ctx['projects_by_client'];
+		$all_tags           = $ctx['all_tags'];
+
+		// Resolution states (confident/guessed/unset) + header counts for the
+		// finalize screen. Enriches each entry in place with 'resolution_state'
+		// and fills a guessed project from recency.
+		$resolution_counts = self::compute_resolution_states( $entries, $projects_by_client );
+
+		// Load daily log for notes reference.
+		$log = PLTT_Daily_Log::get_log( $date );
+
+		include PLTT_PLUGIN_DIR . 'templates/review.php';
+	}
+
+	/**
+	 * Assemble the shared editor context for a date — the data both the review
+	 * screen and the Daily Log (Today) inline editor need: formatted entries,
+	 * all clients, the projects-by-client map (including any archived projects
+	 * referenced by the entries), and the tag-name list for autocomplete.
+	 *
+	 * @param string $date Date in Y-m-d format.
+	 * @return array {entries, summary, clients, projects_by_client, all_tags}.
+	 */
+	public static function get_editor_context( $date ) {
 		$data    = self::get_entries_for_date( $date );
 		$entries = $data['entries'];
-		$summary = $data['summary'];
 		$clients = PLTT_Clients::get_all();
 
 		// Collect project IDs referenced by entries, grouped by client.
@@ -32,8 +59,8 @@ class PLTT_Review {
 		$extra_project_ids_by_client = array();
 		$unique_client_ids           = array();
 		foreach ( $entries as $entry ) {
-			$cid = $entry['predicted_client_id'] ?? 0;
-			$pid = $entry['predicted_project_id'] ?? 0;
+			$cid = $entry['client_id'] ?? 0;
+			$pid = $entry['project_id'] ?? 0;
 			if ( $cid > 0 ) {
 				$unique_client_ids[] = $cid;
 				if ( $pid > 0 ) {
@@ -48,19 +75,17 @@ class PLTT_Review {
 			$extra_project_ids_by_client
 		);
 
-		// Resolution states (confident/guessed/unset) + header counts for the
-		// finalize screen. Enriches each entry in place with 'resolution_state'
-		// and fills a guessed project from recency.
-		$resolution_counts = self::compute_resolution_states( $entries, $projects_by_client );
-
-		// Load daily log for notes reference.
-		$log = PLTT_Daily_Log::get_log( $date );
-
 		// Collect all known tags for autocomplete.
 		$all_tags = array_column( PLTT_Tags::get_all(), 'name' );
 		sort( $all_tags );
 
-		include PLTT_PLUGIN_DIR . 'templates/review.php';
+		return array(
+			'entries'            => $entries,
+			'summary'            => $data['summary'],
+			'clients'            => $clients,
+			'projects_by_client' => $projects_by_client,
+			'all_tags'           => $all_tags,
+		);
 	}
 
 	/**
@@ -139,7 +164,7 @@ class PLTT_Review {
 	 * Used by the pltt_save_entry AJAX endpoint to return updated row markup
 	 * after a per-row save so the JS can swap it into the list without a page
 	 * reload. The markup MUST match the layout produced by
-	 * templates/partials/review-edit-existing.php.
+	 * templates/partials/entries-editor.php.
 	 *
 	 * @param object $entry Time-entry row from the DB.
 	 */
