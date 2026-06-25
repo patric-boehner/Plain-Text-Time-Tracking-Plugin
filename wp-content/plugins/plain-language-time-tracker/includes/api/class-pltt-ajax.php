@@ -143,19 +143,55 @@ class PLTT_Ajax {
 		// Validate entries.
 		$validation = PLTT_Time_Parser::validate( $entries );
 
-		// Delete existing entries and create new ones in a transaction
+		// Reprocessing safety: keep finalized (verified) entries and the manual
+		// corrections on them. Collect their time spans so re-parsed lines that
+		// fall inside an already-committed entry are skipped — only newly-typed
+		// timestamps in the uncovered gaps become fresh drafts.
+		$verified_spans = array();
+		foreach ( PLTT_Entries::get_by_date( $date ) as $existing ) {
+			if ( empty( $existing->verified ) || empty( $existing->start_time ) ) {
+				continue;
+			}
+			$v_start = pltt_time_to_minutes( $existing->start_time );
+			if ( false === $v_start ) {
+				continue;
+			}
+			$v_end = ! empty( $existing->end_time ) ? pltt_time_to_minutes( $existing->end_time ) : $v_start;
+			if ( false === $v_end ) {
+				$v_end = $v_start;
+			}
+			if ( $v_end < $v_start ) {
+				$v_end += 1440; // Overnight span.
+			}
+			$verified_spans[] = array(
+				'start' => $v_start,
+				'end'   => $v_end,
+			);
+		}
+
+		// Delete only the unverified drafts and create new ones in a transaction
 		// so a failure mid-loop doesn't leave partial data. PLTT_Entries::create()
 		// participates in this same nesting-aware transaction (TRC-DB23).
 		PLTT_Database::begin_transaction();
 
-		PLTT_Entries::delete_by_date( $date );
+		PLTT_Entries::delete_unverified_by_date( $date );
 
-		$all_created = true;
+		$all_created   = true;
+		$created_count = 0;
 
 		// Persist the parser's predictions: client always, and project when a
 		// direct alias-to-project hit resolved one. Both are still editable on
 		// the review screen; an unconfirmed project is just a pre-fill.
 		foreach ( $entries as $entry ) {
+			// Skip any parsed line whose start falls inside a verified entry's
+			// span — that work is already committed and must not be duplicated.
+			if ( ! empty( $verified_spans ) && ! empty( $entry['start_time'] ) ) {
+				$p_start = pltt_time_to_minutes( $entry['start_time'] );
+				if ( false !== $p_start && self::start_in_verified_span( $p_start, $verified_spans ) ) {
+					continue;
+				}
+			}
+
 			$result = PLTT_Entries::create(
 				array(
 					'entry_date'       => $date,
@@ -178,6 +214,8 @@ class PLTT_Ajax {
 				error_log( sprintf( 'PLTT: Entry creation failed for date %s. start=%s end=%s', $date, $entry['start_time'] ?? '?', $entry['end_time'] ?? '?' ) );
 				break;
 			}
+
+			++$created_count;
 		}
 
 		if ( $all_created ) {
@@ -189,13 +227,49 @@ class PLTT_Ajax {
 			return;
 		}
 
+		// When every parsed line fell inside an already-finalized entry, there are
+		// no new drafts to review. Keep the user on the journal and tell them so,
+		// rather than dropping them on a review screen with nothing to do.
+		$redirect = ( 0 === $created_count )
+			? pltt_get_admin_url( 'daily-log', array(
+				'date'         => $date,
+				'pltt_message' => 'nothing_reprocessed',
+			) )
+			: pltt_get_admin_url( 'review', array( 'date' => $date ) );
+
 		wp_send_json_success(
 			array(
 				'entries'    => $entries,
 				'validation' => $validation,
-				'redirect'   => pltt_get_admin_url( 'review', array( 'date' => $date ) ),
+				'redirect'   => $redirect,
 			)
 		);
+	}
+
+	/**
+	 * Whether a parsed entry's start minute falls inside any verified span.
+	 *
+	 * A span covers [start, end): a line starting exactly at a verified entry's
+	 * end is treated as the next (uncovered) gap, not a duplicate. Zero-length
+	 * spans (a verified entry with no end time) match only an exact start.
+	 *
+	 * @param int   $start_min Parsed entry's start time in minutes.
+	 * @param array $spans     List of ['start' => int, 'end' => int] verified spans.
+	 * @return bool True if the start falls within a committed entry's span.
+	 */
+	private static function start_in_verified_span( $start_min, $spans ) {
+		foreach ( $spans as $span ) {
+			if ( $span['start'] === $span['end'] ) {
+				if ( $start_min === $span['start'] ) {
+					return true;
+				}
+				continue;
+			}
+			if ( $start_min >= $span['start'] && $start_min < $span['end'] ) {
+				return true;
+			}
+		}
+		return false;
 	}
 
 	/**

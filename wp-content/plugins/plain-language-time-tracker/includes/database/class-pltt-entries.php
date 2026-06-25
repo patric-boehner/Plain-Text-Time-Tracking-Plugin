@@ -409,6 +409,43 @@ class PLTT_Entries {
 	}
 
 	/**
+	 * Delete only the UNVERIFIED entries for a date, leaving finalized work intact.
+	 *
+	 * Used when reprocessing a day's journal: committed (verified) entries must
+	 * survive a re-parse so manual client/project/tag/billable corrections are
+	 * never wiped. Only the draft (verified = 0) rows are cleared and replaced.
+	 *
+	 * @param string $date Date in Y-m-d format.
+	 * @return int|false Number of deleted rows or false on error.
+	 */
+	public static function delete_unverified_by_date( $date ) {
+		global $wpdb;
+		$table            = PLTT_Database::get_table_name( 'time_entries' );
+		$entry_tags_table = PLTT_Database::get_table_name( 'entry_tags' );
+
+		// Delete junction rows for the unverified entries only, in one DELETE JOIN.
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+		$wpdb->query(
+			$wpdb->prepare(
+				"DELETE et FROM {$entry_tags_table} et
+				INNER JOIN {$table} e ON et.entry_id = e.id
+				WHERE e.entry_date = %s AND e.verified = 0",
+				$date
+			)
+		);
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+		return $wpdb->delete(
+			$table,
+			array(
+				'entry_date' => $date,
+				'verified'   => 0,
+			),
+			array( '%s', '%d' )
+		);
+	}
+
+	/**
 	 * SQL expression for a single entry's billable amount.
 	 *
 	 * Uses the stored snapshot (e.billable_amount) when present, else a live
