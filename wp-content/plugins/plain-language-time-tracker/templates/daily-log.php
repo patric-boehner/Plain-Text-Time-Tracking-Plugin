@@ -66,7 +66,8 @@ $has_entries      = ! empty( $existing_entries );
 		// that are too far from the H1.
 		pltt_render_admin_notices(
 			array(
-				'entries_saved' => __( 'Entries saved successfully.', 'plain-language-time-tracker' ),
+				'entries_saved'       => __( 'Entries saved successfully.', 'plain-language-time-tracker' ),
+				'nothing_reprocessed' => __( 'Nothing new to process — every timestamp is already part of a finalized entry.', 'plain-language-time-tracker' ),
 			),
 			array(
 				'invalid_date'     => __( 'Invalid date.', 'plain-language-time-tracker' ),
