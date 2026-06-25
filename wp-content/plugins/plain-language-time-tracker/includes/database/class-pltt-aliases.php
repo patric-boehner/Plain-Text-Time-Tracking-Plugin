@@ -36,6 +36,54 @@ class PLTT_Aliases {
 	);
 
 	/**
+	 * Common English words that should never become a client alias.
+	 *
+	 * Catches accidental mid-sentence / sentence-start capitalizations (e.g.
+	 * "Into", "Get", "Work", "Now") that the learner would otherwise harvest as
+	 * junk aliases. Stored lowercase and matched case-insensitively, so a
+	 * capitalized form is filtered the same as a lowercase one. Client names are
+	 * proper nouns, so filtering ordinary words here is low-risk — and seeding
+	 * via the chip manager bypasses this filter if you ever truly need one.
+	 *
+	 * @var array
+	 */
+	const COMMON_WORDS = array(
+		// Determiners / quantifiers.
+		'the', 'this', 'that', 'these', 'those', 'some', 'any', 'all', 'each', 'every',
+		'both', 'more', 'most', 'other', 'another', 'such', 'same', 'own', 'few', 'many',
+		// Pronouns.
+		'you', 'she', 'her', 'him', 'his', 'they', 'them', 'their', 'our', 'its',
+		'who', 'whom', 'whose', 'what', 'which', 'someone', 'something', 'anything', 'everything',
+		// Prepositions / particles.
+		'into', 'onto', 'over', 'under', 'between', 'among', 'through', 'during', 'before',
+		'after', 'above', 'below', 'out', 'off', 'near', 'around', 'across', 'against',
+		'along', 'behind', 'within', 'without', 'upon', 'about', 'with', 'from', 'for',
+		// Conjunctions.
+		'and', 'but', 'nor', 'because', 'while', 'although', 'though', 'since', 'unless',
+		'until', 'whether', 'than', 'then', 'when', 'where',
+		// Common verbs (esp. capitalized at sentence start).
+		'are', 'was', 'were', 'been', 'being', 'have', 'has', 'had', 'having',
+		'does', 'did', 'doing', 'done', 'get', 'gets', 'got', 'gotten', 'getting',
+		'make', 'makes', 'made', 'making', 'goes', 'going', 'went', 'gone',
+		'come', 'comes', 'came', 'coming', 'take', 'takes', 'took', 'taken', 'taking',
+		'meet', 'meets', 'met', 'see', 'sees', 'saw', 'seen', 'know', 'knows', 'knew', 'known', 'knowing',
+		'think', 'thinks', 'thought', 'want', 'wants', 'wanted', 'need', 'needs', 'needed',
+		'use', 'uses', 'used', 'using', 'work', 'works', 'worked', 'working',
+		'put', 'set', 'keep', 'kept', 'let', 'say', 'says', 'said', 'tell', 'told',
+		'ask', 'asks', 'asked', 'find', 'found', 'give', 'gives', 'gave', 'given',
+		'try', 'tried', 'trying', 'start', 'starts', 'started', 'finish', 'finished',
+		'send', 'sent', 'look', 'looks', 'looked', 'add', 'added', 'run', 'ran', 'end',
+		// Adverbs / misc.
+		'now', 'here', 'there', 'just', 'also', 'still', 'very', 'too', 'only', 'even',
+		'well', 'back', 'again', 'once', 'never', 'always', 'often', 'soon', 'later',
+		'really', 'maybe', 'probably', 'actually', 'however', 'instead', 'almost', 'already',
+		'enough', 'quite', 'rather', 'much', 'lot', 'today', 'tomorrow', 'yesterday',
+		// Days / time.
+		'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday',
+		'morning', 'afternoon', 'evening', 'night', 'week', 'next', 'last',
+	);
+
+	/**
 	 * Get an alias by ID.
 	 *
 	 * @param int $id Alias ID.
@@ -444,13 +492,9 @@ class PLTT_Aliases {
 			return array();
 		}
 
-		$common_words = array(
-			'The', 'And', 'For', 'With', 'From', 'This', 'That', 'Done', 'End', 'Finished',
-			'Having', 'Going', 'Working', 'Getting', 'Making', 'Taking', 'Doing',
-			'Also', 'Just', 'Still', 'Then', 'About', 'After', 'Before', 'Around',
-		);
-
-		return array_values( array_diff( $matches[1], $common_words ) );
+		// Common-word filtering happens case-insensitively in
+		// _filter_stopwords_and_tags(), so just return the raw candidates here.
+		return $matches[1];
 	}
 
 	/**
@@ -468,6 +512,7 @@ class PLTT_Aliases {
 			function ( $p ) use ( $stopwords_lower, $known_tags ) {
 				$lower = strtolower( $p );
 				return ! in_array( $lower, $stopwords_lower, true )
+					&& ! in_array( $lower, self::COMMON_WORDS, true )
 					&& ! in_array( $lower, $known_tags, true );
 			}
 		);
