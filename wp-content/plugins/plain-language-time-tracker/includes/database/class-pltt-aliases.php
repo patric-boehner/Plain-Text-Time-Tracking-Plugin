@@ -371,6 +371,61 @@ class PLTT_Aliases {
 	}
 
 	/**
+	 * Prune low-value learned aliases.
+	 *
+	 * Two precise rules, neither of which touches deliberate seeds (confidence
+	 * >= 0.95):
+	 *  - common/stop word: alias_text is now in STOPWORDS/COMMON_WORDS (would
+	 *    never be learned today);
+	 *  - never confirmed: confidence <= 0.10 (used but consistently wrong).
+	 *
+	 * Deliberately NOT pruning low-use "one-offs": use-count = 1 can't tell a
+	 * fresh proper-noun alias (e.g. "Mintie" -> Daniel Mintie) from a typo, so
+	 * those are left to manual pruning in the chip manager.
+	 *
+	 * @param bool $apply When true, delete the candidates; otherwise dry-run.
+	 * @return array Candidate objects: { alias, reason }.
+	 */
+	public static function prune_low_value( $apply = false ) {
+		global $wpdb;
+		$table = PLTT_Database::get_table_name( 'aliases' );
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+		$aliases  = $wpdb->get_results( "SELECT * FROM {$table}" );
+		$filtered = array_merge( array_map( 'strtolower', self::STOPWORDS ), self::COMMON_WORDS );
+
+		$candidates = array();
+		foreach ( $aliases as $a ) {
+			$conf  = (float) $a->confidence;
+			$lower = strtolower( $a->alias_text );
+
+			$reason = '';
+			if ( $conf < 0.95 && in_array( $lower, $filtered, true ) ) {
+				$reason = 'common/stop word';
+			} elseif ( $conf <= 0.10 ) {
+				$reason = 'never confirmed (' . number_format( $conf, 2 ) . ')';
+			}
+
+			if ( '' !== $reason ) {
+				$candidates[] = (object) array(
+					'alias'  => $a,
+					'reason' => $reason,
+				);
+			}
+		}
+
+		if ( $apply && ! empty( $candidates ) ) {
+			foreach ( $candidates as $c ) {
+				// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
+				$wpdb->delete( $table, array( 'id' => (int) $c->alias->id ), array( '%d' ) );
+			}
+			pltt_flush_alias_cache();
+		}
+
+		return $candidates;
+	}
+
+	/**
 	 * Find matching aliases in text.
 	 *
 	 * @param string $text Text to search.
