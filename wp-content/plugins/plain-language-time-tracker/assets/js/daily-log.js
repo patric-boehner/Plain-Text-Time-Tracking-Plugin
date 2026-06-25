@@ -185,8 +185,8 @@
 
 			// Check if log is already processed (button has secondary class).
 			if ( processBtn.classList.contains( 'button-secondary' ) ) {
-				const confirmMsg = 'This will delete all existing entries and recreate them from the parsed log text.\n\n' +
-					'To edit individual entries, use the Review screen instead.\n\nContinue?';
+				const confirmMsg = 'This re-reads the log and refreshes your unsaved draft entries.\n\n' +
+					'Finalized entries are kept as-is — only new timestamps become new drafts to review.\n\nContinue?';
 				if ( ! confirm( confirmMsg ) ) {
 					return;
 				}

@@ -233,7 +233,7 @@ For detailed feature documentation and data model: [PROJECT.md](PROJECT.md)
 
 ## Status
 
-**Current Version:** 1.9.28 (DB Version: 1.9.6)
+**Current Version:** 1.9.29 (DB Version: 1.9.6)
 
 The plugin is **functionally complete** for its core use case and in active daily use. All planned features are implemented and working.
 

@@ -34,6 +34,13 @@ var PlttTagPicker = ( function() {
 		this.onClose = onClose || null;
 		this.tagGroups = tagGroups || {};
 
+		// Opt-in predicted state (set by the finalize screen via data-predicted).
+		// Pre-filled tags are parser guesses: shown dashed ("records if left")
+		// until the user edits this row, then they solidify. Other usages
+		// (Reports, edit-existing) don't set the flag, so this is inert there.
+		this.markPredicted = container.dataset.predicted === '1';
+		this.predictedTags = [];
+
 		_instances.push( this );
 
 		this._buildDOM();
@@ -98,6 +105,11 @@ var PlttTagPicker = ( function() {
 				self.selectedTags.push( tag );
 			}
 		} );
+
+		// Whatever was pre-filled here is the prediction set.
+		if ( this.markPredicted ) {
+			this.predictedTags = this.selectedTags.slice();
+		}
 
 		this._renderPills();
 		this._updateCheckboxStates();
@@ -251,6 +263,8 @@ var PlttTagPicker = ( function() {
 		}
 		if ( autoSelect && this.selectedTags.indexOf( tagName ) === -1 ) {
 			this.selectedTags.push( tagName );
+			// Adding a tag by hand confirms the row — drop the predicted cue.
+			this.predictedTags = [];
 			this._renderPills();
 			this._sync();
 		}
@@ -286,6 +300,9 @@ var PlttTagPicker = ( function() {
 			this.selectedTags.splice( index, 1 );
 		}
 
+		// Editing this row's tags confirms them — drop the dashed predicted cue.
+		this.predictedTags = [];
+
 		this._renderPills();
 		this._sync();
 	};
@@ -307,8 +324,13 @@ var PlttTagPicker = ( function() {
 		this.selectedTags.forEach( function( tag ) {
 			var pill = document.createElement( 'span' );
 			pill.className = 'pltt-badge pltt-badge-tag pltt-tag-pill-trigger';
+			if ( self.predictedTags.indexOf( tag ) !== -1 ) {
+				pill.className += ' is-predicted';
+				pill.title = 'Predicted tag — click to confirm or change';
+			} else {
+				pill.title = 'Click to edit tags';
+			}
 			pill.textContent = tag.charAt( 0 ).toUpperCase() + tag.slice( 1 );
-			pill.title = 'Click to edit tags';
 			pill.addEventListener( 'click', function( e ) {
 				e.stopPropagation();
 				self._toggleDropdown();

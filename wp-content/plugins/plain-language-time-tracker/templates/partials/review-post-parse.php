@@ -40,18 +40,23 @@ if ( $rc['untagged'] > 0 ) {
 	$pill_parts[] = sprintf( _n( '%d untagged', '%d untagged', $rc['untagged'], 'plain-language-time-tracker' ), $rc['untagged'] );
 }
 ?>
-<div id="pltt-finalize-status" class="pltt-finalize-status <?php echo $rc_clear ? 'is-clear' : 'is-pending'; ?>"
+<?php
+// Standard WP notice styling for consistency with the plugin's other notices.
+// The `inline` class keeps core's JS from relocating it up to the H1, so it
+// stays here above the table; no `is-dismissible` (it reflects state, not a
+// one-time message). Green when ready to save, amber while anything is pending.
+?>
+<div id="pltt-finalize-status" class="notice <?php echo $rc_clear ? 'notice-success' : 'notice-warning'; ?> inline"
 	data-needs-assigning="<?php echo esc_attr( $rc['needs_assigning'] ); ?>"
 	data-to-confirm="<?php echo esc_attr( $rc['to_confirm'] ); ?>"
 	data-untagged="<?php echo esc_attr( $rc['untagged'] ); ?>">
-	<span class="pltt-finalize-status-dot" aria-hidden="true"></span>
-	<span class="pltt-finalize-status-text">
+	<p>
 		<?php
 		echo $rc_clear
 			? esc_html__( 'All set — ready to save', 'plain-language-time-tracker' )
 			: esc_html( implode( ' · ', $pill_parts ) );
 		?>
-	</span>
+	</p>
 </div>
 <form id="pltt-review-form" method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
 	<input type="hidden" name="action" value="pltt_save_entries">
@@ -241,7 +246,15 @@ if ( $rc['untagged'] > 0 ) {
 						</select>
 					</td>
 					<td>
-						<div class="pltt-tag-input-wrap">
+						<?php
+						// Pre-filled tags on a DRAFT entry are parser predictions — flag the
+						// wrap so the picker renders them dashed ("records if left") until
+						// edited. A verified entry's tags are already confirmed, never dashed
+						// (matters on a reprocessed day, where finalized + draft rows mix).
+						$has_predicted_tags = empty( $entry['verified'] )
+							&& '' !== trim( (string) ( $entry['tags'] ?? '' ) );
+						?>
+						<div class="pltt-tag-input-wrap"<?php echo $has_predicted_tags ? ' data-predicted="1"' : ''; ?>>
 							<input
 								type="hidden"
 								name="entries[<?php echo esc_attr( $index ); ?>][tags]"

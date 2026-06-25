@@ -497,43 +497,8 @@
 
 /* === Finalize screen: resolution states (confident / guessed / unset) === */
 
-.pltt-finalize-status {
-	display: inline-flex;
-	align-items: center;
-	gap: 8px;
-	margin: 0 0 12px;
-	padding: 6px 14px;
-	border-radius: 16px;
-	font-size: 13px;
-	font-weight: 500;
-}
-
-.pltt-finalize-status-dot {
-	flex: 0 0 auto;
-	width: 9px;
-	height: 9px;
-	border-radius: 50%;
-}
-
-.pltt-finalize-status.is-pending {
-	background: #fcf3e6;
-	border: 1px solid #f0d9a8;
-	color: #8a6116;
-}
-
-.pltt-finalize-status.is-pending .pltt-finalize-status-dot {
-	background: #d9a020;
-}
-
-.pltt-finalize-status.is-clear {
-	background: #e6f4ea;
-	border: 1px solid #b7dcc0;
-	color: #1c6b2e;
-}
-
-.pltt-finalize-status.is-clear .pltt-finalize-status-dot {
-	background: #2ea043;
-}
+/* The finalize status banner uses core WP notice styling (.notice .notice-success
+   / .notice-warning .inline) for consistency — no custom rules needed here. */
 
 /* Unset row — the loudest outstanding item: amber tint + left rule. */
 .pltt-review-table tr[data-resolution-state="unset"] td {
@@ -562,6 +527,14 @@
 .pltt-review-table tr[data-resolution-state="guessed"] .pltt-project-select {
 	border-style: dashed;
 	border-color: #d9a020;
+}
+
+/* Predicted tag — dashed cue mirroring the guessed project: records if left,
+   solidifies once the row's tags are edited. */
+.pltt-tag-pill-trigger.is-predicted {
+	background: #fbf3e0;
+	border: 1px dashed #d9a020;
+	color: #7a5e12;
 }
 
 /* Hide the status column entirely when nothing in the table needs it. */
