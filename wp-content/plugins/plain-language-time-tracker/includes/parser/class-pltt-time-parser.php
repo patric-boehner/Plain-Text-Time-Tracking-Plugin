@@ -268,13 +268,16 @@ class PLTT_Time_Parser {
 	 * @return array Entries with predicted client_id and (when hit) project_id.
 	 */
 	public static function apply_predictions( $entries ) {
-		// Preload seeded keyword->tag rows and a tag id=>name map once, so tag
-		// prediction across the whole log costs no per-entry queries.
-		$tag_alias_rows  = PLTT_Tag_Aliases::get_all();
-		$tag_names_by_id = array();
-		if ( ! empty( $tag_alias_rows ) ) {
-			foreach ( PLTT_Tags::get_all() as $tag_obj ) {
-				$tag_names_by_id[ (int) $tag_obj->id ] = $tag_obj->name;
+		// Preload tags + seeded keyword->tag rows once, so tag prediction across
+		// the whole log costs no per-entry queries. Literal tag-name matching
+		// excludes the Project Phases group (those are heading to date-derived).
+		$tag_alias_rows    = PLTT_Tag_Aliases::get_all();
+		$tag_names_by_id   = array();
+		$literal_tag_names = array();
+		foreach ( PLTT_Tags::get_all() as $tag_obj ) {
+			$tag_names_by_id[ (int) $tag_obj->id ] = $tag_obj->name;
+			if ( 'Project Phases' !== ( $tag_obj->group_name ?? '' ) ) {
+				$literal_tag_names[] = $tag_obj->name;
 			}
 		}
 
@@ -311,22 +314,32 @@ class PLTT_Time_Parser {
 				}
 			}
 
-			// Tags: pre-fill from seeded keyword matches, merged with any tags
-			// already extracted from hashtags. De-duped case-insensitively.
-			if ( ! empty( $tag_alias_rows ) ) {
-				$matched_tag_aliases = PLTT_Tag_Aliases::match( $text, $tag_alias_rows );
-				if ( ! empty( $matched_tag_aliases ) ) {
-					$tags     = array_filter( array_map( 'trim', explode( ',', $entry['tags'] ?? '' ) ) );
-					$tags_low = array_map( 'strtolower', $tags );
-					foreach ( $matched_tag_aliases as $ta_row ) {
-						$tag_name = $tag_names_by_id[ (int) $ta_row->tag_id ] ?? '';
-						if ( '' !== $tag_name && ! in_array( strtolower( $tag_name ), $tags_low, true ) ) {
-							$tags[]     = $tag_name;
-							$tags_low[] = strtolower( $tag_name );
-						}
-					}
-					$entry['tags'] = implode( ', ', $tags );
+			// Tags: pre-fill from (a) a tag's own name appearing literally in the
+			// text and (b) seeded keyword->tag matches, merged with any hashtag
+			// tags and de-duped case-insensitively.
+			$candidate_tag_names = array();
+			foreach ( $literal_tag_names as $literal_name ) {
+				if ( preg_match( '/\b' . preg_quote( $literal_name, '/' ) . '\b/i', $text ) ) {
+					$candidate_tag_names[] = $literal_name;
 				}
+			}
+			foreach ( PLTT_Tag_Aliases::match( $text, $tag_alias_rows ) as $ta_row ) {
+				$name = $tag_names_by_id[ (int) $ta_row->tag_id ] ?? '';
+				if ( '' !== $name ) {
+					$candidate_tag_names[] = $name;
+				}
+			}
+
+			if ( ! empty( $candidate_tag_names ) ) {
+				$tags     = array_filter( array_map( 'trim', explode( ',', $entry['tags'] ?? '' ) ) );
+				$tags_low = array_map( 'strtolower', $tags );
+				foreach ( $candidate_tag_names as $name ) {
+					if ( ! in_array( strtolower( $name ), $tags_low, true ) ) {
+						$tags[]     = $name;
+						$tags_low[] = strtolower( $name );
+					}
+				}
+				$entry['tags'] = implode( ', ', $tags );
 			}
 		}
 
