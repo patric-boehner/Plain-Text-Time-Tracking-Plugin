@@ -42,6 +42,9 @@
 			var cell = this.closest( 'td' );
 			var checkbox = cell.querySelector( '.pltt-billable' );
 			if ( checkbox ) {
+				// A click here is a deliberate choice — flag it so a later project
+				// change won't re-apply the project default over the user's pick.
+				checkbox.dataset.userSet = '1';
 				checkbox.checked = ! checkbox.checked;
 				checkbox.dispatchEvent( new Event( 'change' ) );
 			}
@@ -50,6 +53,11 @@
 
 	// Billable checkbox change — update $ symbol.
 	document.querySelectorAll( '.pltt-billable' ).forEach( function( checkbox ) {
+		// A direct click on the checkbox is also a deliberate choice. 'click'
+		// fires only on real interaction, never on a programmatic dispatch.
+		checkbox.addEventListener( 'click', function() {
+			this.dataset.userSet = '1';
+		} );
 		checkbox.addEventListener( 'change', function() {
 			var cell = this.closest( 'td' );
 			var symbol = cell.querySelector( '.pltt-billable-symbol' );
@@ -415,14 +423,16 @@
 				PLTT.showModal( 'pltt-project-modal' );
 				this.value = '';
 			} else {
-				// Apply project's billability default to the billable checkbox.
+				// Apply the project's billability default to the billable checkbox,
+				// but never clobber a manual choice: if the user has toggled billable
+				// on this row, leave it alone (spec: billable defaults once).
 				var selectedOpt = this.options[ this.selectedIndex ];
 				if ( selectedOpt && selectedOpt.value ) {
 					var billDefault = selectedOpt.dataset.billabilityDefault;
 					if ( billDefault !== undefined ) {
 						var entryRow = this.closest( '.pltt-entry-row' );
 						var checkbox = entryRow && entryRow.querySelector( '.pltt-billable' );
-						if ( checkbox ) {
+						if ( checkbox && checkbox.dataset.userSet !== '1' ) {
 							var shouldBeBillable = billDefault === '1';
 							if ( checkbox.checked !== shouldBeBillable ) {
 								checkbox.checked = shouldBeBillable;
