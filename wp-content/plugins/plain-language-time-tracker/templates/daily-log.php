@@ -19,9 +19,17 @@ $previous_date = PLTT_Daily_Log::get_previous_date( $date );
 $next_date     = PLTT_Daily_Log::get_next_date( $date );
 $today         = pltt_get_current_date();
 
-// Check if there are existing entries for this date.
-$existing_entries = PLTT_Entries::get_by_date( $date );
-$has_entries      = ! empty( $existing_entries );
+// Inline editor context (from PLTT_Daily_Log::render via PLTT_Review::get_editor_context).
+$entries            = $editor['entries'];
+$clients            = $editor['clients'];
+$projects_by_client = $editor['projects_by_client'];
+$all_tags           = $editor['all_tags'];
+$has_entries        = ! empty( $entries );
+
+// When arriving from Reports' "Edit" (which now routes here), keep a way back.
+// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only GET routing.
+$return_to_raw = isset( $_GET['return_to'] ) ? esc_url_raw( wp_unslash( $_GET['return_to'] ) ) : '';
+$return_to     = $return_to_raw ? wp_validate_redirect( $return_to_raw, '' ) : '';
 ?>
 
 <div class="wrap pltt-wrap">
@@ -79,6 +87,12 @@ $has_entries      = ! empty( $existing_entries );
 		?>
 	</div>
 
+	<?php if ( $return_to ) : ?>
+		<p class="pltt-back-link">
+			<a href="<?php echo esc_url( $return_to ); ?>">&larr; <?php esc_html_e( 'Back to Reports', 'plain-language-time-tracker' ); ?></a>
+		</p>
+	<?php endif; ?>
+
 	<div class="pltt-date-display">
 		<h2><?php echo esc_html( pltt_format_date( $date ) ); ?></h2>
 		<?php if ( $has_entries ) : ?>
@@ -86,8 +100,8 @@ $has_entries      = ! empty( $existing_entries );
 				<?php
 				printf(
 					/* translators: %d: number of entries */
-					esc_html( _n( '%d entry recorded', '%d entries recorded', count( $existing_entries ), 'plain-language-time-tracker' ) ),
-					count( $existing_entries )
+					esc_html( _n( '%d entry recorded', '%d entries recorded', count( $entries ), 'plain-language-time-tracker' ) ),
+					count( $entries )
 				);
 				?>
 			</span>
@@ -140,18 +154,27 @@ $has_entries      = ! empty( $existing_entries );
 	<?php if ( $has_entries ) : ?>
 		<div class="pltt-existing-entries">
 			<h3><?php esc_html_e( 'Recorded Entries', 'plain-language-time-tracker' ); ?></h3>
-			<p class="description">
-				<?php esc_html_e( 'You have already processed entries for this date.', 'plain-language-time-tracker' ); ?>
-			</p>
 
-			<?php pltt_render_entry_table( $existing_entries, array( 'table_class' => 'pltt-daily-log-entries' ) ); ?>
+			<input type="hidden" id="pltt-entry-date" value="<?php echo esc_attr( $date ); ?>">
 
-			<div class="pltt-existing-entries-footer">
-				<a href="<?php echo esc_url( pltt_get_admin_url( 'review', array( 'date' => $date ) ) ); ?>" class="button button-primary">
-					<?php esc_html_e( 'Edit Entries', 'plain-language-time-tracker' ); ?> &rarr;
-				</a>
-			</div>
+			<?php
+			// Inline editable list (compact rows + expandable edit form) — wired by
+			// review.js IIFE 2, the same editor the review screen uses.
+			include PLTT_PLUGIN_DIR . 'templates/partials/entries-editor.php';
+			?>
 		</div>
+
+		<?php
+		// SEC-L1: JSON_HEX_TAG/AMP so a "</script>" inside a tag/group name can't
+		// break out of the inline <script>.
+		wp_add_inline_script(
+			'pltt-review',
+			'var plttAllTags = ' . wp_json_encode( $all_tags, JSON_HEX_TAG | JSON_HEX_AMP ) . ';var plttTagGroups = ' . wp_json_encode( PLTT_Tags::get_name_to_group_map(), JSON_HEX_TAG | JSON_HEX_AMP ) . ';',
+			'before'
+		);
+
+		include PLTT_PLUGIN_DIR . 'templates/partials/entry-editor-modals.php';
+		?>
 	<?php endif; ?>
 	<?php // Notice params are stripped from the URL by PLTT.cleanNoticeParams() in shared.js. ?>
 </div>

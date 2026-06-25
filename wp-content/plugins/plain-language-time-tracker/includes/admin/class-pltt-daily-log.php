@@ -22,6 +22,10 @@ class PLTT_Daily_Log {
 		$date = isset( $_GET['date'] ) ? pltt_sanitize_date( wp_unslash( $_GET['date'] ) ) : pltt_get_current_date();
 		$log  = self::get_log( $date );
 
+		// Inline entry editor context — the same data the review screen uses, so
+		// finalized entries can be edited in place here (no trip to review).
+		$editor = PLTT_Review::get_editor_context( $date );
+
 		include PLTT_PLUGIN_DIR . 'templates/daily-log.php';
 	}
 

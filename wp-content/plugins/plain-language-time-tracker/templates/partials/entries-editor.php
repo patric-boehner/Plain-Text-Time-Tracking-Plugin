@@ -1,16 +1,19 @@
 <?php
 /**
- * Editing-existing review state: compact rows + expandable per-row edit form.
+ * Editable entries list: compact rows + expandable per-row edit form.
  *
- * Rendered by review.php when all entries on the current date are verified.
+ * Shared by the review screen (editing-existing state) and the Daily Log
+ * (Today) inline editor. Renders the `#pltt-entries-tbody` table that review.js
+ * IIFE 2 binds to; the caller is responsible for the three create-modals
+ * (entry-editor-modals.php), the `plttAllTags` / `plttTagGroups` globals, the
+ * `#pltt-entry-date` hidden input, and any surrounding footer/back links.
  *
  * @package PlainLanguageTimeTracker
  *
  * @var string $date               Current date.
- * @var array  $entries            Entries on this date.
+ * @var array  $entries            Entries on this date (all verified).
  * @var array  $clients            All clients.
  * @var array  $projects_by_client Projects grouped by client.
- * @var string $return_to          Optional safe-redirect URL.
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -112,15 +115,3 @@ $row_projects_cache = PLTT_Projects::get_multiple( array_unique( $entry_project_
 		<?php endforeach; ?>
 	</tbody>
 </table>
-
-<div class="pltt-entries-footer">
-	<?php if ( $return_to ) : ?>
-		<a href="<?php echo esc_url( $return_to ); ?>" class="button">
-			&larr; <?php esc_html_e( 'Back to Reports', 'plain-language-time-tracker' ); ?>
-		</a>
-	<?php else : ?>
-		<a href="<?php echo esc_url( pltt_get_admin_url( 'daily-log', array( 'date' => $date ) ) ); ?>" class="button">
-			&larr; <?php esc_html_e( 'Back to Notes', 'plain-language-time-tracker' ); ?>
-		</a>
-	<?php endif; ?>
-</div>

@@ -21,6 +21,54 @@ class PLTT_Admin {
 	public static function init() {
 		add_action( 'admin_menu', array( __CLASS__, 'add_admin_menu' ) );
 		add_action( 'admin_enqueue_scripts', array( __CLASS__, 'enqueue_assets' ) );
+		add_action( 'admin_init', array( __CLASS__, 'maybe_redirect_finalized_review' ) );
+	}
+
+	/**
+	 * Route finalized-day "review" visits to the Daily Log (Today) inline editor.
+	 *
+	 * Editing committed entries happens in place on the Today screen now; the
+	 * review screen is only for the post-parse commit. So when a review link
+	 * lands on a date whose entries are all verified (or that has no entries),
+	 * send the user to Today instead, forwarding any return_to so the
+	 * Reports → Edit → Back loop is preserved. A day with an unverified draft
+	 * is mid-commit and stays on the review screen.
+	 *
+	 * Runs on admin_init (before any output) so wp_safe_redirect is safe.
+	 */
+	public static function maybe_redirect_finalized_review() {
+		// phpcs:disable WordPress.Security.NonceVerification.Recommended -- read-only GET routing.
+		$page   = isset( $_GET['page'] ) ? sanitize_key( wp_unslash( $_GET['page'] ) ) : '';
+		$screen = isset( $_GET['screen'] ) ? sanitize_key( wp_unslash( $_GET['screen'] ) ) : '';
+		if ( 'pltt-time-tracker' !== $page || 'review' !== $screen ) {
+			return;
+		}
+
+		$date    = isset( $_GET['date'] ) ? pltt_sanitize_date( wp_unslash( $_GET['date'] ) ) : pltt_get_current_date();
+		$entries = PLTT_Entries::get_by_date( $date );
+
+		// Any unverified draft → genuine post-parse commit; leave it on review.
+		foreach ( $entries as $entry ) {
+			if ( empty( $entry->verified ) ) {
+				return;
+			}
+		}
+
+		// All verified (or empty): edit on Today instead.
+		$args = array( 'date' => $date );
+		if ( ! empty( $_GET['return_to'] ) ) {
+			// Read it the same way review.php does, validate against open-redirects,
+			// then rawurlencode for forwarding: add_query_arg does NOT encode values,
+			// so a bare "&" in the URL would otherwise split the query.
+			$return_to = wp_validate_redirect( esc_url_raw( wp_unslash( $_GET['return_to'] ) ), '' );
+			if ( $return_to ) {
+				$args['return_to'] = rawurlencode( $return_to );
+			}
+		}
+		// phpcs:enable WordPress.Security.NonceVerification.Recommended
+
+		wp_safe_redirect( pltt_get_admin_url( 'daily-log', $args ) );
+		exit;
 	}
 
 	/**
@@ -247,34 +295,38 @@ class PLTT_Admin {
 		if ( 'toplevel_page_pltt-time-tracker' === $hook ) {
 			$screen = isset( $_GET['screen'] ) ? sanitize_text_field( wp_unslash( $_GET['screen'] ) ) : 'daily-log';
 
-			if ( 'review' === $screen ) {
-				wp_enqueue_style(
-					'pltt-tag-picker',
-					PLTT_PLUGIN_URL . 'assets/css/tag-picker.css',
-					array( 'pltt-admin' ),
-					$version
-				);
-				wp_enqueue_style(
-					'pltt-review',
-					PLTT_PLUGIN_URL . 'assets/css/review.css',
-					array( 'pltt-admin', 'pltt-tag-picker' ),
-					$version
-				);
-				wp_enqueue_script(
-					'pltt-tag-picker',
-					PLTT_PLUGIN_URL . 'assets/js/tag-picker.js',
-					array(),
-					$version,
-					true
-				);
-				wp_enqueue_script(
-					'pltt-review',
-					PLTT_PLUGIN_URL . 'assets/js/review.js',
-					array( 'pltt-shared', 'pltt-tag-picker' ),
-					$version,
-					true
-				);
-			} else {
+			// Inline entry-editor bundle — shared by the review screen and the
+			// Daily Log (Today) inline editor. review.js IIFE 2 binds it wherever
+			// the editable list is present.
+			wp_enqueue_style(
+				'pltt-tag-picker',
+				PLTT_PLUGIN_URL . 'assets/css/tag-picker.css',
+				array( 'pltt-admin' ),
+				$version
+			);
+			wp_enqueue_style(
+				'pltt-review',
+				PLTT_PLUGIN_URL . 'assets/css/review.css',
+				array( 'pltt-admin', 'pltt-tag-picker' ),
+				$version
+			);
+			wp_enqueue_script(
+				'pltt-tag-picker',
+				PLTT_PLUGIN_URL . 'assets/js/tag-picker.js',
+				array(),
+				$version,
+				true
+			);
+			wp_enqueue_script(
+				'pltt-review',
+				PLTT_PLUGIN_URL . 'assets/js/review.js',
+				array( 'pltt-shared', 'pltt-tag-picker' ),
+				$version,
+				true
+			);
+
+			if ( 'review' !== $screen ) {
+				// Daily Log also loads the capture UI (textarea autosave / process).
 				wp_enqueue_style(
 					'pltt-daily-log',
 					PLTT_PLUGIN_URL . 'assets/css/daily-log.css',
