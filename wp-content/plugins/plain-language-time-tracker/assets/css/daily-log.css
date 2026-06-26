@@ -106,27 +106,8 @@
 	margin-bottom: 10px;
 }
 
-.pltt-existing-entries .description {
-	margin-bottom: 15px;
-}
-
 .pltt-existing-entries table {
 	margin-top: 15px;
-}
-
-.pltt-daily-log-entries .pltt-duration-cell {
-	font-variant-numeric: tabular-nums;
-}
-
-.pltt-daily-log-entries .pltt-tag-pills {
-	display: flex;
-	flex-wrap: wrap;
-	gap: 4px;
-}
-
-.pltt-existing-entries-footer {
-	margin-top: 15px;
-	text-align: right;
 }
 
 /* Wrapper: pill + standalone Today button side by side in the header */
