@@ -24,7 +24,14 @@ $entries            = $editor['entries'];
 $clients            = $editor['clients'];
 $projects_by_client = $editor['projects_by_client'];
 $all_tags           = $editor['all_tags'];
+$summary            = $editor['summary'];
 $has_entries        = ! empty( $entries );
+
+// Day total for the summary cards under the log.
+$total_minutes = 0;
+foreach ( $entries as $entry ) {
+	$total_minutes += $entry['duration_minutes'] ?? 0;
+}
 
 // When arriving from Reports' "Edit" (which now routes here), keep a way back.
 // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only GET routing.
@@ -95,17 +102,6 @@ $return_to     = $return_to_raw ? wp_validate_redirect( $return_to_raw, '' ) : '
 
 	<div class="pltt-date-display">
 		<h2><?php echo esc_html( pltt_format_date( $date ) ); ?></h2>
-		<?php if ( $has_entries ) : ?>
-			<span class="pltt-badge pltt-badge-info">
-				<?php
-				printf(
-					/* translators: %d: number of entries */
-					esc_html( _n( '%d entry recorded', '%d entries recorded', count( $entries ), 'plain-language-time-tracker' ) ),
-					count( $entries )
-				);
-				?>
-			</span>
-		<?php endif; ?>
 		<?php if ( $is_processed ) : ?>
 			<span class="pltt-badge pltt-badge-success"><?php esc_html_e( 'Processed', 'plain-language-time-tracker' ); ?></span>
 		<?php endif; ?>
@@ -154,6 +150,24 @@ $return_to     = $return_to_raw ? wp_validate_redirect( $return_to_raw, '' ) : '
 	<?php if ( $has_entries ) : ?>
 		<div class="pltt-existing-entries" id="pltt-entries">
 			<h3><?php esc_html_e( 'Recorded Entries', 'plain-language-time-tracker' ); ?></h3>
+
+			<?php // Pared day summary (matches Reports): hours, billable hours, amount. ?>
+			<div class="pltt-summary-cards">
+				<div class="card">
+					<div class="card-label"><?php esc_html_e( 'Total Hours', 'plain-language-time-tracker' ); ?></div>
+					<div class="card-value"><?php echo esc_html( pltt_format_hours( $total_minutes ) ); ?></div>
+				</div>
+				<div class="card">
+					<div class="card-label"><?php esc_html_e( 'Billable Hours', 'plain-language-time-tracker' ); ?></div>
+					<div class="card-value"><?php echo esc_html( pltt_format_hours( $summary['billable_minutes'] ) ); ?></div>
+				</div>
+				<?php if ( (float) $summary['billable_amount'] > 0 ) : ?>
+					<div class="card">
+						<div class="card-label"><?php esc_html_e( 'Billable Amount', 'plain-language-time-tracker' ); ?></div>
+						<div class="card-value"><?php echo esc_html( pltt_format_currency( $summary['billable_amount'] ) ); ?></div>
+					</div>
+				<?php endif; ?>
+			</div>
 
 			<input type="hidden" id="pltt-entry-date" value="<?php echo esc_attr( $date ); ?>">
 
