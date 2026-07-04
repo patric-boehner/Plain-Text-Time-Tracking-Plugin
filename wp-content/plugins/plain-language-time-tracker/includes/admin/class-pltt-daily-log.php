@@ -26,6 +26,22 @@ class PLTT_Daily_Log {
 		// finalized entries can be edited in place here (no trip to review).
 		$editor = PLTT_Review::get_editor_context( $date );
 
+		// Post-parse state: any unverified draft means the day was just processed and
+		// still needs confirming. That confirm table now renders inline on Today
+		// (Process no longer navigates to a separate Review screen), so build the same
+		// resolution-state context the review screen used and enrich the entries.
+		$is_post_parse = false;
+		foreach ( $editor['entries'] as $editor_entry ) {
+			if ( empty( $editor_entry['verified'] ) ) {
+				$is_post_parse = true;
+				break;
+			}
+		}
+		$resolution_counts = array();
+		if ( $is_post_parse ) {
+			$resolution_counts = PLTT_Review::compute_resolution_states( $editor['entries'], $editor['projects_by_client'] );
+		}
+
 		include PLTT_PLUGIN_DIR . 'templates/daily-log.php';
 	}
 

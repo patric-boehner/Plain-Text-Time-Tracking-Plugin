@@ -147,7 +147,14 @@ $return_to     = $return_to_raw ? wp_validate_redirect( $return_to_raw, '' ) : '
 		</div>
 	</div>
 
-	<?php if ( $has_entries ) : ?>
+	<?php if ( $is_post_parse ) : ?>
+		<?php // Just processed: confirm the parsed blocks in place — no separate Review screen. ?>
+		<div class="pltt-existing-entries" id="pltt-entries">
+			<h3><?php esc_html_e( 'Review parsed entries', 'plain-language-time-tracker' ); ?></h3>
+			<input type="hidden" id="pltt-entry-date" value="<?php echo esc_attr( $date ); ?>">
+			<?php include PLTT_PLUGIN_DIR . 'templates/partials/review-post-parse.php'; ?>
+		</div>
+	<?php elseif ( $has_entries ) : ?>
 		<div class="pltt-existing-entries" id="pltt-entries">
 			<h3><?php esc_html_e( 'Recorded Entries', 'plain-language-time-tracker' ); ?></h3>
 
@@ -177,8 +184,12 @@ $return_to     = $return_to_raw ? wp_validate_redirect( $return_to_raw, '' ) : '
 			include PLTT_PLUGIN_DIR . 'templates/partials/entries-editor.php';
 			?>
 		</div>
+	<?php endif; ?>
 
+	<?php if ( $has_entries ) : ?>
 		<?php
+		// Tag globals + create-new modals — needed by both the post-parse confirm
+		// table and the settled inline editor.
 		// SEC-L1: JSON_HEX_TAG/AMP so a "</script>" inside a tag/group name can't
 		// break out of the inline <script>.
 		wp_add_inline_script(

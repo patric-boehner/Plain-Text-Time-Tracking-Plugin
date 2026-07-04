@@ -104,7 +104,7 @@ class PLTT_Review {
 	 * @param array $projects_by_client client_id => [projects], recency-ordered.
 	 * @return array Counts: needs_assigning, to_confirm, untagged, total.
 	 */
-	private static function compute_resolution_states( array &$entries, array $projects_by_client ) {
+	public static function compute_resolution_states( array &$entries, array $projects_by_client ) {
 		$counts = array(
 			'needs_assigning' => 0,
 			'to_confirm'      => 0,

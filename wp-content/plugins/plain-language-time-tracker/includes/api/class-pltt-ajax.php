@@ -230,15 +230,16 @@ class PLTT_Ajax {
 			return;
 		}
 
-		// When every parsed line fell inside an already-finalized entry, there are
-		// no new drafts to review. Keep the user on the journal and tell them so,
-		// rather than dropping them on a review screen with nothing to do.
+		// New drafts land back on Today — the confirm table renders inline there now
+		// (#pltt-entries), no separate Review screen. When every parsed line fell
+		// inside an already-finalized entry, there's nothing new to confirm: stay on
+		// the journal with an explanatory notice.
 		$redirect = ( 0 === $created_count )
 			? pltt_get_admin_url( 'daily-log', array(
 				'date'         => $date,
 				'pltt_message' => 'nothing_reprocessed',
 			) )
-			: pltt_get_admin_url( 'review', array( 'date' => $date ) );
+			: pltt_get_admin_url( 'daily-log', array( 'date' => $date ) ) . '#pltt-entries';
 
 		wp_send_json_success(
 			array(
