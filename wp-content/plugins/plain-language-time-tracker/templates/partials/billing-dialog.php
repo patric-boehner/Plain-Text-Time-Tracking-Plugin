@@ -53,15 +53,7 @@ $remainder = number_format( (float) $scope['unbilled'], 2, '.', '' );
 			?>
 		</p>
 
-		<?php if ( 'hourly' === $scope['billing_type'] && ! empty( $scope['entries'] ) ) : ?>
-			<div class="pltt-billing-picker">
-				<p class="pltt-billing-picker-hint"><?php esc_html_e( 'Uncheck an entry to leave it unbilled — it stays open for a future invoice.', 'plain-language-time-tracker' ); ?></p>
-				<div class="pltt-billing-picker-scroll">
-					<?php pltt_render_billing_manifest( $scope['entries'], true ); ?>
-				</div>
-			</div>
-		<?php endif; ?>
-
+		<?php // Entry selection now happens inline in the queue row; this modal just records the bill. ?>
 		<div class="pltt-billing-amount-row">
 			<label class="pltt-billing-amount-label" for="<?php echo esc_attr( $dialog_id ); ?>-amount">
 				<?php esc_html_e( 'Amount to bill', 'plain-language-time-tracker' ); ?>
@@ -73,16 +65,13 @@ $remainder = number_format( (float) $scope['unbilled'], 2, '.', '' );
 		</div>
 
 		<div class="pltt-billing-description-row">
-			<div class="pltt-billing-desc-head">
-				<select id="<?php echo esc_attr( $dialog_id ); ?>-mode" class="pltt-billing-desc-mode" aria-label="<?php esc_attr_e( 'Description source', 'plain-language-time-tracker' ); ?>">
-					<option value="default" data-text="<?php echo esc_attr( $v['default_desc'] ); ?>"><?php esc_html_e( 'Default description', 'plain-language-time-tracker' ); ?></option>
-					<option value="ai_prompt" data-text="<?php echo esc_attr( $v['ai_prompt'] ); ?>"><?php esc_html_e( 'Structured list + AI prompt', 'plain-language-time-tracker' ); ?></option>
-				</select>
-				<button type="button" class="button pltt-billing-copy">
-					<span class="pltt-copy-label"><?php esc_html_e( 'Copy', 'plain-language-time-tracker' ); ?></span>
-				</button>
-			</div>
+			<label class="pltt-billing-amount-label" for="<?php echo esc_attr( $dialog_id ); ?>-desc">
+				<?php esc_html_e( 'Invoice description', 'plain-language-time-tracker' ); ?>
+			</label>
 			<textarea id="<?php echo esc_attr( $dialog_id ); ?>-desc" name="description" rows="4" class="pltt-billing-description"><?php echo esc_textarea( $v['default_desc'] ); ?></textarea>
+			<p class="pltt-billing-desc-hint">
+				<?php esc_html_e( 'Need formatted line items or an AI prompt? Use “Line items” back on the row.', 'plain-language-time-tracker' ); ?>
+			</p>
 		</div>
 
 		<p class="pltt-billing-error" role="alert" hidden></p>
