@@ -109,9 +109,9 @@
 	width: 65px;
 }
 
-.pltt-date-group .widefat th.pltt-invoiced-col,
-.pltt-date-group .widefat td.pltt-invoiced-col { /* Inv. / Invoiced */
-	width: 74px;
+.pltt-date-group .widefat th.pltt-status-col,
+.pltt-date-group .widefat td.pltt-status-col { /* Billing status badge */
+	width: 104px;
 	text-align: center;
 	white-space: nowrap;
 }
@@ -169,9 +169,8 @@
 	flex: 0 0 auto;
 }
 
-/* Inline toggle buttons — shared base */
-.pltt-inline-toggle,
-.pltt-invoiced-toggle {
+/* Inline toggle button (the Billable $ toggle) */
+.pltt-inline-toggle {
 	background: none;
 	border: none;
 	padding: 0;
@@ -182,27 +181,16 @@
 	transition: opacity 0.1s;
 }
 
-.pltt-inline-toggle:focus,
-.pltt-invoiced-toggle:focus {
+.pltt-inline-toggle:focus {
 	outline: 2px solid var(--pltt-primary);
 	outline-offset: 2px;
 	border-radius: 2px;
 }
 
 /* Saving state — subtle fade while request is in flight */
-.pltt-inline-toggle.pltt-saving,
-.pltt-invoiced-toggle.pltt-saving {
+.pltt-inline-toggle.pltt-saving {
 	opacity: 0.4;
 	cursor: wait;
-}
-
-/* Invoiced toggle states */
-.pltt-invoiced-toggle.is-invoiced {
-	color: var(--pltt-primary);
-}
-
-.pltt-invoiced-toggle.not-invoiced {
-	color: var(--pltt-border);
 }
 
 /* Tag cell */
@@ -318,15 +306,6 @@
 
 .pltt-date-group .widefat tr.pltt-row-covered > td:first-child {
 	box-shadow: inset 3px 0 0 var(--pltt-primary);
-}
-
-/* Covered "Invoiced" column mark — the recycled read-only checkmark, matching
-   the old invoiced-toggle color. Tooltip carries the record pointer
-   ("Invoiced · record #N · period"). */
-.pltt-invoiced-mark {
-	color: var(--pltt-primary);
-	font-weight: 700;
-	cursor: help;
 }
 
 /* Global "billable time outside your date range" notification (summary view). */

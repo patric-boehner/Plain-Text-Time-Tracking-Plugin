@@ -3,11 +3,10 @@
  * Project billing section — the "Review & bill" entry point + billing history,
  * rendered inside the Reports single-project card (detailed view only).
  *
- * "Review & bill" now opens the INLINE billing surface (?billing=1 on this same
- * detailed view) rather than a modal — see templates/partials/billing-panel.php.
- * This section just shows the outstanding total(s), the entry link, and the
- * lifetime billing-history ledger (collapsed). Renders nothing when the project
- * has neither.
+ * Insights is read-only now: "Review & bill on Billing" is a link to the Billing
+ * page, not an in-place editor. This section just shows the outstanding total(s),
+ * that link, and the lifetime billing-history ledger (collapsed). Renders nothing
+ * when the project has neither.
  *
  * Outstanding scopes are driven by the billing MODEL, not the report's date
  * filter: hourly = all-time uncovered, retainer = each open overage period.
