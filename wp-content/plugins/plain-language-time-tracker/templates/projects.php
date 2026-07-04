@@ -72,17 +72,35 @@ if ( ! empty( $projects ) ) {
 		<p class="description"><?php esc_html_e( 'No projects yet. Add your first project to get started.', 'plain-language-time-tracker' ); ?></p>
 	<?php else : ?>
 		<?php
-		$group_mode = isset( $_GET['group'] ) ? sanitize_key( wp_unslash( $_GET['group'] ) ) : 'status';
-		if ( ! in_array( $group_mode, array( 'status', 'type' ), true ) ) {
-			$group_mode = 'status';
+		$group_mode = isset( $_GET['group'] ) ? sanitize_key( wp_unslash( $_GET['group'] ) ) : 'type';
+		if ( ! in_array( $group_mode, array( 'client', 'type' ), true ) ) {
+			$group_mode = 'type';
+		}
+
+		// Active / Archived / All status filter (default: Active).
+		$status_filter = isset( $_GET['pstatus'] ) ? sanitize_key( wp_unslash( $_GET['pstatus'] ) ) : 'active';
+		if ( ! in_array( $status_filter, array( 'active', 'archived', 'all' ), true ) ) {
+			$status_filter = 'active';
+		}
+
+		$count_all      = count( $projects );
+		$count_archived = count( array_filter( $projects, fn( $p ) => 'archived' === $p->status ) );
+		$count_active   = $count_all - $count_archived;
+
+		if ( 'archived' === $status_filter ) {
+			$visible_projects = array_filter( $projects, fn( $p ) => 'archived' === $p->status );
+		} elseif ( 'all' === $status_filter ) {
+			$visible_projects = $projects;
+		} else {
+			$visible_projects = array_filter( $projects, fn( $p ) => 'archived' !== $p->status );
 		}
 
 		$project_groups = array();
 
 		if ( 'type' === $group_mode ) {
-			// Group all projects by billing type (archived blend into their type).
+			// Group the visible projects by billing type (archived blend into their type).
 			$by_type = array();
-			foreach ( $projects as $project ) {
+			foreach ( $visible_projects as $project ) {
 				$by_type[ pltt_get_billing_type( $project ) ][] = $project;
 			}
 			$type_labels = array(
@@ -102,32 +120,70 @@ if ( ! empty( $projects ) ) {
 				);
 			}
 		} else {
-			// 'status' — default grouping: Active + Archived as separate buckets.
-			$active_projects   = array_filter( $projects, fn( $p ) => 'archived' !== $p->status );
-			$archived_projects = array_filter( $projects, fn( $p ) => 'archived' === $p->status );
-
-			$project_groups[] = array(
-				'label'    => __( 'Active', 'plain-language-time-tracker' ),
-				'projects' => $active_projects,
-				'tbody_id' => 'pltt-projects-list',
-			);
-			if ( ! empty( $archived_projects ) ) {
+			// 'client' grouping: one bucket per client, ordered by client name.
+			$by_client = array();
+			foreach ( $visible_projects as $project ) {
+				$by_client[ $project->client_id ][] = $project;
+			}
+			$client_names = array();
+			foreach ( array_keys( $by_client ) as $cid ) {
+				$client_names[ $cid ] = isset( $clients_by_id[ $cid ] )
+					? $clients_by_id[ $cid ]->name
+					: __( '(Unknown client)', 'plain-language-time-tracker' );
+			}
+			asort( $client_names, SORT_NATURAL | SORT_FLAG_CASE );
+			foreach ( $client_names as $cid => $cname ) {
 				$project_groups[] = array(
-					'label'    => __( 'Archived', 'plain-language-time-tracker' ),
-					'projects' => $archived_projects,
+					'label'    => $cname,
+					'projects' => $by_client[ $cid ],
 					'tbody_id' => '',
 				);
 			}
 		}
+
+		// Status-filter links preserve the current grouping ('type' is the default).
+		$pltt_status_base = admin_url( 'admin.php?page=pltt-projects' );
+		if ( 'type' !== $group_mode ) {
+			$pltt_status_base = add_query_arg( 'group', $group_mode, $pltt_status_base );
+		}
+		$pltt_status_links = array(
+			'active'   => array( __( 'Active', 'plain-language-time-tracker' ), $count_active ),
+			'archived' => array( __( 'Archived', 'plain-language-time-tracker' ), $count_archived ),
+			'all'      => array( __( 'All', 'plain-language-time-tracker' ), $count_all ),
+		);
 		?>
-		<form method="get" action="" class="pltt-projects-toolbar">
-			<input type="hidden" name="page" value="pltt-projects">
-			<label for="pltt-group-by"><?php esc_html_e( 'Group by:', 'plain-language-time-tracker' ); ?></label>
-			<select name="group" id="pltt-group-by" onchange="this.form.submit()">
-				<option value="status" <?php selected( $group_mode, 'status' ); ?>><?php esc_html_e( 'Status', 'plain-language-time-tracker' ); ?></option>
-				<option value="type" <?php selected( $group_mode, 'type' ); ?>><?php esc_html_e( 'Type', 'plain-language-time-tracker' ); ?></option>
-			</select>
-		</form>
+		<div class="pltt-projects-toolbar">
+			<ul class="subsubsub">
+				<?php
+				$pltt_status_i    = 0;
+				$pltt_status_last = count( $pltt_status_links ) - 1;
+				foreach ( $pltt_status_links as $pltt_status_key => $pltt_status_info ) :
+					?>
+					<li>
+						<a href="<?php echo esc_url( add_query_arg( 'pstatus', $pltt_status_key, $pltt_status_base ) ); ?>"
+							class="<?php echo $status_filter === $pltt_status_key ? 'current' : ''; ?>">
+							<?php echo esc_html( $pltt_status_info[0] ); ?>
+							<span class="count">(<?php echo (int) $pltt_status_info[1]; ?>)</span>
+						</a><?php echo $pltt_status_i < $pltt_status_last ? ' |' : ''; ?>
+					</li>
+					<?php
+					++$pltt_status_i;
+				endforeach;
+				?>
+			</ul>
+			<form method="get" action="" class="pltt-projects-groupby">
+				<input type="hidden" name="page" value="pltt-projects">
+				<input type="hidden" name="pstatus" value="<?php echo esc_attr( $status_filter ); ?>">
+				<label for="pltt-group-by"><?php esc_html_e( 'Group by:', 'plain-language-time-tracker' ); ?></label>
+				<select name="group" id="pltt-group-by" onchange="this.form.submit()">
+					<option value="type" <?php selected( $group_mode, 'type' ); ?>><?php esc_html_e( 'Type', 'plain-language-time-tracker' ); ?></option>
+					<option value="client" <?php selected( $group_mode, 'client' ); ?>><?php esc_html_e( 'Client', 'plain-language-time-tracker' ); ?></option>
+				</select>
+			</form>
+		</div>
+		<?php if ( empty( $project_groups ) ) : ?>
+			<p class="description"><?php esc_html_e( 'No projects match this filter.', 'plain-language-time-tracker' ); ?></p>
+		<?php endif; ?>
 		<?php foreach ( $project_groups as $group ) : ?>
 			<div class="pltt-project-group">
 				<div class="pltt-project-group-header">
@@ -156,14 +212,16 @@ if ( ! empty( $projects ) ) {
 							<?php
 						$project_entry_count        = isset( $project_stats->total_count ) ? (int) $project_stats->total_count : 0;
 						$project_unbilled_minutes   = isset( $project_stats->unbilled_billable_minutes ) ? (int) $project_stats->unbilled_billable_minutes : 0;
-						$row_class                  = ( 'archived' === $project->status && 'status' !== $group_mode ) ? 'pltt-row-archived' : '';
+						// Archived projects now share client/type groups with active ones, so
+						// always distinguish them with the row tint + badge.
+						$row_class                  = ( 'archived' === $project->status ) ? 'pltt-row-archived' : '';
 
 						$view_url = PLTT_Project_Detail::get_url( $project->id );
 						?>
 						<tr<?php echo $row_class ? ' class="' . esc_attr( $row_class ) . '"' : ''; ?> data-project-id="<?php echo esc_attr( $project->id ); ?>" data-unbilled-minutes="<?php echo esc_attr( $project_unbilled_minutes ); ?>" data-name="<?php echo esc_attr( $project->name ); ?>" data-client-id="<?php echo esc_attr( $project->client_id ); ?>" data-status="<?php echo esc_attr( $project->status ); ?>" data-rate="<?php echo esc_attr( $project->hourly_rate ?? '' ); ?>" data-billability-default="<?php echo esc_attr( $project->billability_default ?? '1' ); ?>" data-recurring-period="<?php echo esc_attr( $project->recurring_period ?? '' ); ?>" data-billing-type="<?php echo esc_attr( $billing_type ); ?>" data-budget-hours="<?php echo esc_attr( $project->budget_hours ?? '' ); ?>" data-budget-fee="<?php echo esc_attr( $project->budget_fee ?? '' ); ?>" data-entry-count="<?php echo esc_attr( $project_entry_count ); ?>">
 							<td>
 								<strong><a href="<?php echo esc_url( $view_url ); ?>"><?php echo esc_html( $project->name ); ?></a></strong>
-								<?php if ( 'archived' === $project->status && 'status' !== $group_mode ) : ?>
+								<?php if ( 'archived' === $project->status ) : ?>
 									<span class="pltt-badge pltt-badge-archived"><?php esc_html_e( 'Archived', 'plain-language-time-tracker' ); ?></span>
 								<?php endif; ?>
 								<div class="row-actions">
@@ -247,13 +305,27 @@ if ( ! empty( $projects ) ) {
 				<input type="text" id="pltt-project-name" name="name" class="regular-text widefat" required>
 			</p>
 			<p>
-				<label for="pltt-project-billing-type"><?php esc_html_e( 'Billing Type', 'plain-language-time-tracker' ); ?></label>
-				<select id="pltt-project-billing-type" class="widefat">
-					<option value="hourly"><?php esc_html_e( 'Hourly', 'plain-language-time-tracker' ); ?></option>
-					<option value="fixed"><?php esc_html_e( 'Fixed Budget', 'plain-language-time-tracker' ); ?></option>
-					<option value="recurring"><?php esc_html_e( 'Recurring', 'plain-language-time-tracker' ); ?></option>
-					<option value="none"><?php esc_html_e( 'None / Internal', 'plain-language-time-tracker' ); ?></option>
-				</select>
+				<label id="pltt-project-billing-type-label"><?php esc_html_e( 'How is it billed?', 'plain-language-time-tracker' ); ?></label>
+				<span class="pltt-typepick" role="radiogroup" aria-labelledby="pltt-project-billing-type-label">
+					<button type="button" class="pltt-typecard" data-type="hourly" role="radio" aria-checked="false">
+						<span class="pltt-typecard-t"><?php esc_html_e( 'Hourly', 'plain-language-time-tracker' ); ?></span>
+						<span class="pltt-typecard-d"><?php esc_html_e( 'Bill time × rate. Each entry is billable unless you say otherwise.', 'plain-language-time-tracker' ); ?></span>
+					</button>
+					<button type="button" class="pltt-typecard" data-type="recurring" role="radio" aria-checked="false">
+						<span class="pltt-typecard-t"><?php esc_html_e( 'Monthly retainer', 'plain-language-time-tracker' ); ?></span>
+						<span class="pltt-typecard-d"><?php esc_html_e( 'Flat fee for an allocation of hours; only overage is billable.', 'plain-language-time-tracker' ); ?></span>
+					</button>
+					<button type="button" class="pltt-typecard" data-type="fixed" role="radio" aria-checked="false">
+						<span class="pltt-typecard-t"><?php esc_html_e( 'Fixed budget', 'plain-language-time-tracker' ); ?></span>
+						<span class="pltt-typecard-d"><?php esc_html_e( 'One agreed price. Time is tracked for awareness, not billed hourly.', 'plain-language-time-tracker' ); ?></span>
+					</button>
+					<button type="button" class="pltt-typecard" data-type="none" role="radio" aria-checked="false">
+						<span class="pltt-typecard-t"><?php esc_html_e( 'Internal', 'plain-language-time-tracker' ); ?></span>
+						<span class="pltt-typecard-d"><?php esc_html_e( 'Your own work. Tracked, never billed.', 'plain-language-time-tracker' ); ?></span>
+					</button>
+				</span>
+				<?php // Value holder read/written by the modal JS; type itself isn't submitted — it's derived server-side from the fields below. ?>
+				<input type="hidden" id="pltt-project-billing-type" value="hourly">
 			</p>
 
 			<!-- Type-specific settings box: shown for Fixed Fee and Recurring only -->
@@ -510,19 +582,30 @@ if ( ! empty( $projects ) ) {
 			document.getElementById('pltt-project-status-group').classList.add('pltt-hidden');
 			document.getElementById('pltt-project-status').value = 'active';
 			document.getElementById('pltt-delete-project-btn').classList.remove('visible');
-			document.getElementById('pltt-project-billing-type').value = 'hourly';
-			applyBillingTypeUI('hourly', true);
+			selectBillingType('hourly', true);
 			PLTT.showModal('pltt-project-modal');
 		});
 	}
 
-	// Billing Type dropdown change.
-	var billingTypeSelect = document.getElementById('pltt-project-billing-type');
-	if (billingTypeSelect) {
-		billingTypeSelect.addEventListener('change', function() {
-			applyBillingTypeUI(this.value, true);
+	// Billing-type card picker. The hidden #pltt-project-billing-type input stays
+	// the source of truth (the rest of the modal JS reads/writes its .value);
+	// selecting a card updates that value, the cards' selected state, and the
+	// field UI in one place.
+	function selectBillingType(type, setDefaults) {
+		el('pltt-project-billing-type').value = type;
+		document.querySelectorAll('.pltt-typecard').forEach(function(card) {
+			var on = card.dataset.type === type;
+			card.classList.toggle('is-selected', on);
+			card.setAttribute('aria-checked', on ? 'true' : 'false');
 		});
+		applyBillingTypeUI(type, setDefaults);
 	}
+
+	document.querySelectorAll('.pltt-typecard').forEach(function(card) {
+		card.addEventListener('click', function() {
+			selectBillingType(this.dataset.type, true);
+		});
+	});
 
 	var budgetModeSelect = el('pltt-project-budget-mode');
 	if (budgetModeSelect) {
@@ -544,11 +627,11 @@ if ( ! empty( $projects ) ) {
 			document.getElementById('pltt-project-name').value = row.dataset.name;
 			document.getElementById('pltt-project-rate').value = row.dataset.rate || '';
 			document.getElementById('pltt-project-recurring-period').value = row.dataset.recurringPeriod || '';
-			document.getElementById('pltt-project-billing-type').value = row.dataset.billingType || 'hourly';
 			document.getElementById('pltt-project-budget-hours').value = row.dataset.budgetHours || '';
 			document.getElementById('pltt-project-budget-fee').value = row.dataset.budgetFee || '';
-			var billingType = row.dataset.billingType || 'hourly';
-			applyBillingTypeUI(billingType, false);
+			// Set the type (and its field UI) after the budget values are in place, so
+			// fixed-fee can infer hours-vs-fee mode from the populated inputs.
+			selectBillingType(row.dataset.billingType || 'hourly', false);
 			document.getElementById('pltt-project-non-billable').checked = row.dataset.billabilityDefault === '0';
 
 			document.getElementById('pltt-project-status-group').classList.remove('pltt-hidden');

@@ -1232,13 +1232,73 @@ fieldset.pltt-date-nav-custom-inputs input[type="date"] {
 .pltt-projects-toolbar {
 	display: flex;
 	align-items: center;
-	gap: 8px;
+	justify-content: space-between;
+	gap: 12px;
 	margin-bottom: 12px;
+	flex-wrap: wrap;
+}
+
+.pltt-projects-toolbar .subsubsub {
+	margin: 0;
+	float: none;
+}
+
+.pltt-projects-groupby {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	margin: 0;
 }
 
 .pltt-projects-toolbar label {
 	font-size: 13px;
 	color: var(--pltt-text-faint);
+}
+
+/* Project billing-type picker (Add/Edit Project modal): four cards, type-first. */
+.pltt-typepick {
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	gap: 8px;
+	margin-top: 4px;
+}
+.pltt-typecard {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	text-align: left;
+	border: 1.5px solid var(--pltt-border);
+	background: var(--pltt-bg-white);
+	border-radius: 6px;
+	padding: 9px 11px;
+	cursor: pointer;
+	font: inherit;
+}
+.pltt-typecard:hover {
+	border-color: var(--pltt-primary-light);
+	background: var(--pltt-bg-subtle);
+}
+.pltt-typecard.is-selected {
+	border-color: var(--pltt-primary);
+	background: var(--pltt-bg-highlight);
+	box-shadow: 0 0 0 3px rgba(34, 113, 177, 0.12);
+}
+.pltt-typecard:focus-visible {
+	outline: 2px solid var(--pltt-primary);
+	outline-offset: 1px;
+}
+.pltt-typecard-t {
+	font-weight: 600;
+	font-size: 13px;
+	color: var(--pltt-text-dark);
+}
+.pltt-typecard-d {
+	font-size: 11.5px;
+	line-height: 1.4;
+	color: var(--pltt-text-muted);
+}
+@media (max-width: 480px) {
+	.pltt-typepick { grid-template-columns: 1fr; }
 }
 
 
