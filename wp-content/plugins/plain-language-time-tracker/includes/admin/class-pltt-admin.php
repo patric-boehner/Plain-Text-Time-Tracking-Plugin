@@ -77,7 +77,10 @@ class PLTT_Admin {
 	 * Register admin menu pages.
 	 */
 	public static function add_admin_menu() {
-		// Main menu page (Daily Log).
+		// Top-level group. Keep the menu title "Time Tracker": WordPress derives the
+		// submenu hook suffixes (time-tracker_page_*) from it, and enqueue_assets()
+		// keys its allowlist off those hooks — renaming it would silently break asset
+		// loading.
 		add_menu_page(
 			__( 'Time Tracker', 'plain-language-time-tracker' ),
 			__( 'Time Tracker', 'plain-language-time-tracker' ),
@@ -88,17 +91,24 @@ class PLTT_Admin {
 			30
 		);
 
-		// Submenu: Daily Log (same as parent).
+		/*
+		 * Redesign nav (phase 1): relabel the three primary destinations — Today,
+		 * Insights, Billing — and keep Clients, Projects and Tags as their own menu
+		 * items. Every page slug is unchanged, so existing links, bookmarks and the
+		 * enqueue allowlist keep working; only three labels change.
+		 */
+
+		// Today — capture + process + review (same slug as the parent).
 		add_submenu_page(
 			'pltt-time-tracker',
-			__( 'Daily Log', 'plain-language-time-tracker' ),
-			__( 'Daily Log', 'plain-language-time-tracker' ),
+			__( 'Today', 'plain-language-time-tracker' ),
+			__( 'Today', 'plain-language-time-tracker' ),
 			'manage_options',
 			'pltt-time-tracker',
 			array( __CLASS__, 'render_page' )
 		);
 
-		// Submenu: Log History.
+		// Log History.
 		add_submenu_page(
 			'pltt-time-tracker',
 			__( 'Log History', 'plain-language-time-tracker' ),
@@ -108,27 +118,27 @@ class PLTT_Admin {
 			array( __CLASS__, 'render_log_archive_page' )
 		);
 
-		// Submenu: Reports.
+		// Insights — reporting (slug kept as pltt-reports).
 		add_submenu_page(
 			'pltt-time-tracker',
-			__( 'Reports', 'plain-language-time-tracker' ),
-			__( 'Reports', 'plain-language-time-tracker' ),
+			__( 'Insights', 'plain-language-time-tracker' ),
+			__( 'Insights', 'plain-language-time-tracker' ),
 			'manage_options',
 			'pltt-reports',
 			array( __CLASS__, 'render_reports_page' )
 		);
 
-		// Submenu: Invoicing (the cross-project ready-to-invoice queue).
+		// Billing — cross-project queue + invoiced ledger (slug kept as pltt-invoicing).
 		add_submenu_page(
 			'pltt-time-tracker',
-			__( 'Invoicing', 'plain-language-time-tracker' ),
-			__( 'Invoicing', 'plain-language-time-tracker' ),
+			__( 'Billing', 'plain-language-time-tracker' ),
+			__( 'Billing', 'plain-language-time-tracker' ),
 			'manage_options',
 			'pltt-invoicing',
 			array( __CLASS__, 'render_invoicing_page' )
 		);
 
-		// Submenu: Clients.
+		// Clients.
 		add_submenu_page(
 			'pltt-time-tracker',
 			__( 'Clients', 'plain-language-time-tracker' ),
@@ -138,7 +148,7 @@ class PLTT_Admin {
 			array( __CLASS__, 'render_clients_page' )
 		);
 
-		// Submenu: Projects.
+		// Projects.
 		add_submenu_page(
 			'pltt-time-tracker',
 			__( 'Projects', 'plain-language-time-tracker' ),
@@ -148,7 +158,7 @@ class PLTT_Admin {
 			array( __CLASS__, 'render_projects_page' )
 		);
 
-		// Submenu: Tags.
+		// Tags.
 		add_submenu_page(
 			'pltt-time-tracker',
 			__( 'Tags', 'plain-language-time-tracker' ),
@@ -157,7 +167,6 @@ class PLTT_Admin {
 			'pltt-tags',
 			array( __CLASS__, 'render_tags_page' )
 		);
-
 	}
 
 	/**
