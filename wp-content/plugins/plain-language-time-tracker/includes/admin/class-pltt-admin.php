@@ -118,6 +118,16 @@ class PLTT_Admin {
 			array( __CLASS__, 'render_reports_page' )
 		);
 
+		// Submenu: Invoicing (the cross-project ready-to-invoice queue).
+		add_submenu_page(
+			'pltt-time-tracker',
+			__( 'Invoicing', 'plain-language-time-tracker' ),
+			__( 'Invoicing', 'plain-language-time-tracker' ),
+			'manage_options',
+			'pltt-invoicing',
+			array( __CLASS__, 'render_invoicing_page' )
+		);
+
 		// Submenu: Clients.
 		add_submenu_page(
 			'pltt-time-tracker',
@@ -200,6 +210,24 @@ class PLTT_Admin {
 	}
 
 	/**
+	 * Render the invoicing page — the cross-project ready-to-invoice queue.
+	 */
+	public static function render_invoicing_page() {
+		self::require_access();
+
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only view switch.
+		$view = ( isset( $_GET['view'] ) && 'invoiced' === sanitize_key( wp_unslash( $_GET['view'] ) ) ) ? 'invoiced' : 'ready';
+
+		if ( 'invoiced' === $view ) {
+			$log = PLTT_Billing::get_invoiced_log();
+		} else {
+			$queue = PLTT_Billing::get_invoicing_queue();
+		}
+
+		include PLTT_PLUGIN_DIR . 'templates/reports-invoicing.php';
+	}
+
+	/**
 	 * Render the clients page.
 	 */
 	public static function render_clients_page() {
@@ -218,6 +246,13 @@ class PLTT_Admin {
 		$action = isset( $_GET['action'] ) ? sanitize_key( wp_unslash( $_GET['action'] ) ) : '';
 		if ( 'view' === $action ) {
 			PLTT_Project_Detail::render();
+			return;
+		}
+		if ( 'bill' === $action ) {
+			// The one billing surface (verify -> adjust -> commit), reached from the
+			// project page's "Review & bill". Lives under pltt-projects (like the
+			// project detail view) to share the capability gate and enqueue hook.
+			PLTT_Billing_Surface::render();
 			return;
 		}
 
@@ -244,6 +279,7 @@ class PLTT_Admin {
 			'toplevel_page_pltt-time-tracker',
 			'time-tracker_page_pltt-log-archive',
 			'time-tracker_page_pltt-reports',
+			'time-tracker_page_pltt-invoicing',
 			'time-tracker_page_pltt-clients',
 			'time-tracker_page_pltt-projects',
 			'time-tracker_page_pltt-tags',
@@ -417,6 +453,36 @@ class PLTT_Admin {
 			);
 		}
 
+		// Billing styles: the surface (action=bill), the project page's
+		// ready-to-invoice prompt + billing history (action=view), the
+		// cross-project Invoicing queue, and the Reports single-project card's
+		// Review & Invoice section all use them.
+		$needs_billing_css = ( 'time-tracker_page_pltt-invoicing' === $hook )
+			|| ( 'time-tracker_page_pltt-reports' === $hook )
+			|| ( 'time-tracker_page_pltt-projects' === $hook
+				&& ( 'bill' === $projects_action || 'view' === $projects_action ) );
+		if ( $needs_billing_css ) {
+			wp_enqueue_style(
+				'pltt-billing',
+				PLTT_PLUGIN_URL . 'assets/css/billing.css',
+				array( 'pltt-admin' ),
+				$version
+			);
+		}
+
+		// Commit-in-a-modal: the Invoicing queue, and the Reports single-project
+		// card (the script no-ops unless a .pltt-billing-form is on the page).
+		if ( 'time-tracker_page_pltt-invoicing' === $hook
+			|| 'time-tracker_page_pltt-reports' === $hook ) {
+			wp_enqueue_script(
+				'pltt-invoicing',
+				PLTT_PLUGIN_URL . 'assets/js/invoicing.js',
+				array( 'pltt-shared' ),
+				$version,
+				true
+			);
+		}
+
 		if ( 'time-tracker_page_pltt-reports' === $hook ) {
 			wp_enqueue_style(
 				'pltt-tag-picker',
@@ -460,6 +526,15 @@ class PLTT_Admin {
 				'pltt-reports',
 				PLTT_PLUGIN_URL . 'assets/js/reports.js',
 				array( 'pltt-shared', 'pltt-tag-picker', 'pltt-tooltip' ),
+				$version,
+				true
+			);
+			// Inline billing panel (in-place Review & bill). No-ops unless a
+			// .pltt-billing-panel is on the page.
+			wp_enqueue_script(
+				'pltt-billing-inline',
+				PLTT_PLUGIN_URL . 'assets/js/billing-inline.js',
+				array( 'pltt-shared' ),
 				$version,
 				true
 			);

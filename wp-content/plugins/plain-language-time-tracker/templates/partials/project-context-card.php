@@ -70,6 +70,11 @@ if ( $has_alloc ) {
 	<?php endif; ?>
 
 	<?php
+	// Billed state for the shown retainer period (drives the bar amber→green and
+	// the section's "Billed" line). $billed_period is read by project-billing-section.php.
+	$is_billed_bar = false;
+	$billed_period = null;
+
 	if ( $show_bar ) {
 		$used_min  = (int) $overage['used_minutes'];
 		$alloc_min = (int) $overage['allocation_minutes'];
@@ -78,12 +83,38 @@ if ( $has_alloc ) {
 		if ( 'recurring' === $billing_type ) {
 			$fee_args = null;
 			if ( 'over' === $overage['state'] ) {
-				$caption = sprintf(
-					/* translators: 1: time used, e.g. "5h 15m"; 2: overage time, e.g. "2h 15m". */
-					__( '%1$s used · %2$s over', 'plain-language-time-tracker' ),
-					pltt_format_duration( $used_min ),
-					pltt_format_duration( (int) $overage['overage_minutes'] )
-				);
+				$over_min = (int) $overage['overage_minutes'];
+
+				// Settled = a committed record covers this period with nothing left
+				// unbilled (lowering the amount absorbs the rest, so any record for
+				// the period settles it until more overage accrues).
+				if ( ! empty( $overage['period_start'] ) ) {
+					$period_rate     = pltt_resolve_billable_rate( (int) $project->client_id, (int) $project->id );
+					$period_calc     = pltt_billable_amount( $over_min, $period_rate );
+					$period_sums     = PLTT_Billing_Records::sum_billed( (int) $project->id, 'retainer_overage', $overage['period_start'] );
+					$period_unbilled = $period_calc - $period_sums['billed'] - $period_sums['absorbed'];
+					if ( ( $period_sums['billed'] + $period_sums['absorbed'] ) > 0 && $period_unbilled <= 0.005 ) {
+						$is_billed_bar = true;
+						$billed_period = array(
+							'label'  => date_i18n( 'F Y', strtotime( $overage['period_start'] ) ),
+							'amount' => (float) $period_sums['billed'],
+						);
+					}
+				}
+
+				$caption = $is_billed_bar
+					? sprintf(
+						/* translators: 1: time used; 2: overage time, now billed. */
+						__( '%1$s used · %2$s billed', 'plain-language-time-tracker' ),
+						pltt_format_duration( $used_min ),
+						pltt_format_duration( $over_min )
+					)
+					: sprintf(
+						/* translators: 1: time used, e.g. "5h 15m"; 2: overage time, e.g. "2h 15m". */
+						__( '%1$s used · %2$s over', 'plain-language-time-tracker' ),
+						pltt_format_duration( $used_min ),
+						pltt_format_duration( $over_min )
+					);
 			} else {
 				$caption = sprintf(
 					/* translators: 1: time used; 2: time remaining in the allocation. */
@@ -113,64 +144,14 @@ if ( $has_alloc ) {
 			);
 		}
 
-		pltt_render_allocation_bar( $used_min, $alloc_min / 60, $billing_type, $fee_args, $caption );
+		pltt_render_allocation_bar( $used_min, $alloc_min / 60, $billing_type, $fee_args, $caption, $is_billed_bar );
+	}
+
+	// Billing: Review & Invoice (modal) + the project's billing-history ledger.
+	// Detailed view only — that's where the per-entry work happens; the summary
+	// view stays a high-level overview. $view comes from PLTT_Reports::render().
+	if ( isset( $view ) && 'detailed' === $view ) {
+		include PLTT_PLUGIN_DIR . 'templates/partials/project-billing-section.php';
 	}
 	?>
 </div>
-
-<?php
-// Overage-to-invoice card — a separate, contextually-shown card (retainers in overage
-// only; fixed-fee work isn't invoiced per-entry). Compares the calculated overage
-// (math-correct) against what the user has flipped to billable. Relies on $overage /
-// $billing_type / $project set above; reports.php includes this partial as one unit.
-if ( 'recurring' === $billing_type && ! empty( $overage ) && 'over' === $overage['state'] ) :
-		$rate           = pltt_resolve_billable_rate( (int) $project->client_id, (int) $project->id );
-		$calc_minutes   = (int) $overage['overage_minutes'];
-		$calc_amount    = round( $calc_minutes / 60.0 * $rate, 2 );
-		$marked_minutes = (int) $overage['marked_billable_minutes'];
-		$marked_amount  = (float) $overage['marked_billable_amount'];
-		$diff = $marked_minutes - $calc_minutes;
-
-		if ( 0 === $marked_minutes ) {
-			$note_state = 'none';
-			$note_icon  = 'dashicons-warning';
-			$note_text  = __( 'No overage marked billable yet. Mark entries to invoice or use the bulk action.', 'plain-language-time-tracker' );
-		} elseif ( 0 === $diff ) {
-			$note_state = 'match';
-			$note_icon  = 'dashicons-yes';
-			$note_text  = __( 'Your marked entries match the calculated overage exactly.', 'plain-language-time-tracker' );
-		} elseif ( $diff > 0 ) {
-			$note_state = 'over';
-			$note_icon  = 'dashicons-warning';
-			$note_text  = sprintf(
-				/* translators: 1: marked time; 2: marked dollars; 3: extra time beyond calculated; 4: calculated dollars. */
-				__( 'You\'ve marked %1$s · %2$s — %3$s more than calculated. Adjust invoice down to %4$s.', 'plain-language-time-tracker' ),
-				pltt_format_duration( $marked_minutes ),
-				pltt_format_currency( $marked_amount ),
-				pltt_format_duration( $diff ),
-				pltt_format_currency( $calc_amount )
-			);
-		} else {
-			$note_state = 'under';
-			$note_icon  = 'dashicons-info-outline';
-			$note_text  = sprintf(
-				/* translators: 1: marked time; 2: marked dollars; 3: absorbed time. */
-				__( 'You\'ve marked %1$s · %2$s — absorbing %3$s. Invoice for %2$s.', 'plain-language-time-tracker' ),
-				pltt_format_duration( $marked_minutes ),
-				pltt_format_currency( $marked_amount ),
-				pltt_format_duration( abs( $diff ) )
-			);
-		}
-		?>
-		<div class="card pltt-project-overage-card">
-			<div class="pltt-pcc-overage-label"><?php esc_html_e( 'Overage to invoice', 'plain-language-time-tracker' ); ?></div>
-			<div class="pltt-pcc-overage-figure">
-				<span class="pltt-pcc-overage-time"><?php echo esc_html( pltt_format_duration( $calc_minutes ) ); ?></span>
-				<span class="pltt-pcc-overage-amount"><?php echo esc_html( pltt_format_currency( $calc_amount ) ); ?></span>
-			</div>
-			<div class="pltt-pcc-overage-note is-<?php echo esc_attr( $note_state ); ?>">
-				<span class="dashicons <?php echo esc_attr( $note_icon ); ?>" aria-hidden="true"></span>
-				<span class="pltt-pcc-overage-note-text"><?php echo esc_html( $note_text ); ?></span>
-			</div>
-		</div>
-<?php endif; ?>

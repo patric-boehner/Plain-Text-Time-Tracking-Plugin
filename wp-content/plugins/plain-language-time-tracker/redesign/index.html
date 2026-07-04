@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Reimagining the Time Tracker — concept</title>
+<link rel="stylesheet" href="assets/app.css">
+</head>
+<body>
+<div class="wpmain" style="padding-top:28px;">
+  <div class="wrap">
+
+    <div class="hero">
+      <h1>A fresh shape for the Time Tracker</h1>
+      <p>Read only from the code, then redrawn from scratch. Same soul — <span class="kbd">jot plain text → process the day → confirm the guesses → see it → bill it</span> — but structured around the four things you actually do, instead of the fourteen screens that grew over time.</p>
+      <div class="pillrow">
+        <span class="pill">7 menu items → 4</span>
+        <span class="pill">3 "a day" screens → 1</span>
+        <span class="pill">3 billing entry points → 1</span>
+        <span class="pill">Hidden project type → explicit</span>
+        <span class="pill">Still 100% WP-admin native</span>
+      </div>
+    </div>
+
+    <div class="section">
+      <h2>The one idea</h2>
+      <p style="max-width:760px;font-size:15px;color:var(--ink-2);">
+        The whole product is a single pipeline. The current build breaks that pipeline across separate pages that
+        you navigate between — capture on one screen, process on another, review in a table, edit back on the first.
+        The redesign treats the pipeline as <b>one continuous surface per job</b>, and demotes everything that's really
+        just configuration.
+      </p>
+    </div>
+
+    <!-- IA before/after -->
+    <div class="section">
+      <h2>Information architecture</h2>
+      <div class="compare">
+        <div class="col before">
+          <div class="h">Today · 7 top-level menu items</div>
+          <ul>
+            <li><b>Daily Log</b> — type notes for a date</li>
+            <li><b>Log History</b> — browse past days</li>
+            <li><i>(Review)</i> — hidden screen you bounce through after "Process"</li>
+            <li><b>Reports</b> — analytics <i>and</i> an inline billing panel</li>
+            <li><b>Invoicing</b> — a second billing surface</li>
+            <li><i>(Billing surface)</i> — a third, per-project</li>
+            <li><b>Clients</b> · <b>Projects</b> · <b>Tags</b> — three CRUD lists</li>
+          </ul>
+        </div>
+        <div class="col after">
+          <div class="h">Reimagined · 4 destinations</div>
+          <ul>
+            <li><b>☀️ Today</b> — capture + live parse + confirm + a day rail for history. <i>Absorbs Daily Log, Process, Review, Log History.</i></li>
+            <li><b>📊 Insights</b> — where the time went, trends, per-project drill-in. <i>Reports, minus the billing.</i></li>
+            <li><b>🧾 Billing</b> — one queue of everything billable + history. <i>Absorbs all three billing entry points.</i></li>
+            <li><b>⚙️ Setup</b> — Clients / Projects / Tags as tabs. <i>Configuration, not daily nav.</i></li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- the pipeline diagram -->
+    <div class="card section">
+      <h2>Where each step lives now</h2>
+      <div class="row wrap" style="gap:0;font-size:13.5px;">
+        <span class="badge ok" style="padding:8px 14px;font-size:13px;">✍️ Capture (all day)</span>
+        <span style="color:var(--faint);padding:0 8px;">→</span>
+        <span class="badge ok" style="padding:8px 14px;font-size:13px;">🔎 Process (when done)</span>
+        <span style="color:var(--faint);padding:0 8px;">→</span>
+        <span class="badge ok" style="padding:8px 14px;font-size:13px;">✓ Confirm guesses</span>
+        <span style="color:var(--muted);padding:0 10px;">┈ one evolving <b>Today</b> ┈</span>
+        <span class="badge monthly" style="padding:8px 14px;font-size:13px;">📊 See it — Insights</span>
+        <span style="color:var(--faint);padding:0 8px;">→</span>
+        <span class="badge fixed" style="padding:8px 14px;font-size:13px;">🧾 Bill it — Billing</span>
+      </div>
+    </div>
+
+    <!-- the five moves -->
+    <div class="section">
+      <h2>Five deliberate moves</h2>
+      <div class="grid cols-2">
+        <div class="card">
+          <h3>1 · One surface that evolves — not four screens</h3>
+          <p class="metaline">Capture stays a plain journal: typing only autosaves — nothing forms below, nothing to react to, so the flow of jotting is never interrupted. When you're done, one deliberate <b>Process</b> parses the whole day and the <i>same</i> screen evolves (capture → processed → settled) instead of throwing you to a Review table and back. The end-of-day ritual is kept, the screen-hopping isn't. Past days sit behind a <b>Today · History</b> toggle.</p>
+        </div>
+        <div class="card">
+          <h3>2 · Make project <i>type</i> an explicit first choice</h3>
+          <p class="metaline">Hourly / Monthly retainer / Fixed budget / Internal — picked up front, revealing only the fields that matter. Today the type is silently inferred from four different columns, and the form shows every field with JS hiding/showing them.</p>
+        </div>
+        <div class="card">
+          <h3>3 · One home for billing</h3>
+          <p class="metaline">A single queue of everything outstanding, grouped by client, with one "Review &amp; bill" sheet. Replaces the Invoicing page, the inline Reports panel, and the per-project billing surface — three doors to the same room.</p>
+        </div>
+        <div class="card">
+          <h3>4 · Predictions as a visible trust surface</h3>
+          <p class="metaline">The learned guess shows <i>why</i> it guessed and confirms in one tap, turning dashed → solid. The learning that already exists finally <i>looks</i> like it's working, which is what earns the tap.</p>
+        </div>
+        <div class="card">
+          <h3>5 · Insights reports; it doesn't bill</h3>
+          <p class="metaline">Reporting and money are different jobs. Insights answers "where did my time go"; Billing answers "what do I send." A one-line bridge connects them ("$1,240 unbilled outside this range → Billing").</p>
+        </div>
+        <div class="card">
+          <h3>What stays sacred</h3>
+          <p class="metaline">Plain-text capture, the <code>@time</code>/<code>#tag</code>/<code>done</code> grammar, learned aliases, the four project types and their billing math, the immutable "what was billed" record. The engine is good — this is about the shape wrapped around it.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- screens -->
+    <div class="section">
+      <h2>Walk the wireframes</h2>
+      <div class="navcards">
+        <a class="navcard" href="today.html">
+          <div class="n"><span class="ico">☀️</span> Today <span class="badge">3 states</span></div>
+          <div class="desc">A calm plain-text journal that evolves on <b>Process</b> into a confirm-the-blocks view (capture → processed → settled). Toggle to History for past days.</div>
+          <div class="was">Replaces: Daily Log · Process · Review · Log History</div>
+        </a>
+        <a class="navcard" href="insights.html">
+          <div class="n"><span class="ico">📊</span> Insights</div>
+          <div class="desc">KPIs with matched-period deltas, hours-by-day, where-the-time-went, and a per-project table that drills in.</div>
+          <div class="was">Replaces: Reports (analytics half)</div>
+        </a>
+        <a class="navcard" href="billing.html">
+          <div class="n"><span class="ico">🧾</span> Billing</div>
+          <div class="desc">Outstanding grouped by client, plus the single Review-&amp;-bill sheet (absorb, hold entries, copy line items).</div>
+          <div class="was">Replaces: Invoicing · inline Reports panel · billing surface</div>
+        </a>
+        <a class="navcard" href="setup.html">
+          <div class="n"><span class="ico">⚙️</span> Setup</div>
+          <div class="desc">Clients / Projects / Tags as tabs — and the explicit "pick a type first" new-project flow.</div>
+          <div class="was">Replaces: Clients · Projects · Tags (3 menu items)</div>
+        </a>
+        <a class="navcard" href="project.html">
+          <div class="n"><span class="ico">📁</span> Project detail</div>
+          <div class="desc">Report + Settings + Billing history as tabs on one project, with the plan/budget crossing made plain.</div>
+          <div class="was">Replaces: Project Detail report + settings modal</div>
+        </a>
+      </div>
+    </div>
+
+    <div class="anno" style="max-width:820px;">
+      <b>How to read these:</b> they're static HTML mockups, not wired to the plugin — mock data, a faux WP-admin sidebar for context, and a little JS so the prediction chips and live-parse counter feel real. Open <b>Today</b> first; it carries the central idea. Everything sits in <code>plugins/plain-language-time-tracker/redesign/</code>.
+    </div>
+
+    <footer class="note">
+      Neutral third-party redesign concept · derived from the code, not the spec docs · intent preserved, structure reimagined.
+    </footer>
+  </div>
+</div>
+</body>
+</html>

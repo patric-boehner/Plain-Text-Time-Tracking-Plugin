@@ -217,6 +217,7 @@ if ( $rc['untagged'] > 0 ) {
 						<?php endif; ?>
 					</td>
 					<td>
+						<?php $row_flag_applies = true; ?>
 						<select name="entries[<?php echo esc_attr( $index ); ?>][project_id]" class="pltt-project-select">
 							<option value=""><?php esc_html_e( 'Select project...', 'plain-language-time-tracker' ); ?></option>
 							<?php if ( $predicted_client > 0 && ! empty( $projects_by_client[ $predicted_client ] ) ) : ?>
@@ -229,11 +230,16 @@ if ( $rc['untagged'] > 0 ) {
 									$label = $is_archived
 										? $project->name . ' ' . __( '(Archived)', 'plain-language-time-tracker' )
 										: $project->name;
+									$opt_flag_applies = pltt_billable_flag_applies( $project );
+									if ( (int) $project->id === (int) $predicted_project ) {
+										$row_flag_applies = $opt_flag_applies;
+									}
 									?>
 									<option
 										value="<?php echo esc_attr( $project->id ); ?>"
 										<?php selected( $predicted_project, $project->id ); ?>
 										data-billability-default="<?php echo (int) $project->billability_default; ?>"
+										data-billable-flag="<?php echo $opt_flag_applies ? '1' : '0'; ?>"
 										<?php if ( $is_archived ) : ?>
 											data-archived="1"
 										<?php endif; ?>
@@ -264,11 +270,11 @@ if ( $rc['untagged'] > 0 ) {
 						</div>
 					</td>
 					<td class="pltt-col-billable pltt-billable-indicator">
-						<span class="pltt-billable-symbol <?php echo ! empty( $entry['billable'] ) ? 'is-billable' : 'not-billable'; ?>">$</span>
+						<span class="pltt-billable-symbol <?php echo ! empty( $entry['billable'] ) ? 'is-billable' : 'not-billable'; ?><?php echo $row_flag_applies ? '' : ' pltt-hidden'; ?>">$</span>
 						<input
 							type="checkbox"
 							name="entries[<?php echo esc_attr( $index ); ?>][billable]"
-							class="pltt-billable"
+							class="pltt-billable<?php echo $row_flag_applies ? '' : ' pltt-hidden'; ?>"
 							value="1"
 							<?php checked( ! empty( $entry['billable'] ) ); ?>
 						>

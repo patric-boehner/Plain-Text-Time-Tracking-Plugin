@@ -1,0 +1,776 @@
+/**
+ * Billing surface + project-page billing sections.
+ *
+ * Loaded on the projects page for action=bill (the surface) and action=view
+ * (the project page's ready-to-invoice prompt + billing history). Leans on
+ * admin.css for the base card/badge/button styling.
+ */
+
+/* ---- Ready to invoice (project page) ---- */
+.pltt-ready-card {
+	border-left: 3px solid #d18b00;
+	background: #fffaf0;
+}
+
+.pltt-ready-title {
+	margin: 0 0 12px;
+	font-size: 14px;
+	font-weight: 600;
+}
+
+.pltt-ready-row {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 16px;
+	padding: 8px 0;
+	border-top: 1px solid #f0e2c4;
+}
+
+.pltt-ready-row:first-of-type {
+	border-top: 0;
+}
+
+.pltt-ready-prompt {
+	font-size: 14px;
+	font-weight: 500;
+}
+
+/* ---- In-card billing section (Reports single-project card) ---- */
+.pltt-pcc-billing {
+	margin-top: 16px;
+	padding-top: 16px;
+	border-top: 1px solid #e0e0e0;
+}
+
+.pltt-pcc-bill-scope + .pltt-pcc-bill-scope {
+	margin-top: 12px;
+	padding-top: 12px;
+	border-top: 1px solid #f0f0f1;
+}
+
+/* Label + amount share one line; the button drops to its own line below. */
+.pltt-pcc-bill-head {
+	display: flex;
+	align-items: baseline;
+	justify-content: space-between;
+	gap: 12px;
+	margin-bottom: 8px;
+}
+
+.pltt-pcc-bill-label {
+	font-size: 13px;
+	font-weight: 600;
+}
+
+.pltt-pcc-bill-amount {
+	font-size: 15px;
+	font-weight: 700;
+}
+
+.pltt-pcc-billing-caughtup {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	margin: 0;
+	color: #50575e;
+	font-size: 13px;
+}
+
+.pltt-pcc-billing-caughtup .dashicons {
+	color: #2a8a43;
+	font-size: 18px;
+	width: 18px;
+	height: 18px;
+}
+
+/* Settled state: the shown retainer period has a committed record. */
+.pltt-pcc-bill-billed {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	margin: 0;
+	color: var(--pltt-success, #2f9e63);
+	font-size: 14px;
+	font-weight: 600;
+}
+
+.pltt-pcc-bill-billed .dashicons {
+	font-size: 18px;
+	width: 18px;
+	height: 18px;
+}
+
+.pltt-pcc-billing-history-link {
+	margin: 12px 0 0;
+	font-size: 13px;
+}
+
+/* ---- Billing surface card ---- */
+.pltt-billing-card {
+	max-width: 720px;
+	margin-top: 16px;
+	padding: 24px;
+	background: #fff;
+	border: 1px solid #dcdcde;
+	border-radius: 6px;
+	box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+
+.pltt-billing-card-head {
+	margin-bottom: 16px;
+}
+
+.pltt-billing-period {
+	font-size: 16px;
+	font-weight: 600;
+}
+
+.pltt-billing-amount-row {
+	margin-bottom: 20px;
+}
+
+.pltt-billing-amount-label,
+.pltt-billing-label {
+	display: block;
+	margin-bottom: 6px;
+	font-weight: 600;
+	font-size: 13px;
+}
+
+.pltt-billing-amount-field {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+}
+
+.pltt-billing-currency {
+	color: var(--pltt-text-subtle);
+}
+
+.pltt-billing-amount-input {
+	width: 120px;
+	font-weight: 600;
+}
+
+.pltt-billing-derivation {
+	margin: 8px 0 0;
+	color: #50575e;
+	font-size: 13px;
+}
+
+.pltt-billing-prior {
+	color: #8a6d00;
+}
+
+.pltt-billing-hint {
+	margin: 4px 0 0;
+	color: #787c82;
+	font-size: 12px;
+	font-style: italic;
+}
+
+.pltt-billing-description-row {
+	margin-bottom: 20px;
+}
+
+.pltt-billing-description {
+	width: 100%;
+	font-size: 14px;
+}
+
+.pltt-billing-manifest {
+	margin-bottom: 20px;
+}
+
+.pltt-billing-manifest > summary {
+	cursor: pointer;
+	font-size: 13px;
+	font-weight: 500;
+	color: #2271b1;
+	padding: 6px 0;
+}
+
+.pltt-billing-manifest[open] > summary {
+	margin-bottom: 8px;
+}
+
+/* In-dialog entry picker (hourly exclusion): checkable, scrollable manifest. */
+.pltt-billing-picker {
+	margin: 0 0 16px;
+	border: 1px solid #dcdcde;
+	border-radius: 4px;
+	overflow: hidden;
+}
+
+.pltt-billing-picker-hint {
+	margin: 0;
+	padding: 8px 10px;
+	background: #f6f7f7;
+	border-bottom: 1px solid #dcdcde;
+	color: #50575e;
+	font-size: 12px;
+}
+
+.pltt-billing-picker-scroll {
+	max-height: 220px;
+	overflow-y: auto;
+}
+
+.pltt-billing-picker .pltt-billing-manifest-table {
+	border: 0;
+	box-shadow: none;
+}
+
+.pltt-manifest-check {
+	width: 32px;
+	text-align: center;
+}
+
+/* A dropped (unchecked) row reads muted. */
+.pltt-billing-manifest-table tr.pltt-manifest-row:has( .pltt-bill-entry:not(:checked) ) td {
+	opacity: 0.45;
+	text-decoration: line-through;
+}
+
+.pltt-billing-actions {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	padding-top: 8px;
+	border-top: 1px solid #f0f0f1;
+}
+
+.pltt-billing-leaveopen {
+	margin-left: auto;
+	color: #50575e;
+	font-size: 13px;
+}
+
+.pltt-billing-empty {
+	max-width: 720px;
+}
+
+/* ---- Billing history (project page) ---- */
+.pltt-billing-history-table {
+	margin-top: 4px;
+}
+
+.pltt-billing-history-desc {
+	color: #50575e;
+}
+
+/* ---- Invoicing page ---- */
+
+/* Ready / Invoiced toggle (same segmented-button group as the Reports view
+   toggle, whose CSS lives in reports.css and isn't loaded here). */
+.pltt-view-toggle {
+	display: inline-flex;
+}
+
+.pltt-view-toggle .button {
+	border-radius: 0;
+	margin-left: -1px;
+	text-decoration: none;
+}
+
+.pltt-view-toggle .button:first-child {
+	border-radius: 3px 0 0 3px;
+	margin-left: 0;
+}
+
+.pltt-view-toggle .button:last-child {
+	border-radius: 0 3px 3px 0;
+}
+
+/* Invoiced ledger: right-align the money columns. */
+.pltt-invoiced-table th.pltt-amount-col,
+.pltt-invoiced-table td.pltt-amount-col {
+	text-align: right;
+	white-space: nowrap;
+}
+
+.pltt-invoicing-lead {
+	font-size: 14px;
+	margin: 8px 0 16px;
+	color: var(--pltt-text-base);
+}
+
+/* Each client is a bordered white card (the page doesn't load project-detail.css
+   where .pltt-card lives, so the table chrome is defined here off global tokens). */
+.pltt-invoicing-client {
+	margin-bottom: 16px;
+	background: var(--pltt-bg-white);
+	border: 1px solid var(--pltt-border-light);
+	border-radius: 4px;
+	overflow: hidden;
+}
+
+.pltt-invoicing-client-head {
+	display: flex;
+	align-items: baseline;
+	justify-content: space-between;
+	gap: 16px;
+	padding: 12px 1.5em;
+	border-bottom: 1px solid var(--pltt-border-light);
+}
+
+.pltt-invoicing-client-name {
+	margin: 0;
+	font-size: 15px;
+	font-weight: 600;
+	color: var(--pltt-text-dark);
+}
+
+.pltt-invoicing-client-total {
+	font-size: 15px;
+	font-weight: 600;
+	color: var(--pltt-text-dark);
+}
+
+.pltt-invoicing-empty {
+	max-width: 720px;
+	background: var(--pltt-bg-white);
+	border: 1px solid var(--pltt-border-light);
+	border-radius: 4px;
+	padding: 16px 1.5em;
+}
+
+/* Scope list — each item is a clickable disclosure (the whole row toggles).
+   Chrome matches the .pltt-notes-reference disclosure: token colors, thin
+   chevron caret, subtle hover, primary focus ring. */
+.pltt-invoicing-list {
+	margin: 0;
+	list-style: none;
+}
+
+.pltt-invoicing-item {
+	margin: 0;
+	border-top: 1px solid var(--pltt-border-faint);
+}
+
+.pltt-invoicing-item:first-child {
+	border-top: 0;
+}
+
+/* The whole row is the toggle button. Columns align across rows via a shared
+   grid track template: project (flex) | entries | hours | amount | caret. */
+.pltt-invoicing-toggle {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr) 7em 6em 7em 1.25em;
+	align-items: center;
+	gap: 16px;
+	width: 100%;
+	padding: 12px 1.5em;
+	border: 0;
+	background: none;
+	text-align: left;
+	cursor: pointer;
+}
+
+.pltt-invoicing-toggle:hover {
+	background: var(--pltt-bg-subtle);
+}
+
+.pltt-invoicing-toggle:focus-visible {
+	outline: 2px solid var(--pltt-primary);
+	outline-offset: -1px;
+}
+
+/* Project cell: title over a muted "type · date range" line. */
+.pltt-invoicing-proj {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	min-width: 0;
+}
+
+.pltt-invoicing-title {
+	font-size: 14px;
+	font-weight: 600;
+	color: var(--pltt-text-dark);
+}
+
+.pltt-invoicing-meta {
+	font-size: 12px;
+	color: var(--pltt-text-muted);
+}
+
+/* Numeric columns: right-aligned so they line up down the list. */
+.pltt-invoicing-col {
+	font-size: 13px;
+	color: var(--pltt-text-subtle);
+	text-align: right;
+	white-space: nowrap;
+}
+
+.pltt-invoicing-amount {
+	font-weight: 600;
+	color: var(--pltt-text-dark);
+}
+
+/* Thin chevron caret — same construction as .pltt-notes-reference. */
+.pltt-expand-caret {
+	display: inline-block;
+	width: 0.5rem;
+	height: 0.5rem;
+	border: solid var(--pltt-text-subtle);
+	border-width: 0 2px 2px 0;
+	transform: rotate(45deg);
+	transition: transform 0.12s ease;
+}
+
+.pltt-invoicing-toggle[aria-expanded="true"] .pltt-expand-caret {
+	transform: rotate(-135deg);
+}
+
+/* Expanded panel: entries + actions. */
+.pltt-invoicing-panel {
+	padding: 4px 1.5em 16px;
+}
+
+.pltt-invoicing-panel-actions {
+	display: flex;
+	align-items: center;
+	justify-content: flex-end;
+	gap: 16px;
+	margin-top: 12px;
+}
+
+.pltt-invoicing-viewproject {
+	margin-right: auto;
+	font-size: 13px;
+	text-decoration: none;
+}
+
+/* Billing dialog (the commit modal on the invoicing page) */
+.pltt-bill-dialog {
+	width: min(560px, calc(100vw - 32px));
+	padding: 24px;
+	border: 1px solid var(--pltt-border);
+	border-radius: 6px;
+	box-shadow: var(--pltt-shadow-modal);
+}
+
+.pltt-bill-dialog::backdrop {
+	background-color: var(--pltt-overlay);
+}
+
+.pltt-bill-dialog-title {
+	margin: 0 0 2px;
+	font-size: 16px;
+	color: var(--pltt-text-dark);
+}
+
+.pltt-bill-dialog-sub {
+	margin: 0 0 20px;
+	color: var(--pltt-text-subtle);
+	font-size: 13px;
+}
+
+/* Description: source dropdown left, Copy right, textarea below. */
+.pltt-billing-desc-head {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 8px;
+	width: 100%;
+	margin-bottom: 8px;
+}
+
+.pltt-billing-desc-mode {
+	flex: 0 1 auto;
+	max-width: 240px;
+}
+
+.pltt-billing-copy {
+	flex: 0 0 auto;
+}
+
+/* Cancel: quiet text action pushed to the right of the action row. */
+.pltt-billing-cancel {
+	margin-left: auto;
+	border: 0;
+	background: none;
+	color: var(--pltt-text-subtle);
+	font-size: 13px;
+	cursor: pointer;
+}
+
+.pltt-billing-cancel:hover {
+	color: var(--pltt-text-dark);
+}
+
+.pltt-billing-error {
+	margin: 0 0 12px;
+	padding: 8px 10px;
+	border-left: 3px solid var(--pltt-danger-dark);
+	background: var(--pltt-bg-danger);
+	color: var(--pltt-danger-text);
+	font-size: 13px;
+}
+
+/* ============================================================================
+   Inline billing surface (Reports single-project detailed view, ?billing=1)
+   The in-place replacement for the Review & bill modal: a settings panel + a
+   select toolbar sit above the project's real entry rows.
+   ============================================================================ */
+
+.pltt-billing-panel {
+	margin-bottom: 20px;
+}
+
+/* ---- Settings panel ---- */
+.pltt-bill-panel {
+	padding: 20px 22px;
+	background: var(--pltt-bg-white);
+	border: 1px solid var(--pltt-border);
+	border-radius: 8px;
+	box-shadow: var(--pltt-shadow-dropdown-light);
+	margin-bottom: 16px;
+}
+
+.pltt-bill-panel-head {
+	display: flex;
+	align-items: flex-start;
+	justify-content: space-between;
+	gap: 16px;
+	flex-wrap: wrap;
+}
+
+.pltt-bill-panel-title {
+	margin: 0 0 2px;
+	font-size: 18px;
+	font-weight: 600;
+	color: var(--pltt-text-dark);
+}
+
+.pltt-bill-panel-sub {
+	margin: 0 0 8px;
+	font-size: 13px;
+	color: var(--pltt-text-subtle);
+}
+
+/* Blue "Scope · <range>" pill with a lock glyph. */
+.pltt-bill-scope-pill {
+	display: inline-flex;
+	align-items: center;
+	gap: 5px;
+	padding: 3px 10px;
+	border-radius: 999px;
+	background: var(--pltt-badge-info-bg);
+	color: var(--pltt-badge-info-text);
+	font-size: 12px;
+	font-weight: 600;
+}
+
+.pltt-bill-scope-pill .dashicons {
+	font-size: 14px;
+	width: 14px;
+	height: 14px;
+}
+
+.pltt-bill-panel-actions {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	flex: 0 0 auto;
+}
+
+.pltt-bill-copy-open .dashicons,
+.pltt-billing-exit .dashicons {
+	font-size: 16px;
+	width: 16px;
+	height: 16px;
+	vertical-align: text-bottom;
+}
+
+/* ---- Invoice description ---- */
+.pltt-bill-desc-row {
+	margin-top: 18px;
+}
+
+.pltt-bill-desc-label {
+	display: block;
+	margin-bottom: 4px;
+	font-size: 12px;
+	font-weight: 600;
+	color: var(--pltt-text-subtle);
+}
+
+.pltt-bill-desc-input {
+	width: 100%;
+}
+
+/* ---- Computed / Invoice amount / Absorbed cards ---- */
+.pltt-bill-stat-cards {
+	display: grid;
+	grid-template-columns: repeat(3, 1fr);
+	gap: 12px;
+	margin-top: 18px;
+}
+
+.pltt-bill-stat {
+	padding: 12px 14px;
+	background: var(--pltt-bg-subtle);
+	border: 1px solid var(--pltt-border-light);
+	border-radius: 6px;
+}
+
+.pltt-bill-stat .card-label {
+	display: flex;
+	align-items: baseline;
+	justify-content: space-between;
+	gap: 8px;
+	font-size: 12px;
+	font-weight: 600;
+	color: var(--pltt-text-subtle);
+	margin-bottom: 6px;
+}
+
+.pltt-bill-computed-count {
+	font-weight: 400;
+	color: var(--pltt-text-muted);
+}
+
+.pltt-bill-stat .card-value {
+	font-size: 22px;
+	font-weight: 600;
+	color: var(--pltt-text-dark);
+}
+
+.pltt-bill-stat-absorbed .card-value {
+	color: var(--pltt-text-muted);
+}
+
+.pltt-bill-amount-field {
+	display: flex;
+	align-items: center;
+	gap: 4px;
+}
+
+.pltt-bill-currency {
+	font-size: 18px;
+	color: var(--pltt-text-subtle);
+}
+
+.pltt-bill-amount-input {
+	width: 100%;
+	max-width: 140px;
+	font-size: 18px;
+	font-weight: 600;
+}
+
+.pltt-bill-error {
+	margin: 14px 0 0;
+	padding: 8px 10px;
+	border-left: 3px solid var(--pltt-danger-dark);
+	background: var(--pltt-bg-danger);
+	color: var(--pltt-danger-text);
+	font-size: 13px;
+}
+
+/* ---- Select toolbar ---- */
+.pltt-bill-select-toolbar {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 12px;
+	padding: 10px 16px;
+	margin-bottom: 8px;
+	background: var(--pltt-badge-info-bg);
+	border-radius: 6px;
+}
+
+.pltt-bill-select-label {
+	font-size: 13px;
+	font-weight: 600;
+	color: var(--pltt-badge-info-text);
+}
+
+.pltt-bill-select-actions {
+	display: flex;
+	gap: 6px;
+}
+
+/* ---- Entry rows: leading checkbox column ---- */
+/* Present in the DOM on the single-project detailed view, but hidden until
+   "Review & bill" toggles billing on. */
+.pltt-bill-select-col {
+	display: none;
+}
+
+.pltt-wrap.pltt-billing-active .pltt-bill-select-col {
+	display: table-cell;
+	width: 40px;
+	text-align: center;
+	vertical-align: middle;
+}
+
+.pltt-bill-select {
+	width: 18px;
+	height: 18px;
+	accent-color: var(--pltt-primary);
+	cursor: pointer;
+}
+
+/* ---- Copy line items dialog ---- */
+.pltt-billcopy-dialog {
+	width: min(560px, calc(100vw - 32px));
+	padding: 24px;
+	border: 1px solid var(--pltt-border);
+	border-radius: 6px;
+	box-shadow: var(--pltt-shadow-modal);
+}
+
+.pltt-billcopy-dialog::backdrop {
+	background-color: var(--pltt-overlay);
+}
+
+.pltt-billcopy-title {
+	margin: 0 0 16px;
+	font-size: 16px;
+	color: var(--pltt-text-dark);
+}
+
+.pltt-billcopy-head {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 8px;
+	margin-bottom: 8px;
+}
+
+.pltt-billcopy-mode {
+	flex: 0 1 auto;
+	max-width: 260px;
+}
+
+.pltt-billcopy-text {
+	width: 100%;
+	font-family: var(--pltt-font-mono, monospace);
+	font-size: 12px;
+}
+
+.pltt-billcopy-actions {
+	display: flex;
+	justify-content: flex-end;
+	margin-top: 16px;
+}
+
+@media screen and (max-width: 782px) {
+	.pltt-bill-stat-cards {
+		grid-template-columns: 1fr;
+	}
+}
+
+/* Transient nudge when "Review & bill" is clicked but nothing billable is in the
+   current view (all outstanding time sits outside the date range). */
+.pltt-billing-empty-note {
+	margin: 0 0 16px;
+	padding: 12px 16px;
+	background: var(--pltt-badge-warning-bg);
+	color: var(--pltt-warning-text);
+	border-radius: 6px;
+	font-size: 13px;
+}

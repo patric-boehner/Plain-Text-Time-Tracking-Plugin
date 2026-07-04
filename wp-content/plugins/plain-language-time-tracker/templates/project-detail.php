@@ -42,6 +42,21 @@ $is_archived = ( 'archived' === $project->status );
 				&larr; <?php esc_html_e( 'Back to Projects', 'plain-language-time-tracker' ); ?>
 			</a>
 		</div>
+
+		<?php
+		// Billing-commit results land back here. Notices stay inside the header
+		// wrapper near the H1 (WordPress relocates ones that drift too far).
+		pltt_render_admin_notices(
+			array(
+				'billed' => __( 'Billing recorded.', 'plain-language-time-tracker' ),
+			),
+			array(
+				'nothing_to_bill' => __( 'Nothing outstanding to bill for that scope.', 'plain-language-time-tracker' ),
+				'invalid_project' => __( 'That project could not be found.', 'plain-language-time-tracker' ),
+				'db_insert_failed' => __( 'Could not save the billing record. Please try again.', 'plain-language-time-tracker' ),
+			)
+		);
+		?>
 	</div>
 
 	<?php include PLTT_PLUGIN_DIR . 'templates/partials/project-detail-report.php'; ?>

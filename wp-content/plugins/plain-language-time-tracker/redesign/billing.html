@@ -1,0 +1,228 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Billing · Time Tracker (reimagined)</title>
+<link rel="stylesheet" href="assets/app.css">
+</head>
+<body data-page="billing">
+<main class="wpmain">
+  <div class="wrap">
+
+    <div class="pagehead">
+      <div class="grow">
+        <h1>Billing</h1>
+        <p class="subhead">Pick what goes on the invoice inline; record the bill in a focused step. Two concerns, two places.</p>
+      </div>
+      <div class="actions">
+        <div class="seg">
+          <a class="on" href="billing.html">Ready to bill</a>
+          <a href="billing-history.html">Billed history</a>
+        </div>
+      </div>
+    </div>
+
+    <div class="grid cols-3 section">
+      <div class="kpi"><div class="label">Outstanding</div><div class="value" style="color:var(--amber)">$4,980</div><div class="sub">across 3 clients · 3 open items</div></div>
+      <div class="kpi"><div class="label">Billed this month</div><div class="value">$8,260</div><div class="sub">6 invoices sent</div></div>
+      <div class="kpi"><div class="label">Absorbed this month</div><div class="value muted">$310</div><div class="sub">written down at bill time</div></div>
+    </div>
+
+    <p class="eyebrow">Ready to bill — grouped by client · click a project to expand and select</p>
+
+    <!-- CLIENT: ACME (hourly) — expanded to show the inline entry picker -->
+    <div class="card card-flush section">
+      <div class="row" style="padding:14px 18px;border-bottom:1px solid var(--line-2);">
+        <h2 style="margin:0;">ACME Co</h2><span class="spacer"></span><span class="money" style="font-size:16px;">$2,730</span>
+      </div>
+
+      <div class="bill-item open" data-bill>
+        <div class="bill-row" data-bill-toggle>
+          <span class="bill-caret">▶</span>
+          <span class="grow">
+            <span class="bill-title">Website Rebuild</span> <span class="badge hourly">Hourly</span>
+            <div class="bill-meta"><span data-count>14</span> of 14 entries · Jun 3 – Jul 2</div>
+          </span>
+          <span class="bill-amt" data-rowamt>$2,730</span>
+          <span class="bill-cta"><button class="btn btn-ghost btn-sm">Collapse ▲</button></span>
+        </div>
+
+        <div class="bill-panel">
+          <div class="bill-selectall">
+            <label class="row" style="gap:8px;"><input type="checkbox" checked data-all> Select all</label>
+            <span class="spacer"></span>
+            <a href="#">Only unbilled</a> · <a href="project.html">Open project</a>
+          </div>
+          <table class="bill-entries">
+            <tr><td class="bill-chk"><input type="checkbox" checked data-amt="263"></td><td><span class="bill-edesc">Homepage hero build</span> <span class="rowsub">Jun 3 · #dev</span></td><td class="bill-edur">1h 45m</td><td class="bill-eamt">$263</td></tr>
+            <tr><td class="bill-chk"><input type="checkbox" checked data-amt="375"></td><td><span class="bill-edesc">Template system</span> <span class="rowsub">Jun 4 · #dev</span></td><td class="bill-edur">2h 30m</td><td class="bill-eamt">$375</td></tr>
+            <tr><td class="bill-chk"><input type="checkbox" checked data-amt="188"></td><td><span class="bill-edesc">QA + fixes</span> <span class="rowsub">Jun 6</span></td><td class="bill-edur">1h 15m</td><td class="bill-eamt">$188</td></tr>
+            <tr><td class="bill-chk"><input type="checkbox" checked data-amt="450"></td><td><span class="bill-edesc">Responsive pass + nav</span> <span class="rowsub">Jun 10 · #dev</span></td><td class="bill-edur">3h 00m</td><td class="bill-eamt">$450</td></tr>
+            <tr><td class="bill-chk"><input type="checkbox" checked data-amt="1454"></td><td><span class="bill-edesc">…10 more entries</span> <span class="rowsub">Jun 12 – Jul 2</span></td><td class="bill-edur">9h 42m</td><td class="bill-eamt">$1,454</td></tr>
+          </table>
+
+          <div class="bill-foot">
+            <div class="metaline">Tick what goes on the invoice — the total updates live. Then choose: record the bill for your books, or generate line items to paste into your invoicing tool. They’re independent.</div>
+            <div>
+              <div class="bill-total-row big"><span class="t">Selected (<span data-count>14</span>)</span><span class="v" data-selected>$2,730</span></div>
+              <div class="bill-actions">
+                <button class="btn btn-ghost" data-open-dialog="invoice">Line items…</button>
+                <button class="btn btn-primary" data-open-dialog="record">Record bill →</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- CLIENT: Northwind (retainer overage) — read-only manifest, straight to record -->
+    <div class="card card-flush section">
+      <div class="row" style="padding:14px 18px;border-bottom:1px solid var(--line-2);">
+        <h2 style="margin:0;">Northwind</h2><span class="spacer"></span><span class="money" style="font-size:16px;">$720</span>
+      </div>
+      <div class="bill-item" data-bill>
+        <div class="bill-row" data-bill-toggle>
+          <span class="bill-caret">▶</span>
+          <span class="grow">
+            <span class="bill-title">Monthly Care Plan</span> <span class="badge monthly">Monthly · overage</span>
+            <div class="bill-meta">June 2026 · 20h plan used up, 4.8h over × $150/hr</div>
+          </span>
+          <span class="bill-amt">$720</span>
+          <span class="bill-cta"><button class="btn btn-primary btn-sm">Review &amp; bill ›</button></span>
+        </div>
+        <div class="bill-panel">
+          <p class="metaline" style="margin:8px 0;">Retainers bill by <b>period overage</b>, not per entry — the whole month is one line. Blocks past the plan (for reference):</p>
+          <table class="bill-entries">
+            <tr><td>Content edits</td><td class="rowsub">Jun 25</td><td class="bill-edur">1h 30m</td></tr>
+            <tr><td>Emergency plugin fix</td><td class="rowsub">Jun 27</td><td class="bill-edur">2h 00m</td></tr>
+            <tr><td>Homepage banner swap</td><td class="rowsub">Jun 30</td><td class="bill-edur">1h 18m</td></tr>
+          </table>
+          <div class="bill-foot">
+            <div class="metaline">This period is $720 of overage. Record it for your books, or generate the line item to invoice — independently.</div>
+            <div>
+              <div class="bill-total-row big"><span class="t">Overage</span><span class="v">$720</span></div>
+              <div class="bill-actions">
+                <button class="btn btn-ghost" data-open-dialog="invoice">Line items…</button>
+                <button class="btn btn-primary" data-open-dialog="record">Record bill →</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- CLIENT: Riverside (hourly, collapsed) -->
+    <div class="card card-flush section">
+      <div class="row" style="padding:14px 18px;border-bottom:1px solid var(--line-2);">
+        <h2 style="margin:0;">Riverside</h2><span class="spacer"></span><span class="money" style="font-size:16px;">$1,530</span>
+      </div>
+      <div class="bill-item" data-bill>
+        <div class="bill-row" data-bill-toggle>
+          <span class="bill-caret">▶</span>
+          <span class="grow">
+            <span class="bill-title">New Website</span> <span class="badge hourly">Hourly</span>
+            <div class="bill-meta">9 entries · Jun 12 – Jul 1</div>
+          </span>
+          <span class="bill-amt" data-rowamt>$1,530</span>
+          <span class="bill-cta"><button class="btn btn-primary btn-sm">Review &amp; bill ›</button></span>
+        </div>
+        <div class="bill-panel">
+          <div class="bill-selectall">
+            <label class="row" style="gap:8px;"><input type="checkbox" checked data-all> Select all</label>
+            <span class="spacer"></span><a href="project.html">Open project</a>
+          </div>
+          <table class="bill-entries">
+            <tr><td class="bill-chk"><input type="checkbox" checked data-amt="405"></td><td><span class="bill-edesc">Proposal + kickoff</span> <span class="rowsub">Jun 12 · #writing</span></td><td class="bill-edur">3h 00m</td><td class="bill-eamt">$405</td></tr>
+            <tr><td class="bill-chk"><input type="checkbox" checked data-amt="675"></td><td><span class="bill-edesc">Wireframes</span> <span class="rowsub">Jun 18 · #design</span></td><td class="bill-edur">5h 00m</td><td class="bill-eamt">$675</td></tr>
+            <tr><td class="bill-chk"><input type="checkbox" checked data-amt="450"></td><td><span class="bill-edesc">…7 more entries</span> <span class="rowsub">Jun 20 – Jul 1</span></td><td class="bill-edur">3h 18m</td><td class="bill-eamt">$450</td></tr>
+          </table>
+          <div class="bill-foot">
+            <div class="metaline">Tick what goes on the invoice — then record the bill or generate line items, independently.</div>
+            <div>
+              <div class="bill-total-row big"><span class="t">Selected (<span data-count>9</span>)</span><span class="v" data-selected>$1,530</span></div>
+              <div class="bill-actions">
+                <button class="btn btn-ghost" data-open-dialog="invoice">Line items…</button>
+                <button class="btn btn-primary" data-open-dialog="record">Record bill →</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <p class="metaline" style="margin-top:24px;">Try it: expand a project, toggle entries (total updates), then <b>Bill selected →</b> to open the record step.</p>
+
+    <footer class="note">
+      Reimagined concept · <a href="index.html">back to overview</a> · <b>Selection is inline</b> (scales to many entries); <b>recording the bill is Modal 1</b> (amount, absorb, freeze coverage); <b>invoice line-item generation is Modal 2</b> — separate, and also reachable later from Billed history so you never have to re-commit just to re-copy.
+    </footer>
+  </div>
+
+  <!-- MODAL 1 · Record the bill (the internal billing record) -->
+  <dialog class="sheet" id="dlg-record">
+    <div class="sh-head">
+      <div>
+        <div class="dlg-step">Step · record the bill</div>
+        <div style="font-weight:600;color:var(--ink);" data-fill-name>Website Rebuild</div>
+        <div class="metaline">Selected work · lower the amount to absorb</div>
+      </div>
+      <button class="iconbtn" data-close-dialog>✕</button>
+    </div>
+    <div class="sh-body">
+      <div class="grid cols-3" style="margin-bottom:16px;">
+        <div class="kpi" style="box-shadow:none;"><div class="label">Computed</div><div class="value" style="font-size:20px;" data-fill-amt>$2,730</div></div>
+        <div class="kpi" style="box-shadow:none;"><div class="label">Invoice</div><div class="value" style="font-size:20px;color:var(--blue)" data-fill-amt>$2,730</div></div>
+        <div class="kpi" style="box-shadow:none;"><div class="label">Absorbed</div><div class="value muted" style="font-size:20px;">$0</div></div>
+      </div>
+      <label class="field">
+        <span class="lab">Amount to invoice <span class="dim">(lower to absorb — never raises)</span></span>
+        <input class="inp" data-fill-amt value="$2,730.00">
+      </label>
+      <label class="field">
+        <span class="lab">What this covers <span class="dim">(internal note)</span></span>
+        <input class="inp" value="Website Rebuild — June work">
+      </label>
+      <div class="notice info"><span class="ico">🔒</span><div class="grow">Recording freezes the entries you selected onto this bill, so the same time can’t be billed twice.</div></div>
+    </div>
+    <div class="sh-foot">
+      <button class="btn btn-ghost" data-close-dialog>Cancel</button>
+      <span class="spacer"></span>
+      <button class="btn btn-primary" data-close-dialog>Mark billed</button>
+    </div>
+  </dialog>
+
+  <!-- MODAL 2 · Invoice line-item generation (the outbound artifact) -->
+  <dialog class="sheet" id="dlg-invoice">
+    <div class="sh-head">
+      <div>
+        <div class="dlg-step">Invoice line items</div>
+        <div style="font-weight:600;color:var(--ink);">Copy into your invoicing tool</div>
+        <div class="metaline">Purely the outbound text — separate from the billing record</div>
+      </div>
+      <button class="iconbtn" data-close-dialog>✕</button>
+    </div>
+    <div class="sh-body">
+      <label class="field">
+        <span class="lab">Format</span>
+        <div class="seg" data-toggle><a class="on" href="#">Itemized</a><a href="#">One summary line</a><a href="#">Compose with AI ✦</a></div>
+      </label>
+      <div class="lineitems">Website Rebuild — June 2026
+
+Homepage hero build ........ 1h 45m    $263
+Template system ............ 2h 30m    $375
+QA + fixes ................. 1h 15m    $188
+Responsive pass + nav ...... 3h 00m    $450
+(+10 more entries) ........ 9h 42m   $1,454
+                           ──────────────────
+Total        18h 12m                $2,730</div>
+    </div>
+    <div class="sh-foot">
+      <button class="btn btn-ghost" data-close-dialog>Close</button>
+      <span class="spacer"></span>
+      <button class="btn btn-primary">📋 Copy to clipboard</button>
+    </div>
+  </dialog>
+</main>
+<script src="assets/app.js"></script>
+</body>
+</html>

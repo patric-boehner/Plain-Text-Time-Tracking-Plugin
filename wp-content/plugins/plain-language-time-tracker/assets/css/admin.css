@@ -517,6 +517,7 @@ a.pltt-pcc-project:focus {
 
 .pltt-alloc-seg-within { background: var(--pltt-primary); } /* blue: any client work */
 .pltt-alloc-seg-over   { background: var(--pltt-primary-light); } /* light blue: overage portion */
+.pltt-alloc-seg-billed { background: var(--pltt-success); } /* green: overage settled by a billing record */
 
 .pltt-alloc-label {
 	font-size: 12px;
@@ -524,6 +525,11 @@ a.pltt-pcc-project:focus {
 	white-space: nowrap;
 	display: block;
 	margin-top: 8px;
+}
+
+.pltt-alloc-label.pltt-alloc-billed {
+	color: var(--pltt-success);
+	font-weight: 600;
 }
 
 /* WordPress row-actions for management tables */

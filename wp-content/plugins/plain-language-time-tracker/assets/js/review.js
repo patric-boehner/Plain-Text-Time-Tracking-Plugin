@@ -343,7 +343,9 @@
 						? PLTT.escapeHtml( project.name ) + ' (Archived)'
 						: PLTT.escapeHtml( project.name );
 					var billDefault = parseInt( project.billability_default, 10 ) === 1 ? '1' : '0';
+					var billFlag = parseInt( project.billable_flag_applies, 10 ) === 0 ? '0' : '1';
 					var dataAttr = ' data-billability-default="' + billDefault + '"' +
+						' data-billable-flag="' + billFlag + '"' +
 						( isArchived ? ' data-archived="1"' : '' );
 					// SEC-M13: defense-in-depth — coerce id to int before interpolating.
 					html += '<option value="' + parseInt( project.id, 10 ) + '"' + dataAttr + '>' +
@@ -371,6 +373,11 @@
 					if ( projectSelect.value && projectSelect.value !== 'new' ) {
 						projectSelect.dispatchEvent( new Event( 'change' ) );
 					}
+				}
+
+				var ppRow = projectSelect.closest( '.pltt-entry-row' );
+				if ( ppRow ) {
+					applyBillableVisibility( ppRow );
 				}
 			}
 		} );
@@ -423,6 +430,11 @@
 				PLTT.showModal( 'pltt-project-modal' );
 				this.value = '';
 			} else {
+				var pRowVis = this.closest( '.pltt-entry-row' );
+				if ( pRowVis ) {
+					applyBillableVisibility( pRowVis );
+				}
+
 				// Apply the project's billability default to the billable checkbox,
 				// but never clobber a manual choice: if the user has toggled billable
 				// on this row, leave it alone (spec: billable defaults once).
@@ -467,6 +479,27 @@
 	}
 
 	/**
+	 * Show/hide a row's billable control based on the selected project's type.
+	 * Retainer/fixed-fee projects (data-billable-flag="0") bill at the period
+	 * level, so the per-entry flag is hidden. The checkbox stays in the DOM and
+	 * still submits its (defaulted non-billable) value.
+	 *
+	 * @param {HTMLElement} row The .pltt-entry-row element.
+	 */
+	function applyBillableVisibility( row ) {
+		var projectSelect = row.querySelector( '.pltt-project-select' );
+		var cell = row.querySelector( '.pltt-billable-indicator' );
+		if ( ! projectSelect || ! cell ) {
+			return;
+		}
+		var opt = projectSelect.options[ projectSelect.selectedIndex ];
+		var hide = !! ( opt && opt.dataset.billableFlag === '0' );
+		cell.querySelectorAll( '.pltt-billable-symbol, .pltt-billable' ).forEach( function( el ) {
+			el.classList.toggle( 'pltt-hidden', hide );
+		} );
+	}
+
+	/**
 	 * On page load: apply internal-client non-billable rule for rows already on the page.
 	 * Handles entries that already have the internal client assigned (change handler only
 	 * fires on user interaction, not on initial render).
@@ -484,6 +517,8 @@
 		if ( selectedClientOpt && selectedClientOpt.dataset.isInternal === '1' && ! hasProject ) {
 			setBillableVisual( row, false );
 		}
+
+		applyBillableVisibility( row );
 	} );
 
 	/**
@@ -584,6 +619,7 @@
 						option.value = project.id;
 						option.textContent = project.name;
 						option.dataset.billabilityDefault = parseInt( project.billability_default, 10 ) === 1 ? '1' : '0';
+						option.dataset.billableFlag = parseInt( project.billable_flag_applies, 10 ) === 0 ? '0' : '1';
 						option.selected = true;
 
 						const addNewOption = projectSelect.querySelector( 'option[value="new"]' );
@@ -1261,6 +1297,7 @@
 					syncBillableButton( formRow );
 				}
 			}
+			applyFormBillableVisibility( formRow );
 		}
 	} );
 
@@ -1289,12 +1326,34 @@
 					return; // Don't pollute the picker with archived projects.
 				}
 				const billDefault = parseInt( project.billability_default, 10 ) === 1 ? '1' : '0';
-				html += '<option value="' + parseInt( project.id, 10 ) + '" data-billability-default="' + billDefault + '">' +
+				const billFlag = parseInt( project.billable_flag_applies, 10 ) === 0 ? '0' : '1';
+				html += '<option value="' + parseInt( project.id, 10 ) + '" data-billability-default="' + billDefault + '" data-billable-flag="' + billFlag + '">' +
 					PLTT.escapeHtml( project.name ) + '</option>';
 			} );
 			html += '<option value="new">+ Add new project...</option>';
 			projectSelect.innerHTML = html;
+			applyFormBillableVisibility( projectSelect.closest( '.pltt-entry-form' ) );
 		} );
+	}
+
+	/**
+	 * Show/hide a form row's billable field based on the selected project's type.
+	 * Retainer/fixed-fee projects (data-billable-flag="0") bill at the period
+	 * level, so the per-entry control is hidden. The hidden checkbox still submits.
+	 *
+	 * @param {HTMLElement} formRow The .pltt-entry-form element.
+	 */
+	function applyFormBillableVisibility( formRow ) {
+		if ( ! formRow ) {
+			return;
+		}
+		const sel = formRow.querySelector( '.pltt-form-project' );
+		const field = formRow.querySelector( '.pltt-field-billable' );
+		if ( ! sel || ! field ) {
+			return;
+		}
+		const opt = sel.options[ sel.selectedIndex ];
+		field.classList.toggle( 'pltt-hidden', !! ( opt && opt.dataset.billableFlag === '0' ) );
 	}
 
 	/**
@@ -1373,6 +1432,7 @@
 						option.value = project.id;
 						option.textContent = project.name;
 						option.dataset.billabilityDefault = parseInt( project.billability_default, 10 ) === 1 ? '1' : '0';
+						option.dataset.billableFlag = parseInt( project.billable_flag_applies, 10 ) === 0 ? '0' : '1';
 						option.selected = true;
 						const addNewOption = projectSelect.querySelector( 'option[value="new"]' );
 						projectSelect.insertBefore( option, addNewOption );

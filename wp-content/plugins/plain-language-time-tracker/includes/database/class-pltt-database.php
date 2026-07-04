@@ -20,7 +20,7 @@ class PLTT_Database {
 	 *
 	 * @var string
 	 */
-	const DB_VERSION = '1.9.6';
+	const DB_VERSION = '1.9.8';
 
 	/**
 	 * Get the full table name with WordPress prefix.
@@ -262,6 +262,50 @@ class PLTT_Database {
 			KEY tag_id (tag_id)
 		) {$charset_collate};";
 		dbDelta( $sql_tag_aliases );
+
+		// Billing records: one durable per-scope summary written at commit time
+		// (verify -> adjust -> commit). The single source of truth for what's been
+		// billed — entries carry no billing_record link. One remainder rule for
+		// every type: unbilled = calculated - SUM(billed) - SUM(absorbed). A
+		// fully-absorbed record is just billed_amount = 0 (absorbed = calculated);
+		// there is no status column. Hours stored as minutes to match the rest of
+		// the schema (duration_minutes, etc.). See billing-record-spec.md.
+		$table_billing = self::get_table_name( 'billing_records' );
+		$sql_billing   = "CREATE TABLE {$table_billing} (
+			id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+			project_id bigint(20) unsigned NOT NULL,
+			period_start date DEFAULT NULL,
+			period_end date DEFAULT NULL,
+			billing_type varchar(20) NOT NULL,
+			rate decimal(10,2) DEFAULT NULL,
+			calculated_amount decimal(10,2) NOT NULL DEFAULT 0.00,
+			billed_amount decimal(10,2) NOT NULL DEFAULT 0.00,
+			absorbed_amount decimal(10,2) NOT NULL DEFAULT 0.00,
+			billed_minutes int unsigned DEFAULT NULL,
+			allocation_minutes int unsigned DEFAULT NULL,
+			description text,
+			marked_at datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			created_at datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			updated_at datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+			PRIMARY KEY (id),
+			KEY project_id (project_id),
+			KEY project_type (project_id, billing_type),
+			KEY project_period (project_id, period_start)
+		) {$charset_collate};";
+		dbDelta( $sql_billing );
+
+		// Frozen coverage snapshot: which entries a finalized billing record
+		// captured. Written once at commit (hourly = the billed entries minus any
+		// excluded; retainer = the period's overage entries). This is what makes
+		// entry billing status immutable instead of recomputed live.
+		$table_record_entries = self::get_table_name( 'billing_record_entries' );
+		$sql_record_entries   = "CREATE TABLE {$table_record_entries} (
+			record_id bigint(20) unsigned NOT NULL,
+			entry_id bigint(20) unsigned NOT NULL,
+			PRIMARY KEY  (record_id, entry_id),
+			KEY entry_id (entry_id)
+		) {$charset_collate};";
+		dbDelta( $sql_record_entries );
 	}
 
 	/**

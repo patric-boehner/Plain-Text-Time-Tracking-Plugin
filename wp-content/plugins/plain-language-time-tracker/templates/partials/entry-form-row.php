@@ -21,6 +21,10 @@ $selected_cid  = (int) ( $form_entry['client_id'] ?? 0 );
 $selected_pid  = (int) ( $form_entry['project_id'] ?? 0 );
 $internal_cid  = pltt_get_internal_client_id();
 $is_billable   = ! empty( $form_entry['billable'] );
+// Whether the per-entry billable control applies to the selected project (hidden
+// for retainer/fixed-fee). Captured in the project-option loop below; defaults to
+// shown when no project is selected yet.
+$selected_flag_applies = true;
 $row_classes   = array( 'pltt-entry-form-row' );
 if ( ! $row_visible ) {
 	$row_classes[] = 'pltt-hidden';
@@ -139,11 +143,16 @@ if ( ! $row_visible ) {
 									$label = $is_archived
 										? $project->name . ' ' . __( '(Archived)', 'plain-language-time-tracker' )
 										: $project->name;
+									$opt_flag_applies = pltt_billable_flag_applies( $project );
+									if ( (int) $project->id === $selected_pid ) {
+										$selected_flag_applies = $opt_flag_applies;
+									}
 									?>
 									<option
 										value="<?php echo esc_attr( $project->id ); ?>"
 										<?php selected( $selected_pid, $project->id ); ?>
 										data-billability-default="<?php echo (int) $project->billability_default; ?>"
+										data-billable-flag="<?php echo $opt_flag_applies ? '1' : '0'; ?>"
 										<?php if ( $is_archived ) : ?>data-archived="1"<?php endif; ?>
 									>
 										<?php echo esc_html( $label ); ?>
@@ -163,7 +172,7 @@ if ( ! $row_visible ) {
 							>
 						</div>
 					</div>
-					<div class="pltt-field pltt-field-billable">
+					<div class="pltt-field pltt-field-billable<?php echo $selected_flag_applies ? '' : ' pltt-hidden'; ?>">
 						<label><?php esc_html_e( 'Billable', 'plain-language-time-tracker' ); ?></label>
 						<button type="button"
 							class="pltt-billable-symbol pltt-inline-toggle pltt-form-billable-btn <?php echo $is_billable ? 'is-billable' : 'not-billable'; ?>"
