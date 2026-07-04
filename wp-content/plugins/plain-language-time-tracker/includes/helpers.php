@@ -1383,11 +1383,81 @@ function pltt_render_threshold_marker_row( $colspan, $primary, $secondary = '' )
 }
 
 /**
+ * Derive the billing status of a single entry for the Reports "Status" column.
+ *
+ * Read-only, from the real billing state (record coverage + project type +
+ * overage), not the legacy per-entry `billed` flag. Returns a badge:
+ *   Invoiced (covered by a record — or the legacy flag when no coverage set is
+ *   available), Over plan / On plan (retainer), Fixed fee, Internal,
+ *   Unbilled / Not billed (hourly). Reuses the plugin's .pltt-badge variants.
+ *
+ * @param object|null $project        Entry's project (null = uncategorized).
+ * @param bool        $is_billable    The entry's billable flag.
+ * @param bool        $is_invoiced    Whether it's covered by a committed record.
+ * @param string      $invoiced_label Optional detail for the Invoiced tooltip (e.g. "Invoiced · record #7").
+ * @param bool        $is_overage     Whether it's past a retainer allocation.
+ * @return array{text:string,variant:string,title:string}
+ */
+function pltt_entry_status_badge( $project, $is_billable, $is_invoiced, $invoiced_label = '', $is_overage = false ) {
+	if ( $is_invoiced ) {
+		return array(
+			'text'    => __( 'Invoiced', 'plain-language-time-tracker' ),
+			'variant' => 'pltt-badge-info',
+			'title'   => '' !== $invoiced_label ? $invoiced_label : __( 'On a committed invoice', 'plain-language-time-tracker' ),
+		);
+	}
+
+	$type = $project ? pltt_get_billing_type( $project ) : 'hourly';
+
+	if ( 'none' === $type ) {
+		return array(
+			'text'    => __( 'Internal', 'plain-language-time-tracker' ),
+			'variant' => '',
+			'title'   => __( 'Internal work — never billed', 'plain-language-time-tracker' ),
+		);
+	}
+	if ( 'fixed' === $type ) {
+		return array(
+			'text'    => __( 'Fixed fee', 'plain-language-time-tracker' ),
+			'variant' => 'pltt-badge-purple',
+			'title'   => __( 'Fixed-budget project — invoiced separately, not from time', 'plain-language-time-tracker' ),
+		);
+	}
+	if ( 'recurring' === $type ) {
+		return $is_overage
+			? array(
+				'text'    => __( 'Over plan', 'plain-language-time-tracker' ),
+				'variant' => 'pltt-badge-warning',
+				'title'   => __( 'Past the retainer allocation — billable as overage', 'plain-language-time-tracker' ),
+			)
+			: array(
+				'text'    => __( 'On plan', 'plain-language-time-tracker' ),
+				'variant' => 'pltt-badge-info',
+				'title'   => __( 'Within the retainer allocation — covered by the plan', 'plain-language-time-tracker' ),
+			);
+	}
+
+	// Hourly / uncategorized.
+	return $is_billable
+		? array(
+			'text'    => __( 'Unbilled', 'plain-language-time-tracker' ),
+			'variant' => 'pltt-badge-success',
+			'title'   => __( 'Billable — not yet on an invoice', 'plain-language-time-tracker' ),
+		)
+		: array(
+			'text'    => __( 'Not billed', 'plain-language-time-tracker' ),
+			'variant' => '',
+			'title'   => __( 'Marked non-billable', 'plain-language-time-tracker' ),
+		);
+}
+
+/**
  * Render an entry table.
  *
  * Outputs a complete <table> with entry rows showing description,
  * client, project, tags, time, duration, and billable indicator.
- * When inline_edit is true, Tags, Billable, and Invoiced are interactive.
+ * When inline_edit is true, Tags and Billable are interactive; a read-only
+ * Status column shows each entry's billing state.
  *
  * @param array $entries Array of entry objects.
  * @param array $options {
@@ -1435,11 +1505,10 @@ function pltt_render_entry_table( $entries, $options = array() ) {
 	// Optional per-entry labels (entry_id => "Invoiced · record #N · period") for
 	// the covered-row marker's tooltip — the record pointer the snapshot enables.
 	$covered_meta      = ! empty( $options['covered_entry_meta'] ) ? (array) $options['covered_entry_meta'] : array();
-	$show_invoiced_col = $inline_edit && ! $covered_mode;
-	// Covered mode shows a read-only "Invoiced" checkmark column in place of the
-	// editable Inv. toggle — coverage from the frozen snapshot is the truth here.
-	// Only when the project actually has covered entries, else it's a dead column.
-	$show_covered_col  = $covered_mode && ! empty( $covered_lookup );
+	// One read-only Status column replaces the old editable "Inv." toggle and the
+	// covered "Invoiced" checkmark. It reads the real billing state (record
+	// coverage + project type + overage), never the legacy per-entry billed flag.
+	$show_status_col = $inline_edit || $covered_mode;
 
 	if ( empty( $entries ) ) {
 		return;
@@ -1486,10 +1555,7 @@ function pltt_render_entry_table( $entries, $options = array() ) {
 	if ( $show_billable_col ) {
 		$colspan++;
 	}
-	if ( $show_invoiced_col ) {
-		$colspan++;
-	}
-	if ( $show_covered_col ) {
+	if ( $show_status_col ) {
 		$colspan++;
 	}
 	if ( $show_amount ) {
@@ -1509,11 +1575,8 @@ function pltt_render_entry_table( $entries, $options = array() ) {
 				<?php if ( $show_billable_col ) : ?>
 					<th><?php esc_html_e( 'Billable', 'plain-language-time-tracker' ); ?></th>
 				<?php endif; ?>
-				<?php if ( $show_invoiced_col ) : ?>
-					<th class="pltt-invoiced-col"><?php esc_html_e( 'Inv.', 'plain-language-time-tracker' ); ?></th>
-				<?php endif; ?>
-				<?php if ( $show_covered_col ) : ?>
-					<th class="pltt-invoiced-col"><?php esc_html_e( 'Invoiced', 'plain-language-time-tracker' ); ?></th>
+				<?php if ( $show_status_col ) : ?>
+					<th class="pltt-status-col"><?php esc_html_e( 'Status', 'plain-language-time-tracker' ); ?></th>
 				<?php endif; ?>
 				<?php if ( $show_amount ) : ?>
 					<th class="pltt-amount-col"><?php esc_html_e( 'Amount', 'plain-language-time-tracker' ); ?></th>
@@ -1635,27 +1698,18 @@ function pltt_render_entry_table( $entries, $options = array() ) {
 							<?php endif; ?>
 						</td>
 					<?php endif; ?>
-					<?php if ( $show_invoiced_col ) : ?>
-						<td class="pltt-invoiced-col">
-							<button type="button"
-								class="pltt-invoiced-toggle <?php echo $is_billed ? 'is-invoiced' : 'not-invoiced'; ?>"
-								data-entry-id="<?php echo esc_attr( $entry->id ); ?>"
-								data-field="billed"
-								data-value="<?php echo $is_billed ? '1' : '0'; ?>"
-								aria-label="<?php echo $is_billed ? esc_attr__( 'Invoiced — click to toggle', 'plain-language-time-tracker' ) : esc_attr__( 'Not invoiced — click to toggle', 'plain-language-time-tracker' ); ?>"
-								title="<?php echo $is_billed ? esc_attr__( 'Invoiced — click to toggle', 'plain-language-time-tracker' ) : esc_attr__( 'Not invoiced — click to toggle', 'plain-language-time-tracker' ); ?>"
-								<?php echo ! $is_billable ? 'style="visibility:hidden"' : ''; ?>>
-								<?php echo $is_billed ? '✓' : '○'; ?>
-							</button>
-						</td>
-					<?php endif; ?>
-					<?php if ( $show_covered_col ) : ?>
-						<td class="pltt-invoiced-col">
-							<?php if ( isset( $covered_lookup[ $entry_id_int ] ) ) :
-								$cover_label = isset( $covered_meta[ $entry_id_int ] ) ? $covered_meta[ $entry_id_int ] : __( 'Invoiced', 'plain-language-time-tracker' );
-								?>
-								<span class="pltt-invoiced-mark is-invoiced" title="<?php echo esc_attr( $cover_label ); ?>" aria-label="<?php echo esc_attr( $cover_label ); ?>">&#10003;</span>
-							<?php endif; ?>
+					<?php if ( $show_status_col ) :
+						// Invoiced = covered by a committed record (single-project covered
+						// mode); elsewhere fall back to the legacy billed flag so the column
+						// still reads sensibly in the multi-project view.
+						$status_is_covered  = $covered_mode && isset( $covered_lookup[ $entry_id_int ] );
+						$status_is_invoiced = $status_is_covered || ( ! $covered_mode && $is_billed );
+						$status_inv_label   = $status_is_covered && isset( $covered_meta[ $entry_id_int ] ) ? $covered_meta[ $entry_id_int ] : '';
+						$status_is_overage  = isset( $overage_lookup[ $entry_id_int ] );
+						$status             = pltt_entry_status_badge( $project, $is_billable, $status_is_invoiced, $status_inv_label, $status_is_overage );
+						?>
+						<td class="pltt-status-col">
+							<span class="pltt-badge <?php echo esc_attr( $status['variant'] ); ?>" title="<?php echo esc_attr( $status['title'] ); ?>"><?php echo esc_html( $status['text'] ); ?></span>
 						</td>
 					<?php endif; ?>
 					<?php if ( $show_amount ) :
