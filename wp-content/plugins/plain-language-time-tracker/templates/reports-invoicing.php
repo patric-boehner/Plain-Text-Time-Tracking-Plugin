@@ -93,17 +93,42 @@ $inv_base = admin_url( 'admin.php?page=pltt-invoicing' );
 								<span class="pltt-expand-caret" aria-hidden="true"></span>
 							</button>
 
+							<?php // Hourly scopes pick entries inline; retainer overage is one whole-period line. ?>
+							<?php $inv_selectable = ( 'hourly' === $scope['billing_type'] && $v['count'] > 0 ); ?>
 							<div class="pltt-invoicing-panel" id="<?php echo esc_attr( $panel_id ); ?>" hidden>
 								<?php if ( $v['count'] > 0 ) : ?>
-									<?php pltt_render_billing_manifest( $v['entries'] ); ?>
+									<?php if ( $inv_selectable ) : ?>
+										<div class="pltt-invoicing-selectall">
+											<label><input type="checkbox" class="pltt-inv-selectall-box" checked> <?php esc_html_e( 'Select all', 'plain-language-time-tracker' ); ?></label>
+											<span class="pltt-invoicing-selecthint"><?php esc_html_e( 'Untick an entry to leave it unbilled — it stays open for a future invoice.', 'plain-language-time-tracker' ); ?></span>
+										</div>
+										<?php pltt_render_billing_manifest( $v['entries'], true ); ?>
+									<?php else : ?>
+										<p class="pltt-invoicing-refnote"><?php esc_html_e( 'Retainers bill the whole period’s overage — one line, not per entry.', 'plain-language-time-tracker' ); ?></p>
+										<?php pltt_render_billing_manifest( $v['entries'] ); ?>
+									<?php endif; ?>
 								<?php endif; ?>
-								<div class="pltt-invoicing-panel-actions">
-									<a class="pltt-invoicing-viewproject" href="<?php echo esc_url( PLTT_Project_Detail::get_url( (int) $proj->id ) ); ?>">
-										<?php esc_html_e( 'View project', 'plain-language-time-tracker' ); ?>
-									</a>
-									<button type="button" class="button button-primary" data-bill-dialog="pltt-bill-<?php echo esc_attr( $v['uid'] ); ?>">
-										<?php esc_html_e( 'Review &amp; Invoice', 'plain-language-time-tracker' ); ?>
-									</button>
+								<div class="pltt-invoicing-panel-foot">
+									<div class="pltt-invoicing-selected">
+										<?php if ( $inv_selectable ) : ?>
+											<?php esc_html_e( 'Selected', 'plain-language-time-tracker' ); ?>
+											(<span class="pltt-inv-sel-count"><?php echo (int) $v['count']; ?></span>)
+										<?php else : ?>
+											<?php esc_html_e( 'Overage', 'plain-language-time-tracker' ); ?>
+										<?php endif; ?>
+										<span class="pltt-inv-sel-total"><?php echo esc_html( pltt_format_currency( $scope['unbilled'] ) ); ?></span>
+									</div>
+									<div class="pltt-invoicing-panel-actions">
+										<a class="pltt-invoicing-viewproject" href="<?php echo esc_url( PLTT_Project_Detail::get_url( (int) $proj->id ) ); ?>">
+											<?php esc_html_e( 'View project', 'plain-language-time-tracker' ); ?>
+										</a>
+										<button type="button" class="button" data-lineitems-dialog="pltt-billcopy-<?php echo esc_attr( $v['uid'] ); ?>">
+											<?php esc_html_e( 'Line items…', 'plain-language-time-tracker' ); ?>
+										</button>
+										<button type="button" class="button button-primary" data-bill-dialog="pltt-bill-<?php echo esc_attr( $v['uid'] ); ?>">
+											<?php esc_html_e( 'Record bill', 'plain-language-time-tracker' ); ?> &rarr;
+										</button>
+									</div>
 								</div>
 							</div>
 						</li>
@@ -112,6 +137,7 @@ $inv_base = admin_url( 'admin.php?page=pltt-invoicing' );
 
 				<?php foreach ( $views as $v ) : ?>
 					<?php include PLTT_PLUGIN_DIR . 'templates/partials/billing-dialog.php'; ?>
+					<?php include PLTT_PLUGIN_DIR . 'templates/partials/billing-copy-dialog.php'; ?>
 				<?php endforeach; ?>
 			</div>
 		<?php endforeach; ?>
