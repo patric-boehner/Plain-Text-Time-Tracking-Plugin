@@ -20,25 +20,7 @@
 	font-variant-numeric: tabular-nums;
 }
 
-/* View toggle button group */
-.pltt-view-toggle {
-	display: inline-flex;
-}
-
-.pltt-view-toggle .button {
-	border-radius: 0;
-	margin-left: -1px;
-	text-decoration: none;
-}
-
-.pltt-view-toggle .button:first-child {
-	border-radius: 3px 0 0 3px;
-	margin-left: 0;
-}
-
-.pltt-view-toggle .button:last-child {
-	border-radius: 0 3px 3px 0;
-}
+/* .pltt-view-toggle now lives in admin.css (shared across all plugin pages). */
 
 /* Filter dropdown width and truncation */
 .pltt-report-filters .pltt-filter-group select {

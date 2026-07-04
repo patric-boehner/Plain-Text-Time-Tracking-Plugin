@@ -40,10 +40,29 @@ $return_to     = $return_to_raw ? wp_validate_redirect( $return_to_raw, '' ) : '
 ?>
 
 <div class="wrap pltt-wrap">
-	<?php include PLTT_PLUGIN_DIR . 'templates/partials/today-tabs.php'; ?>
 	<div class="pltt-header">
 		<h1><?php esc_html_e( 'Today', 'plain-language-time-tracker' ); ?></h1>
-		<div class="pltt-daily-log-nav">
+		<?php include PLTT_PLUGIN_DIR . 'templates/partials/today-tabs.php'; ?>
+		<?php
+		// OPT-DUP1: display success/error notices via shared helper. Inside the
+		// header div on purpose — see memory: WordPress JS relocates notices
+		// that are too far from the H1.
+		pltt_render_admin_notices(
+			array(
+				'entries_saved'       => __( 'Entries saved successfully.', 'plain-language-time-tracker' ),
+				'nothing_reprocessed' => __( 'Nothing new to process — every timestamp is already part of a finalized entry.', 'plain-language-time-tracker' ),
+			),
+			array(
+				'invalid_date'     => __( 'Invalid date.', 'plain-language-time-tracker' ),
+				'no_entries'       => __( 'No entries to save.', 'plain-language-time-tracker' ),
+				'save_failed'      => __( 'Failed to save entries.', 'plain-language-time-tracker' ),
+				'too_many_entries' => __( 'Too many entries in one save (max 200).', 'plain-language-time-tracker' ),
+			)
+		);
+		?>
+	</div>
+
+	<div class="pltt-daily-log-nav pltt-daily-log-nav-row">
 			<div class="pltt-date-nav pltt-date-nav-single"
 				role="group"
 				aria-label="<?php esc_attr_e( 'Date navigation', 'plain-language-time-tracker' ); ?>">
@@ -75,25 +94,6 @@ $return_to     = $return_to_raw ? wp_validate_redirect( $return_to_raw, '' ) : '
 				</a>
 			<?php endif; ?>
 		</div>
-
-		<?php
-		// OPT-DUP1: display success/error notices via shared helper. Inside the
-		// header div on purpose — see memory: WordPress JS relocates notices
-		// that are too far from the H1.
-		pltt_render_admin_notices(
-			array(
-				'entries_saved'       => __( 'Entries saved successfully.', 'plain-language-time-tracker' ),
-				'nothing_reprocessed' => __( 'Nothing new to process — every timestamp is already part of a finalized entry.', 'plain-language-time-tracker' ),
-			),
-			array(
-				'invalid_date'     => __( 'Invalid date.', 'plain-language-time-tracker' ),
-				'no_entries'       => __( 'No entries to save.', 'plain-language-time-tracker' ),
-				'save_failed'      => __( 'Failed to save entries.', 'plain-language-time-tracker' ),
-				'too_many_entries' => __( 'Too many entries in one save (max 200).', 'plain-language-time-tracker' ),
-			)
-		);
-		?>
-	</div>
 
 	<?php if ( $return_to ) : ?>
 		<p class="pltt-back-link">
