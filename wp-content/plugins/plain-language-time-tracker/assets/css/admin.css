@@ -99,6 +99,34 @@
 	gap: 10px;
 }
 
+/* View toggle button group (Reports Summary/Detailed, Billing Ready/Invoiced,
+   Today/History). Shared so every page that uses it is styled — lives here in
+   admin.css, which loads on all plugin pages. */
+.pltt-view-toggle {
+	display: inline-flex;
+}
+
+.pltt-view-toggle .button {
+	border-radius: 0;
+	margin-left: -1px;
+	text-decoration: none;
+}
+
+.pltt-view-toggle .button:first-child {
+	border-radius: 3px 0 0 3px;
+	margin-left: 0;
+}
+
+.pltt-view-toggle .button:last-child {
+	border-radius: 0 3px 3px 0;
+}
+
+/* When the Today/History toggle sits in the header, the day/month nav drops to
+   its own row just below. */
+.pltt-daily-log-nav-row {
+	margin-bottom: 20px;
+}
+
 /* Date display */
 .pltt-date-display {
 	display: flex;

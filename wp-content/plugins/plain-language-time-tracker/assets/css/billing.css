@@ -262,26 +262,7 @@
 
 /* ---- Invoicing page ---- */
 
-/* Ready / Invoiced toggle (same segmented-button group as the Reports view
-   toggle, whose CSS lives in reports.css and isn't loaded here). */
-.pltt-view-toggle {
-	display: inline-flex;
-}
-
-.pltt-view-toggle .button {
-	border-radius: 0;
-	margin-left: -1px;
-	text-decoration: none;
-}
-
-.pltt-view-toggle .button:first-child {
-	border-radius: 3px 0 0 3px;
-	margin-left: 0;
-}
-
-.pltt-view-toggle .button:last-child {
-	border-radius: 0 3px 3px 0;
-}
+/* .pltt-view-toggle now lives in admin.css (shared across all plugin pages). */
 
 /* Invoiced ledger: right-align the money columns. */
 .pltt-invoiced-table th.pltt-amount-col,

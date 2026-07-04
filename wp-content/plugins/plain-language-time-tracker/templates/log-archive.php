@@ -27,10 +27,12 @@ if ( ! defined( 'ABSPATH' ) ) {
 ?>
 
 <div class="wrap pltt-wrap">
-	<?php include PLTT_PLUGIN_DIR . 'templates/partials/today-tabs.php'; ?>
 	<div class="pltt-header">
 		<h1><?php esc_html_e( 'History', 'plain-language-time-tracker' ); ?></h1>
-		<form method="get" action="" class="pltt-report-filters-form">
+		<?php include PLTT_PLUGIN_DIR . 'templates/partials/today-tabs.php'; ?>
+	</div>
+
+	<form method="get" action="" class="pltt-report-filters-form">
 		<input type="hidden" name="page" value="pltt-time-tracker">
 		<input type="hidden" name="screen" value="history">
 		<input type="hidden" name="from" id="pltt-date-from" value="<?php echo esc_attr( $date_from ); ?>">
@@ -110,7 +112,6 @@ if ( ! defined( 'ABSPATH' ) ) {
 			<?php endif; ?>
 		</div>
 		</form>
-	</div>
 
 	<?php if ( $total_logs > 0 ) : ?>
 		<div class="pltt-summary-cards">
