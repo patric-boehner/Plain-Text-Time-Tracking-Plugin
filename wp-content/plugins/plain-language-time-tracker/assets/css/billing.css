@@ -195,33 +195,6 @@
 	margin-bottom: 8px;
 }
 
-/* In-dialog entry picker (hourly exclusion): checkable, scrollable manifest. */
-.pltt-billing-picker {
-	margin: 0 0 16px;
-	border: 1px solid #dcdcde;
-	border-radius: 4px;
-	overflow: hidden;
-}
-
-.pltt-billing-picker-hint {
-	margin: 0;
-	padding: 8px 10px;
-	background: #f6f7f7;
-	border-bottom: 1px solid #dcdcde;
-	color: #50575e;
-	font-size: 12px;
-}
-
-.pltt-billing-picker-scroll {
-	max-height: 220px;
-	overflow-y: auto;
-}
-
-.pltt-billing-picker .pltt-billing-manifest-table {
-	border: 0;
-	box-shadow: none;
-}
-
 .pltt-manifest-check {
 	width: 32px;
 	text-align: center;
@@ -506,25 +479,6 @@
 	font-size: 13px;
 }
 
-/* Description: source dropdown left, Copy right, textarea below. */
-.pltt-billing-desc-head {
-	display: flex;
-	align-items: center;
-	justify-content: space-between;
-	gap: 8px;
-	width: 100%;
-	margin-bottom: 8px;
-}
-
-.pltt-billing-desc-mode {
-	flex: 0 1 auto;
-	max-width: 240px;
-}
-
-.pltt-billing-copy {
-	flex: 0 0 auto;
-}
-
 /* Cancel: quiet text action pushed to the right of the action row. */
 .pltt-billing-cancel {
 	margin-left: auto;
@@ -553,10 +507,6 @@
    The in-place replacement for the Review & bill modal: a settings panel + a
    select toolbar sit above the project's real entry rows.
    ============================================================================ */
-
-.pltt-billing-panel {
-	margin-bottom: 20px;
-}
 
 /* ---- Settings panel ---- */
 .pltt-bill-panel {

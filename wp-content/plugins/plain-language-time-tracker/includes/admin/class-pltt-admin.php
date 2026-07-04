@@ -227,15 +227,6 @@ class PLTT_Admin {
 	}
 
 	/**
-	 * Render the log archive page.
-	 */
-	public static function render_log_archive_page() {
-		self::require_access();
-
-		PLTT_Log_Archive::render();
-	}
-
-	/**
 	 * Render the reports page.
 	 */
 	public static function render_reports_page() {
@@ -312,7 +303,6 @@ class PLTT_Admin {
 		// Only load on our plugin pages.
 		$plugin_pages = array(
 			'toplevel_page_pltt-time-tracker',
-			'time-tracker_page_pltt-log-archive',
 			'time-tracker_page_pltt-reports',
 			'time-tracker_page_pltt-invoicing',
 			'time-tracker_page_pltt-clients',
