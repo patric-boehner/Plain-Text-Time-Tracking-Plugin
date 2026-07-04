@@ -107,7 +107,8 @@ class PLTT_Log_Archive {
 			: $next_month->format( 'Y-m-t' );
 		$has_next  = $next_month->format( 'Y-m' ) <= $today_dt->format( 'Y-m' );
 
-		$base_archive_url = admin_url( 'admin.php?page=pltt-log-archive' );
+		// History is a sub-view of Today now (?page=pltt-time-tracker&screen=history).
+		$base_archive_url = pltt_get_admin_url( 'history' );
 		$prev_url         = add_query_arg( array( 'from' => $prev_from, 'to' => $prev_to ), $base_archive_url );
 		$next_url         = $has_next ? add_query_arg( array( 'from' => $next_from, 'to' => $next_to ), $base_archive_url ) : '';
 

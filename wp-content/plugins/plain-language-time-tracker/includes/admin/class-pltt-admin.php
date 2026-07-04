@@ -22,6 +22,7 @@ class PLTT_Admin {
 		add_action( 'admin_menu', array( __CLASS__, 'add_admin_menu' ) );
 		add_action( 'admin_enqueue_scripts', array( __CLASS__, 'enqueue_assets' ) );
 		add_action( 'admin_init', array( __CLASS__, 'maybe_redirect_finalized_review' ) );
+		add_action( 'admin_init', array( __CLASS__, 'redirect_legacy_log_archive' ) );
 	}
 
 	/**
@@ -74,6 +75,32 @@ class PLTT_Admin {
 	}
 
 	/**
+	 * Redirect the retired Log History page to Today's History sub-view.
+	 *
+	 * Log History lost its own menu item; it now lives at
+	 * ?page=pltt-time-tracker&screen=history. Old bookmarks and any stray
+	 * ?page=pltt-log-archive links land here and are forwarded, preserving the
+	 * month range + pagination. Runs on admin_init (before output).
+	 */
+	public static function redirect_legacy_log_archive() {
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only routing.
+		$page = isset( $_GET['page'] ) ? sanitize_key( wp_unslash( $_GET['page'] ) ) : '';
+		if ( 'pltt-log-archive' !== $page ) {
+			return;
+		}
+		$args = array();
+		foreach ( array( 'from', 'to', 'paged' ) as $key ) {
+			// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only routing.
+			if ( isset( $_GET[ $key ] ) ) {
+				// phpcs:ignore WordPress.Security.NonceVerification.Recommended
+				$args[ $key ] = sanitize_text_field( wp_unslash( $_GET[ $key ] ) );
+			}
+		}
+		wp_safe_redirect( pltt_get_admin_url( 'history', $args ) );
+		exit;
+	}
+
+	/**
 	 * Register admin menu pages.
 	 */
 	public static function add_admin_menu() {
@@ -108,15 +135,9 @@ class PLTT_Admin {
 			array( __CLASS__, 'render_page' )
 		);
 
-		// Log History.
-		add_submenu_page(
-			'pltt-time-tracker',
-			__( 'Log History', 'plain-language-time-tracker' ),
-			__( 'Log History', 'plain-language-time-tracker' ),
-			'manage_options',
-			'pltt-log-archive',
-			array( __CLASS__, 'render_log_archive_page' )
-		);
+		// (Log History is no longer its own menu item — it's the History sub-view of
+		// Today, reached via the Today · History toggle and rendered by render_page's
+		// 'history' screen. Old ?page=pltt-log-archive URLs redirect there.)
 
 		// Insights — reporting (slug kept as pltt-reports).
 		add_submenu_page(
@@ -193,6 +214,11 @@ class PLTT_Admin {
 		switch ( $screen ) {
 			case 'review':
 				PLTT_Review::render();
+				break;
+			case 'history':
+				// History is now a sub-view of Today (the old Log History page),
+				// reached via the Today · History toggle rather than its own menu item.
+				PLTT_Log_Archive::render();
 				break;
 			default:
 				PLTT_Daily_Log::render();
@@ -342,6 +368,25 @@ class PLTT_Admin {
 		if ( 'toplevel_page_pltt-time-tracker' === $hook ) {
 			$screen = isset( $_GET['screen'] ) ? sanitize_text_field( wp_unslash( $_GET['screen'] ) ) : 'daily-log';
 
+			// History sub-view (the retired Log History page) — only needs its own
+			// month-navigator assets, nothing from the capture/review bundle.
+			if ( 'history' === $screen ) {
+				wp_enqueue_style(
+					'pltt-log-archive',
+					PLTT_PLUGIN_URL . 'assets/css/log-archive.css',
+					array( 'pltt-admin' ),
+					$version
+				);
+				wp_enqueue_script(
+					'pltt-log-archive',
+					PLTT_PLUGIN_URL . 'assets/js/log-archive.js',
+					array( 'pltt-shared' ),
+					$version,
+					true
+				);
+				return;
+			}
+
 			// Inline entry-editor bundle — shared by the review screen and the
 			// Daily Log (Today) inline editor. review.js IIFE 2 binds it wherever
 			// the editable list is present.
@@ -388,22 +433,6 @@ class PLTT_Admin {
 					true
 				);
 			}
-		}
-
-		if ( 'time-tracker_page_pltt-log-archive' === $hook ) {
-			wp_enqueue_style(
-				'pltt-log-archive',
-				PLTT_PLUGIN_URL . 'assets/css/log-archive.css',
-				array( 'pltt-admin' ),
-				$version
-			);
-			wp_enqueue_script(
-				'pltt-log-archive',
-				PLTT_PLUGIN_URL . 'assets/js/log-archive.js',
-				array( 'pltt-shared' ),
-				$version,
-				true
-			);
 		}
 
 		// Alias/keyword chip manager — clients (alias seeding) and tags (keyword

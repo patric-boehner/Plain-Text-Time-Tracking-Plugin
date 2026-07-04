@@ -27,10 +27,12 @@ if ( ! defined( 'ABSPATH' ) ) {
 ?>
 
 <div class="wrap pltt-wrap">
+	<?php include PLTT_PLUGIN_DIR . 'templates/partials/today-tabs.php'; ?>
 	<div class="pltt-header">
-		<h1><?php esc_html_e( 'Log History', 'plain-language-time-tracker' ); ?></h1>
+		<h1><?php esc_html_e( 'History', 'plain-language-time-tracker' ); ?></h1>
 		<form method="get" action="" class="pltt-report-filters-form">
-		<input type="hidden" name="page" value="pltt-log-archive">
+		<input type="hidden" name="page" value="pltt-time-tracker">
+		<input type="hidden" name="screen" value="history">
 		<input type="hidden" name="from" id="pltt-date-from" value="<?php echo esc_attr( $date_from ); ?>">
 		<input type="hidden" name="to"   id="pltt-date-to"   value="<?php echo esc_attr( $date_to ); ?>">
 
@@ -101,7 +103,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 			</nav>
 
 			<?php if ( substr( $date_from, 0, 7 ) !== substr( $today, 0, 7 ) ) : ?>
-				<a href="<?php echo esc_url( admin_url( 'admin.php?page=pltt-log-archive' ) ); ?>"
+				<a href="<?php echo esc_url( pltt_get_admin_url( 'history' ) ); ?>"
 					class="button button-secondary">
 					<?php esc_html_e( 'This Month', 'plain-language-time-tracker' ); ?>
 				</a>
@@ -182,7 +184,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 									</td>
 									<td>
 										<?php if ( (int) $log->entry_count > 0 ) : ?>
-											<a href="<?php echo esc_url( pltt_get_admin_url( 'review', array( 'date' => $log->log_date ) ) ); ?>">
+											<a href="<?php echo esc_url( pltt_get_admin_url( 'daily-log', array( 'date' => $log->log_date ) ) ); ?>#pltt-entries">
 												<?php echo esc_html( $log->entry_count ); ?>
 											</a>
 										<?php else : ?>
@@ -214,7 +216,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 
 			<?php
-			$base_url = add_query_arg( array( 'from' => $date_from, 'to' => $date_to ), admin_url( 'admin.php?page=pltt-log-archive' ) );
+			$base_url = add_query_arg( array( 'from' => $date_from, 'to' => $date_to ), pltt_get_admin_url( 'history' ) );
 			pltt_render_pagination( $paged, $total_pages, $total_logs, $base_url, 'log', 'logs' );
 			?>
 

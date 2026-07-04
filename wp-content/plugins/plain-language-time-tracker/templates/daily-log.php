@@ -40,8 +40,9 @@ $return_to     = $return_to_raw ? wp_validate_redirect( $return_to_raw, '' ) : '
 ?>
 
 <div class="wrap pltt-wrap">
+	<?php include PLTT_PLUGIN_DIR . 'templates/partials/today-tabs.php'; ?>
 	<div class="pltt-header">
-		<h1><?php esc_html_e( 'Daily Log', 'plain-language-time-tracker' ); ?></h1>
+		<h1><?php esc_html_e( 'Today', 'plain-language-time-tracker' ); ?></h1>
 		<div class="pltt-daily-log-nav">
 			<div class="pltt-date-nav pltt-date-nav-single"
 				role="group"
