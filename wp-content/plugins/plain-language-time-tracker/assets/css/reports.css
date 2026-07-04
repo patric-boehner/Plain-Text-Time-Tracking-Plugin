@@ -128,8 +128,10 @@
 }
 
 .pltt-date-group .widefat th.pltt-invoiced-col,
-.pltt-date-group .widefat td.pltt-invoiced-col { /* Inv. */
-	width: 50px;
+.pltt-date-group .widefat td.pltt-invoiced-col { /* Inv. / Invoiced */
+	width: 74px;
+	text-align: center;
+	white-space: nowrap;
 }
 
 .pltt-date-group .widefat th.pltt-amount-col,
@@ -324,6 +326,25 @@
 
 .pltt-date-group .widefat tr.pltt-row-overage:hover {
 	background: var(--pltt-bg-overage-hover);
+}
+
+/* Covered row tint — blue bg + blue left edge: entry sits inside a committed
+   billing record (read-only "covered", not billed-vs-absorbed). */
+.pltt-date-group .widefat tr.pltt-row-covered {
+	background: var(--pltt-billed-bg);
+}
+
+.pltt-date-group .widefat tr.pltt-row-covered > td:first-child {
+	box-shadow: inset 3px 0 0 var(--pltt-primary);
+}
+
+/* Covered "Invoiced" column mark — the recycled read-only checkmark, matching
+   the old invoiced-toggle color. Tooltip carries the record pointer
+   ("Invoiced · record #N · period"). */
+.pltt-invoiced-mark {
+	color: var(--pltt-primary);
+	font-weight: 700;
+	cursor: help;
 }
 
 /* Global "billable time outside your date range" notification (summary view). */

@@ -20,9 +20,6 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-// Compact-row table columns: Date/Time, Duration, Description, Tags, Billable.
-$colspan = 5;
-
 // Bulk-load clients and projects referenced by the entries on this date (avoid N+1 in the row loop).
 $entry_client_ids  = array();
 $entry_project_ids = array();
@@ -36,6 +33,19 @@ foreach ( $entries as $e ) {
 }
 $row_clients_cache  = PLTT_Clients::get_multiple( array_unique( $entry_client_ids ) );
 $row_projects_cache = PLTT_Projects::get_multiple( array_unique( $entry_project_ids ) );
+
+// Compact-row columns: Date/Time, Duration, Description, Tags (+ Billable when at
+// least one entry's project uses the per-entry flag — hourly). All-retainer/
+// fixed-fee lists drop the Billable column.
+$show_billable_col = false;
+foreach ( $entries as $e ) {
+	$p = ! empty( $e['project_id'] ) && isset( $row_projects_cache[ (int) $e['project_id'] ] ) ? $row_projects_cache[ (int) $e['project_id'] ] : null;
+	if ( pltt_billable_flag_applies( $p ) ) {
+		$show_billable_col = true;
+		break;
+	}
+}
+$colspan = $show_billable_col ? 5 : 4;
 ?>
 
 <table class="pltt-entries-table widefat">
@@ -45,7 +55,9 @@ $row_projects_cache = PLTT_Projects::get_multiple( array_unique( $entry_project_
 			<th class="pltt-col-duration"><?php esc_html_e( 'Duration', 'plain-language-time-tracker' ); ?></th>
 			<th class="pltt-col-description"><?php esc_html_e( 'Description', 'plain-language-time-tracker' ); ?></th>
 			<th class="pltt-col-tags"><?php esc_html_e( 'Tags', 'plain-language-time-tracker' ); ?></th>
-			<th class="pltt-col-billable"><?php esc_html_e( 'Billable', 'plain-language-time-tracker' ); ?></th>
+			<?php if ( $show_billable_col ) : ?>
+				<th class="pltt-col-billable"><?php esc_html_e( 'Billable', 'plain-language-time-tracker' ); ?></th>
+			<?php endif; ?>
 		</tr>
 	</thead>
 	<tbody id="pltt-entries-tbody">
@@ -100,11 +112,15 @@ $row_projects_cache = PLTT_Projects::get_multiple( array_unique( $entry_project_
 						<?php pltt_render_tag_badges( ! empty( $entry['tags'] ) ? explode( ',', $entry['tags'] ) : array() ); ?>
 					</div>
 				</td>
-				<td class="pltt-billable-indicator">
-					<span class="pltt-billable-symbol <?php echo $is_billable ? 'is-billable' : 'not-billable'; ?>"
-						aria-label="<?php echo $is_billable ? esc_attr__( 'Billable', 'plain-language-time-tracker' ) : esc_attr__( 'Not billable', 'plain-language-time-tracker' ); ?>"
-						title="<?php echo $is_billable ? esc_attr__( 'Billable', 'plain-language-time-tracker' ) : esc_attr__( 'Not billable', 'plain-language-time-tracker' ); ?>">$</span>
-				</td>
+				<?php if ( $show_billable_col ) : ?>
+					<td class="pltt-billable-indicator">
+						<?php if ( pltt_billable_flag_applies( $project ) ) : ?>
+							<span class="pltt-billable-symbol <?php echo $is_billable ? 'is-billable' : 'not-billable'; ?>"
+								aria-label="<?php echo $is_billable ? esc_attr__( 'Billable', 'plain-language-time-tracker' ) : esc_attr__( 'Not billable', 'plain-language-time-tracker' ); ?>"
+								title="<?php echo $is_billable ? esc_attr__( 'Billable', 'plain-language-time-tracker' ) : esc_attr__( 'Not billable', 'plain-language-time-tracker' ); ?>">$</span>
+						<?php endif; ?>
+					</td>
+				<?php endif; ?>
 			</tr>
 			<?php
 			// Hidden form row directly beneath. Pre-populated with the entry's values.

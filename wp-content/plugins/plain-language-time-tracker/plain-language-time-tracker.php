@@ -3,7 +3,7 @@
  * Plugin Name: Plain Language Time Tracker
  * Plugin URI: https://github.com/patrickb/plain-language-time-tracker
  * Description: Time tracking with a "capture first, categorize later" workflow. Jot plain text notes with timestamps, then process them into structured time entries.
- * Version: 1.9.30
+ * Version: 1.9.34
  * Author: Patrick Boehner
  * Text Domain: plain-language-time-tracker
  * Domain Path: /languages
@@ -20,7 +20,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 // Plugin constants.
-define( 'PLTT_VERSION', '1.9.30' );
+define( 'PLTT_VERSION', '1.9.33' );
 define( 'PLTT_PLUGIN_FILE', __FILE__ );
 define( 'PLTT_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'PLTT_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
@@ -50,6 +50,11 @@ function pltt_load_dependencies() {
 	require_once PLTT_PLUGIN_DIR . 'includes/database/class-pltt-entries.php';
 	require_once PLTT_PLUGIN_DIR . 'includes/database/class-pltt-aliases.php';
 	require_once PLTT_PLUGIN_DIR . 'includes/database/class-pltt-tag-aliases.php';
+	require_once PLTT_PLUGIN_DIR . 'includes/database/class-pltt-billing-records.php';
+	require_once PLTT_PLUGIN_DIR . 'includes/database/class-pltt-billing-record-entries.php';
+
+	// Billing engine (read model).
+	require_once PLTT_PLUGIN_DIR . 'includes/class-pltt-billing.php';
 
 	// Parser.
 	require_once PLTT_PLUGIN_DIR . 'includes/parser/class-pltt-time-parser.php';
@@ -65,6 +70,7 @@ function pltt_load_dependencies() {
 	require_once PLTT_PLUGIN_DIR . 'includes/admin/class-pltt-reports.php';
 	require_once PLTT_PLUGIN_DIR . 'includes/admin/class-pltt-project-report.php';
 	require_once PLTT_PLUGIN_DIR . 'includes/admin/class-pltt-project-detail.php';
+	require_once PLTT_PLUGIN_DIR . 'includes/admin/class-pltt-billing-surface.php';
 	require_once PLTT_PLUGIN_DIR . 'includes/admin/class-pltt-log-archive.php';
 }
 
@@ -76,6 +82,9 @@ function pltt_activate() {
 	PLTT_Database::create_tables();
 	add_option( 'pltt_version', PLTT_VERSION );
 	add_option( 'pltt_db_version', PLTT_Database::DB_VERSION );
+	// Clean-break billing cutoff: records ignore entries dated before this. Empty
+	// means "first of the current month" (resolved lazily by PLTT_Billing).
+	add_option( 'pltt_billing_start_date', '' );
 }
 register_activation_hook( __FILE__, 'pltt_activate' );
 

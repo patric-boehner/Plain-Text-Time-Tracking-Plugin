@@ -209,7 +209,11 @@ if ( ! empty( $projects ) ) {
 								}
 							?></td>
 							<td class="pltt-col-billable">
-								<span class="pltt-billable-symbol <?php echo 'none' !== $billing_type && (int) ( $project->billability_default ?? 1 ) === 1 ? 'is-billable' : 'not-billable'; ?>">$</span>
+								<?php if ( pltt_billable_flag_applies( $project ) ) : ?>
+									<span class="pltt-billable-symbol <?php echo (int) ( $project->billability_default ?? 1 ) === 1 ? 'is-billable' : 'not-billable'; ?>">$</span>
+								<?php else : ?>
+									<span class="pltt-empty">—</span>
+								<?php endif; ?>
 							</td>
 						</tr>
 						<?php endforeach; ?>
@@ -390,6 +394,9 @@ if ( ! empty( $projects ) ) {
 		rateField.disabled = false;
 		rateGroup.classList.remove('pltt-field-disabled');
 		nonBillableGroup.classList.remove('pltt-field-disabled');
+		// Default the per-entry billable setting visible; retainer/fixed-fee hide it
+		// below (their billing is computed at the period level, not per entry).
+		nonBillableGroup.classList.remove('pltt-hidden');
 
 		// Update dynamic descriptions.
 		el('pltt-rate-description').textContent = BILLING_DESCRIPTIONS.rate[type];
@@ -424,8 +431,10 @@ if ( ! empty( $projects ) ) {
 			var budgetMode = (feeInput.value !== '') ? 'fee' : 'hours';
 			el('pltt-project-budget-mode').value = budgetMode;
 			applyBudgetModeUI(budgetMode);
-			// Fixed-fee dollars come from the flat fee, not time × rate — default entries to non-billable.
+			// Fixed-fee dollars come from the flat fee, not time × rate — default entries to
+			// non-billable and hide the per-entry billable setting (it does nothing here).
 			if (setDefaults) { nonBillable.checked = true; }
+			nonBillableGroup.classList.add('pltt-hidden');
 
 		} else if (type === 'recurring') {
 			settingsBox.classList.remove('pltt-hidden');
@@ -447,6 +456,9 @@ if ( ! empty( $projects ) ) {
 				nonBillable.checked = true;
 				if (recurringSelect.value === '') { recurringSelect.value = 'monthly'; }
 			}
+			// Within-allocation time is covered by the flat fee and overage is billed at
+			// the period level — the per-entry billable setting does nothing here. Hide it.
+			nonBillableGroup.classList.add('pltt-hidden');
 
 		} else if (type === 'none') {
 			settingsBox.classList.add('pltt-hidden');

@@ -1,0 +1,201 @@
+<?php
+/**
+ * Billing record CRUD operations.
+ *
+ * A billing record is one durable per-scope summary written at commit time
+ * (verify -> adjust -> commit). It is the single source of truth for what has
+ * been billed — entries carry no link back. One remainder rule for every type:
+ *
+ *     unbilled(scope) = calculated − SUM(billed) − SUM(absorbed)
+ *
+ * A fully-absorbed record is just billed_amount = 0 (absorbed = calculated),
+ * reached by trimming the amount to zero; there is no status column. See
+ * billing-record-spec.md and PLTT_Billing (the engine).
+ *
+ * @package PlainLanguageTimeTracker
+ */
+
+// Prevent direct access.
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
+
+/**
+ * Handles billing record database operations.
+ */
+class PLTT_Billing_Records {
+
+	/**
+	 * Allowed billing_type values (snapshot of how the record was billed).
+	 */
+	const TYPES = array( 'hourly', 'retainer_overage' );
+
+	/**
+	 * Get a single record by ID.
+	 *
+	 * @param int $id Record ID.
+	 * @return object|null
+	 */
+	public static function get( $id ) {
+		global $wpdb;
+		$table = PLTT_Database::get_table_name( 'billing_records' );
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+		return $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$table} WHERE id = %d", (int) $id ) );
+	}
+
+	/**
+	 * Insert a billing record.
+	 *
+	 * Caller is responsible for computing calculated/billed/absorbed correctly;
+	 * this layer validates the type allowlist and clamps the money fields so a
+	 * bad post can never write absorbed < 0 or billed > calculated.
+	 *
+	 * @param array $data {
+	 *     @type int    $project_id         Required.
+	 *     @type string $billing_type       Required; one of self::TYPES.
+	 *     @type string $period_start       Optional 'Y-m-d' or null (hourly).
+	 *     @type string $period_end         Optional 'Y-m-d' or null.
+	 *     @type float  $rate               Optional snapshot rate.
+	 *     @type float  $calculated_amount  Required.
+	 *     @type float  $billed_amount      Required (0 = fully absorbed).
+	 *     @type int    $billed_minutes     Optional.
+	 *     @type int    $allocation_minutes Optional (retainer only).
+	 *     @type string $description        Optional.
+	 * }
+	 * @return int|WP_Error Inserted ID, or WP_Error on validation/DB failure.
+	 */
+	public static function create( $data ) {
+		global $wpdb;
+
+		$project_id = isset( $data['project_id'] ) ? (int) $data['project_id'] : 0;
+		if ( $project_id <= 0 ) {
+			return new WP_Error( 'invalid_project', __( 'A project is required.', 'plain-language-time-tracker' ) );
+		}
+
+		$billing_type = isset( $data['billing_type'] ) ? (string) $data['billing_type'] : '';
+		if ( ! in_array( $billing_type, self::TYPES, true ) ) {
+			return new WP_Error( 'invalid_billing_type', __( 'Unknown billing type.', 'plain-language-time-tracker' ) );
+		}
+
+		$calculated = isset( $data['calculated_amount'] ) ? round( (float) $data['calculated_amount'], 2 ) : 0.0;
+		$billed     = isset( $data['billed_amount'] ) ? round( (float) $data['billed_amount'], 2 ) : 0.0;
+
+		// Clamp: never negative, never bill more than the honest figure.
+		$calculated = max( 0.0, $calculated );
+		$billed     = min( max( 0.0, $billed ), $calculated );
+		$absorbed   = round( $calculated - $billed, 2 );
+
+		$insert = array(
+			'project_id'        => $project_id,
+			'billing_type'      => $billing_type,
+			'rate'              => isset( $data['rate'] ) ? round( (float) $data['rate'], 2 ) : null,
+			'calculated_amount' => $calculated,
+			'billed_amount'     => $billed,
+			'absorbed_amount'   => $absorbed,
+			'description'       => isset( $data['description'] ) ? (string) $data['description'] : '',
+			'marked_at'         => current_time( 'mysql' ),
+		);
+		$formats = array( '%d', '%s', '%f', '%f', '%f', '%f', '%s', '%s' );
+
+		// Nullable columns: only include when set, so wpdb writes a real NULL via
+		// the schema default rather than coercing null through a %d/%s format.
+		if ( ! empty( $data['period_start'] ) ) {
+			$insert['period_start'] = $data['period_start'];
+			$formats[]              = '%s';
+		}
+		if ( ! empty( $data['period_end'] ) ) {
+			$insert['period_end'] = $data['period_end'];
+			$formats[]            = '%s';
+		}
+		if ( isset( $data['billed_minutes'] ) && null !== $data['billed_minutes'] ) {
+			$insert['billed_minutes'] = (int) $data['billed_minutes'];
+			$formats[]                = '%d';
+		}
+		if ( isset( $data['allocation_minutes'] ) && null !== $data['allocation_minutes'] ) {
+			$insert['allocation_minutes'] = (int) $data['allocation_minutes'];
+			$formats[]                    = '%d';
+		}
+
+		$table = PLTT_Database::get_table_name( 'billing_records' );
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+		$result = $wpdb->insert( $table, $insert, $formats );
+
+		if ( false === $result ) {
+			return new WP_Error( 'db_insert_failed', __( 'Could not save the billing record.', 'plain-language-time-tracker' ) );
+		}
+
+		return (int) $wpdb->insert_id;
+	}
+
+	/**
+	 * Every billing record, newest first — the cross-project invoiced ledger.
+	 *
+	 * @return array<int, object>
+	 */
+	public static function get_all() {
+		global $wpdb;
+		$table = PLTT_Database::get_table_name( 'billing_records' );
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+		return $wpdb->get_results( "SELECT * FROM {$table} ORDER BY marked_at DESC, id DESC" );
+	}
+
+	/**
+	 * All records for a project, newest first — the read-only billing history.
+	 *
+	 * @param int $project_id Project ID.
+	 * @return array<int, object>
+	 */
+	public static function get_for_project( $project_id ) {
+		global $wpdb;
+		$table = PLTT_Database::get_table_name( 'billing_records' );
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+		return $wpdb->get_results(
+			$wpdb->prepare(
+				"SELECT * FROM {$table} WHERE project_id = %d ORDER BY marked_at DESC, id DESC",
+				(int) $project_id
+			)
+		);
+	}
+
+	/**
+	 * Sum what existing records already account for over a scope, so the engine
+	 * can subtract it from calculated(scope) to get the unbilled remainder.
+	 *
+	 * Scope = project + billing_type, optionally narrowed to a retainer month by
+	 * period_start (an exact match on the month's first day — how retainer records
+	 * store it). Hourly records carry no period_start, so they are summed in full.
+	 *
+	 * @param int         $project_id   Project ID.
+	 * @param string      $billing_type One of self::TYPES.
+	 * @param string|null $period_start Optional 'Y-m-d' to scope to one retainer month.
+	 * @return array{billed: float, absorbed: float}
+	 */
+	public static function sum_billed( $project_id, $billing_type, $period_start = null ) {
+		global $wpdb;
+		$table = PLTT_Database::get_table_name( 'billing_records' );
+
+		$where   = array( 'project_id = %d', 'billing_type = %s' );
+		$prepare = array( (int) $project_id, (string) $billing_type );
+
+		if ( ! empty( $period_start ) ) {
+			$where[]   = 'period_start = %s';
+			$prepare[] = $period_start;
+		}
+
+		$sql = "SELECT COALESCE(SUM(billed_amount), 0) AS billed,
+			COALESCE(SUM(absorbed_amount), 0) AS absorbed
+			FROM {$table} WHERE " . implode( ' AND ', $where );
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.NotPrepared
+		$row = $wpdb->get_row( $wpdb->prepare( $sql, $prepare ) );
+
+		return array(
+			'billed'   => $row ? (float) $row->billed : 0.0,
+			'absorbed' => $row ? (float) $row->absorbed : 0.0,
+		);
+	}
+}

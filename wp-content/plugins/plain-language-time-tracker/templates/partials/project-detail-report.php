@@ -59,6 +59,62 @@ $is_period   = ! empty( $window['is_period'] );
 </div>
 
 <?php
+// Ready to invoice — one prompt per outstanding scope, linking to the billing
+// surface (verify -> adjust -> commit). Active projects only: an archived project
+// has nothing live to bill, so Review & bill disappears (billing history stays).
+//
+// Temporarily HIDDEN on the project page (2026-06-27, Patrick's call — keeps the
+// page cleaner; may return). The queue still lives on the Invoicing menu page, so
+// nothing is lost. To restore, set $show_ready = true.
+$show_ready   = false;
+$ready_scopes = ( $show_ready && 'active' === $project->status )
+	? PLTT_Billing::get_ready_to_invoice( $project )
+	: array();
+if ( ! empty( $ready_scopes ) ) :
+	?>
+	<div class="pltt-card pltt-ready-card">
+		<h2 class="pltt-ready-title"><?php esc_html_e( 'Ready to invoice', 'plain-language-time-tracker' ); ?></h2>
+		<?php foreach ( $ready_scopes as $rs ) : ?>
+			<?php
+			$bill_url = add_query_arg(
+				array(
+					'page'       => 'pltt-projects',
+					'action'     => 'bill',
+					'project_id' => (int) $project->id,
+					'type'       => $rs['billing_type'],
+					'period'     => (string) $rs['period_start'],
+				),
+				admin_url( 'admin.php' )
+			);
+
+			if ( 'retainer_overage' === $rs['billing_type'] ) {
+				$prompt = sprintf(
+					/* translators: 1: period label, 2: dollar amount over allocation. */
+					__( '%1$s — %2$s over allocation', 'plain-language-time-tracker' ),
+					$rs['period_label'],
+					pltt_format_currency( $rs['unbilled'] )
+				);
+			} else {
+				$prompt = sprintf(
+					/* translators: %s: unbilled dollar amount. */
+					__( '%s unbilled', 'plain-language-time-tracker' ),
+					pltt_format_currency( $rs['unbilled'] )
+				);
+			}
+			?>
+			<div class="pltt-ready-row">
+				<span class="pltt-ready-prompt"><?php echo esc_html( $prompt ); ?></span>
+				<a class="button button-primary" href="<?php echo esc_url( $bill_url ); ?>">
+					<?php esc_html_e( 'Review &amp; Invoice', 'plain-language-time-tracker' ); ?>
+				</a>
+			</div>
+		<?php endforeach; ?>
+	</div>
+	<?php
+endif;
+?>
+
+<?php
 // Period lens (recurring projects only) — sits beneath the cards and drives the
 // cards, the volume chart, and the "Where the time went" bars; the swimlane
 // stays lifetime. Styling mirrors the Reports view-toggle + date-nav approach.
@@ -439,3 +495,20 @@ if ( ! empty( $budget_line ) && ! empty( $axis ) ) {
 	<?php endforeach; ?>
 </div>
 <?php endif; ?>
+
+<?php
+// Billing history — the full read-only ledger of records for this project. Unlike
+// everything above, it is NOT bound to the selected period; it's the lifetime
+// ledger. A record with billed_amount = 0 is fully absorbed (no status column).
+$billing_history = PLTT_Billing::get_for_project_history( (int) $project->id );
+if ( ! empty( $billing_history ) ) :
+	?>
+	<div class="pltt-card pltt-billing-history" id="pltt-billing-history">
+		<div class="pltt-where-header">
+			<h2 class="pltt-where-title"><?php esc_html_e( 'Billing history', 'plain-language-time-tracker' ); ?></h2>
+		</div>
+		<?php include PLTT_PLUGIN_DIR . 'templates/partials/billing-history-table.php'; ?>
+	</div>
+	<?php
+endif;
+?>

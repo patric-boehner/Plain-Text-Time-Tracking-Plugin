@@ -40,6 +40,9 @@ class PLTT_Ajax {
 		// Tag operations (create - used from review screen modal).
 		add_action( 'wp_ajax_pltt_create_tag', array( __CLASS__, 'create_tag' ) );
 
+		// Billing.
+		add_action( 'wp_ajax_pltt_commit_billing', array( __CLASS__, 'commit_billing' ) );
+
 	}
 
 	/**
@@ -464,6 +467,13 @@ class PLTT_Ajax {
 		$include_ids = $current_project_id > 0 ? array( $current_project_id ) : array();
 		$projects    = PLTT_Projects::get_by_client_recent_first( $client_id, $include_ids );
 
+		// Stamp whether the per-entry billable flag applies (hidden for retainer/
+		// fixed-fee) so the finalize UI can hide the control without re-deriving
+		// the rule in JS.
+		foreach ( $projects as $project ) {
+			$project->billable_flag_applies = pltt_billable_flag_applies( $project ) ? 1 : 0;
+		}
+
 		wp_send_json_success(
 			array(
 				'projects' => $projects,
@@ -554,6 +564,9 @@ class PLTT_Ajax {
 		}
 
 		$project = PLTT_Projects::get( $project_id );
+		if ( $project ) {
+			$project->billable_flag_applies = pltt_billable_flag_applies( $project ) ? 1 : 0;
+		}
 		wp_send_json_success(
 			array(
 				'project' => $project,
@@ -755,6 +768,64 @@ class PLTT_Ajax {
 		} else {
 			wp_send_json_error( __( 'Failed to delete log.', 'plain-language-time-tracker' ) );
 		}
+	}
+
+	/**
+	 * Commit a billing record from the invoicing-page modal.
+	 *
+	 * The scope is recomputed server-side in PLTT_Billing::commit(); the posted
+	 * amount can only lower the bill (trimming to zero fully absorbs the scope).
+	 */
+	public static function commit_billing() {
+		if ( ! self::verify_request() ) {
+			return;
+		}
+
+		$project_id   = isset( $_POST['project_id'] ) ? absint( $_POST['project_id'] ) : 0;
+		$billing_type = isset( $_POST['billing_type'] ) ? sanitize_key( wp_unslash( $_POST['billing_type'] ) ) : '';
+		$period       = isset( $_POST['period'] ) ? sanitize_text_field( wp_unslash( $_POST['period'] ) ) : '';
+		$amount       = isset( $_POST['billed_amount'] ) ? floatval( wp_unslash( $_POST['billed_amount'] ) ) : 0.0;
+		$excluded_ids = isset( $_POST['excluded_entry_ids'] )
+			? array_values( array_filter( array_map( 'absint', explode( ',', sanitize_text_field( wp_unslash( $_POST['excluded_entry_ids'] ) ) ) ) ) )
+			: array();
+		// Inline surface: the exact entries the user left checked on the visible rows.
+		$included_ids = isset( $_POST['included_entry_ids'] )
+			? array_values( array_filter( array_map( 'absint', explode( ',', sanitize_text_field( wp_unslash( $_POST['included_entry_ids'] ) ) ) ) ) )
+			: array();
+		$description  = isset( $_POST['description'] ) ? sanitize_textarea_field( wp_unslash( $_POST['description'] ) ) : '';
+
+		$period_start = ( 'retainer_overage' === $billing_type && '' !== $period )
+			? pltt_sanitize_date_strict( $period )
+			: null;
+
+		// Hourly bills the viewed range; commit recomputes the same uncovered scope.
+		$date_from = isset( $_POST['date_from'] ) && '' !== $_POST['date_from'] ? pltt_sanitize_date_strict( wp_unslash( $_POST['date_from'] ) ) : null;
+		$date_to   = isset( $_POST['date_to'] ) && '' !== $_POST['date_to'] ? pltt_sanitize_date_strict( wp_unslash( $_POST['date_to'] ) ) : null;
+
+		$result = PLTT_Billing::commit(
+			array(
+				'project_id'    => $project_id,
+				'billing_type'  => $billing_type,
+				'period_start'  => $period_start,
+				'date_from'     => $date_from,
+				'date_to'       => $date_to,
+				'billed_amount' => $amount,
+				'excluded_entry_ids' => $excluded_ids,
+				'included_entry_ids' => $included_ids,
+				'description'   => $description,
+			)
+		);
+
+		if ( is_wp_error( $result ) ) {
+			wp_send_json_error( array( 'message' => $result->get_error_message() ) );
+			return;
+		}
+
+		wp_send_json_success(
+			array(
+				'message' => __( 'Billing recorded.', 'plain-language-time-tracker' ),
+			)
+		);
 	}
 
 }

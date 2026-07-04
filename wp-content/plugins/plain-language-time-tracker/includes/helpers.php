@@ -1409,6 +1409,13 @@ function pltt_render_entry_table( $entries, $options = array() ) {
 	$inline_edit = ! empty( $options['inline_edit'] );
 	$all_tags    = $inline_edit && ! empty( $options['all_tags'] ) ? $options['all_tags'] : array();
 
+	// Billing-select mode (inline billing on the Reports single-project view): a
+	// leading checkbox column lets the user pick which entries land on the billing
+	// record. Each box carries data-entry-id + data-amount (the same frozen-or-
+	// resolved figure the Amount column shows); the inline controller reads them to
+	// recompute the record total and collect the entries the user drops.
+	$billing_select = ! empty( $options['billing_select'] );
+
 	// Overage decision-support options.
 	$overage_lookup          = ! empty( $options['overage_entry_ids'] )
 		? array_flip( array_map( 'intval', (array) $options['overage_entry_ids'] ) )
@@ -1417,18 +1424,25 @@ function pltt_render_entry_table( $entries, $options = array() ) {
 	$marker_primary          = isset( $options['threshold_marker_primary'] ) ? (string) $options['threshold_marker_primary'] : '';
 	$marker_secondary        = isset( $options['threshold_marker_secondary'] ) ? (string) $options['threshold_marker_secondary'] : '';
 
+	// Covered mode: when a covered-entry set is supplied (Reports single-project
+	// detailed view), tint membership rows blue from billing-record coverage and
+	// retire the manual per-entry "Inv." toggle — the commit never wrote that flag,
+	// so record coverage is the truth here.
+	$covered_lookup = ! empty( $options['covered_entry_ids'] )
+		? array_flip( array_map( 'intval', (array) $options['covered_entry_ids'] ) )
+		: array();
+	$covered_mode      = isset( $options['covered_entry_ids'] );
+	// Optional per-entry labels (entry_id => "Invoiced · record #N · period") for
+	// the covered-row marker's tooltip — the record pointer the snapshot enables.
+	$covered_meta      = ! empty( $options['covered_entry_meta'] ) ? (array) $options['covered_entry_meta'] : array();
+	$show_invoiced_col = $inline_edit && ! $covered_mode;
+	// Covered mode shows a read-only "Invoiced" checkmark column in place of the
+	// editable Inv. toggle — coverage from the frozen snapshot is the truth here.
+	// Only when the project actually has covered entries, else it's a dead column.
+	$show_covered_col  = $covered_mode && ! empty( $covered_lookup );
+
 	if ( empty( $entries ) ) {
 		return;
-	}
-
-	// Colspan for the threshold marker row: Desc, Tags, Time, Duration, Billable
-	// (+1 if inline_edit adds the Inv. column, +1 if show_amount adds Amount).
-	$colspan = 5;
-	if ( $inline_edit ) {
-		$colspan++;
-	}
-	if ( $show_amount ) {
-		$colspan++;
 	}
 
 	// Collect unique project and client IDs to avoid N+1 queries.
@@ -1450,17 +1464,56 @@ function pltt_render_entry_table( $entries, $options = array() ) {
 	// Bulk-load tags from the junction table to avoid N+1 queries.
 	$entry_ids     = array_map( fn( $e ) => (int) $e->id, $entries );
 	$tags_by_entry = PLTT_Tags::get_for_entries( $entry_ids );
+
+	// Billable column appears only when at least one entry's project uses the
+	// per-entry billable flag (plain hourly). Retainer/fixed-fee tables, where
+	// billing is computed at the period level, drop the column entirely.
+	$show_billable_col = false;
+	foreach ( $entries as $e ) {
+		$p = ! empty( $e->project_id ) && isset( $projects_cache[ (int) $e->project_id ] ) ? $projects_cache[ (int) $e->project_id ] : null;
+		if ( pltt_billable_flag_applies( $p ) ) {
+			$show_billable_col = true;
+			break;
+		}
+	}
+
+	// Colspan for the threshold marker row: Desc, Tags, Time, Duration
+	// (+1 each for the select box, Billable, Inv., and Amount when shown).
+	$colspan = 4;
+	if ( $billing_select ) {
+		$colspan++;
+	}
+	if ( $show_billable_col ) {
+		$colspan++;
+	}
+	if ( $show_invoiced_col ) {
+		$colspan++;
+	}
+	if ( $show_covered_col ) {
+		$colspan++;
+	}
+	if ( $show_amount ) {
+		$colspan++;
+	}
 	?>
 	<table class="widefat<?php echo esc_attr( $table_class ); ?>">
 		<thead>
 			<tr>
+				<?php if ( $billing_select ) : ?>
+					<th class="pltt-bill-select-col"><span class="screen-reader-text"><?php esc_html_e( 'Include in bill', 'plain-language-time-tracker' ); ?></span></th>
+				<?php endif; ?>
 				<th><?php esc_html_e( 'Description', 'plain-language-time-tracker' ); ?></th>
 				<th><?php esc_html_e( 'Tags', 'plain-language-time-tracker' ); ?></th>
 				<th><?php esc_html_e( 'Time', 'plain-language-time-tracker' ); ?></th>
 				<th><?php esc_html_e( 'Duration', 'plain-language-time-tracker' ); ?></th>
-				<th><?php esc_html_e( 'Billable', 'plain-language-time-tracker' ); ?></th>
-				<?php if ( $inline_edit ) : ?>
+				<?php if ( $show_billable_col ) : ?>
+					<th><?php esc_html_e( 'Billable', 'plain-language-time-tracker' ); ?></th>
+				<?php endif; ?>
+				<?php if ( $show_invoiced_col ) : ?>
 					<th class="pltt-invoiced-col"><?php esc_html_e( 'Inv.', 'plain-language-time-tracker' ); ?></th>
+				<?php endif; ?>
+				<?php if ( $show_covered_col ) : ?>
+					<th class="pltt-invoiced-col"><?php esc_html_e( 'Invoiced', 'plain-language-time-tracker' ); ?></th>
 				<?php endif; ?>
 				<?php if ( $show_amount ) : ?>
 					<th class="pltt-amount-col"><?php esc_html_e( 'Amount', 'plain-language-time-tracker' ); ?></th>
@@ -1483,7 +1536,13 @@ function pltt_render_entry_table( $entries, $options = array() ) {
 				}
 
 				$tr_classes = array();
-				if ( $is_billed ) {
+				if ( $covered_mode ) {
+					// Record-coverage is the source of truth; the legacy per-entry
+					// pltt-billed tint is suppressed in this view.
+					if ( isset( $covered_lookup[ $entry_id_int ] ) ) {
+						$tr_classes[] = 'pltt-row-covered';
+					}
+				} elseif ( $is_billed ) {
 					$tr_classes[] = 'pltt-billed';
 				}
 				if ( isset( $overage_lookup[ $entry_id_int ] ) ) {
@@ -1492,6 +1551,31 @@ function pltt_render_entry_table( $entries, $options = array() ) {
 				$class_attr = $tr_classes ? ' class="' . esc_attr( implode( ' ', $tr_classes ) ) . '"' : '';
 				?>
 				<tr<?php echo $class_attr; ?><?php echo $inline_edit ? ' data-entry-id="' . esc_attr( $entry->id ) . '"' : ''; ?>>
+					<?php if ( $billing_select ) :
+						// Eligible = billable and not already covered by a committed record.
+						// Only those rows get a box; others show an empty cell so columns
+						// stay aligned. Amount mirrors the Amount column so the box's
+						// data-amount and the visible figure always agree.
+						$sel_eligible = $is_billable && ! isset( $covered_lookup[ $entry_id_int ] );
+						$sel_amount   = 0.0;
+						if ( $sel_eligible && $entry->duration_minutes > 0 ) {
+							if ( null !== $entry->billable_amount ) {
+								$sel_amount = (float) $entry->billable_amount;
+							} else {
+								$sel_rate   = pltt_resolve_billable_rate( (int) $entry->client_id, (int) $entry->project_id, $clients_cache, $projects_cache );
+								$sel_amount = pltt_billable_amount( $entry->duration_minutes, $sel_rate );
+							}
+						}
+						?>
+						<td class="pltt-bill-select-col">
+							<?php if ( $sel_eligible ) : ?>
+								<input type="checkbox" class="pltt-bill-select" checked
+									data-entry-id="<?php echo esc_attr( $entry_id_int ); ?>"
+									data-amount="<?php echo esc_attr( number_format( $sel_amount, 2, '.', '' ) ); ?>"
+									aria-label="<?php esc_attr_e( 'Include this entry in the bill', 'plain-language-time-tracker' ); ?>">
+							<?php endif; ?>
+						</td>
+					<?php endif; ?>
 					<td class="pltt-entry-desc-cell">
 						<?php if ( $is_billed && ! $inline_edit ) : ?>
 							<span class="screen-reader-text"><?php esc_html_e( 'Invoiced:', 'plain-language-time-tracker' ); ?></span>
@@ -1533,21 +1617,25 @@ function pltt_render_entry_table( $entries, $options = array() ) {
 					<td class="pltt-duration-cell">
 						<?php echo esc_html( pltt_format_duration( $entry->duration_minutes ) ); ?>
 					</td>
-					<td class="pltt-billable-indicator">
-						<?php if ( $inline_edit ) : ?>
-							<button type="button"
-								class="pltt-billable-symbol pltt-inline-toggle <?php echo $is_billable ? 'is-billable' : 'not-billable'; ?>"
-								data-entry-id="<?php echo esc_attr( $entry->id ); ?>"
-								data-field="billable"
-								data-value="<?php echo $is_billable ? '1' : '0'; ?>"
-								data-minutes="<?php echo esc_attr( (int) $entry->duration_minutes ); ?>"
-								aria-label="<?php echo $is_billable ? esc_attr__( 'Billable — click to toggle', 'plain-language-time-tracker' ) : esc_attr__( 'Not billable — click to toggle', 'plain-language-time-tracker' ); ?>"
-								title="<?php echo $is_billable ? esc_attr__( 'Billable — click to toggle', 'plain-language-time-tracker' ) : esc_attr__( 'Not billable — click to toggle', 'plain-language-time-tracker' ); ?>">$</button>
-						<?php else : ?>
-							<span class="pltt-billable-symbol <?php echo $is_billable ? 'is-billable' : 'not-billable'; ?>" aria-label="<?php echo $is_billable ? esc_attr__( 'Billable', 'plain-language-time-tracker' ) : esc_attr__( 'Not billable', 'plain-language-time-tracker' ); ?>" title="<?php echo $is_billable ? esc_attr__( 'Billable', 'plain-language-time-tracker' ) : esc_attr__( 'Not billable', 'plain-language-time-tracker' ); ?>">$</span>
-						<?php endif; ?>
-					</td>
-					<?php if ( $inline_edit ) : ?>
+					<?php if ( $show_billable_col ) : ?>
+						<td class="pltt-billable-indicator">
+							<?php if ( ! pltt_billable_flag_applies( $project ) ) : ?>
+								<?php /* Retainer/fixed-fee entry: billing is period-level, so no per-entry flag. */ ?>
+							<?php elseif ( $inline_edit ) : ?>
+								<button type="button"
+									class="pltt-billable-symbol pltt-inline-toggle <?php echo $is_billable ? 'is-billable' : 'not-billable'; ?>"
+									data-entry-id="<?php echo esc_attr( $entry->id ); ?>"
+									data-field="billable"
+									data-value="<?php echo $is_billable ? '1' : '0'; ?>"
+									data-minutes="<?php echo esc_attr( (int) $entry->duration_minutes ); ?>"
+									aria-label="<?php echo $is_billable ? esc_attr__( 'Billable — click to toggle', 'plain-language-time-tracker' ) : esc_attr__( 'Not billable — click to toggle', 'plain-language-time-tracker' ); ?>"
+									title="<?php echo $is_billable ? esc_attr__( 'Billable — click to toggle', 'plain-language-time-tracker' ) : esc_attr__( 'Not billable — click to toggle', 'plain-language-time-tracker' ); ?>">$</button>
+							<?php else : ?>
+								<span class="pltt-billable-symbol <?php echo $is_billable ? 'is-billable' : 'not-billable'; ?>" aria-label="<?php echo $is_billable ? esc_attr__( 'Billable', 'plain-language-time-tracker' ) : esc_attr__( 'Not billable', 'plain-language-time-tracker' ); ?>" title="<?php echo $is_billable ? esc_attr__( 'Billable', 'plain-language-time-tracker' ) : esc_attr__( 'Not billable', 'plain-language-time-tracker' ); ?>">$</span>
+							<?php endif; ?>
+						</td>
+					<?php endif; ?>
+					<?php if ( $show_invoiced_col ) : ?>
 						<td class="pltt-invoiced-col">
 							<button type="button"
 								class="pltt-invoiced-toggle <?php echo $is_billed ? 'is-invoiced' : 'not-invoiced'; ?>"
@@ -1559,6 +1647,15 @@ function pltt_render_entry_table( $entries, $options = array() ) {
 								<?php echo ! $is_billable ? 'style="visibility:hidden"' : ''; ?>>
 								<?php echo $is_billed ? '✓' : '○'; ?>
 							</button>
+						</td>
+					<?php endif; ?>
+					<?php if ( $show_covered_col ) : ?>
+						<td class="pltt-invoiced-col">
+							<?php if ( isset( $covered_lookup[ $entry_id_int ] ) ) :
+								$cover_label = isset( $covered_meta[ $entry_id_int ] ) ? $covered_meta[ $entry_id_int ] : __( 'Invoiced', 'plain-language-time-tracker' );
+								?>
+								<span class="pltt-invoiced-mark is-invoiced" title="<?php echo esc_attr( $cover_label ); ?>" aria-label="<?php echo esc_attr( $cover_label ); ?>">&#10003;</span>
+							<?php endif; ?>
 						</td>
 					<?php endif; ?>
 					<?php if ( $show_amount ) :
@@ -1576,6 +1673,232 @@ function pltt_render_entry_table( $entries, $options = array() ) {
 						?>
 						<td class="pltt-duration-cell pltt-amount-col"><?php echo $billable_amount > 0 ? esc_html( pltt_format_currency( $billable_amount ) ) : '<span class="pltt-empty">—</span>'; ?></td>
 					<?php endif; ?>
+				</tr>
+			<?php endforeach; ?>
+		</tbody>
+	</table>
+	<?php
+}
+
+/**
+ * Format a billing record's period for display.
+ *
+ * A full calendar month reads "June 2026"; any other dated span reads
+ * "Jun 1 – Jun 8, 2026"; an hourly record (period_end only, the bill-through
+ * cutoff) reads "Through Jun 27, 2026". Shared by the project billing history
+ * and the cross-project invoiced ledger.
+ *
+ * @param object $record Billing record row (period_start / period_end).
+ * @return string
+ */
+function pltt_format_billing_period( $record ) {
+	if ( ! empty( $record->period_start ) && ! empty( $record->period_end ) ) {
+		$ps = strtotime( $record->period_start );
+		if ( gmdate( 'd', $ps ) === '01' && gmdate( 'Y-m-d', strtotime( $record->period_end ) ) === gmdate( 'Y-m-t', $ps ) ) {
+			return gmdate( 'F Y', $ps );
+		}
+		return gmdate( 'M j', $ps ) . ' – ' . gmdate( 'M j, Y', strtotime( $record->period_end ) );
+	}
+
+	if ( ! empty( $record->period_end ) ) {
+		/* translators: %s: bill-through cutoff date. */
+		return sprintf( __( 'Through %s', 'plain-language-time-tracker' ), gmdate( 'M j, Y', strtotime( $record->period_end ) ) );
+	}
+
+	return '—';
+}
+
+/**
+ * Build the display view-model for a single outstanding billing scope.
+ *
+ * Turns an engine scope (from PLTT_Billing::get_ready_to_invoice() /
+ * ::get_scope()) into the labels + descriptions the Review & Invoice UI needs,
+ * so every surface that renders the billing modal (the Invoicing queue, the
+ * Reports single-project card) produces an identical dialog.
+ *
+ * @param array  $scope       One scope array; expects keys billing_type,
+ *                            period_start, period_label, rate, minutes,
+ *                            unbilled, project, and (optionally) entries.
+ * @param string $client_name Owning client name, for the AI-prompt header.
+ * @return array View-model: scope, proj, entries, uid, derivation,
+ *               default_desc, ai_prompt, type_label, date_range, hours_label,
+ *               count.
+ */
+function pltt_build_billing_scope_view( $scope, $client_name ) {
+	$proj        = $scope['project'];
+	$is_retainer = ( 'retainer_overage' === $scope['billing_type'] );
+	$entries     = isset( $scope['entries'] ) ? $scope['entries'] : array();
+	$rate        = (float) $scope['rate'];
+
+	$key = $scope['period_start'] ? preg_replace( '/[^0-9]/', '', $scope['period_start'] ) : 'hourly';
+	$uid = (int) $proj->id . '-' . $key;
+
+	// Basis minutes: retainer = overage minutes; hourly = sum of durations.
+	$basis = $scope['minutes'];
+	if ( null === $basis ) {
+		$basis = 0;
+		foreach ( $entries as $e ) {
+			$basis += (int) $e->duration_minutes;
+		}
+	}
+
+	if ( $is_retainer ) {
+		$derivation = sprintf(
+			/* translators: 1: overage duration, 2: hourly rate. */
+			__( '%1$s over allocation × %2$s', 'plain-language-time-tracker' ),
+			pltt_format_duration( $basis ),
+			pltt_format_currency( $rate )
+		);
+		$default_desc = sprintf(
+			/* translators: %s: billing period label. */
+			__( 'Support beyond your plan — %s', 'plain-language-time-tracker' ),
+			$scope['period_label']
+		);
+	} else {
+		$derivation = sprintf(
+			/* translators: 1: billable duration, 2: hourly rate. */
+			__( '%1$s billable × %2$s', 'plain-language-time-tracker' ),
+			pltt_format_duration( $basis ),
+			pltt_format_currency( $rate )
+		);
+		$descs = array();
+		foreach ( $entries as $e ) {
+			$d = trim( (string) $e->description );
+			if ( '' !== $d ) {
+				$descs[ strtolower( $d ) ] = $d;
+			}
+		}
+		$default_desc = implode( '; ', array_slice( array_values( $descs ), 0, 12 ) );
+	}
+
+	// Row meta: "{type} · {date range}". Retainer's range is its period label
+	// ("June 2026"); hourly shows the span of its unbilled entries.
+	$type_labels = array(
+		'hourly'    => __( 'Hourly', 'plain-language-time-tracker' ),
+		'recurring' => __( 'Retainer', 'plain-language-time-tracker' ),
+		'fixed'     => __( 'Fixed Fee', 'plain-language-time-tracker' ),
+		'none'      => __( 'Internal', 'plain-language-time-tracker' ),
+	);
+	$type_label = $type_labels[ pltt_get_billing_type( $proj ) ] ?? $type_labels['hourly'];
+
+	if ( $is_retainer || empty( $entries ) ) {
+		$date_range = $scope['period_label'];
+	} else {
+		$first      = $entries[0]->entry_date;
+		$last       = $entries[ count( $entries ) - 1 ]->entry_date;
+		$date_range = ( $first === $last )
+			? date_i18n( 'M j, Y', strtotime( $first ) )
+			: date_i18n( 'M j', strtotime( $first ) ) . ' – ' . date_i18n( 'M j, Y', strtotime( $last ) );
+	}
+
+	// "Structured list + AI prompt" description option: a raw dump of the scope
+	// (project details + every entry) with an appended instruction, to paste
+	// into an AI for a polished line.
+	$ai_lines   = array();
+	$ai_lines[] = 'Project: ' . $client_name . ' — ' . $proj->name;
+	$ai_lines[] = 'Type: ' . $type_label;
+	$ai_lines[] = 'Period: ' . $date_range;
+	$ai_lines[] = 'Billable: ' . pltt_format_duration( $basis ) . ' × ' . pltt_format_currency( $rate ) . ' = ' . pltt_format_currency( $scope['unbilled'] );
+	$ai_lines[] = '';
+	$ai_lines[] = 'Time entries:';
+	foreach ( $entries as $e ) {
+		$ai_lines[] = '- ' . date_i18n( 'M j', strtotime( $e->entry_date ) )
+			. ' (' . pltt_format_duration( (int) $e->duration_minutes ) . '): '
+			. trim( (string) $e->description );
+	}
+	$ai_lines[] = '';
+	$ai_lines[] = 'Write a concise, professional, client-facing invoice line-item description for this work. One or two sentences, plain language with no internal shorthand or jargon, grouping related tasks into themes.';
+	$ai_prompt  = implode( "\n", $ai_lines );
+
+	return array(
+		'scope'        => $scope,
+		'proj'         => $proj,
+		'entries'      => $entries,
+		'uid'          => $uid,
+		'derivation'   => $derivation,
+		'default_desc' => $default_desc,
+		'ai_prompt'    => $ai_prompt,
+		'type_label'   => $type_label,
+		'date_range'   => $date_range,
+		'hours_label'  => pltt_format_duration( $basis ),
+		'count'        => count( $entries ),
+	);
+}
+
+/**
+ * Render the pared read-only entry manifest for a billing scope.
+ *
+ * A deliberately minimal table for the invoicing panel / billing surface:
+ * Date · Description · Duration · Amount. No tags, no per-entry time range, no
+ * client/project meta line, and no billable toggle — those belong to the full
+ * pltt_render_entry_table().
+ * Entries are assumed billable and from a single project; rows render in the order
+ * given (the engine loads them oldest-first).
+ *
+ * When $excludable is true (hourly commit), each row gets a leading "Bill"
+ * checkbox (checked) carrying data-entry-id + data-amount; invoicing.js reads
+ * these to recompute the live total and collect the entries the user drops.
+ *
+ * @param array $entries    Entry row objects.
+ * @param bool  $excludable Render per-entry exclusion checkboxes. Default false.
+ */
+function pltt_render_billing_manifest( $entries, $excludable = false ) {
+	if ( empty( $entries ) ) {
+		return;
+	}
+
+	// Bulk-load caches for the amount fallback (the snapshot is preferred).
+	$project_ids = array();
+	$client_ids  = array();
+	foreach ( $entries as $e ) {
+		if ( ! empty( $e->project_id ) ) {
+			$project_ids[] = (int) $e->project_id;
+		}
+		if ( ! empty( $e->client_id ) ) {
+			$client_ids[] = (int) $e->client_id;
+		}
+	}
+	$projects_cache = PLTT_Projects::get_multiple( array_unique( $project_ids ) );
+	$clients_cache  = PLTT_Clients::get_multiple( array_unique( $client_ids ) );
+	?>
+	<table class="widefat pltt-billing-manifest-table">
+		<thead>
+			<tr>
+				<?php if ( $excludable ) : ?>
+					<th class="pltt-manifest-check"><span class="screen-reader-text"><?php esc_html_e( 'Bill', 'plain-language-time-tracker' ); ?></span></th>
+				<?php endif; ?>
+				<th><?php esc_html_e( 'Date', 'plain-language-time-tracker' ); ?></th>
+				<th><?php esc_html_e( 'Description', 'plain-language-time-tracker' ); ?></th>
+				<th class="pltt-amount-col"><?php esc_html_e( 'Duration', 'plain-language-time-tracker' ); ?></th>
+				<th class="pltt-amount-col"><?php esc_html_e( 'Amount', 'plain-language-time-tracker' ); ?></th>
+			</tr>
+		</thead>
+		<tbody>
+			<?php foreach ( $entries as $entry ) : ?>
+				<?php
+				$amount = 0.0;
+				if ( ! empty( $entry->billable ) && $entry->duration_minutes > 0 ) {
+					if ( null !== $entry->billable_amount ) {
+						$amount = (float) $entry->billable_amount;
+					} else {
+						$hourly_rate = pltt_resolve_billable_rate( (int) $entry->client_id, (int) $entry->project_id, $clients_cache, $projects_cache );
+						$amount      = pltt_billable_amount( $entry->duration_minutes, $hourly_rate );
+					}
+				}
+				?>
+				<tr class="pltt-manifest-row">
+					<?php if ( $excludable ) : ?>
+						<td class="pltt-manifest-check">
+							<input type="checkbox" class="pltt-bill-entry" checked
+								data-entry-id="<?php echo esc_attr( (int) $entry->id ); ?>"
+								data-amount="<?php echo esc_attr( number_format( $amount, 2, '.', '' ) ); ?>"
+								aria-label="<?php esc_attr_e( 'Include this entry in the bill', 'plain-language-time-tracker' ); ?>">
+						</td>
+					<?php endif; ?>
+					<td class="pltt-time-cell"><?php echo esc_html( date_i18n( 'M j', strtotime( $entry->entry_date ) ) ); ?></td>
+					<td class="pltt-entry-desc-cell"><?php echo esc_html( $entry->description ); ?></td>
+					<td class="pltt-duration-cell pltt-amount-col"><?php echo esc_html( pltt_format_duration( $entry->duration_minutes ) ); ?></td>
+					<td class="pltt-duration-cell pltt-amount-col"><?php echo $amount > 0 ? esc_html( pltt_format_currency( $amount ) ) : '<span class="pltt-empty">&mdash;</span>'; ?></td>
 				</tr>
 			<?php endforeach; ?>
 		</tbody>
@@ -1604,6 +1927,28 @@ function pltt_get_billing_type( $project ) {
 		return 'none';
 	}
 	return 'hourly';
+}
+
+/**
+ * Whether the per-entry billable flag is a meaningful, editable control for a
+ * project's entries.
+ *
+ * Hidden for retainer ('recurring') and fixed-fee ('fixed') projects: there the
+ * billable amount is computed at the period/project level (overage, or a flat
+ * fee invoiced separately), so flipping individual entries does nothing. Plain
+ * hourly projects keep the flag (it drives what gets billed), as do internal/
+ * 'none' projects (unchanged behaviour — always non-billable). A null project
+ * (uncategorized entry) keeps the flag; it can't be a retainer/fixed project.
+ *
+ * @param object|null $project Project object, or null for an uncategorized entry.
+ * @return bool
+ */
+function pltt_billable_flag_applies( $project ) {
+	if ( ! $project ) {
+		return true;
+	}
+	$type = pltt_get_billing_type( $project );
+	return 'recurring' !== $type && 'fixed' !== $type;
 }
 
 /**
@@ -1960,7 +2305,7 @@ function pltt_compute_overage_threshold( $project, $filter_args ) {
  * @param string|null $label_override Optional. Replaces the computed bar label (e.g. the
  *                                    project context card's "5h 15m used · 2h 15m over" caption).
  */
-function pltt_render_allocation_bar( $alloc_mins, $budget_hours, $billing_type, $fee_args = null, $label_override = null ) {
+function pltt_render_allocation_bar( $alloc_mins, $budget_hours, $billing_type, $fee_args = null, $label_override = null, $is_billed = false ) {
 	$alloc_hours = $alloc_mins / 60;
 	$pct         = $budget_hours > 0 ? ( $alloc_hours / $budget_hours ) * 100 : 0;
 	$is_over     = $pct >= 100;
@@ -2012,11 +2357,11 @@ function pltt_render_allocation_bar( $alloc_mins, $budget_hours, $billing_type, 
 			<span class="pltt-alloc-seg pltt-alloc-seg-within"
 				  style="width:<?php echo esc_attr( $within_seg_pct ); ?>%"></span>
 			<?php if ( $is_over ) : ?>
-				<span class="pltt-alloc-seg pltt-alloc-seg-over"
+				<span class="pltt-alloc-seg <?php echo $is_billed ? 'pltt-alloc-seg-billed' : 'pltt-alloc-seg-over'; ?>"
 					  style="width:<?php echo esc_attr( $over_seg_pct ); ?>%"></span>
 			<?php endif; ?>
 		</div>
-		<span class="pltt-alloc-label<?php echo $is_over ? ' pltt-alloc-over' : ''; ?>">
+		<span class="pltt-alloc-label<?php echo $is_over ? ' pltt-alloc-over' : ''; ?><?php echo $is_billed ? ' pltt-alloc-billed' : ''; ?>">
 			<?php echo esc_html( $label ); ?>
 		</span>
 	</div>

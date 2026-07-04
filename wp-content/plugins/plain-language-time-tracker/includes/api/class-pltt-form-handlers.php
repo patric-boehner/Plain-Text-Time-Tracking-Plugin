@@ -32,6 +32,9 @@ class PLTT_Form_Handlers {
 		// Review screen.
 		add_action( 'admin_post_pltt_save_entries', array( __CLASS__, 'handle_save_entries' ) );
 
+		// Billing surface: commit one billing record.
+		add_action( 'admin_post_pltt_commit_billing', array( __CLASS__, 'handle_commit_billing' ) );
+
 		// Tag operations.
 		add_action( 'admin_post_pltt_create_tag', array( __CLASS__, 'handle_create_tag' ) );
 		add_action( 'admin_post_pltt_rename_tag', array( __CLASS__, 'handle_rename_tag' ) );
@@ -449,6 +452,59 @@ class PLTT_Form_Handlers {
 		} else {
 			self::redirect_back( array( 'pltt_error' => 'save_failed' ) );
 		}
+	}
+
+	/**
+	 * Commit one billing record from the billing surface.
+	 *
+	 * The verify-and-commit step: nothing writes a record except this handler.
+	 * `calculated` is ALWAYS recomputed server-side via PLTT_Billing — the posted
+	 * amount only ever lowers the bill (absorption), never raises it. Trimming the
+	 * amount to zero fully absorbs the scope.
+	 */
+	public static function handle_commit_billing() {
+		self::guard( 'pltt_commit_billing' );
+
+		$project_id    = isset( $_POST['project_id'] ) ? absint( $_POST['project_id'] ) : 0;
+		$billing_type  = isset( $_POST['billing_type'] ) ? sanitize_key( wp_unslash( $_POST['billing_type'] ) ) : '';
+		$period        = isset( $_POST['period'] ) ? sanitize_text_field( wp_unslash( $_POST['period'] ) ) : '';
+		$posted_amount = isset( $_POST['billed_amount'] ) ? floatval( wp_unslash( $_POST['billed_amount'] ) ) : 0.0;
+		$excluded_ids  = isset( $_POST['excluded_entry_ids'] )
+			? array_values( array_filter( array_map( 'absint', explode( ',', sanitize_text_field( wp_unslash( $_POST['excluded_entry_ids'] ) ) ) ) ) )
+			: array();
+		$description   = isset( $_POST['description'] ) ? sanitize_textarea_field( wp_unslash( $_POST['description'] ) ) : '';
+
+		$redirect = $project_id > 0 ? PLTT_Project_Detail::get_url( $project_id ) : pltt_get_admin_url( 'projects' );
+
+		// Retainer records are scoped to a period (its first day); hourly is scoped
+		// to the viewed date range it billed.
+		$period_start = ( 'retainer_overage' === $billing_type && '' !== $period )
+			? pltt_sanitize_date_strict( $period )
+			: null;
+		$date_from = isset( $_POST['date_from'] ) && '' !== $_POST['date_from'] ? pltt_sanitize_date_strict( wp_unslash( $_POST['date_from'] ) ) : null;
+		$date_to   = isset( $_POST['date_to'] ) && '' !== $_POST['date_to'] ? pltt_sanitize_date_strict( wp_unslash( $_POST['date_to'] ) ) : null;
+
+		// Single shared write path (recomputes the scope server-side).
+		$result = PLTT_Billing::commit(
+			array(
+				'project_id'    => $project_id,
+				'billing_type'  => $billing_type,
+				'period_start'  => $period_start,
+				'date_from'     => $date_from,
+				'date_to'       => $date_to,
+				'billed_amount' => $posted_amount,
+				'excluded_entry_ids' => $excluded_ids,
+				'description'   => $description,
+			)
+		);
+
+		if ( is_wp_error( $result ) ) {
+			wp_safe_redirect( add_query_arg( 'pltt_error', $result->get_error_code(), $redirect ) );
+			exit;
+		}
+
+		wp_safe_redirect( add_query_arg( 'pltt_message', 'billed', $redirect ) );
+		exit;
 	}
 
 }

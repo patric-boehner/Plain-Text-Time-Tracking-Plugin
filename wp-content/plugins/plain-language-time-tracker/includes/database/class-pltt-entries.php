@@ -462,6 +462,46 @@ class PLTT_Entries {
 	}
 
 	/**
+	 * Sum the billable dollar amount of a project's verified, billable entries
+	 * on/after a cutoff date — the hourly billing engine's "calculated(scope)".
+	 *
+	 * Deliberately does NOT filter on the legacy per-entry `billed` flag: under
+	 * the billing-record model, records (not the flag) define what's been billed.
+	 * The unbilled remainder is computed by the engine as calculated − billed −
+	 * absorbed across the project's records.
+	 *
+	 * @param int    $project_id  Project to sum.
+	 * @param string $since_date  Inclusive lower bound, 'Y-m-d'. Empty = no bound.
+	 * @return float Total billable amount (snapshot-aware via billable_amount_expr()).
+	 */
+	public static function sum_billable_amount( $project_id, $since_date = '' ) {
+		global $wpdb;
+
+		$table          = PLTT_Database::get_table_name( 'time_entries' );
+		$projects_table = PLTT_Database::get_table_name( 'projects' );
+		$clients_table  = PLTT_Database::get_table_name( 'clients' );
+
+		$where   = array( 'e.project_id = %d', 'e.verified = 1', 'e.billable = 1' );
+		$prepare = array( (int) $project_id );
+
+		if ( ! empty( $since_date ) ) {
+			$where[]   = 'e.entry_date >= %s';
+			$prepare[] = $since_date;
+		}
+
+		$amount = self::billable_amount_expr();
+
+		$sql = "SELECT COALESCE(SUM({$amount}), 0)
+			FROM {$table} e
+			LEFT JOIN {$projects_table} p ON e.project_id = p.id
+			LEFT JOIN {$clients_table} c ON e.client_id = c.id
+			WHERE " . implode( ' AND ', $where );
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.NotPrepared
+		return (float) $wpdb->get_var( $wpdb->prepare( $sql, $prepare ) );
+	}
+
+	/**
 	 * Get aggregate stats for a date range.
 	 *
 	 * Returns entry count, total/billable minutes, and verified count
@@ -679,8 +719,10 @@ class PLTT_Entries {
 	 * Aggregate billable, uninvoiced, verified time that falls OUTSIDE a date range.
 	 *
 	 * Powers the single global "billable time outside your range" notification on the
-	 * summary report view. Returns one row across all qualifying entries (respecting
-	 * the active client/project/tag filters) or null when nothing qualifies.
+	 * summary report view. "Unbilled" means NOT covered by a committed billing record
+	 * (record-truth, not the legacy per-entry `billed` flag). Returns one aggregate
+	 * across all qualifying entries (respecting the active client/project/tag filters)
+	 * or null when nothing qualifies.
 	 *
 	 * Two project types are excluded explicitly — not left to the billable model —
 	 * so a manually-flipped flag or migrated row can't raise a false notification:
@@ -705,7 +747,6 @@ class PLTT_Entries {
 		$where = array(
 			'(e.entry_date < %s OR e.entry_date > %s)',
 			'e.billable = 1',
-			'COALESCE(e.billed, 0) = 0',
 			'e.verified = 1',
 			// Exclude archived projects (entries with no project still count).
 			"(p.id IS NULL OR p.status != 'archived')",
@@ -725,24 +766,67 @@ class PLTT_Entries {
 
 		$amount = self::billable_amount_expr();
 
+		// Candidate entries (per-row), then drop any covered by a committed billing
+		// record. "Unbilled" = uncovered, per the records model — the legacy
+		// per-entry `billed` flag is no longer consulted.
 		$sql = "SELECT
-			COUNT(*) AS entry_count,
-			COALESCE(SUM(e.duration_minutes), 0) AS total_minutes,
-			COALESCE(SUM({$amount}), 0) AS total_amount,
-			MIN(e.entry_date) AS earliest,
-			MAX(e.entry_date) AS latest
+			e.id AS id,
+			e.entry_date AS entry_date,
+			e.duration_minutes AS duration_minutes,
+			({$amount}) AS amount
 			FROM {$entries_table} e
 			LEFT JOIN {$projects_table} p ON e.project_id = p.id
 			LEFT JOIN {$clients_table} c ON e.client_id = c.id
 			WHERE " . implode( ' AND ', $where );
 
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.NotPrepared
-		$row = $wpdb->get_row( $wpdb->prepare( $sql, $prepare ) );
-
-		if ( ! $row || (int) $row->entry_count === 0 ) {
+		$rows = $wpdb->get_results( $wpdb->prepare( $sql, $prepare ) );
+		if ( empty( $rows ) ) {
 			return null;
 		}
-		return $row;
+
+		// Global covered set = union over every project that has billing records.
+		$covered      = array();
+		$records_table = PLTT_Database::get_table_name( 'billing_records' );
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.NotPrepared
+		$record_pids = $wpdb->get_col( "SELECT DISTINCT project_id FROM {$records_table}" );
+		foreach ( $record_pids as $pid ) {
+			foreach ( PLTT_Billing::get_covered_entry_ids( (int) $pid ) as $eid ) {
+				$covered[ (int) $eid ] = true;
+			}
+		}
+
+		$count       = 0;
+		$minutes     = 0;
+		$amount_sum  = 0.0;
+		$earliest    = null;
+		$latest      = null;
+		foreach ( $rows as $r ) {
+			if ( isset( $covered[ (int) $r->id ] ) ) {
+				continue;
+			}
+			$count++;
+			$minutes    += (int) $r->duration_minutes;
+			$amount_sum += (float) $r->amount;
+			if ( null === $earliest || $r->entry_date < $earliest ) {
+				$earliest = $r->entry_date;
+			}
+			if ( null === $latest || $r->entry_date > $latest ) {
+				$latest = $r->entry_date;
+			}
+		}
+
+		if ( 0 === $count ) {
+			return null;
+		}
+
+		return (object) array(
+			'entry_count'   => $count,
+			'total_minutes' => $minutes,
+			'total_amount'  => round( $amount_sum, 2 ),
+			'earliest'      => $earliest,
+			'latest'        => $latest,
+		);
 	}
 
 	/**
