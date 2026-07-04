@@ -1383,75 +1383,6 @@ function pltt_render_threshold_marker_row( $colspan, $primary, $secondary = '' )
 }
 
 /**
- * Derive the billing status of a single entry for the Reports "Status" column.
- *
- * Read-only, from the real billing state (record coverage + project type +
- * overage), not the legacy per-entry `billed` flag. Returns a badge:
- *   Invoiced (covered by a record — or the legacy flag when no coverage set is
- *   available), Over plan / On plan (retainer), Fixed fee, Internal,
- *   Unbilled / Not billed (hourly). Reuses the plugin's .pltt-badge variants.
- *
- * @param object|null $project        Entry's project (null = uncategorized).
- * @param bool        $is_billable    The entry's billable flag.
- * @param bool        $is_invoiced    Whether it's covered by a committed record.
- * @param string      $invoiced_label Optional detail for the Invoiced tooltip (e.g. "Invoiced · record #7").
- * @param bool        $is_overage     Whether it's past a retainer allocation.
- * @return array{text:string,variant:string,title:string}
- */
-function pltt_entry_status_badge( $project, $is_billable, $is_invoiced, $invoiced_label = '', $is_overage = false ) {
-	if ( $is_invoiced ) {
-		return array(
-			'text'    => __( 'Invoiced', 'plain-language-time-tracker' ),
-			'variant' => 'pltt-badge-info',
-			'title'   => '' !== $invoiced_label ? $invoiced_label : __( 'On a committed invoice', 'plain-language-time-tracker' ),
-		);
-	}
-
-	$type = $project ? pltt_get_billing_type( $project ) : 'hourly';
-
-	if ( 'none' === $type ) {
-		return array(
-			'text'    => __( 'Internal', 'plain-language-time-tracker' ),
-			'variant' => '',
-			'title'   => __( 'Internal work — never billed', 'plain-language-time-tracker' ),
-		);
-	}
-	if ( 'fixed' === $type ) {
-		return array(
-			'text'    => __( 'Fixed fee', 'plain-language-time-tracker' ),
-			'variant' => 'pltt-badge-purple',
-			'title'   => __( 'Fixed-budget project — invoiced separately, not from time', 'plain-language-time-tracker' ),
-		);
-	}
-	if ( 'recurring' === $type ) {
-		return $is_overage
-			? array(
-				'text'    => __( 'Over plan', 'plain-language-time-tracker' ),
-				'variant' => 'pltt-badge-warning',
-				'title'   => __( 'Past the retainer allocation — billable as overage', 'plain-language-time-tracker' ),
-			)
-			: array(
-				'text'    => __( 'On plan', 'plain-language-time-tracker' ),
-				'variant' => 'pltt-badge-info',
-				'title'   => __( 'Within the retainer allocation — covered by the plan', 'plain-language-time-tracker' ),
-			);
-	}
-
-	// Hourly / uncategorized.
-	return $is_billable
-		? array(
-			'text'    => __( 'Unbilled', 'plain-language-time-tracker' ),
-			'variant' => 'pltt-badge-success',
-			'title'   => __( 'Billable — not yet on an invoice', 'plain-language-time-tracker' ),
-		)
-		: array(
-			'text'    => __( 'Not billed', 'plain-language-time-tracker' ),
-			'variant' => '',
-			'title'   => __( 'Marked non-billable', 'plain-language-time-tracker' ),
-		);
-}
-
-/**
  * Render an entry table.
  *
  * Outputs a complete <table> with entry rows showing description,
@@ -1699,17 +1630,27 @@ function pltt_render_entry_table( $entries, $options = array() ) {
 						</td>
 					<?php endif; ?>
 					<?php if ( $show_status_col ) :
-						// Invoiced = covered by a committed record (single-project covered
-						// mode); elsewhere fall back to the legacy billed flag so the column
-						// still reads sensibly in the multi-project view.
+						// Billing status only — has this entry been invoiced, or is it
+						// billable and still waiting? Everything that isn't part of that
+						// question (non-billable, internal, fixed-fee, within-plan retainer
+						// time) reads as a muted dash. Coverage from a committed record is
+						// the truth; the legacy billed flag is the fallback in the
+						// multi-project view, where no coverage set is passed.
 						$status_is_covered  = $covered_mode && isset( $covered_lookup[ $entry_id_int ] );
 						$status_is_invoiced = $status_is_covered || ( ! $covered_mode && $is_billed );
-						$status_inv_label   = $status_is_covered && isset( $covered_meta[ $entry_id_int ] ) ? $covered_meta[ $entry_id_int ] : '';
-						$status_is_overage  = isset( $overage_lookup[ $entry_id_int ] );
-						$status             = pltt_entry_status_badge( $project, $is_billable, $status_is_invoiced, $status_inv_label, $status_is_overage );
 						?>
 						<td class="pltt-status-col">
-							<span class="pltt-badge <?php echo esc_attr( $status['variant'] ); ?>" title="<?php echo esc_attr( $status['title'] ); ?>"><?php echo esc_html( $status['text'] ); ?></span>
+							<?php if ( $status_is_invoiced ) :
+								$status_inv_label = $status_is_covered && isset( $covered_meta[ $entry_id_int ] )
+									? $covered_meta[ $entry_id_int ]
+									: __( 'On a committed invoice', 'plain-language-time-tracker' );
+								?>
+								<span class="pltt-badge pltt-badge-info" title="<?php echo esc_attr( $status_inv_label ); ?>"><?php esc_html_e( 'Invoiced', 'plain-language-time-tracker' ); ?></span>
+							<?php elseif ( $is_billable ) : ?>
+								<span class="pltt-badge pltt-badge-success" title="<?php esc_attr_e( 'Billable — not yet invoiced', 'plain-language-time-tracker' ); ?>"><?php esc_html_e( 'Unbilled', 'plain-language-time-tracker' ); ?></span>
+							<?php else : ?>
+								<span class="pltt-empty" aria-label="<?php esc_attr_e( 'Not separately billed', 'plain-language-time-tracker' ); ?>">&mdash;</span>
+							<?php endif; ?>
 						</td>
 					<?php endif; ?>
 					<?php if ( $show_amount ) :
