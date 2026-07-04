@@ -479,10 +479,10 @@ class PLTT_Admin {
 			);
 		}
 
-		// Commit-in-a-modal: the Invoicing queue, and the Reports single-project
-		// card (the script no-ops unless a .pltt-billing-form is on the page).
-		if ( 'time-tracker_page_pltt-invoicing' === $hook
-			|| 'time-tracker_page_pltt-reports' === $hook ) {
+		// Commit-in-a-modal for the Billing (Invoicing) queue. Reports/Insights is
+		// read-only now — billing happens on the Billing page, so this no longer
+		// loads there.
+		if ( 'time-tracker_page_pltt-invoicing' === $hook ) {
 			wp_enqueue_script(
 				'pltt-invoicing',
 				PLTT_PLUGIN_URL . 'assets/js/invoicing.js',
@@ -535,15 +535,6 @@ class PLTT_Admin {
 				'pltt-reports',
 				PLTT_PLUGIN_URL . 'assets/js/reports.js',
 				array( 'pltt-shared', 'pltt-tag-picker', 'pltt-tooltip' ),
-				$version,
-				true
-			);
-			// Inline billing panel (in-place Review & bill). No-ops unless a
-			// .pltt-billing-panel is on the page.
-			wp_enqueue_script(
-				'pltt-billing-inline',
-				PLTT_PLUGIN_URL . 'assets/js/billing-inline.js',
-				array( 'pltt-shared' ),
 				$version,
 				true
 			);

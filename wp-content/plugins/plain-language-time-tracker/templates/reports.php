@@ -770,74 +770,6 @@ $tab_base_url = add_query_arg( $filter_params, admin_url( 'admin.php' ) );
 				$covered_entry_ids = array_keys( $covered_entry_meta );
 				?>
 
-				<?php
-				// Inline billing panel(s): the settings box lifted out of the old modal,
-				// rendered hidden right here and revealed in place by "Review & bill" —
-				// no navigation. Hourly builds the record from the eligible entries
-				// already shown (billable + not yet covered), picked via the checkboxes
-				// on those rows; retainer bills the whole overage period (no checkboxes).
-				$billing_panels         = array();
-				$billing_select_enabled = false;
-				if ( $is_single_project_view && ! empty( $context_projects[0] ) && 'active' === ( $context_projects[0]->status ?? '' ) ) {
-					$bill_project = $context_projects[0];
-					$bill_type    = pltt_get_billing_type( $bill_project );
-					$bill_client  = ! empty( $context_client ) ? $context_client->name : '';
-
-					if ( 'hourly' === $bill_type ) {
-						$covered_flip  = array_flip( array_map( 'intval', $covered_entry_ids ) );
-						$eligible      = array();
-						$eligible_calc = 0.0;
-						foreach ( $entries as $bent ) {
-							if ( empty( $bent->billable ) || isset( $covered_flip[ (int) $bent->id ] ) ) {
-								continue;
-							}
-							$eligible[]     = $bent;
-							$eligible_calc += pltt_resolve_entry_amount( $bent );
-						}
-						if ( ! empty( $eligible ) ) {
-							// Oldest-first so the scope view's date-range reads left-to-right.
-							usort( $eligible, static function ( $a, $b ) {
-								return strcmp( $a->entry_date, $b->entry_date );
-							} );
-							$eligible_calc = round( $eligible_calc, 2 );
-							$bill_rate     = pltt_resolve_billable_rate( (int) $bill_project->client_id, (int) $bill_project->id );
-							$hourly_scope  = array(
-								'project'            => $bill_project,
-								'billing_type'       => 'hourly',
-								'period_start'       => null,
-								'period_end'         => pltt_get_current_date(),
-								'period_label'       => __( 'Selected entries', 'plain-language-time-tracker' ),
-								'rate'               => $bill_rate,
-								'calculated'         => $eligible_calc,
-								'billed'             => 0.0,
-								'absorbed'           => 0.0,
-								'unbilled'           => $eligible_calc,
-								'minutes'            => null,
-								'allocation_minutes' => null,
-								'entries'            => $eligible,
-							);
-							$billing_panels[]       = array(
-								'view'       => pltt_build_billing_scope_view( $hourly_scope, $bill_client ),
-								'selectable' => true,
-							);
-							$billing_select_enabled = true;
-						}
-					} elseif ( 'recurring' === $bill_type ) {
-						foreach ( PLTT_Billing::get_ready_to_invoice( $bill_project, true ) as $ret_scope ) {
-							$billing_panels[] = array(
-								'view'       => pltt_build_billing_scope_view( $ret_scope, $bill_client ),
-								'selectable' => false,
-							);
-						}
-					}
-				}
-
-				foreach ( $billing_panels as $bp ) {
-					$v          = $bp['view'];
-					$selectable = $bp['selectable'];
-					include PLTT_PLUGIN_DIR . 'templates/partials/billing-panel.php';
-				}
-				?>
 
 				<?php
 				// SEC-M12: whitelist the query params that survive the round-trip
@@ -897,11 +829,6 @@ $tab_base_url = add_query_arg( $filter_params, admin_url( 'admin.php' ) );
 							// record pointer; drops the Inv. column.
 							$entry_table_opts['covered_entry_ids']  = $covered_entry_ids;
 							$entry_table_opts['covered_entry_meta'] = $covered_entry_meta;
-						}
-						if ( $billing_select_enabled ) {
-							// Leading checkbox column (hidden until "Review & bill" is on):
-							// eligible rows get a box carrying data-entry-id + data-amount.
-							$entry_table_opts['billing_select'] = true;
 						}
 						if ( $marker_day_key && $group_date === $marker_day_key ) {
 							$entry_table_opts['threshold_marker_before']    = (int) $context_overage['marker_entry_id'];

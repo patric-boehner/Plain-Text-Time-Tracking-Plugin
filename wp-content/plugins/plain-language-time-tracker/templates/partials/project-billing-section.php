@@ -65,10 +65,10 @@ if ( empty( $ready_scopes ) && empty( $billing_history ) ) {
 				</div>
 			</div>
 		<?php endforeach; ?>
-		<?php // Reveals the inline billing panel in place (billing-inline.js) — no navigation. ?>
-		<button type="button" class="button button-primary pltt-pcc-bill-review" data-billing-toggle>
-			<?php esc_html_e( 'Review &amp; bill', 'plain-language-time-tracker' ); ?>
-		</button>
+		<?php // Insights is read-only; the action navigates to the Billing page. ?>
+		<a class="button pltt-pcc-bill-review" href="<?php echo esc_url( admin_url( 'admin.php?page=pltt-invoicing' ) ); ?>">
+			<?php esc_html_e( 'Review &amp; bill on Billing', 'plain-language-time-tracker' ); ?> &rarr;
+		</a>
 	<?php elseif ( ! empty( $billed_period ) ) : ?>
 		<?php // Settled: the shown retainer period has a committed record (set by project-context-card.php). ?>
 		<p class="pltt-pcc-bill-billed">
