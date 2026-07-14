@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Project report — type-aware (redesign v2)</title>
+<style>
+  :root{
+    --wp-blue:#2271b1; --wp-blue-hover:#135e96; --wp-menu-bg:#1d2327; --wp-menu-hover:#2c3338;
+    --wp-text:#1d2327; --wp-text-dim:#646970; --wp-border:#c3c4c7; --wp-border-light:#dcdcde;
+    --wp-bg:#f0f0f1; --ok:#007017; --ok-bg:#edfaef; --warn:#996800; --warn-bg:#fcf7ec; --over:#b32d2e; --over-bg:#fcf0f0;
+    --radius:4px;
+    --font:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Oxygen-Sans,Ubuntu,Cantarell,"Helvetica Neue",sans-serif;
+    --mono:ui-monospace,"SF Mono",SFMono-Regular,Menlo,Consolas,monospace;
+  }
+  *{box-sizing:border-box;} html,body{margin:0;padding:0;}
+  body{font-family:var(--font);font-size:13px;color:var(--wp-text);background:var(--wp-bg);-webkit-font-smoothing:antialiased;}
+
+  .adminbar{height:32px;background:var(--wp-menu-bg);color:#f0f0f1;display:flex;align-items:center;padding:0 12px;font-size:13px;position:sticky;top:0;z-index:30;}
+  .adminbar .dot{width:16px;height:16px;border-radius:50%;background:#82878c;margin-right:6px;}
+  .adminbar .spacer{flex:1;} .adminbar .who{color:#c3c4c7;}
+
+  .shell{display:grid;grid-template-columns:160px 1fr;min-height:calc(100vh - 32px);}
+  .menu{background:var(--wp-menu-bg);color:#c3c4c7;padding-top:8px;}
+  .menu .group-title{display:flex;align-items:center;gap:8px;padding:10px 12px;color:#fff;font-weight:600;font-size:14px;}
+  .menu .group-title .ico{width:20px;text-align:center;opacity:.8;}
+  .menu a{display:block;padding:8px 12px 8px 34px;color:#c3c4c7;text-decoration:none;font-size:13px;}
+  .menu a:hover{background:var(--wp-menu-hover);color:#72aee6;}
+  .menu a.current{background:var(--wp-blue);color:#fff;font-weight:600;}
+
+  .content{padding:20px 32px 80px;max-width:1080px;}
+  .breadcrumb{font-size:12px;color:var(--wp-text-dim);margin-bottom:6px;}
+  .breadcrumb a{color:var(--wp-blue);text-decoration:none;}
+  .breadcrumb a:hover{text-decoration:underline;}
+
+  .phead{display:flex;align-items:flex-start;gap:14px;margin-bottom:18px;}
+  .phead h1{font-size:23px;font-weight:400;margin:0 0 4px;}
+  .phead .meta{color:var(--wp-text-dim);font-size:13px;}
+  .phead .acts{margin-left:auto;display:flex;gap:8px;align-items:center;}
+
+  .chiplet{display:inline-block;font-size:11px;border-radius:10px;padding:1px 9px;vertical-align:2px;border:1px solid;margin-left:8px;}
+  .chiplet.hourly{background:#eef4fb;color:#2c5a86;border-color:#cfe0f0;}
+  .chiplet.retainer{background:#f3eefc;color:#6d3fb0;border-color:#e3d6f7;}
+  .chiplet.fixed{background:#eef7ee;color:#04600f;border-color:#bfe3c4;}
+
+  .button{display:inline-flex;align-items:center;gap:6px;background:#f6f7f7;border:1px solid var(--wp-border);color:var(--wp-blue-hover);border-radius:var(--radius);padding:6px 12px;font-size:13px;cursor:pointer;text-decoration:none;}
+  .button:hover{background:#f0f0f1;border-color:#8c8f94;}
+  .button-primary{background:var(--wp-blue);border-color:var(--wp-blue);color:#fff;}
+  .button-primary:hover{background:var(--wp-blue-hover);border-color:var(--wp-blue-hover);}
+  .button-sm{padding:4px 10px;font-size:12px;}
+  .button-link{background:none;border:0;color:var(--wp-blue);cursor:pointer;font-size:13px;padding:2px 4px;}
+  .button-link:hover{text-decoration:underline;}
+
+  .card{background:#fff;border:1px solid var(--wp-border-light);border-radius:var(--radius);}
+  .card-pad{padding:18px 20px;}
+  .card-title{font-size:13px;font-weight:600;margin:0 0 2px;}
+  .card-sub{font-size:12px;color:var(--wp-text-dim);margin:0 0 14px;}
+  .mb16{margin-bottom:16px;}
+
+  /* type-aware HERO */
+  .hero{display:grid;grid-template-columns:1.3fr 1fr;gap:0;border:1px solid var(--wp-border-light);border-radius:var(--radius);overflow:hidden;background:#fff;margin-bottom:16px;}
+  .hero .left{padding:20px 22px;}
+  .hero .right{padding:20px 22px;border-left:1px solid var(--wp-border-light);background:#fbfbfc;display:flex;flex-direction:column;justify-content:center;gap:6px;}
+  .hero .htag{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--wp-text-dim);}
+  .hero .hbig{font-size:32px;font-weight:600;margin:4px 0 2px;font-variant-numeric:tabular-nums;}
+  .hero .hbig small{font-size:16px;font-weight:400;color:var(--wp-text-dim);}
+  .hero .hsub{color:var(--wp-text-dim);font-size:13px;}
+  .hero .hsub.warn{color:var(--warn);} .hero .hsub.over{color:var(--over);} .hero .hsub.ok{color:var(--ok);}
+
+  .track{height:16px;background:#eceded;border-radius:9px;overflow:hidden;margin:14px 0 6px;position:relative;}
+  .track i{display:block;height:100%;border-radius:9px;}
+  .track i.ok{background:var(--ok);} .track i.warn{background:var(--warn);} .track i.over{background:var(--over);}
+  .track .marker{position:absolute;top:-3px;bottom:-3px;width:2px;background:#1d2327;opacity:.5;}
+  .trackcap{display:flex;justify-content:space-between;font-size:12px;color:var(--wp-text-dim);}
+
+  .minirow{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px dashed var(--wp-border-light);font-size:13px;}
+  .minirow:last-child{border-bottom:0;}
+  .minirow b{font-variant-numeric:tabular-nums;}
+  .minirow .lbl{color:var(--wp-text-dim);}
+
+  .period-sel{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--wp-text-dim);}
+  .period-sel .navbtn{width:26px;height:26px;border:1px solid var(--wp-border);background:#fff;border-radius:var(--radius);cursor:pointer;color:#50575e;}
+
+  /* stat cards */
+  .grid-cards{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:16px;}
+  .statcard{background:#fff;border:1px solid var(--wp-border-light);border-radius:var(--radius);padding:14px 16px;}
+  .statcard .k{font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--wp-text-dim);}
+  .statcard .v{font-size:22px;font-weight:600;margin:6px 0 2px;font-variant-numeric:tabular-nums;}
+  .statcard .m{font-size:12px;color:var(--wp-text-dim);}
+
+  /* volume / period chart */
+  .vchart{display:flex;align-items:flex-end;gap:8px;height:150px;padding:10px 0;}
+  .vchart .col{flex:1;display:flex;flex-direction:column;justify-content:flex-end;gap:3px;position:relative;}
+  .vchart .seg{width:100%;} .vchart .seg.bill{background:var(--ok);}
+  .vchart .seg.non{background-image:repeating-linear-gradient(45deg,#8fc79a,#8fc79a 3px,#a9d6b2 3px,#a9d6b2 6px);}
+  .vchart .seg.int{background:#c3c4c7;}
+  .vlbls{display:flex;gap:8px;} .vlbls .vl{flex:1;text-align:center;font-size:10.5px;color:var(--wp-text-dim);}
+  .alloc-line{position:absolute;left:0;right:0;border-top:2px dashed var(--warn);}
+  .alloc-tag{position:absolute;right:0;font-size:10px;color:var(--warn);background:var(--warn-bg);padding:0 4px;border-radius:3px;transform:translateY(-50%);}
+
+  /* swimlane timeline */
+  .swim{position:relative;border:1px solid var(--wp-border-light);border-radius:var(--radius);background:#fff;padding:16px 18px 30px;overflow:hidden;}
+  .swim .lane{position:relative;height:34px;background:linear-gradient(#fafafa,#fafafa) padding-box;border-radius:6px;border:1px solid var(--wp-border-light);}
+  .swim .blk{position:absolute;top:5px;height:24px;border-radius:4px;background:var(--ok);opacity:.85;}
+  .swim .blk.non{background:#a9d6b2;} .swim .blk.int{background:#c3c4c7;}
+  .swim .gl{position:absolute;top:0;bottom:22px;width:1px;background:var(--wp-border-light);}
+  .swim .gllbl{position:absolute;bottom:6px;font-size:10.5px;color:var(--wp-text-dim);transform:translateX(-50%);}
+  .swim .budget-line{position:absolute;top:8px;bottom:22px;width:2px;background:var(--over);}
+  .swim .budget-lbl{position:absolute;top:-2px;font-size:10px;color:var(--over);background:var(--over-bg);padding:1px 5px;border-radius:3px;transform:translateX(-50%);white-space:nowrap;}
+  .swim .overwash{position:absolute;top:0;bottom:22px;background:rgba(179,45,46,.06);}
+  .swim .period-band{position:absolute;top:0;bottom:22px;border-left:1px dashed #c9a9e6;}
+
+  /* recent entries (peek, links out) */
+  table.wp{width:100%;border-collapse:collapse;background:#fff;border:1px solid var(--wp-border-light);border-radius:var(--radius);overflow:hidden;}
+  table.wp th{background:#fbfbfb;text-align:left;padding:9px 14px;font-size:12px;color:var(--wp-text-dim);border-bottom:1px solid var(--wp-border);font-weight:600;}
+  table.wp td{padding:10px 14px;border-bottom:1px solid var(--wp-border-light);font-size:13px;}
+  table.wp tr:last-child td{border-bottom:0;}
+  table.wp td.num{text-align:right;font-variant-numeric:tabular-nums;}
+  .etime{font-family:var(--mono);font-size:11.5px;color:#50575e;}
+  .badge{font-size:11px;border-radius:10px;padding:2px 9px;}
+  .badge.unbilled{background:#eef4fb;color:#2c5a86;border:1px solid #cfe0f0;}
+  .badge.muted{background:#f0f0f1;color:#646970;}
+  .badge.over{background:var(--over-bg);color:var(--over);border:1px solid #f0cfcf;}
+  .linkout{display:flex;justify-content:center;padding:12px;background:#fbfbfb;border-top:1px solid var(--wp-border-light);}
+
+  .sectitle{font-size:15px;font-weight:600;margin:22px 0 10px;}
+
+  /* mock switch */
+  .mock-switch{position:fixed;right:16px;bottom:16px;z-index:50;background:#1d2327;color:#fff;border-radius:8px;padding:10px 12px;box-shadow:0 6px 24px rgba(0,0,0,.28);font-size:12px;}
+  .mock-switch .ms-title{color:#a7aaad;text-transform:uppercase;letter-spacing:.06em;font-size:10px;margin-bottom:8px;}
+  .mock-switch .ms-btns{display:flex;gap:6px;}
+  .mock-switch button{background:#2c3338;color:#c3c4c7;border:1px solid #3c434a;border-radius:5px;padding:6px 10px;cursor:pointer;font-size:12px;}
+  .mock-switch button.on{background:var(--wp-blue);color:#fff;border-color:var(--wp-blue);}
+
+  .hidden{display:none !important;}
+</style>
+</head>
+<body>
+
+<div class="adminbar">
+  <span class="dot"></span><span>Patrick's Studio</span>
+  <div class="spacer"></div><div class="who">Howdy, Patrick</div>
+</div>
+
+<div class="shell">
+  <nav class="menu">
+    <div class="group-title"><span class="ico">⏱</span> Time Tracker</div>
+    <a href="#">Today</a>
+    <a href="#">Insights</a>
+    <a href="#">Billing</a>
+    <a href="#">Clients</a>
+    <a href="#" class="current">Projects</a>
+    <a href="#">Tags</a>
+  </nav>
+
+  <main class="content">
+    <div class="breadcrumb"><a href="#">Projects</a> › <span id="bcName">Website Redesign</span></div>
+
+    <!-- ============ HOURLY ============ -->
+    <section id="rep-hourly">
+      <div class="phead">
+        <div>
+          <h1>Website Redesign <span class="chiplet hourly">Hourly</span></h1>
+          <div class="meta">Acme Corp · $100/h · active since May 2026</div>
+        </div>
+        <div class="acts">
+          <button class="button-primary button">Bill unbilled →</button>
+          <button class="button">Edit</button>
+          <button class="button">Archive</button>
+        </div>
+      </div>
+
+      <div class="hero">
+        <div class="left">
+          <div class="htag">Earned to date</div>
+          <div class="hbig">$5,580 <small>· 55.8h</small></div>
+          <div class="hsub">All time billable value at $100/h.</div>
+        </div>
+        <div class="right">
+          <div class="minirow"><span class="lbl">Billed</span><b>$2,850</b></div>
+          <div class="minirow"><span class="lbl">Unbilled</span><b style="color:var(--wp-blue)">$2,730</b></div>
+          <div class="minirow"><span class="lbl">Effective rate</span><b>$100/h</b></div>
+        </div>
+      </div>
+
+      <div class="grid-cards">
+        <div class="statcard"><div class="k">Total hours</div><div class="v">55.8</div><div class="m">across 41 entries</div></div>
+        <div class="statcard"><div class="k">This month</div><div class="v">28.5</div><div class="m">$2,850</div></div>
+        <div class="statcard"><div class="k">Unbilled</div><div class="v" style="color:var(--wp-blue)">$2,730</div><div class="m">27.3h ready to bill</div></div>
+        <div class="statcard"><div class="k">Effective rate</div><div class="v">$100</div><div class="m">value ÷ hours</div></div>
+      </div>
+
+      <div class="card card-pad mb16">
+        <h3 class="card-title">Hours by month</h3>
+        <div class="vchart">
+          <div class="col"><div class="seg bill" style="height:38px"></div></div>
+          <div class="col"><div class="seg bill" style="height:64px"></div></div>
+          <div class="col"><div class="seg bill" style="height:96px"></div><div class="seg non" style="height:14px"></div></div>
+        </div>
+        <div class="vlbls"><span class="vl">May</span><span class="vl">Jun</span><span class="vl">Jul</span></div>
+      </div>
+
+      <div class="card swim mb16">
+        <div class="lane">
+          <div class="gl" style="left:5%"></div><div class="gl" style="left:38%"></div><div class="gl" style="left:71%"></div>
+          <div class="blk" style="left:6%;width:9%"></div>
+          <div class="blk" style="left:20%;width:12%"></div>
+          <div class="blk" style="left:40%;width:8%"></div>
+          <div class="blk" style="left:52%;width:14%"></div>
+          <div class="blk" style="left:72%;width:10%"></div>
+          <div class="blk" style="left:85%;width:11%"></div>
+          <div class="gllbl" style="left:5%">May</div><div class="gllbl" style="left:38%">Jun</div><div class="gllbl" style="left:71%">Jul</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ RETAINER ============ -->
+    <section id="rep-retainer" class="hidden">
+      <div class="phead">
+        <div>
+          <h1>Brand Retainer <span class="chiplet retainer">Monthly retainer</span></h1>
+          <div class="meta">Meridian Health · 20h/mo · overage at $100/h · active since Mar 2026</div>
+        </div>
+        <div class="acts">
+          <button class="button">Edit</button>
+          <button class="button">Archive</button>
+        </div>
+      </div>
+
+      <div class="hero">
+        <div class="left">
+          <div style="display:flex;align-items:center;">
+            <div class="htag">This period</div>
+            <span style="flex:1"></span>
+            <span class="period-sel"><button class="navbtn">‹</button> July 2026 <button class="navbtn">›</button></span>
+          </div>
+          <div class="track"><i class="warn" style="width:92%"></i></div>
+          <div class="trackcap"><span><b>18.5h</b> used</span><span>20h allocation</span></div>
+          <div class="hsub warn" style="margin-top:8px;">92% used with 12 days left — 1.5h remaining before overage.</div>
+        </div>
+        <div class="right">
+          <div class="minirow"><span class="lbl">Overage this period</span><b>0.0h · —</b></div>
+          <div class="minirow"><span class="lbl">Avg / month (6 mo)</span><b>19.2h</b></div>
+          <div class="minirow"><span class="lbl">Went over</span><b>2 of 6 months</b></div>
+        </div>
+      </div>
+
+      <div class="grid-cards">
+        <div class="statcard"><div class="k">This period</div><div class="v">18.5h</div><div class="m">of 20h</div></div>
+        <div class="statcard"><div class="k">Overage billable</div><div class="v">$0</div><div class="m">nothing over yet</div></div>
+        <div class="statcard"><div class="k">Avg / month</div><div class="v">19.2h</div><div class="m">last 6 months</div></div>
+        <div class="statcard"><div class="k">Lifetime</div><div class="v">115h</div><div class="m">since Mar 2026</div></div>
+      </div>
+
+      <div class="card card-pad mb16">
+        <h3 class="card-title">Each period vs. the 20h allocation</h3>
+        <p class="card-sub">Bars over the dashed line are overage — billable.</p>
+        <div class="vchart" style="position:relative;">
+          <div class="alloc-line" style="bottom:96px;"><span class="alloc-tag">20h</span></div>
+          <div class="col"><div class="seg bill" style="height:82px"></div></div>
+          <div class="col"><div class="seg bill" style="height:96px"></div><div class="seg over" style="height:18px;background:var(--over)"></div></div>
+          <div class="col"><div class="seg bill" style="height:72px"></div></div>
+          <div class="col"><div class="seg bill" style="height:96px"></div><div class="seg over" style="height:10px;background:var(--over)"></div></div>
+          <div class="col"><div class="seg bill" style="height:90px"></div></div>
+          <div class="col"><div class="seg bill" style="height:89px"></div></div>
+        </div>
+        <div class="vlbls"><span class="vl">Feb</span><span class="vl">Mar</span><span class="vl">Apr</span><span class="vl">May</span><span class="vl">Jun</span><span class="vl">Jul</span></div>
+      </div>
+
+      <div class="card swim mb16">
+        <div class="lane">
+          <div class="period-band" style="left:16.6%"></div><div class="period-band" style="left:33.3%"></div>
+          <div class="period-band" style="left:50%"></div><div class="period-band" style="left:66.6%"></div><div class="period-band" style="left:83.3%"></div>
+          <div class="blk non" style="left:2%;width:11%"></div>
+          <div class="blk non" style="left:18%;width:13%"></div>
+          <div class="blk non" style="left:35%;width:9%"></div>
+          <div class="blk non" style="left:52%;width:12%"></div>
+          <div class="blk non" style="left:68%;width:10%"></div>
+          <div class="blk non" style="left:85%;width:8%"></div>
+          <div class="gllbl" style="left:8%">Feb</div><div class="gllbl" style="left:25%">Mar</div><div class="gllbl" style="left:42%">Apr</div><div class="gllbl" style="left:58%">May</div><div class="gllbl" style="left:75%">Jun</div><div class="gllbl" style="left:91%">Jul</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ FIXED BUDGET ============ -->
+    <section id="rep-fixed" class="hidden">
+      <div class="phead">
+        <div>
+          <h1>Rebrand <span class="chiplet fixed">Fixed budget</span></h1>
+          <div class="meta">Bright Labs · $8,000 budget · active since Jun 2026</div>
+        </div>
+        <div class="acts">
+          <button class="button">Edit</button>
+          <button class="button">Archive</button>
+        </div>
+      </div>
+
+      <div class="hero">
+        <div class="left">
+          <div class="htag">Budget consumed</div>
+          <div class="track"><i class="warn" style="width:66%"></i></div>
+          <div class="trackcap"><span><b>$5,240</b> of $8,000</span><span>$2,760 left</span></div>
+          <div class="hsub" style="margin-top:8px;">66% used · 52.4h logged. At the current pace you'd reach the budget around <b>early August</b>.</div>
+        </div>
+        <div class="right">
+          <div class="minirow"><span class="lbl">Remaining</span><b>$2,760</b></div>
+          <div class="minirow"><span class="lbl">Hours logged</span><b>52.4h</b></div>
+          <div class="minirow"><span class="lbl">Effective rate so far</span><b>$100/h</b></div>
+        </div>
+      </div>
+
+      <div class="grid-cards">
+        <div class="statcard"><div class="k">Budget</div><div class="v">$8,000</div><div class="m">fixed</div></div>
+        <div class="statcard"><div class="k">Consumed</div><div class="v">$5,240</div><div class="m">66% · 52.4h</div></div>
+        <div class="statcard"><div class="k">Remaining</div><div class="v">$2,760</div><div class="m">~27.6h at $100/h</div></div>
+        <div class="statcard"><div class="k">Effective rate</div><div class="v">$100</div><div class="m">value ÷ hours so far</div></div>
+      </div>
+
+      <div class="card card-pad mb16">
+        <h3 class="card-title">Cumulative spend toward budget</h3>
+        <p class="card-sub">Watch the climb approach the $8,000 line.</p>
+        <div class="vchart" style="position:relative;">
+          <div class="alloc-line" style="bottom:120px;border-top-color:var(--over);"><span class="alloc-tag" style="color:var(--over);background:var(--over-bg);">$8,000</span></div>
+          <div class="col"><div class="seg bill" style="height:22px"></div></div>
+          <div class="col"><div class="seg bill" style="height:52px"></div></div>
+          <div class="col"><div class="seg bill" style="height:70px"></div></div>
+          <div class="col"><div class="seg bill" style="height:79px"></div></div>
+        </div>
+        <div class="vlbls"><span class="vl">Wk 1</span><span class="vl">Wk 2</span><span class="vl">Wk 3</span><span class="vl">Wk 4</span></div>
+      </div>
+
+      <div class="card swim mb16">
+        <div class="lane">
+          <div class="overwash" style="left:82%;right:0;"></div>
+          <div class="budget-line" style="left:82%;"><span class="budget-lbl" style="left:0;">$8,000</span></div>
+          <div class="gl" style="left:25%"></div><div class="gl" style="left:50%"></div><div class="gl" style="left:75%"></div>
+          <div class="blk" style="left:3%;width:16%"></div>
+          <div class="blk" style="left:24%;width:20%"></div>
+          <div class="blk" style="left:48%;width:14%"></div>
+          <div class="blk" style="left:66%;width:13%"></div>
+          <div class="gllbl" style="left:12%">Wk 1</div><div class="gllbl" style="left:37%">Wk 2</div><div class="gllbl" style="left:62%">Wk 3</div><div class="gllbl" style="left:88%">Wk 4</div>
+        </div>
+        <p class="card-sub" style="margin:12px 0 0;">The red line is where the $8,000 budget lands — you're on pace to cross it if scope holds.</p>
+      </div>
+    </section>
+
+    <!-- ============ shared: recent entries (peek that links out) ============ -->
+    <div class="sectitle">Recent entries</div>
+    <table class="wp">
+      <thead><tr><th style="width:130px">Time</th><th>Description</th><th style="width:150px">Tags</th><th class="num" style="width:80px">Amount</th><th style="width:96px">Status</th></tr></thead>
+      <tbody>
+        <tr><td><span class="etime">Jul 4 · 9:15a</span></td><td>Kickoff — goals &amp; timeline</td><td>—</td><td class="num">$125</td><td><span class="badge unbilled">Unbilled</span></td></tr>
+        <tr><td><span class="etime">Jul 3 · 9:00a</span></td><td>Homepage build-out</td><td>#dev</td><td class="num">$250</td><td><span class="badge unbilled">Unbilled</span></td></tr>
+        <tr><td><span class="etime">Jul 2 · 10:00a</span></td><td>Homepage revisions round 2</td><td>—</td><td class="num">$325</td><td><span class="badge unbilled">Unbilled</span></td></tr>
+      </tbody>
+    </table>
+    <div class="card" style="border-top:0;border-radius:0 0 var(--radius) var(--radius);">
+      <div class="linkout"><a class="button" href="#">View all 41 entries in detail →</a></div>
+    </div>
+    <p class="card-sub" style="margin-top:10px;">Editing happens in the detailed Entries view (filtered to this project) — this page just shows where the project stands.</p>
+
+  </main>
+</div>
+
+<div class="mock-switch">
+  <div class="ms-title">Mockup · project type</div>
+  <div class="ms-btns">
+    <button id="mh" class="on" onclick="rep('hourly','Website Redesign')">Hourly</button>
+    <button id="mr" onclick="rep('retainer','Brand Retainer')">Retainer</button>
+    <button id="mf" onclick="rep('fixed','Rebrand')">Fixed budget</button>
+  </div>
+</div>
+
+<script>
+  function rep(t, name){
+    ['hourly','retainer','fixed'].forEach(k=>document.getElementById('rep-'+k).classList.toggle('hidden', k!==t));
+    document.getElementById('bcName').textContent = name;
+    document.getElementById('mh').classList.toggle('on', t==='hourly');
+    document.getElementById('mr').classList.toggle('on', t==='retainer');
+    document.getElementById('mf').classList.toggle('on', t==='fixed');
+    window.scrollTo({top:0,behavior:'smooth'});
+  }
+</script>
+</body>
+</html>

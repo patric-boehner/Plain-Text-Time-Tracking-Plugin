@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Insights — Summary + Entries, type-aware billing card (redesign v2)</title>
+<style>
+  :root{
+    --wp-blue:#2271b1; --wp-blue-hover:#135e96; --wp-menu-bg:#1d2327; --wp-menu-hover:#2c3338;
+    --wp-text:#1d2327; --wp-text-dim:#646970; --wp-border:#c3c4c7; --wp-border-light:#dcdcde;
+    --wp-bg:#f0f0f1; --ok:#007017; --ok-bg:#edfaef; --warn:#996800; --warn-bg:#fcf7ec; --over:#b32d2e;
+    --radius:4px;
+    --font:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Oxygen-Sans,Ubuntu,Cantarell,"Helvetica Neue",sans-serif;
+    --mono:ui-monospace,"SF Mono",SFMono-Regular,Menlo,Consolas,monospace;
+  }
+  *{box-sizing:border-box;} html,body{margin:0;padding:0;}
+  body{font-family:var(--font);font-size:13px;color:var(--wp-text);background:var(--wp-bg);-webkit-font-smoothing:antialiased;}
+
+  .adminbar{height:32px;background:var(--wp-menu-bg);color:#f0f0f1;display:flex;align-items:center;padding:0 12px;font-size:13px;position:sticky;top:0;z-index:30;}
+  .adminbar .dot{width:16px;height:16px;border-radius:50%;background:#82878c;margin-right:6px;}
+  .adminbar .spacer{flex:1;} .adminbar .who{color:#c3c4c7;}
+
+  .shell{display:grid;grid-template-columns:160px 1fr;min-height:calc(100vh - 32px);}
+  .menu{background:var(--wp-menu-bg);color:#c3c4c7;padding-top:8px;}
+  .menu .group-title{display:flex;align-items:center;gap:8px;padding:10px 12px;color:#fff;font-weight:600;font-size:14px;}
+  .menu .group-title .ico{width:20px;text-align:center;opacity:.8;}
+  .menu a{display:block;padding:8px 12px 8px 34px;color:#c3c4c7;text-decoration:none;font-size:13px;}
+  .menu a:hover{background:var(--wp-menu-hover);color:#72aee6;}
+  .menu a.current{background:var(--wp-blue);color:#fff;font-weight:600;}
+
+  .content{padding:20px 32px 80px;max-width:1120px;}
+  h1{font-size:23px;font-weight:400;margin:4px 0;}
+  .subhead{color:var(--wp-text-dim);margin:0 0 16px;}
+  .breadcrumb{font-size:12px;color:var(--wp-text-dim);margin-bottom:2px;}
+  .breadcrumb a{color:var(--wp-blue);text-decoration:none;cursor:pointer;} .breadcrumb a:hover{text-decoration:underline;}
+
+  .button{display:inline-flex;align-items:center;gap:6px;background:#f6f7f7;border:1px solid var(--wp-border);color:var(--wp-blue-hover);border-radius:var(--radius);padding:6px 12px;font-size:13px;cursor:pointer;text-decoration:none;}
+  .button:hover{background:#f0f0f1;border-color:#8c8f94;}
+  .button-primary{background:var(--wp-blue);border-color:var(--wp-blue);color:#fff;}
+  .button-primary:hover{background:var(--wp-blue-hover);border-color:var(--wp-blue-hover);}
+  .button-sm{padding:4px 10px;font-size:12px;}
+  .button-link{background:none;border:0;color:var(--wp-blue);cursor:pointer;font-size:13px;padding:2px 4px;}
+  .button-link:hover{color:var(--wp-blue-hover);text-decoration:underline;}
+
+  .view-toggle{display:inline-flex;border:1px solid var(--wp-border);border-radius:var(--radius);overflow:hidden;background:#fff;}
+  .view-toggle button{border:0;background:#fff;padding:6px 16px;font-size:13px;cursor:pointer;color:var(--wp-text-dim);border-left:1px solid var(--wp-border-light);}
+  .view-toggle button:first-child{border-left:0;}
+  .view-toggle button.on{background:var(--wp-blue);color:#fff;}
+
+  .pagehead{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;margin-bottom:14px;}
+
+  .filters{display:flex;flex-wrap:wrap;gap:10px;align-items:center;background:#fff;border:1px solid var(--wp-border-light);border-radius:var(--radius);padding:12px 14px;margin-bottom:16px;}
+  .filters select{border:1px solid var(--wp-border);border-radius:var(--radius);padding:5px 8px;font-size:13px;background:#fff;color:var(--wp-text);}
+  .filters .lbl{font-size:12px;color:var(--wp-text-dim);}
+  .filters .spacer{flex:1;}
+  .rangectrl{border:1px solid var(--wp-border);border-radius:var(--radius);padding:5px 10px;font-size:13px;background:#fff;}
+  .rangectrl.reset{background:var(--warn-bg);border-color:#e6d59f;color:var(--warn);font-weight:600;animation:pulse .5s ease;}
+  @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(153,104,0,.35);}100%{box-shadow:0 0 0 8px rgba(153,104,0,0);}}
+  .filter-chip{display:inline-flex;align-items:center;gap:6px;background:#eef4fb;border:1px solid #cfe0f0;color:#2c5a86;border-radius:14px;padding:3px 6px 3px 11px;font-size:12px;font-weight:600;}
+  .filter-chip button{border:0;background:#cfe0f0;color:#2c5a86;border-radius:50%;width:16px;height:16px;cursor:pointer;line-height:1;}
+
+  .grid-cards{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:16px;}
+  .statcard{background:#fff;border:1px solid var(--wp-border-light);border-radius:var(--radius);padding:14px 16px;}
+  .statcard .k{font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--wp-text-dim);}
+  .statcard .v{font-size:24px;font-weight:600;margin:6px 0 2px;}
+  .statcard .m{font-size:12px;color:var(--wp-text-dim);}
+
+  .card{background:#fff;border:1px solid var(--wp-border-light);border-radius:var(--radius);}
+  .card-pad{padding:16px 18px;} .card-title{font-size:13px;font-weight:600;margin:0 0 2px;}
+
+  .daychart{display:flex;align-items:flex-end;gap:5px;height:130px;padding:10px 0;}
+  .daychart .d{flex:1;display:flex;flex-direction:column;justify-content:flex-end;gap:4px;}
+  .daychart .seg{width:100%;} .daychart .seg.bill{background:var(--ok);}
+  .daychart .seg.non{background-image:repeating-linear-gradient(45deg,#8fc79a,#8fc79a 3px,#a9d6b2 3px,#a9d6b2 6px);}
+  .daychart .seg.int{background:#c3c4c7;}
+  .daylbls{display:flex;gap:5px;}.daylbls .dl{flex:1;text-align:center;font-size:10px;color:var(--wp-text-dim);}
+  .legend{display:flex;gap:16px;font-size:12px;color:var(--wp-text-dim);margin-top:12px;}
+  .legend i{display:inline-block;width:11px;height:11px;border-radius:2px;margin-right:5px;vertical-align:-1px;}
+
+  .listhead{display:flex;align-items:center;gap:12px;margin:22px 0 10px;}
+  .listhead h2{font-size:15px;font-weight:600;margin:0;} .listhead .spacer{flex:1;}
+  .groupby{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--wp-text-dim);}
+  .groupby .view-toggle button{padding:4px 12px;font-size:12px;}
+
+  table.wp{width:100%;border-collapse:collapse;background:#fff;border:1px solid var(--wp-border-light);border-radius:var(--radius);overflow:hidden;}
+  table.wp th{background:#fbfbfb;text-align:left;padding:10px 14px;font-size:12px;color:var(--wp-text-dim);border-bottom:1px solid var(--wp-border);font-weight:600;}
+  table.wp td{padding:11px 14px;border-bottom:1px solid var(--wp-border-light);font-size:13px;}
+  table.wp tr:last-child td{border-bottom:0;}
+  table.wp td.num,table.wp th.num{text-align:right;font-variant-numeric:tabular-nums;}
+  .chiplet{font-size:11px;border-radius:10px;padding:1px 8px;margin-left:8px;vertical-align:1px;border:1px solid;}
+  .chiplet.hourly{background:#eef4fb;color:#2c5a86;border-color:#cfe0f0;}
+  .chiplet.retainer{background:#f3eefc;color:#6d3fb0;border-color:#e3d6f7;}
+  .chiplet.fixed{background:#eef7ee;color:#04600f;border-color:#bfe3c4;}
+  .chiplet.internal{background:#f0f0f1;color:#646970;border-color:#dcdcde;}
+
+  tr.projrow{cursor:pointer;} tr.projrow:hover td{background:#f6f9fc;}
+  tr.projrow .pname{font-weight:600;}
+  tr.projrow .go{color:var(--wp-blue);font-size:12px;opacity:0;transition:opacity .12s;}
+  tr.projrow:hover .go{opacity:1;}
+  tfoot td{background:#fbfbfb;font-weight:600;border-top:1px solid var(--wp-border);}
+
+  .daygroup td{background:#f6f7f7;font-weight:600;font-size:12px;color:var(--wp-text-dim);}
+  .badge{font-size:11px;border-radius:10px;padding:2px 9px;white-space:nowrap;}
+  .badge.unbilled{background:#eef4fb;color:#2c5a86;border:1px solid #cfe0f0;}
+  .badge.muted{background:#f0f0f1;color:#646970;}
+  .badge.covered{background:var(--ok-bg);color:#04600f;border:1px solid #a7d8ae;}
+  .etime{font-family:var(--mono);font-size:11.5px;color:#50575e;}
+  .tag-pill{font-size:10.5px;background:#f3eefc;color:#6d3fb0;border:1px solid #e3d6f7;border-radius:9px;padding:1px 7px;margin-right:4px;}
+  tr.covered-row td{background:#fafdfb;}
+
+  /* ===== the type-aware billing card (mirrors the ledger card) ===== */
+  .billcard{display:flex;align-items:center;gap:18px;border:1px solid #cfe0f0;border-left:3px solid var(--wp-blue);background:#f6f9fc;border-radius:var(--radius);padding:14px 18px;margin-bottom:14px;}
+  .billcard.nothing{border-color:var(--wp-border-light);border-left-color:var(--wp-border);background:#fbfbfb;}
+  .billcard .bc-main{flex:1;}
+  .billcard .bc-title{font-weight:600;}
+  .billcard .bc-scope{font-size:12px;color:var(--wp-text-dim);margin-top:3px;}
+  .billcard .bc-amt{text-align:right;}
+  .billcard .bc-amt b{font-size:20px;font-weight:600;font-variant-numeric:tabular-nums;}
+  .billcard .bc-amt small{display:block;font-size:11px;color:var(--wp-text-dim);text-transform:uppercase;letter-spacing:.03em;}
+
+  .scopeset{display:flex;align-items:center;gap:8px;background:#eef4fb;border:1px solid #cfe0f0;color:#2c5a86;border-radius:var(--radius);padding:9px 13px;font-size:12.5px;margin-bottom:12px;}
+  .scopeset b{color:#1c4468;}
+  .period-step{display:inline-flex;align-items:center;gap:6px;margin-left:auto;}
+  .period-step button{width:22px;height:22px;border:1px solid #cfe0f0;background:#fff;border-radius:4px;cursor:pointer;color:#2c5a86;}
+
+  .actionbar{position:sticky;bottom:16px;display:flex;align-items:center;gap:12px;background:#1d2327;color:#fff;border-radius:8px;padding:11px 16px;margin-top:14px;box-shadow:0 6px 20px rgba(0,0,0,.22);}
+  .actionbar .spacer{flex:1;} .actionbar .sel{font-weight:600;}
+  .actionbar .button{background:#2c3338;border-color:#3c434a;color:#c3c4c7;}
+  .actionbar .button:hover{background:#3c434a;}
+  .actionbar .button-primary{background:var(--wp-blue);border-color:var(--wp-blue);color:#fff;}
+
+  .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--ok);color:#fff;padding:10px 18px;border-radius:20px;font-size:13px;box-shadow:0 6px 20px rgba(0,0,0,.2);opacity:0;transition:opacity .2s;z-index:60;}
+  .toast.show{opacity:1;}
+
+  .hidden{display:none !important;}
+</style>
+</head>
+<body>
+
+<div class="adminbar">
+  <span class="dot"></span><span>Patrick's Studio</span>
+  <div class="spacer"></div><div class="who">Howdy, Patrick</div>
+</div>
+
+<div class="shell">
+  <nav class="menu">
+    <div class="group-title"><span class="ico">⏱</span> Time Tracker</div>
+    <a href="#">Today</a>
+    <a href="#" class="current">Insights</a>
+    <a href="#">Billing</a>
+    <a href="#">Clients</a>
+    <a href="#">Projects</a>
+    <a href="#">Tags</a>
+  </nav>
+
+  <main class="content">
+    <div class="pagehead">
+      <div>
+        <h1>Insights</h1>
+        <p class="subhead" id="subhead">July 2026 · 61.0h across 5 projects</p>
+      </div>
+      <div class="view-toggle">
+        <button id="tSummary" class="on" onclick="show('summary')">Summary</button>
+        <button id="tEntries" onclick="show('entries')">Entries</button>
+      </div>
+    </div>
+
+    <!-- ============ SUMMARY ============ -->
+    <div id="v-summary">
+      <div class="filters">
+        <span class="lbl">Range:</span>
+        <select><option>This month</option><option>Last month</option><option>Custom…</option></select>
+        <select><option>All clients</option></select>
+        <select><option>All projects</option></select>
+        <select><option>All tags</option></select>
+        <select><option>Billable &amp; non-billable</option></select>
+        <button class="button">Apply</button>
+        <span class="spacer"></span>
+        <button class="button button-sm">Export CSV</button>
+      </div>
+
+      <div class="grid-cards">
+        <div class="statcard"><div class="k">Total hours</div><div class="v">61.0</div><div class="m">2.6h / day avg</div></div>
+        <div class="statcard"><div class="k">Billable hours</div><div class="v">28.5</div><div class="m">47% utilization</div></div>
+        <div class="statcard"><div class="k">Billable amount</div><div class="v">$3,330</div><div class="m">$3,210 still unbilled</div></div>
+        <div class="statcard"><div class="k">Overall EHR</div><div class="v">$96</div><div class="m">across all hours</div></div>
+      </div>
+
+      <div class="card card-pad">
+        <h3 class="card-title">Hours by day</h3>
+        <div class="daychart">
+          <div class="d"><div class="seg bill" style="height:40px"></div><div class="seg int" style="height:12px"></div></div>
+          <div class="d"><div class="seg bill" style="height:70px"></div></div>
+          <div class="d"><div class="seg bill" style="height:55px"></div><div class="seg non" style="height:20px"></div></div>
+          <div class="d"><div class="seg non" style="height:30px"></div></div>
+          <div class="d"><div class="seg bill" style="height:82px"></div><div class="seg int" style="height:10px"></div></div>
+          <div class="d"><div class="seg bill" style="height:48px"></div><div class="seg non" style="height:40px"></div></div>
+          <div class="d"><div class="seg int" style="height:22px"></div></div>
+        </div>
+        <div class="daylbls"><span class="dl">Mon</span><span class="dl">Tue</span><span class="dl">Wed</span><span class="dl">Thu</span><span class="dl">Fri</span><span class="dl">Sat</span><span class="dl">Sun</span></div>
+        <div class="legend">
+          <span><i style="background:var(--ok)"></i>Billable</span>
+          <span><i style="background:#8fc79a"></i>Non-billable</span>
+          <span><i style="background:#c3c4c7"></i>Internal</span>
+        </div>
+      </div>
+
+      <div class="listhead">
+        <h2>Where the time went</h2>
+        <span class="spacer"></span>
+        <span class="groupby">Group by
+          <span class="view-toggle"><button class="on">Project</button><button>Client</button></span>
+        </span>
+      </div>
+
+      <table class="wp">
+        <thead><tr><th>Project</th><th>Client</th><th class="num">Hours</th><th class="num">Billable now</th><th></th></tr></thead>
+        <tbody>
+          <tr class="projrow" onclick="drillTo('Website Redesign')">
+            <td><span class="pname">Website Redesign</span><span class="chiplet hourly">Hourly</span></td>
+            <td>Acme Corp</td><td class="num">28.5</td><td class="num">$2,730 unbilled</td>
+            <td class="num"><span class="go">View entries →</span></td>
+          </tr>
+          <tr class="projrow" onclick="drillTo('Rebrand')">
+            <td><span class="pname">Rebrand</span><span class="chiplet fixed">Fixed budget</span></td>
+            <td>Bright Labs</td><td class="num">52.4</td><td class="num">$8,000 budget</td>
+            <td class="num"><span class="go">View entries →</span></td>
+          </tr>
+          <tr class="projrow" onclick="drillTo('Brand Retainer')">
+            <td><span class="pname">Brand Retainer</span><span class="chiplet retainer">Retainer</span></td>
+            <td>Meridian Health</td><td class="num">23.6</td><td class="num">$480 overage</td>
+            <td class="num"><span class="go">View entries →</span></td>
+          </tr>
+          <tr class="projrow" onclick="drillTo('Care Plan')">
+            <td><span class="pname">Care Plan</span><span class="chiplet retainer">Retainer</span></td>
+            <td>Northwind</td><td class="num">2.0</td><td class="num">—</td>
+            <td class="num"><span class="go">View entries →</span></td>
+          </tr>
+          <tr class="projrow" onclick="drillTo('Internal')">
+            <td><span class="pname">Internal</span><span class="chiplet internal">Internal</span></td>
+            <td>Studio</td><td class="num">6.0</td><td class="num">—</td>
+            <td class="num"><span class="go">View entries →</span></td>
+          </tr>
+        </tbody>
+        <tfoot><tr><td>5 projects</td><td></td><td class="num">61.0</td><td class="num">$3,210</td><td></td></tr></tfoot>
+      </table>
+      <p class="subhead" style="margin-top:12px;">Click a project to see its entries — and, when there's billable time, its billing card.</p>
+    </div>
+
+    <!-- ============ ENTRIES (JS-rendered when drilled) ============ -->
+    <div id="v-entries" class="hidden">
+      <div class="breadcrumb" id="eBread"><a onclick="show('summary')">Insights</a> › Entries</div>
+      <div class="pagehead">
+        <div><h1 id="eTitle">Entries</h1></div>
+        <div class="view-toggle">
+          <button onclick="show('summary')">Summary</button>
+          <button class="on">Entries</button>
+        </div>
+      </div>
+
+      <div class="filters">
+        <span class="lbl">Range:</span>
+        <span class="rangectrl" id="rangeCtrl">This month</span>
+        <select><option>All clients</option></select>
+        <span id="projChip"></span>
+        <select><option>All tags</option></select>
+        <span class="spacer"></span>
+        <button class="button button-sm">Export CSV</button>
+      </div>
+
+      <div id="billCardWrap"></div>
+      <div id="scopeWrap"></div>
+      <div id="entriesWrap"></div>
+      <div id="actionWrap"></div>
+    </div>
+
+  </main>
+</div>
+
+<div class="toast" id="toast">Opens the Record-bill sheet</div>
+
+<script>
+  const DATA = {
+    'Website Redesign':{client:'Acme Corp',type:'hourly',chip:'Hourly',
+      cardScope:'Everything unbilled on this project — hourly has no fixed period',
+      amount:'$2,730',amtLabel:'unbilled', afterRange:'All unbilled · all time',
+      note:'Range set to <b>all unbilled</b> — the right scope for hourly. Tick what goes on this invoice.',
+      entries:[
+        {t:'Jul 4 · 9:15a',d:'Kickoff — goals & timeline',tag:'',amt:'$125',st:'unbilled'},
+        {t:'Jul 3 · 9:00a',d:'Homepage build-out',tag:'#dev',amt:'$250',st:'unbilled'},
+        {t:'Jul 2 · 10:00a',d:'Homepage revisions round 2',tag:'',amt:'$325',st:'unbilled'},
+        {t:'Jun 27 · 1:00p',d:'Dev handoff + QA (unbilled carryover)',tag:'',amt:'$300',st:'unbilled'}
+      ]},
+    'Brand Retainer':{client:'Meridian Health',type:'recurring',chip:'Retainer',
+      cardScope:'July 2026 · 23.6h logged, 3.6h over the 20h plan',
+      amount:'$480',amtLabel:'overage', afterRange:'July 2026 · period',
+      note:'Range locked to <b>July 2026</b> — a retainer record is one period. No entry picking; the bill is the overage.',
+      coverage:true, period:true,
+      entries:[
+        {t:'Jul 4 · 2:50p',d:'Call — approved mockups',tag:'#client-comms',amt:'covered',st:'covered'},
+        {t:'Jul 2 · 10:00a',d:'Social templates + newsletter',tag:'',amt:'covered',st:'covered'},
+        {t:'Jul 1 · 9:00a',d:'Monthly SEO + reporting',tag:'',amt:'covered',st:'covered'}
+      ]},
+    'Rebrand':{client:'Bright Labs',type:'fixed',chip:'Fixed budget',
+      cardScope:'Full project timeline · the budget bills in full, no matter the hours',
+      amount:'$8,000',amtLabel:'budget', afterRange:'Full project timeline',
+      note:'Range set to the <b>whole project</b> — a fixed-budget record is the budget itself. No picking; every entry is covered.',
+      coverage:true,
+      entries:[
+        {t:'Jul 1 · 10:00a',d:'Logo exploration round 3',tag:'',amt:'covered',st:'covered'},
+        {t:'Jun 24 · 9:00a',d:'Brand guidelines draft',tag:'#design',amt:'covered',st:'covered'},
+        {t:'Jun 18 · 1:00p',d:'Stakeholder workshop',tag:'',amt:'covered',st:'covered'}
+      ]},
+    'Care Plan':{client:'Northwind',type:'recurring',chip:'Retainer',nothing:true,
+      cardScope:'Within the 8h plan — nothing to bill this period', amount:'—',
+      entries:[{t:'Jul 1 · 9:00a',d:'Monthly maintenance + backups',tag:'',amt:'covered',st:'covered'}]},
+    'Internal':{client:'Studio',type:'internal',chip:'Internal',nothing:true,
+      cardScope:'Internal work — never billed', amount:'—',
+      entries:[{t:'Jul 4 · 3:40p',d:'Cleaned up staging server',tag:'',amt:'—',st:'muted'}]}
+  };
+
+  function show(which){
+    document.getElementById('v-summary').classList.toggle('hidden', which!=='summary');
+    document.getElementById('v-entries').classList.toggle('hidden', which!=='entries');
+    document.getElementById('tSummary').classList.toggle('on', which==='summary');
+    document.getElementById('tEntries').classList.toggle('on', which==='entries');
+    window.scrollTo({top:0,behavior:'smooth'});
+  }
+
+  function drillTo(project){
+    const p = DATA[project];
+    document.getElementById('eTitle').textContent = project;
+    document.getElementById('eBread').innerHTML = '<a onclick="show(\'summary\')">Insights</a> › Entries › '+project;
+    document.getElementById('projChip').innerHTML =
+      '<span class="filter-chip">'+project+' <button onclick="clearProj(event)">✕</button></span>';
+    // reset range control to default until the card scopes it
+    const rc = document.getElementById('rangeCtrl'); rc.className='rangectrl'; rc.textContent='This month';
+
+    // billing card
+    const chipCls = p.type==='hourly'?'hourly':p.type==='fixed'?'fixed':p.type==='internal'?'internal':'retainer';
+    const cardCls = p.nothing?'billcard nothing':'billcard';
+    const action = p.nothing ? '<span style="color:var(--wp-text-dim);font-size:12px;">Nothing to bill</span>'
+      : '<button class="button-primary" onclick="reviewAndBill(\''+project+'\')">Review &amp; bill →</button>';
+    document.getElementById('billCardWrap').innerHTML =
+      '<div class="'+cardCls+'">'+
+        '<div class="bc-main"><div class="bc-title">'+project+' · '+p.client+'<span class="chiplet '+chipCls+'">'+p.chip+'</span></div>'+
+        '<div class="bc-scope">'+p.cardScope+'</div></div>'+
+        (p.nothing?'':'<div class="bc-amt"><b>'+p.amount+'</b><small>'+(p.amtLabel||'')+'</small></div>')+
+        action+
+      '</div>';
+
+    document.getElementById('scopeWrap').innerHTML = '';
+    document.getElementById('actionWrap').innerHTML = '';
+    renderEntries(project, false);
+    show('entries');
+  }
+  function clearProj(e){ e.stopPropagation(); show('summary'); }
+
+  function renderEntries(project, scoped){
+    const p = DATA[project];
+    const selectable = scoped && p.type==='hourly';
+    let rows = '';
+    p.entries.forEach((en,i)=>{
+      const cov = en.st==='covered';
+      rows += '<tr class="'+(scoped&&cov?'covered-row':'')+'">'+
+        (selectable?'<td style="width:28px"><input type="checkbox" class="rowchk" checked onclick="recount(\''+project+'\')" data-amt="'+en.amt.replace(/[$,]/g,'')+'"></td>':'<td style="width:28px"></td>')+
+        '<td style="width:130px"><span class="etime">'+en.t+'</span></td>'+
+        '<td>'+en.d+'</td>'+
+        '<td style="width:150px">'+(en.tag?'<span class="tag-pill">'+en.tag+'</span>':'—')+'</td>'+
+        '<td class="num" style="width:90px">'+(en.amt==='covered'?'—':en.amt)+'</td>'+
+        '<td style="width:110px">'+badge(en.st, scoped)+'</td>'+
+      '</tr>';
+    });
+    document.getElementById('entriesWrap').innerHTML =
+      '<table class="wp"><thead><tr><th></th><th>Time</th><th>Description</th><th>Tags</th><th class="num">Amount</th><th>Status</th></tr></thead><tbody>'+rows+'</tbody></table>';
+  }
+  function badge(st, scoped){
+    if(st==='unbilled') return '<span class="badge unbilled">Unbilled</span>';
+    if(st==='covered') return scoped?'<span class="badge covered">Covered</span>':'<span class="badge unbilled">Unbilled</span>';
+    return '<span class="badge muted">—</span>';
+  }
+
+  function reviewAndBill(project){
+    const p = DATA[project];
+    // 1) reset the range to the type-correct scope (visible)
+    const rc = document.getElementById('rangeCtrl'); rc.className='rangectrl reset'; rc.textContent = p.afterRange;
+    // 2) scope banner (+ period stepper for recurring)
+    document.getElementById('scopeWrap').innerHTML =
+      '<div class="scopeset"><span>◎</span><span>'+p.note+'</span>'+
+      (p.period?'<span class="period-step"><button>‹</button> July 2026 <button>›</button></span>':'')+'</div>';
+    // 3) re-render entries in the correct mode
+    renderEntries(project, true);
+    // 4) the resolution bar — pick-and-sum (hourly) vs confirm-the-number (recurring/fixed)
+    let bar;
+    if(p.type==='hourly'){
+      const total = p.entries.reduce((s,e)=>s+ (+e.amt.replace(/[$,]/g,'')||0),0);
+      bar = '<div class="actionbar" id="abar"><span class="sel"><span id="selN">'+p.entries.length+'</span> entries · <span id="selAmt">$'+total.toLocaleString()+'</span></span>'+
+            '<span class="spacer"></span><button class="button button-sm">Set tags…</button>'+
+            '<button class="button-primary button-sm" onclick="openSheet()">Bill selected →</button></div>';
+    } else {
+      bar = '<div class="actionbar"><span class="sel">'+p.entries.length+' entries covered · '+p.amtLabel+' <b>'+p.amount+'</b></span>'+
+            '<span class="spacer"></span><button class="button-primary button-sm" onclick="openSheet()">Bill '+p.amtLabel+' '+p.amount+' →</button></div>';
+    }
+    document.getElementById('actionWrap').innerHTML = bar;
+    window.scrollTo({top:document.body.scrollHeight,behavior:'smooth'});
+  }
+  function recount(project){
+    const checked=[...document.querySelectorAll('.rowchk:checked')];
+    let amt=0; checked.forEach(c=>amt+=+c.dataset.amt||0);
+    document.getElementById('selN').textContent=checked.length;
+    document.getElementById('selAmt').textContent='$'+amt.toLocaleString();
+  }
+  function openSheet(){ showToast('Opens the Record-bill sheet (see Billing) — same sheet, same commit'); }
+  let tT; function showToast(m){ const t=document.getElementById('toast'); t.textContent=m; t.classList.add('show'); clearTimeout(tT); tT=setTimeout(()=>t.classList.remove('show'),2200); }
+</script>
+</body>
+</html>

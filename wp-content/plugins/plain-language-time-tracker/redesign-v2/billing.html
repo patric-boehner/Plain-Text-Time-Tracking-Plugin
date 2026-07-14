@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Billing — action in detail view + ledger (redesign v2)</title>
+<style>
+  :root{
+    --wp-blue:#2271b1; --wp-blue-hover:#135e96; --wp-menu-bg:#1d2327; --wp-menu-hover:#2c3338;
+    --wp-text:#1d2327; --wp-text-dim:#646970; --wp-border:#c3c4c7; --wp-border-light:#dcdcde;
+    --wp-bg:#f0f0f1; --ok:#007017; --ok-bg:#edfaef; --warn:#996800; --over:#b32d2e;
+    --radius:4px;
+    --font:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Oxygen-Sans,Ubuntu,Cantarell,"Helvetica Neue",sans-serif;
+    --mono:ui-monospace,"SF Mono",SFMono-Regular,Menlo,Consolas,monospace;
+  }
+  *{box-sizing:border-box;} html,body{margin:0;padding:0;}
+  body{font-family:var(--font);font-size:13px;color:var(--wp-text);background:var(--wp-bg);-webkit-font-smoothing:antialiased;}
+
+  .adminbar{height:32px;background:var(--wp-menu-bg);color:#f0f0f1;display:flex;align-items:center;padding:0 12px;font-size:13px;position:sticky;top:0;z-index:30;}
+  .adminbar .dot{width:16px;height:16px;border-radius:50%;background:#82878c;margin-right:6px;}
+  .adminbar .spacer{flex:1;} .adminbar .who{color:#c3c4c7;}
+
+  .shell{display:grid;grid-template-columns:160px 1fr;min-height:calc(100vh - 32px);}
+  .menu{background:var(--wp-menu-bg);color:#c3c4c7;padding-top:8px;}
+  .menu .group-title{display:flex;align-items:center;gap:8px;padding:10px 12px;color:#fff;font-weight:600;font-size:14px;}
+  .menu .group-title .ico{width:20px;text-align:center;opacity:.8;}
+  .menu a{display:block;padding:8px 12px 8px 34px;color:#c3c4c7;text-decoration:none;font-size:13px;}
+  .menu a:hover{background:var(--wp-menu-hover);color:#72aee6;}
+  .menu a.current{background:var(--wp-blue);color:#fff;font-weight:600;}
+
+  .content{padding:20px 32px 80px;max-width:1120px;}
+  h1{font-size:23px;font-weight:400;margin:4px 0;}
+  .subhead{color:var(--wp-text-dim);margin:0 0 16px;}
+  .breadcrumb{font-size:12px;color:var(--wp-text-dim);margin-bottom:2px;}
+  .breadcrumb a{color:var(--wp-blue);text-decoration:none;} .breadcrumb a:hover{text-decoration:underline;}
+
+  .button{display:inline-flex;align-items:center;gap:6px;background:#f6f7f7;border:1px solid var(--wp-border);color:var(--wp-blue-hover);border-radius:var(--radius);padding:6px 12px;font-size:13px;cursor:pointer;text-decoration:none;}
+  .button:hover{background:#f0f0f1;border-color:#8c8f94;}
+  .button-primary{background:var(--wp-blue);border-color:var(--wp-blue);color:#fff;}
+  .button-primary:hover{background:var(--wp-blue-hover);border-color:var(--wp-blue-hover);}
+  .button-sm{padding:4px 10px;font-size:12px;}
+  .button-link{background:none;border:0;color:var(--wp-blue);cursor:pointer;font-size:13px;padding:2px 4px;}
+  .button-link:hover{color:var(--wp-blue-hover);text-decoration:underline;}
+
+  .view-toggle{display:inline-flex;border:1px solid var(--wp-border);border-radius:var(--radius);overflow:hidden;background:#fff;}
+  .view-toggle button{border:0;background:#fff;padding:6px 16px;font-size:13px;cursor:pointer;color:var(--wp-text-dim);border-left:1px solid var(--wp-border-light);}
+  .view-toggle button:first-child{border-left:0;}
+  .view-toggle button.on{background:var(--wp-blue);color:#fff;}
+
+  .pagehead{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;margin-bottom:14px;}
+
+  table.wp{width:100%;border-collapse:collapse;background:#fff;border:1px solid var(--wp-border-light);border-radius:var(--radius);overflow:hidden;}
+  table.wp th{background:#fbfbfb;text-align:left;padding:10px 14px;font-size:12px;color:var(--wp-text-dim);border-bottom:1px solid var(--wp-border);font-weight:600;}
+  table.wp td{padding:11px 14px;border-bottom:1px solid var(--wp-border-light);font-size:13px;}
+  table.wp tr:last-child td{border-bottom:0;}
+  table.wp td.num,table.wp th.num{text-align:right;font-variant-numeric:tabular-nums;}
+
+  .badge{font-size:11px;border-radius:10px;padding:2px 9px;white-space:nowrap;}
+  .badge.unbilled{background:#eef4fb;color:#2c5a86;border:1px solid #cfe0f0;}
+  .badge.invoiced{background:var(--ok-bg);color:#04600f;border:1px solid #a7d8ae;}
+  .badge.muted{background:#f0f0f1;color:#646970;}
+
+  /* ledger: outstanding-by-client glance */
+  .outstanding{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:22px;}
+  .ocard{background:#fff;border:1px solid var(--wp-border-light);border-radius:var(--radius);padding:14px 16px;border-left:3px solid var(--wp-blue);}
+  .ocard .cname{font-weight:600;}
+  .ocard .amt{font-size:22px;font-weight:600;margin:6px 0 2px;}
+  .ocard .meta{font-size:12px;color:var(--wp-text-dim);margin-bottom:10px;}
+  .ocard.none{border-left-color:var(--wp-border);opacity:.75;}
+
+  .sectitle{font-size:15px;font-weight:600;margin:22px 0 10px;}
+
+  /* entries workbench */
+  .filters{display:flex;flex-wrap:wrap;gap:10px;align-items:center;background:#fff;border:1px solid var(--wp-border-light);border-radius:var(--radius);padding:12px 14px;margin-bottom:14px;}
+  .filters select{border:1px solid var(--wp-border);border-radius:var(--radius);padding:5px 8px;font-size:13px;background:#fff;color:var(--wp-text);}
+  .filters .lbl{font-size:12px;color:var(--wp-text-dim);}
+  .filter-chip{display:inline-flex;align-items:center;gap:6px;background:#eef4fb;border:1px solid #cfe0f0;color:#2c5a86;border-radius:14px;padding:3px 6px 3px 11px;font-size:12px;font-weight:600;}
+  .filter-chip button{border:0;background:#cfe0f0;color:#2c5a86;border-radius:50%;width:16px;height:16px;cursor:pointer;line-height:1;}
+  .filters .spacer{flex:1;}
+
+  .daygroup td{background:#f6f7f7;font-weight:600;font-size:12px;color:var(--wp-text-dim);}
+  .etime{font-family:var(--mono);font-size:11.5px;color:#50575e;}
+  .tag-pill{font-size:10.5px;background:#f3eefc;color:#6d3fb0;border:1px solid #e3d6f7;border-radius:9px;padding:1px 7px;margin-right:4px;}
+  .tag-add{font-size:11px;color:var(--wp-text-dim);border:1px dashed var(--wp-border);border-radius:9px;padding:1px 7px;cursor:pointer;background:#fff;}
+  tr.invoiced-row td{background:var(--ok-bg);}
+
+  .bulkbar{position:sticky;bottom:16px;display:none;align-items:center;gap:12px;background:#1d2327;color:#fff;border-radius:8px;padding:11px 16px;margin-top:14px;box-shadow:0 6px 20px rgba(0,0,0,.22);}
+  .bulkbar.show{display:flex;}
+  .bulkbar .spacer{flex:1;}
+  .bulkbar .sel{font-weight:600;}
+  .bulkbar .button{background:#2c3338;border-color:#3c434a;color:#c3c4c7;}
+  .bulkbar .button:hover{background:#3c434a;}
+  .bulkbar .button-primary{background:var(--wp-blue);border-color:var(--wp-blue);color:#fff;}
+
+  /* dialog / sheet */
+  dialog{border:0;border-radius:8px;padding:0;box-shadow:0 20px 60px rgba(0,0,0,.35);max-width:640px;width:calc(100% - 40px);}
+  dialog::backdrop{background:rgba(20,24,28,.55);}
+  .sheet-head{display:flex;align-items:center;gap:12px;padding:16px 20px;border-bottom:1px solid var(--wp-border-light);}
+  .sheet-head h2{font-size:16px;font-weight:600;margin:0;}
+  .sheet-head .x{margin-left:auto;border:0;background:none;font-size:20px;cursor:pointer;color:var(--wp-text-dim);line-height:1;}
+  .sheet-body{padding:18px 20px;max-height:64vh;overflow:auto;}
+  .sheet-foot{display:flex;align-items:center;gap:10px;padding:14px 20px;border-top:1px solid var(--wp-border-light);background:#fbfbfb;}
+  .sheet-foot .spacer{flex:1;}
+
+  .manifest{border:1px solid var(--wp-border-light);border-radius:var(--radius);overflow:hidden;margin-bottom:16px;}
+  .manifest .mrow{display:grid;grid-template-columns:88px 1fr 56px 70px;gap:10px;padding:8px 12px;border-bottom:1px solid #eef0f1;font-size:12.5px;align-items:center;}
+  .manifest .mrow:last-child{border-bottom:0;}
+  .manifest .mrow .mt{font-family:var(--mono);font-size:11px;color:#50575e;}
+  .manifest .mrow .mn{text-align:right;font-variant-numeric:tabular-nums;}
+  .manifest .mhead{background:#fbfbfb;font-weight:600;color:var(--wp-text-dim);font-size:11px;text-transform:uppercase;letter-spacing:.03em;}
+
+  .fieldrow{display:flex;align-items:center;gap:12px;margin-bottom:12px;}
+  .fieldrow label{width:130px;color:var(--wp-text-dim);font-size:12px;}
+  .fieldrow input,.fieldrow textarea{flex:1;border:1px solid var(--wp-border);border-radius:var(--radius);padding:7px 9px;font-size:13px;font-family:inherit;color:var(--wp-text);}
+  .amount-input{position:relative;flex:1;}
+  .amount-input input{width:100%;font-size:18px;font-weight:600;font-variant-numeric:tabular-nums;}
+  .absorb-note{font-size:12px;color:var(--warn);margin:-4px 0 14px 142px;}
+
+  .lineitems{background:#1d2327;color:#e6e7e8;border-radius:var(--radius);padding:14px 16px;font-family:var(--mono);font-size:12px;line-height:1.7;white-space:pre;overflow-x:auto;}
+  .li-head{display:flex;align-items:center;margin:16px 0 8px;}
+  .li-head b{font-size:12px;} .li-head .spacer{flex:1;}
+
+  .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--ok);color:#fff;padding:10px 18px;border-radius:20px;font-size:13px;box-shadow:0 6px 20px rgba(0,0,0,.2);opacity:0;transition:opacity .2s;z-index:60;}
+  .toast.show{opacity:1;}
+
+  .hidden{display:none !important;}
+</style>
+</head>
+<body>
+
+<div class="adminbar">
+  <span class="dot"></span><span>Patrick's Studio</span>
+  <div class="spacer"></div><div class="who">Howdy, Patrick</div>
+</div>
+
+<div class="shell">
+  <nav class="menu">
+    <div class="group-title"><span class="ico">⏱</span> Time Tracker</div>
+    <a href="#">Today</a>
+    <a href="#">Insights</a>
+    <a href="#" class="current">Billing</a>
+    <a href="#">Clients</a>
+    <a href="#">Projects</a>
+    <a href="#">Tags</a>
+  </nav>
+
+  <main class="content">
+
+    <!-- ================= LEDGER (the Billing menu item) ================= -->
+    <div id="v-ledger">
+      <div class="pagehead">
+        <div>
+          <h1>Billing</h1>
+          <p class="subhead">What's owed, and what you've billed. No entries live here — you bill them where you verify them.</p>
+        </div>
+      </div>
+
+      <div class="sectitle">Outstanding — ready to bill</div>
+      <div class="outstanding">
+        <div class="ocard">
+          <div class="cname">Acme Corp</div>
+          <div class="amt">$2,730</div>
+          <div class="meta">7 unbilled entries · Website Redesign</div>
+          <button class="button button-primary button-sm" onclick="showScreen('entries')">Review &amp; bill →</button>
+        </div>
+        <div class="ocard">
+          <div class="cname">Meridian Health</div>
+          <div class="amt">$480</div>
+          <div class="meta">Retainer overage · 3.6h over 20h plan</div>
+          <button class="button button-primary button-sm" onclick="showScreen('entries')">Review &amp; bill →</button>
+        </div>
+        <div class="ocard none">
+          <div class="cname">Northwind</div>
+          <div class="amt" style="color:var(--wp-text-dim)">—</div>
+          <div class="meta">Within retainer · nothing to bill</div>
+          <button class="button button-sm" disabled style="opacity:.5">Nothing due</button>
+        </div>
+      </div>
+
+      <div class="sectitle">Billing records</div>
+      <table class="wp">
+        <thead>
+          <tr><th style="width:130px">Billed on</th><th>Client · Project</th><th class="num">Entries</th><th class="num">Hours</th><th class="num">Amount</th><th style="width:120px"></th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Jun 30, 2026</td><td>Acme Corp · Website Redesign</td>
+            <td class="num">5</td><td class="num">32.0</td><td class="num">$3,200</td>
+            <td><button class="button-link" onclick="openLineItems()">View line items</button></td>
+          </tr>
+          <tr>
+            <td>Jun 30, 2026</td><td>Meridian Health · Brand Retainer</td>
+            <td class="num">1</td><td class="num">20.0</td><td class="num">$2,000</td>
+            <td><button class="button-link" onclick="openLineItems()">View line items</button></td>
+          </tr>
+          <tr>
+            <td>May 31, 2026</td><td>Acme Corp · Website Redesign</td>
+            <td class="num">6</td><td class="num">28.5</td><td class="num">$2,850</td>
+            <td><button class="button-link" onclick="openLineItems()">View line items</button></td>
+          </tr>
+        </tbody>
+      </table>
+      <p class="subhead" style="margin-top:12px;">A record is a frozen snapshot — the entries and rates locked at the moment you billed. Its whole job is to mark those entries as billed, so what's still owed resolves itself. Re-open any to copy its line items again — no sent/paid tracking, that's your invoicing tool's job.</p>
+    </div>
+
+    <!-- ================= ENTRIES WORKBENCH (the detailed view, reached via the doorway) ================= -->
+    <div id="v-entries" class="hidden">
+      <div class="breadcrumb"><a href="#" onclick="showScreen('ledger');return false;">Billing</a> › Review &amp; bill</div>
+      <div class="pagehead">
+        <div>
+          <h1>Detailed entries</h1>
+          <p class="subhead">Same table you verify and edit in. Tick what goes on the invoice, then <b>Bill selected</b>. This is the only place entries are listed.</p>
+        </div>
+        <div class="view-toggle">
+          <button onclick="showScreen('ledger')">Summary</button>
+          <button class="on">Entries</button>
+        </div>
+      </div>
+
+      <div class="filters">
+        <span class="lbl">Range:</span>
+        <select><option>This month</option><option>Custom…</option></select>
+        <span class="filter-chip">Acme Corp <button title="clear">✕</button></span>
+        <select><option>Unbilled only</option><option>All</option></select>
+        <select><option>All tags</option></select>
+        <span class="spacer"></span>
+        <button class="button button-sm">Export CSV</button>
+      </div>
+
+      <table class="wp">
+        <thead>
+          <tr>
+            <th style="width:28px"><input type="checkbox" onclick="toggleAll(this)"></th>
+            <th style="width:120px">Time</th><th>Description</th>
+            <th style="width:150px">Tags</th><th class="num" style="width:80px">Amount</th>
+            <th style="width:96px">Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr class="daygroup"><td></td><td colspan="5">Friday, Jul 4</td></tr>
+          <tr>
+            <td><input type="checkbox" class="rowchk" checked onclick="recount()"></td>
+            <td><span class="etime">9:15–10:30a</span></td>
+            <td>Kickoff — goals &amp; timeline</td>
+            <td><button class="tag-add">+ tag</button></td>
+            <td class="num" data-amt="125">$125</td>
+            <td><span class="badge unbilled">Unbilled</span></td>
+          </tr>
+          <tr>
+            <td><input type="checkbox" class="rowchk" checked onclick="recount()"></td>
+            <td><span class="etime">1:00–2:50p</span></td>
+            <td>Wireframes — product + pricing</td>
+            <td><span class="tag-pill">#wireframes</span></td>
+            <td class="num" data-amt="183">$183</td>
+            <td><span class="badge unbilled">Unbilled</span></td>
+          </tr>
+          <tr class="daygroup"><td></td><td colspan="5">Thursday, Jul 3</td></tr>
+          <tr>
+            <td><input type="checkbox" class="rowchk" checked onclick="recount()"></td>
+            <td><span class="etime">9:00–11:30a</span></td>
+            <td>Homepage build-out</td>
+            <td><span class="tag-pill">#dev</span></td>
+            <td class="num" data-amt="250">$250</td>
+            <td><span class="badge unbilled">Unbilled</span></td>
+          </tr>
+          <tr>
+            <td><input type="checkbox" class="rowchk" checked onclick="recount()"></td>
+            <td><span class="etime">1:00–3:00p</span></td>
+            <td>Content review + revisions</td>
+            <td><button class="tag-add">+ tag</button></td>
+            <td class="num" data-amt="200">$200</td>
+            <td><span class="badge unbilled">Unbilled</span></td>
+          </tr>
+          <tr class="daygroup"><td></td><td colspan="5">Wednesday, Jul 2</td></tr>
+          <tr>
+            <td><input type="checkbox" class="rowchk" checked onclick="recount()"></td>
+            <td><span class="etime">10:00–1:15p</span></td>
+            <td>Homepage revisions round 2</td>
+            <td><button class="tag-add">+ tag</button></td>
+            <td class="num" data-amt="325">$325</td>
+            <td><span class="badge unbilled">Unbilled</span></td>
+          </tr>
+        </tbody>
+      </table>
+      <p class="subhead" style="margin-top:10px;">Uncheck anything you're not billing yet — it stays Unbilled for next time.</p>
+
+      <!-- selection action bar -->
+      <div class="bulkbar" id="bulkbar">
+        <span class="sel"><span id="selN">5</span> entries · <span id="selAmt">$1,083</span></span>
+        <span class="spacer"></span>
+        <button class="button button-sm">Mark non-billable</button>
+        <button class="button button-sm">Set tags…</button>
+        <button class="button button-primary button-sm" onclick="openRecordSheet()">Bill selected →</button>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<!-- ============ RECORD-BILL SHEET (native dialog) ============ -->
+<dialog id="recordSheet">
+  <div class="sheet-head">
+    <h2>Record a bill — Acme Corp</h2>
+    <button class="x" onclick="closeSheet('recordSheet')">×</button>
+  </div>
+  <div class="sheet-body">
+    <p style="margin-top:0;color:var(--wp-text-dim);">These <b id="mCount">5</b> entries will be frozen into a billing record at today's rates.</p>
+
+    <div class="manifest" id="manifest">
+      <div class="mrow mhead"><span>Date</span><span>Description</span><span class="mn">Hrs</span><span class="mn">Amount</span></div>
+      <div class="mrow"><span class="mt">Jul 4</span><span>Kickoff — goals &amp; timeline</span><span class="mn">1.25</span><span class="mn">$125</span></div>
+      <div class="mrow"><span class="mt">Jul 4</span><span>Wireframes — product + pricing</span><span class="mn">1.83</span><span class="mn">$183</span></div>
+      <div class="mrow"><span class="mt">Jul 3</span><span>Homepage build-out</span><span class="mn">2.50</span><span class="mn">$250</span></div>
+      <div class="mrow"><span class="mt">Jul 3</span><span>Content review + revisions</span><span class="mn">2.00</span><span class="mn">$200</span></div>
+      <div class="mrow"><span class="mt">Jul 2</span><span>Homepage revisions round 2</span><span class="mn">3.25</span><span class="mn">$325</span></div>
+    </div>
+
+    <div class="fieldrow">
+      <label>Bill amount</label>
+      <div class="amount-input"><input type="text" id="billAmt" value="$1,083"></div>
+    </div>
+    <div class="absorb-note" id="absorbNote" style="display:none;"></div>
+    <div class="fieldrow">
+      <label>Description</label>
+      <input type="text" value="Website Redesign — July 2026">
+    </div>
+
+    <div class="li-head"><b>Invoice line items</b><span class="spacer"></span><button class="button button-sm" onclick="copyLines()">Copy</button></div>
+    <div class="lineitems" id="lineItems">Website Redesign — July 2026
+────────────────────────────────────────────
+Jul 2   Homepage revisions round 2      3.25h   $325
+Jul 3   Homepage build-out              2.50h   $250
+Jul 3   Content review + revisions      2.00h   $200
+Jul 4   Wireframes — product + pricing  1.83h   $183
+Jul 4   Kickoff — goals & timeline      1.25h   $125
+────────────────────────────────────────────
+                             10.83h          $1,083</div>
+  </div>
+  <div class="sheet-foot">
+    <span style="color:var(--wp-text-dim);font-size:12px;">Recording marks these entries <b>Billed</b> and adds a record to the ledger.</span>
+    <span class="spacer"></span>
+    <button class="button" onclick="closeSheet('recordSheet')">Cancel</button>
+    <button class="button button-primary" onclick="commitBill()">Record bill</button>
+  </div>
+</dialog>
+
+<!-- ============ RE-OPEN LINE ITEMS (from ledger record) ============ -->
+<dialog id="lineSheet">
+  <div class="sheet-head">
+    <h2>Line items — Acme Corp · Jun 30</h2>
+    <button class="x" onclick="closeSheet('lineSheet')">×</button>
+  </div>
+  <div class="sheet-body">
+    <p style="margin-top:0;color:var(--wp-text-dim);">Frozen snapshot from when this was billed. Copy again anytime — nothing re-commits.</p>
+    <div class="li-head"><b>Invoice line items</b><span class="spacer"></span><button class="button button-sm" onclick="copyLines()">Copy</button></div>
+    <div class="lineitems">Website Redesign — June 2026
+────────────────────────────────────────────
+Jun 5   Discovery workshop              4.00h   $400
+Jun 9   Information architecture        6.00h   $600
+Jun 16  Homepage design                 8.00h   $800
+Jun 23  Design revisions                6.00h   $600
+Jun 27  Dev handoff + QA                8.00h   $800
+────────────────────────────────────────────
+                             32.00h          $3,200</div>
+  </div>
+  <div class="sheet-foot">
+    <span style="color:var(--wp-text-dim);font-size:12px;">Billed Jun 30, 2026 · 32.0h · $3,200</span>
+    <span class="spacer"></span>
+    <button class="button">Delete record</button>
+    <button class="button" onclick="closeSheet('lineSheet')">Close</button>
+  </div>
+</dialog>
+
+<div class="toast" id="toast">Bill recorded · 5 entries marked Billed</div>
+
+<script>
+  function showScreen(which){
+    document.getElementById('v-ledger').classList.toggle('hidden', which!=='ledger');
+    document.getElementById('v-entries').classList.toggle('hidden', which!=='entries');
+    if (which==='entries') recount();
+    window.scrollTo({top:0,behavior:'smooth'});
+  }
+  function toggleAll(cb){ document.querySelectorAll('.rowchk').forEach(c=>c.checked=cb.checked); recount(); }
+  function recount(){
+    const checked = [...document.querySelectorAll('.rowchk:checked')];
+    const n = checked.length;
+    let amt = 0;
+    checked.forEach(c=>{ const cell = c.closest('tr').querySelector('[data-amt]'); if(cell) amt += +cell.dataset.amt; });
+    document.getElementById('bulkbar').classList.toggle('show', n>0);
+    document.getElementById('selN').textContent = n;
+    document.getElementById('selAmt').textContent = '$'+amt.toLocaleString();
+  }
+  function openRecordSheet(){
+    const n = document.querySelectorAll('.rowchk:checked').length;
+    document.getElementById('mCount').textContent = n;
+    document.getElementById('recordSheet').showModal();
+  }
+  function openLineItems(){ document.getElementById('lineSheet').showModal(); }
+  function closeSheet(id){ document.getElementById(id).close(); }
+  function copyLines(){ showToast('Line items copied to clipboard'); }
+  function commitBill(){
+    // mark checked rows invoiced
+    document.querySelectorAll('.rowchk:checked').forEach(c=>{
+      const tr = c.closest('tr'); tr.classList.add('invoiced-row');
+      const badge = tr.querySelector('.badge'); if(badge){ badge.className='badge invoiced'; badge.textContent='Billed'; }
+      c.checked=false; c.disabled=true;
+    });
+    recount();
+    closeSheet('recordSheet');
+    showToast('Bill recorded · entries marked Billed');
+    setTimeout(()=>showScreen('ledger'), 700);
+  }
+  let toastT;
+  function showToast(msg){
+    const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show');
+    clearTimeout(toastT); toastT=setTimeout(()=>t.classList.remove('show'),1800);
+  }
+  // light-dismiss the dialogs on backdrop click
+  document.querySelectorAll('dialog').forEach(d=>{
+    d.addEventListener('click', e=>{ if(e.target===d) d.close(); });
+  });
+</script>
+</body>
+</html>
