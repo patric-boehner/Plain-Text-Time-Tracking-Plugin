@@ -292,6 +292,21 @@ document.addEventListener( 'DOMContentLoaded', function() {
 	// Initialize currency inputs.
 	PLTT.initCurrencyInputs( document );
 
+	// Modal chrome: inject a top-right "×" close into every modal so they share
+	// the header (title + close) / footer (buttons) pattern. Runs before the
+	// .pltt-modal-close binding below so the injected button gets wired up too.
+	document.querySelectorAll( '.pltt-modal-content' ).forEach( function( content ) {
+		if ( content.querySelector( '.pltt-modal-x' ) ) {
+			return;
+		}
+		const x = document.createElement( 'button' );
+		x.type      = 'button';
+		x.className = 'pltt-modal-x pltt-modal-close';
+		x.setAttribute( 'aria-label', ( window.plttData && plttData.i18n && plttData.i18n.close ) || 'Close' );
+		x.innerHTML = '&times;';
+		content.insertBefore( x, content.firstChild );
+	} );
+
 	// Close modals on button click.
 	document.querySelectorAll( '.pltt-modal-close' ).forEach( function( btn ) {
 		btn.addEventListener( 'click', function() {

@@ -4,25 +4,32 @@
  * @package PlainLanguageTimeTracker
  */
 
-.pltt-alias-chips {
-	display: flex;
-	flex-wrap: wrap;
-	align-items: center;
-	gap: 6px;
-	padding: 6px;
-	border: 1px solid #8c8f94;
-	border-radius: 4px;
-	background: #fff;
-	min-height: 36px;
+/* Wrapping group box around the alias field (chips + input + note), matching the
+   project modal's .pltt-billing-settings box. */
+.pltt-alias-group {
+	border: 1px solid var(--pltt-border, #c3c4c7);
+	border-radius: 3px;
+	padding: 12px 14px 14px;
+	margin-top: 6px;
 }
 
-.pltt-alias-chips:focus-within {
-	border-color: #2271b1;
-	box-shadow: 0 0 0 1px #2271b1;
+/* The chips (existing/learned names) and the "add" input are separate rows now:
+   pills on top, a standalone input below. */
+.pltt-alias-chips {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
 }
 
 .pltt-alias-chip-list {
-	display: contents;
+	display: flex;
+	flex-wrap: wrap;
+	gap: 6px;
+}
+
+/* No pills yet (e.g. a brand-new client): don't reserve an empty row. */
+.pltt-alias-chip-list:empty {
+	display: none;
 }
 
 .pltt-alias-chip {
@@ -76,14 +83,19 @@
 }
 
 .pltt-alias-input {
-	flex: 1 1 120px;
-	min-width: 120px;
-	border: 0 !important;
+	width: 100%;
+	border: 1px solid #8c8f94 !important;
+	border-radius: 4px !important;
 	outline: 0;
-	box-shadow: none !important;
-	padding: 2px 4px;
+	box-shadow: none;
+	padding: 6px 8px;
 	font-size: 13px;
-	background: transparent;
+	background: #fff;
+}
+
+.pltt-alias-input:focus {
+	border-color: #2271b1 !important;
+	box-shadow: 0 0 0 1px #2271b1 !important;
 }
 
 .pltt-alias-hidden {
@@ -95,4 +107,25 @@
 	margin-top: 4px;
 	color: #646970;
 	font-size: 12px;
+}
+
+/* Learning tip below the alias chips — the app fills these in automatically, so
+   this reassures the user they rarely need to. */
+.pltt-alias-learn-note {
+	display: flex;
+	align-items: flex-start;
+	gap: 6px;
+	margin-top: 8px;
+	color: var(--pltt-text-muted, #646970);
+	font-size: 12px;
+	line-height: 1.5;
+}
+
+.pltt-alias-learn-note .dashicons {
+	flex: 0 0 auto;
+	width: 16px;
+	height: 16px;
+	font-size: 16px;
+	margin-top: 1px;
+	color: #c9a227;
 }
