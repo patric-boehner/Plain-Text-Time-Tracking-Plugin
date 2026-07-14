@@ -1,16 +1,17 @@
 <?php
 /**
- * Reports — Invoicing view (the cross-project queue).
+ * Billing — the ledger + doorway.
  *
- * The top-of-funnel for billing: everything currently outstanding across all
- * active projects, grouped by client, each scope linking to the billing surface
- * (verify -> adjust -> commit). Not period-filtered — it's "what can I bill now."
+ * Two sections, always shown together:
+ *   1. Outstanding — everything ready to bill, grouped by client, one card per
+ *      project scope (hourly, retainer overage, fixed budget). Each card's
+ *      "Review & bill" links INTO the detailed entries view, filtered to that
+ *      project, where selection + commit happen. This page lists no entries.
+ *   2. Billing records — the frozen record of what's already been billed.
+ *      "View line items" reopens the copyable description; no sent/paid tracking.
  *
- * Rendered by PLTT_Admin::render_invoicing_page() (the Invoicing menu page).
- * A Ready-to-Invoice / Invoiced toggle switches between the outstanding queue and
- * the committed-records ledger. Expects $view ('ready'|'invoiced') in scope, plus
- * $queue (PLTT_Billing::get_invoicing_queue()) for the ready view or $log
- * (PLTT_Billing::get_invoiced_log()) for the invoiced view.
+ * Rendered by PLTT_Admin::render_invoicing_page(). Expects $queue
+ * (PLTT_Billing::get_invoicing_queue()) and $log (PLTT_Billing::get_invoiced_log()).
  *
  * @package PlainLanguageTimeTracker
  */
@@ -20,126 +21,188 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-$inv_base = admin_url( 'admin.php?page=pltt-invoicing' );
+$reports_base = admin_url( 'admin.php' );
 ?>
 
-<div class="wrap pltt-wrap">
+<div class="wrap pltt-wrap pltt-billing-ledger">
 	<div class="pltt-header">
-		<h1><?php esc_html_e( 'Invoicing', 'plain-language-time-tracker' ); ?></h1>
-		<div class="pltt-view-toggle">
-			<a href="<?php echo esc_url( add_query_arg( 'view', 'ready', $inv_base ) ); ?>"
-				class="button <?php echo 'invoiced' === $view ? '' : 'button-primary'; ?>">
-				<?php esc_html_e( 'Ready to Invoice', 'plain-language-time-tracker' ); ?>
-			</a>
-			<a href="<?php echo esc_url( add_query_arg( 'view', 'invoiced', $inv_base ) ); ?>"
-				class="button <?php echo 'invoiced' === $view ? 'button-primary' : ''; ?>">
-				<?php esc_html_e( 'Invoiced', 'plain-language-time-tracker' ); ?>
-			</a>
-		</div>
+		<h1><?php esc_html_e( 'Billing', 'plain-language-time-tracker' ); ?></h1>
 	</div>
+	<p class="pltt-bill-subhead">
+		<?php esc_html_e( 'What’s owed, and what you’ve billed. You bill entries where you verify them, so this page lists no entries — just who owes you and the record of past bills.', 'plain-language-time-tracker' ); ?>
+	</p>
 
-	<?php if ( 'invoiced' === $view ) : ?>
-		<?php include PLTT_PLUGIN_DIR . 'templates/partials/invoicing-log.php'; ?>
-	<?php elseif ( empty( $queue['clients'] ) ) : ?>
-		<div class="pltt-card pltt-invoicing-empty">
-			<p class="pltt-report-placeholder-lead"><?php esc_html_e( 'Nothing outstanding to invoice.', 'plain-language-time-tracker' ); ?></p>
-			<p class="description"><?php esc_html_e( 'When a retainer runs over or hourly work is unbilled, it shows up here ready to bill.', 'plain-language-time-tracker' ); ?></p>
+	<?php // ============ OUTSTANDING ============ ?>
+	<h2 class="pltt-bill-sectitle"><?php esc_html_e( 'Outstanding — ready to bill', 'plain-language-time-tracker' ); ?></h2>
+
+	<?php if ( empty( $queue['clients'] ) ) : ?>
+		<div class="pltt-card pltt-bill-empty">
+			<p class="pltt-report-placeholder-lead"><?php esc_html_e( 'Nothing outstanding to bill.', 'plain-language-time-tracker' ); ?></p>
+			<p class="description"><?php esc_html_e( 'When a retainer runs over, an hourly project has unbilled time, or a fixed budget is ready, it shows up here.', 'plain-language-time-tracker' ); ?></p>
 		</div>
 	<?php else : ?>
-		<p class="pltt-invoicing-lead">
-			<strong class="pltt-inv-grand"><?php echo esc_html( pltt_format_currency( $queue['grand_total'] ) ); ?></strong>
+		<p class="pltt-bill-lead">
+			<strong><?php echo esc_html( pltt_format_currency( $queue['grand_total'] ) ); ?></strong>
 			<?php esc_html_e( 'outstanding', 'plain-language-time-tracker' ); ?>
-			· <span class="pltt-inv-items"><?php echo (int) $queue['scope_count']; ?></span> <?php esc_html_e( 'open', 'plain-language-time-tracker' ); ?>
-			· <span class="pltt-inv-clients"><?php echo (int) count( $queue['clients'] ); ?></span> <?php esc_html_e( 'clients', 'plain-language-time-tracker' ); ?>
+			· <?php echo (int) $queue['scope_count']; ?> <?php esc_html_e( 'to bill', 'plain-language-time-tracker' ); ?>
+			· <?php echo (int) count( $queue['clients'] ); ?> <?php esc_html_e( 'clients', 'plain-language-time-tracker' ); ?>
 		</p>
 
-		<?php
-		foreach ( $queue['clients'] as $group ) :
-			$client_name = $group['client'] ? $group['client']->name : __( '(Unknown client)', 'plain-language-time-tracker' );
-			$client_id   = $group['client'] ? (int) $group['client']->id : 0;
+		<?php foreach ( $queue['clients'] as $group ) : ?>
+			<?php $client_name = $group['client'] ? $group['client']->name : __( '(Unknown client)', 'plain-language-time-tracker' ); ?>
+			<section class="pltt-bill-clientgroup">
+				<header class="pltt-bill-clienthead">
+					<h3 class="pltt-bill-clientname"><?php echo esc_html( $client_name ); ?></h3>
+					<span class="pltt-bill-clienttotal">
+						<?php
+						printf(
+							/* translators: %s: client's outstanding total, e.g. "$2,730". */
+							esc_html__( '%s outstanding', 'plain-language-time-tracker' ),
+							esc_html( pltt_format_currency( $group['total'] ) )
+						);
+						?>
+					</span>
+				</header>
 
-			// Precompute a view-model per scope so the table rows and the dialogs
-			// (rendered after the table — a <dialog> can't live inside <tbody>) share
-			// one computation pass. pltt_build_billing_scope_view() is the shared
-			// builder, so this matches the Reports single-project card exactly.
-			$views = array();
-			foreach ( $group['scopes'] as $scope ) {
-				$views[] = pltt_build_billing_scope_view( $scope, $client_name );
-			}
-			?>
-			<div class="pltt-card pltt-invoicing-client" data-client-id="<?php echo esc_attr( $client_id ); ?>">
-				<div class="pltt-invoicing-client-head">
-					<h2 class="pltt-invoicing-client-name"><?php echo esc_html( $client_name ); ?></h2>
-					<span class="pltt-invoicing-client-total"><?php echo esc_html( pltt_format_currency( $group['total'] ) ); ?></span>
+				<div class="pltt-bill-cards">
+					<?php foreach ( $group['scopes'] as $scope ) : ?>
+						<?php
+						$v          = pltt_build_billing_scope_view( $scope, $client_name );
+						$proj       = $scope['project'];
+						$is_hourly  = ( 'hourly' === $scope['billing_type'] );
+
+						// Open the detailed view on the range this scope bills, so all the
+						// billable work is in view: retainer = its period; hourly/fixed =
+						// the span of the unbilled entries through today. (Same rule as the
+						// Insights review card in project-billing-section.php.)
+						if ( 'retainer_overage' === $scope['billing_type'] ) {
+							$range_from = (string) $scope['period_start'];
+							$range_to   = (string) $scope['period_end'];
+						} else {
+							$range_from = pltt_get_current_date();
+							foreach ( $scope['entries'] as $e ) {
+								if ( $e->entry_date < $range_from ) {
+									$range_from = $e->entry_date;
+								}
+							}
+							$range_to = pltt_get_current_date();
+						}
+						$review_url = add_query_arg(
+							array(
+								'page'       => 'pltt-reports',
+								'view'       => 'detailed',
+								'client_id'  => (int) $proj->client_id,
+								'project_id' => (int) $proj->id,
+								'from'       => $range_from,
+								'to'         => $range_to,
+								'bill'       => 1, // Explicit "start a bill" flag — invokes the select row.
+							),
+							$reports_base
+						);
+
+						// One-line basis: hourly names its entry count; retainer/fixed
+						// name their scope (period overage / project).
+						if ( $is_hourly ) {
+							$basis = sprintf(
+								/* translators: %d: number of unbilled entries. */
+								_n( '%d unbilled entry', '%d unbilled entries', $v['count'], 'plain-language-time-tracker' ),
+								$v['count']
+							);
+						} else {
+							$basis = $v['derivation'];
+						}
+						?>
+						<div class="pltt-bill-card">
+							<div class="pltt-bill-card-head">
+								<span class="pltt-bill-card-proj"><?php echo esc_html( $proj->name ); ?></span>
+								<span class="pltt-badge <?php echo esc_attr( pltt_billing_type_badge_class( $scope['billing_type'] ) ); ?>"><?php echo esc_html( $v['type_label'] ); ?></span>
+							</div>
+							<?php if ( ! empty( $v['date_range'] ) ) : ?>
+								<div class="pltt-bill-card-range">
+									<span class="dashicons dashicons-calendar-alt" aria-hidden="true"></span>
+									<?php echo esc_html( $v['date_range'] ); ?>
+								</div>
+							<?php endif; ?>
+							<div class="pltt-bill-card-amount"><?php echo esc_html( pltt_format_currency( $scope['unbilled'] ) ); ?></div>
+							<div class="pltt-bill-card-basis"><?php echo esc_html( $basis ); ?></div>
+							<a class="button button-primary pltt-bill-card-action" href="<?php echo esc_url( $review_url ); ?>">
+								<?php esc_html_e( 'Review &amp; bill', 'plain-language-time-tracker' ); ?> &rarr;
+							</a>
+						</div>
+					<?php endforeach; ?>
 				</div>
+			</section>
+		<?php endforeach; ?>
+	<?php endif; ?>
 
-				<ul class="pltt-invoicing-list">
-					<?php foreach ( $views as $v ) : ?>
-						<?php $scope = $v['scope']; $proj = $v['proj']; $panel_id = 'pltt-entries-' . $v['uid']; ?>
-						<li class="pltt-invoicing-item" data-scope="<?php echo esc_attr( $v['uid'] ); ?>" data-amount="<?php echo esc_attr( number_format( (float) $scope['unbilled'], 2, '.', '' ) ); ?>">
-							<button type="button" class="pltt-invoicing-toggle" aria-expanded="false" aria-controls="<?php echo esc_attr( $panel_id ); ?>">
-								<span class="pltt-invoicing-proj">
-									<span class="pltt-invoicing-title"><?php echo esc_html( $proj->name ); ?></span>
-									<span class="pltt-invoicing-meta"><?php echo esc_html( $v['type_label'] . ' · ' . $v['date_range'] ); ?></span>
-								</span>
-								<span class="pltt-invoicing-col pltt-invoicing-entries">
+	<?php // ============ BILLING RECORDS ============ ?>
+	<h2 class="pltt-bill-sectitle pltt-bill-sectitle--records"><?php esc_html_e( 'Billing records', 'plain-language-time-tracker' ); ?></h2>
+
+	<?php if ( empty( $log['rows'] ) ) : ?>
+		<div class="pltt-card pltt-bill-empty">
+			<p class="pltt-report-placeholder-lead"><?php esc_html_e( 'No bills recorded yet.', 'plain-language-time-tracker' ); ?></p>
+			<p class="description"><?php esc_html_e( 'Once you bill outstanding work, each record shows up here.', 'plain-language-time-tracker' ); ?></p>
+		</div>
+	<?php else : ?>
+		<table class="widefat striped pltt-bill-records-table">
+			<thead>
+				<tr>
+					<th><?php esc_html_e( 'Billed on', 'plain-language-time-tracker' ); ?></th>
+					<th><?php esc_html_e( 'Client · Project', 'plain-language-time-tracker' ); ?></th>
+					<th class="pltt-amount-col"><?php esc_html_e( 'Hours', 'plain-language-time-tracker' ); ?></th>
+					<th class="pltt-amount-col"><?php esc_html_e( 'Amount', 'plain-language-time-tracker' ); ?></th>
+					<th class="pltt-bill-records-action"></th>
+				</tr>
+			</thead>
+			<tbody>
+				<?php foreach ( $log['rows'] as $row ) : ?>
+					<?php
+					$rec   = $row['record'];
+					$label = '' !== $row['client_name']
+						? $row['client_name'] . ' · ' . $row['project_name']
+						: $row['project_name'];
+					$dialog_id = 'pltt-recordcopy-' . (int) $rec->id;
+					?>
+					<tr>
+						<td class="pltt-time-cell"><?php echo esc_html( date_i18n( 'M j, Y', strtotime( $rec->marked_at ) ) ); ?></td>
+						<td>
+							<?php echo esc_html( $label ); ?>
+							<?php if ( (float) $rec->absorbed_amount > 0 ) : ?>
+								<span class="pltt-bill-absorbed">
 									<?php
-									/* translators: %d: number of time entries. */
-									echo esc_html( sprintf( _n( '%d entry', '%d entries', $v['count'], 'plain-language-time-tracker' ), $v['count'] ) );
+									printf(
+										/* translators: %s: absorbed amount. */
+										esc_html__( '· %s absorbed', 'plain-language-time-tracker' ),
+										esc_html( pltt_format_currency( (float) $rec->absorbed_amount ) )
+									);
 									?>
 								</span>
-								<span class="pltt-invoicing-col pltt-invoicing-hours"><?php echo esc_html( $v['hours_label'] ); ?></span>
-								<span class="pltt-invoicing-col pltt-invoicing-amount"><?php echo esc_html( pltt_format_currency( $scope['unbilled'] ) ); ?></span>
-								<span class="pltt-expand-caret" aria-hidden="true"></span>
+							<?php endif; ?>
+						</td>
+						<td class="pltt-amount-col"><?php echo null !== $rec->billed_minutes ? esc_html( pltt_format_duration( (int) $rec->billed_minutes ) ) : '<span class="pltt-empty">&mdash;</span>'; ?></td>
+						<td class="pltt-amount-col"><?php echo esc_html( pltt_format_currency( (float) $rec->billed_amount ) ); ?></td>
+						<td class="pltt-bill-records-action">
+							<button type="button" class="button-link" data-lineitems-dialog="<?php echo esc_attr( $dialog_id ); ?>">
+								<?php esc_html_e( 'View record', 'plain-language-time-tracker' ); ?>
 							</button>
-
-							<?php // Hourly scopes pick entries inline; retainer overage is one whole-period line. ?>
-							<?php $inv_selectable = ( 'hourly' === $scope['billing_type'] && $v['count'] > 0 ); ?>
-							<div class="pltt-invoicing-panel" id="<?php echo esc_attr( $panel_id ); ?>" hidden>
-								<?php if ( $v['count'] > 0 ) : ?>
-									<?php if ( $inv_selectable ) : ?>
-										<div class="pltt-invoicing-selectall">
-											<label><input type="checkbox" class="pltt-inv-selectall-box" checked> <?php esc_html_e( 'Select all', 'plain-language-time-tracker' ); ?></label>
-											<span class="pltt-invoicing-selecthint"><?php esc_html_e( 'Untick an entry to leave it unbilled — it stays open for a future invoice.', 'plain-language-time-tracker' ); ?></span>
-										</div>
-										<?php pltt_render_billing_manifest( $v['entries'], true ); ?>
-									<?php else : ?>
-										<p class="pltt-invoicing-refnote"><?php esc_html_e( 'Retainers bill the whole period’s overage — one line, not per entry.', 'plain-language-time-tracker' ); ?></p>
-										<?php pltt_render_billing_manifest( $v['entries'] ); ?>
-									<?php endif; ?>
-								<?php endif; ?>
-								<div class="pltt-invoicing-panel-foot">
-									<div class="pltt-invoicing-selected">
-										<?php if ( $inv_selectable ) : ?>
-											<?php esc_html_e( 'Selected', 'plain-language-time-tracker' ); ?>
-											(<span class="pltt-inv-sel-count"><?php echo (int) $v['count']; ?></span>)
-										<?php else : ?>
-											<?php esc_html_e( 'Overage', 'plain-language-time-tracker' ); ?>
-										<?php endif; ?>
-										<span class="pltt-inv-sel-total"><?php echo esc_html( pltt_format_currency( $scope['unbilled'] ) ); ?></span>
-									</div>
-									<div class="pltt-invoicing-panel-actions">
-										<a class="pltt-invoicing-viewproject" href="<?php echo esc_url( PLTT_Project_Detail::get_url( (int) $proj->id ) ); ?>">
-											<?php esc_html_e( 'View project', 'plain-language-time-tracker' ); ?>
-										</a>
-										<button type="button" class="button" data-lineitems-dialog="pltt-billcopy-<?php echo esc_attr( $v['uid'] ); ?>">
-											<?php esc_html_e( 'Line items…', 'plain-language-time-tracker' ); ?>
-										</button>
-										<button type="button" class="button button-primary" data-bill-dialog="pltt-bill-<?php echo esc_attr( $v['uid'] ); ?>">
-											<?php esc_html_e( 'Record bill', 'plain-language-time-tracker' ); ?> &rarr;
-										</button>
-									</div>
-								</div>
-							</div>
-						</li>
-					<?php endforeach; ?>
-				</ul>
-
-				<?php foreach ( $views as $v ) : ?>
-					<?php include PLTT_PLUGIN_DIR . 'templates/partials/billing-dialog.php'; ?>
-					<?php include PLTT_PLUGIN_DIR . 'templates/partials/billing-copy-dialog.php'; ?>
+						</td>
+					</tr>
 				<?php endforeach; ?>
-			</div>
+			</tbody>
+		</table>
+
+		<?php // Record-detail dialogs live outside the table (a <dialog> can't sit in a <tbody>). ?>
+		<?php foreach ( $log['rows'] as $row ) : ?>
+			<?php
+			$rec       = $row['record'];
+			$dialog_id = 'pltt-recordcopy-' . (int) $rec->id;
+			$rv        = pltt_build_billing_record_view( $rec );
+			include PLTT_PLUGIN_DIR . 'templates/partials/billing-record-dialog.php';
+			?>
 		<?php endforeach; ?>
+
+		<p class="description pltt-bill-recordnote">
+			<?php esc_html_e( 'A record freezes what you billed and marks those entries billed, so “outstanding” resolves itself. There’s no sent/paid tracking — that’s your invoicing tool’s job.', 'plain-language-time-tracker' ); ?>
+		</p>
 	<?php endif; ?>
 </div>

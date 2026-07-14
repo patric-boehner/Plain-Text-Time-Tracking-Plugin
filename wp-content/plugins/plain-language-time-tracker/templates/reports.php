@@ -399,7 +399,7 @@ $tab_base_url = add_query_arg( $filter_params, admin_url( 'admin.php' ) );
 		<div class="pltt-summary-cards">
 
 			<?php if ( $is_single_project_view && ! empty( $context_projects ) ) : ?>
-				<?php include PLTT_PLUGIN_DIR . 'templates/partials/project-context-card.php'; ?>
+									
 			<?php elseif ( ! empty( $context_client ) ) : ?>
 				<?php include PLTT_PLUGIN_DIR . 'templates/partials/client-context-card.php'; ?>
 			<?php endif; ?>
@@ -534,7 +534,20 @@ $tab_base_url = add_query_arg( $filter_params, admin_url( 'admin.php' ) );
 				</div>
 			</div>
 
-			<?php endif; /* total_entries > 0 */ ?>
+							<?php endif; /* total_entries > 0 */ ?>
+
+			<?php if ( $is_single_project_view && ! empty( $context_projects ) ) : ?>
+				<div class="pltt-project-summary-group">
+					<?php
+					// Identity/intention set, after the metric cards: billing (left) + info (right).
+					if ( 'detailed' === $view ) {
+						$project = $context_projects[0];
+						include PLTT_PLUGIN_DIR . 'templates/partials/project-billing-section.php';
+					}
+					?>
+					<?php include PLTT_PLUGIN_DIR . 'templates/partials/project-context-card.php'; ?>
+				</div>
+			<?php endif; ?>
 
 		</div>
 	<?php endif; ?>
@@ -768,6 +781,19 @@ $tab_base_url = add_query_arg( $filter_params, admin_url( 'admin.php' ) );
 					? PLTT_Billing::get_covered_entry_meta( (int) $context_projects[0]->id )
 					: array();
 				$covered_entry_ids = array_keys( $covered_entry_meta );
+
+				// Billing select row: only when a bill was explicitly started via a
+				// gateway (the Billing page card or the "Ready to bill" card), which set
+				// bill=1 together with the correct scope range. Landing on the detailed
+				// view any other way (e.g. clicking a project from Summary) must NOT
+				// invoke it — that range wouldn't represent the billing scope.
+				// Still gated to a single active HOURLY project (retainer/fixed bill a
+				// computed number, no per-entry selection).
+				// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only mode flag.
+				$billing_mode       = ! empty( $_GET['bill'] );
+				$bill_select_active = ( $billing_mode && $is_single_project_view && ! empty( $context_projects[0] )
+					&& 'active' === ( $context_projects[0]->status ?? '' )
+					&& 'hourly' === pltt_get_billing_type( $context_projects[0] ) );
 				?>
 
 
@@ -830,6 +856,13 @@ $tab_base_url = add_query_arg( $filter_params, admin_url( 'admin.php' ) );
 							$entry_table_opts['covered_entry_ids']  = $covered_entry_ids;
 							$entry_table_opts['covered_entry_meta'] = $covered_entry_meta;
 						}
+						if ( $bill_select_active ) {
+							// The "Include in bill" select row — pick entries to bill.
+							// The table class shifts the positional column widths one
+							// column right to make room for it (see reports.css).
+							$entry_table_opts['billing_select'] = true;
+							$entry_table_opts['table_class']    = 'pltt-has-billselect';
+						}
 						if ( $marker_day_key && $group_date === $marker_day_key ) {
 							$entry_table_opts['threshold_marker_before']    = (int) $context_overage['marker_entry_id'];
 							$entry_table_opts['threshold_marker_primary']   = $marker_primary_text;
@@ -844,6 +877,14 @@ $tab_base_url = add_query_arg( $filter_params, admin_url( 'admin.php' ) );
 				<?php
 				$base_url = add_query_arg( 'view', $view, $tab_base_url );
 				pltt_render_pagination( $paged, $total_pages, $total_entries, $base_url, 'entry', 'entries' );
+
+				// Docked "Bill selected" bar + Record-bill modal (hourly single
+				// project). The select row lives on the entries above; this tallies
+				// the selection and commits it.
+				if ( $bill_select_active ) {
+					$project = $context_projects[0];
+					include PLTT_PLUGIN_DIR . 'templates/partials/billing-select-bar.php';
+				}
 				?>
 
 

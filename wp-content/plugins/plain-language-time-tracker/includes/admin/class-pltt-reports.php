@@ -241,11 +241,27 @@ class PLTT_Reports {
 			$paged      = isset( $_GET['paged'] ) ? max( 1, absint( $_GET['paged'] ) ) : 1;
 			$per_page   = self::PER_PAGE;
 			$offset     = ( $paged - 1 ) * $per_page;
+
+			// Billing mode (bill=1): hide entries already covered by a committed
+			// record from the detailed list and its pagination — you're reviewing a
+			// NEW bill, so they're not actionable. The summary cards keep the full
+			// picture ($stats is left untouched); only the list count is adjusted.
+			$entry_args = $filter_args;
+			// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only mode flag.
+			if ( ! empty( $_GET['bill'] ) && $project_id > 0 ) {
+				$covered_ids = PLTT_Billing::get_covered_entry_ids( $project_id );
+				if ( ! empty( $covered_ids ) ) {
+					$entry_args['exclude_entry_ids'] = $covered_ids;
+					$list_stats    = PLTT_Entries::get_stats( $entry_args );
+					$total_entries = $list_stats ? (int) $list_stats->total_count : 0;
+				}
+			}
+
 			$total_pages = $total_entries > 0 ? (int) ceil( $total_entries / $per_page ) : 1;
 
 			$entries = PLTT_Entries::get_all(
 				array_merge(
-					$filter_args,
+					$entry_args,
 					array(
 						'orderby' => 'entry_date',
 						'order'   => 'DESC',

@@ -24,6 +24,7 @@ $dialog_id = 'pltt-bill-' . $v['uid'];
 $remainder = number_format( (float) $scope['unbilled'], 2, '.', '' );
 ?>
 <dialog id="<?php echo esc_attr( $dialog_id ); ?>" class="pltt-bill-dialog" closedby="any" aria-labelledby="<?php echo esc_attr( $dialog_id ); ?>-title">
+	<button type="button" class="pltt-modal-x" data-close aria-label="<?php esc_attr_e( 'Close', 'plain-language-time-tracker' ); ?>">&times;</button>
 	<form class="pltt-billing-form" data-scope="<?php echo esc_attr( $v['uid'] ); ?>">
 		<input type="hidden" name="project_id" value="<?php echo esc_attr( (int) $proj->id ); ?>">
 		<input type="hidden" name="billing_type" value="<?php echo esc_attr( $scope['billing_type'] ); ?>">

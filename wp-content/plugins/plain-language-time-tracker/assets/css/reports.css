@@ -121,6 +121,52 @@
 	width: 80px;
 }
 
+/* Billing select row: a leading "Include in bill" column shifts the positional
+   widths one column to the right (Status/Amount are class-based, so unaffected). */
+
+/* billing.css hides .pltt-bill-select-col by default (it's shown there only under
+   an old .pltt-billing-active wrap). This flow shows the select row whenever the
+   table is marked, so un-hide it here. */
+.pltt-date-group .widefat.pltt-has-billselect .pltt-bill-select-col {
+	display: table-cell;
+}
+.pltt-date-group .widefat.pltt-has-billselect th:nth-child(1),
+.pltt-date-group .widefat.pltt-has-billselect td:nth-child(1) { /* Select */
+	width: 30px;
+	text-align: center;
+	white-space: nowrap;
+}
+.pltt-date-group .widefat.pltt-has-billselect th:nth-child(2),
+.pltt-date-group .widefat.pltt-has-billselect td:nth-child(2) { /* Description */
+	width: auto;
+	overflow: hidden;
+}
+.pltt-date-group .widefat.pltt-has-billselect th:nth-child(3),
+.pltt-date-group .widefat.pltt-has-billselect td:nth-child(3) { /* Tags */
+	width: 160px;
+}
+.pltt-date-group .widefat.pltt-has-billselect th:nth-child(4),
+.pltt-date-group .widefat.pltt-has-billselect td:nth-child(4) { /* Time */
+	width: 115px;
+	white-space: nowrap;
+}
+.pltt-date-group .widefat.pltt-has-billselect th:nth-child(5),
+.pltt-date-group .widefat.pltt-has-billselect td:nth-child(5) { /* Duration */
+	width: 75px;
+}
+.pltt-date-group .widefat.pltt-has-billselect th:nth-child(6),
+.pltt-date-group .widefat.pltt-has-billselect td:nth-child(6) { /* Billable */
+	width: 65px;
+}
+
+/* Ineligible rows (non-billable / already billed / unverified): a muted "—" so
+   the empty select cell reads as intentional, not a missing checkbox. */
+.pltt-bill-select-na {
+	color: var(--pltt-text-faint, #a7aaad);
+	cursor: default;
+	user-select: none;
+}
+
 /* Summary table column widths — Project column gets remaining space */
 .pltt-summary-table th:nth-child(2),
 .pltt-summary-table td:nth-child(2) { /* Type */

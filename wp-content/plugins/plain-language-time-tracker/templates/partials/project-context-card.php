@@ -147,11 +147,7 @@ if ( $has_alloc ) {
 		pltt_render_allocation_bar( $used_min, $alloc_min / 60, $billing_type, $fee_args, $caption, $is_billed_bar );
 	}
 
-	// Billing: Review & Invoice (modal) + the project's billing-history ledger.
-	// Detailed view only — that's where the per-entry work happens; the summary
-	// view stays a high-level overview. $view comes from PLTT_Reports::render().
-	if ( isset( $view ) && 'detailed' === $view ) {
-		include PLTT_PLUGIN_DIR . 'templates/partials/project-billing-section.php';
-	}
+	// Billing card is rendered as its own card to the LEFT of this info card
+	// (see PLTT_Reports template), not inside it.
 	?>
 </div>

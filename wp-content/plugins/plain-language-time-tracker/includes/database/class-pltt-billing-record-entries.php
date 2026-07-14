@@ -97,6 +97,33 @@ class PLTT_Billing_Record_Entries {
 	}
 
 	/**
+	 * The time entries a record froze, hydrated from the live entries table and
+	 * ordered oldest-first — the "what went into this bill" manifest shown when
+	 * you reopen a record. Entries later deleted simply drop out of the join.
+	 *
+	 * @param int $record_id Billing record id.
+	 * @return object[] time_entries rows.
+	 */
+	public static function get_entries_for_record( $record_id ) {
+		global $wpdb;
+
+		$bre     = PLTT_Database::get_table_name( 'billing_record_entries' );
+		$entries = PLTT_Database::get_table_name( 'time_entries' );
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+		return $wpdb->get_results(
+			$wpdb->prepare(
+				"SELECT te.*
+				FROM {$bre} bre
+				INNER JOIN {$entries} te ON te.id = bre.entry_id
+				WHERE bre.record_id = %d
+				ORDER BY te.entry_date ASC, te.id ASC",
+				(int) $record_id
+			)
+		);
+	}
+
+	/**
 	 * Every covered entry id, across all projects — the global "what's invoiced"
 	 * set (used by the unbilled-outside-range notice). Flat, deduplicated.
 	 *
