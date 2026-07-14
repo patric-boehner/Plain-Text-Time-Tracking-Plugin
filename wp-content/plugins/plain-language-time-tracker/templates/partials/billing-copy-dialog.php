@@ -20,6 +20,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 $dialog_id = 'pltt-billcopy-' . $v['uid'];
 ?>
 <dialog id="<?php echo esc_attr( $dialog_id ); ?>" class="pltt-billcopy-dialog" closedby="any" aria-labelledby="<?php echo esc_attr( $dialog_id ); ?>-title">
+	<button type="button" class="pltt-modal-x" data-close aria-label="<?php esc_attr_e( 'Close', 'plain-language-time-tracker' ); ?>">&times;</button>
 	<div class="pltt-billcopy-inner">
 		<h2 id="<?php echo esc_attr( $dialog_id ); ?>-title" class="pltt-billcopy-title"><?php esc_html_e( 'Copy line items', 'plain-language-time-tracker' ); ?></h2>
 

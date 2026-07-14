@@ -1415,6 +1415,11 @@ function pltt_render_entry_table( $entries, $options = array() ) {
 	// record. Each box carries data-entry-id + data-amount (the same frozen-or-
 	// resolved figure the Amount column shows); the inline controller reads them to
 	// recompute the record total and collect the entries the user drops.
+	// FUTURE (bulk-edit): this "billing_select" checkbox column + the docked
+	// action bar (billing-select.js) is the reuse point for any bulk-editing UI.
+	// To generalize, replace the hard-coded eligibility (billable && verified &&
+	// !covered, below) with a pluggable callback and make the action bar take a set
+	// of actions. Until a second concrete use exists, it stays billing-specific.
 	$billing_select = ! empty( $options['billing_select'] );
 
 	// Overage decision-support options.
@@ -1546,11 +1551,13 @@ function pltt_render_entry_table( $entries, $options = array() ) {
 				?>
 				<tr<?php echo $class_attr; ?><?php echo $inline_edit ? ' data-entry-id="' . esc_attr( $entry->id ) . '"' : ''; ?>>
 					<?php if ( $billing_select ) :
-						// Eligible = billable and not already covered by a committed record.
-						// Only those rows get a box; others show an empty cell so columns
-						// stay aligned. Amount mirrors the Amount column so the box's
-						// data-amount and the visible figure always agree.
-						$sel_eligible = $is_billable && ! isset( $covered_lookup[ $entry_id_int ] );
+						// Eligible = billable, verified, and not already covered by a
+						// committed record — the same set the scope actually bills.
+						// Ineligible rows show a muted "—" (with the reason) so the empty
+						// cell reads as intentional, not a missing checkbox. Amount mirrors
+						// the Amount column so the box's data-amount and the visible figure
+						// always agree.
+						$sel_eligible = $is_billable && ! empty( $entry->verified ) && ! isset( $covered_lookup[ $entry_id_int ] );
 						$sel_amount   = 0.0;
 						if ( $sel_eligible && $entry->duration_minutes > 0 ) {
 							if ( null !== $entry->billable_amount ) {
@@ -1560,6 +1567,15 @@ function pltt_render_entry_table( $entries, $options = array() ) {
 								$sel_amount = pltt_billable_amount( $entry->duration_minutes, $sel_rate );
 							}
 						}
+						if ( ! $sel_eligible ) {
+							if ( isset( $covered_lookup[ $entry_id_int ] ) ) {
+								$sel_reason = __( 'Already billed', 'plain-language-time-tracker' );
+							} elseif ( empty( $entry->verified ) ) {
+								$sel_reason = __( 'Not yet verified', 'plain-language-time-tracker' );
+							} else {
+								$sel_reason = __( 'Non-billable', 'plain-language-time-tracker' );
+							}
+						}
 						?>
 						<td class="pltt-bill-select-col">
 							<?php if ( $sel_eligible ) : ?>
@@ -1567,6 +1583,8 @@ function pltt_render_entry_table( $entries, $options = array() ) {
 									data-entry-id="<?php echo esc_attr( $entry_id_int ); ?>"
 									data-amount="<?php echo esc_attr( number_format( $sel_amount, 2, '.', '' ) ); ?>"
 									aria-label="<?php esc_attr_e( 'Include this entry in the bill', 'plain-language-time-tracker' ); ?>">
+							<?php else : ?>
+								<span class="pltt-bill-select-na" title="<?php echo esc_attr( $sel_reason ); ?>" aria-label="<?php echo esc_attr( $sel_reason ); ?>">&mdash;</span>
 							<?php endif; ?>
 						</td>
 					<?php endif; ?>
@@ -1821,6 +1839,91 @@ function pltt_build_billing_scope_view( $scope, $client_name ) {
 }
 
 /**
+ * Build the display view-model for a committed billing record.
+ *
+ * The mirror of pltt_build_billing_scope_view(), but sourced from a frozen
+ * record + its coverage snapshot instead of a live outstanding scope. Powers
+ * the "View record" dialog on the Billing ledger and the project-report
+ * history table: the entry manifest that went into the bill, a real period
+ * range, the date billed, and the copyable line-items text (the stored
+ * description, plus a structured "list + AI prompt" rebuilt from the entries).
+ *
+ * Self-contained: loads its own client/project names and entries so any caller
+ * can hand it just the record row.
+ *
+ * @param object $record Billing record row.
+ * @return array View-model: uid, label, entries, period, billed_on, amount,
+ *               absorbed, minutes_label, default_desc, ai_prompt.
+ */
+function pltt_build_billing_record_view( $record ) {
+	$entries = PLTT_Billing_Record_Entries::get_entries_for_record( (int) $record->id );
+
+	$proj   = PLTT_Projects::get( (int) $record->project_id );
+	$client = $proj ? PLTT_Clients::get( (int) $proj->client_id ) : null;
+	$client_name  = $client ? $client->name : '';
+	$project_name = $proj ? $proj->name : __( '(project removed)', 'plain-language-time-tracker' );
+	$label        = '' !== $client_name ? $client_name . ' · ' . $project_name : $project_name;
+
+	$period = pltt_format_billing_period( $record );
+	// Legacy/hourly records store only a bill-through cutoff (no period_start), so
+	// pltt_format_billing_period() reads "Through X". When the covered entries are
+	// on hand, show their actual span instead — a real from–to range. Entries are
+	// ordered oldest-first, so [0] is the earliest and the last is the newest.
+	if ( empty( $record->period_start ) && ! empty( $entries ) ) {
+		$first  = $entries[0]->entry_date;
+		$last   = $entries[ count( $entries ) - 1 ]->entry_date;
+		$period = ( $first === $last )
+			? date_i18n( 'M j, Y', strtotime( $first ) )
+			: date_i18n( 'M j', strtotime( $first ) ) . ' – ' . date_i18n( 'M j, Y', strtotime( $last ) );
+	}
+	$billed_on = date_i18n( 'M j, Y', strtotime( $record->marked_at ) );
+
+	// Default description: the label frozen at commit if present, else a fallback
+	// stitched from the covered entries' notes (so an older/blank record still
+	// yields something copyable).
+	$default_desc = trim( (string) $record->description );
+	if ( '' === $default_desc ) {
+		$descs = array();
+		foreach ( $entries as $e ) {
+			$d = trim( (string) $e->description );
+			if ( '' !== $d ) {
+				$descs[ strtolower( $d ) ] = $d;
+			}
+		}
+		$default_desc = implode( '; ', array_slice( array_values( $descs ), 0, 12 ) );
+	}
+
+	// Structured list + AI prompt: rebuilt from the frozen entries, same shape as
+	// the outstanding-scope copy option.
+	$ai_lines   = array();
+	$ai_lines[] = 'Project: ' . $label;
+	$ai_lines[] = 'Period: ' . $period;
+	$ai_lines[] = 'Billed: ' . $billed_on . ' — ' . pltt_format_currency( (float) $record->billed_amount );
+	$ai_lines[] = '';
+	$ai_lines[] = 'Time entries:';
+	foreach ( $entries as $e ) {
+		$ai_lines[] = '- ' . date_i18n( 'M j', strtotime( $e->entry_date ) )
+			. ' (' . pltt_format_duration( (int) $e->duration_minutes ) . '): '
+			. trim( (string) $e->description );
+	}
+	$ai_lines[] = '';
+	$ai_lines[] = 'Write a concise, professional, client-facing invoice line-item description for this work. One or two sentences, plain language with no internal shorthand or jargon, grouping related tasks into themes.';
+
+	return array(
+		'uid'           => (int) $record->id,
+		'label'         => $label,
+		'entries'       => $entries,
+		'period'        => $period,
+		'billed_on'     => $billed_on,
+		'amount'        => (float) $record->billed_amount,
+		'absorbed'      => (float) $record->absorbed_amount,
+		'minutes_label' => null !== $record->billed_minutes ? pltt_format_duration( (int) $record->billed_minutes ) : '',
+		'default_desc'  => $default_desc,
+		'ai_prompt'     => implode( "\n", $ai_lines ),
+	);
+}
+
+/**
  * Render the pared read-only entry manifest for a billing scope.
  *
  * A deliberately minimal table for the invoicing panel / billing surface:
@@ -1961,6 +2064,26 @@ function pltt_render_billing_type_badge( $billing_type ) {
 	list( $class, $label ) = $styles[ $billing_type ] ?? $styles['hourly'];
 	$class                 = trim( 'pltt-badge ' . $class );
 	echo '<span class="' . esc_attr( $class ) . '">' . esc_html( $label ) . '</span>';
+}
+
+/**
+ * The .pltt-badge variant class for a billing type — so custom labels (e.g. the
+ * billing cards' "Retainer") can reuse the shared badge/pill styling and colors
+ * that pltt_render_billing_type_badge() uses everywhere else.
+ *
+ * @param string $billing_type 'hourly' | 'recurring' | 'retainer_overage' | 'fixed' | 'none'.
+ * @return string A .pltt-badge-* variant class.
+ */
+function pltt_billing_type_badge_class( $billing_type ) {
+	switch ( $billing_type ) {
+		case 'recurring':
+		case 'retainer_overage':
+			return 'pltt-badge-info';
+		case 'fixed':
+			return 'pltt-badge-purple';
+		default:
+			return 'pltt-badge-success'; // hourly.
+	}
 }
 
 /**

@@ -669,6 +669,16 @@
 				var isBillable = btn.dataset.value === '1';
 				var minutes    = parseInt( btn.dataset.minutes, 10 ) || 0;
 				updateBillableCards( isBillable ? minutes : -minutes, newAmount - oldAmount );
+
+				// Let the billing select row react: a newly-billable row becomes a
+				// checkable box; a now-non-billable one becomes a muted "—".
+				document.dispatchEvent( new CustomEvent( 'pltt:entry-billable-changed', {
+					detail: {
+						entryId:  row ? row.getAttribute( 'data-entry-id' ) : '',
+						billable: isBillable,
+						amount:   newAmount
+					}
+				} ) );
 			}
 		} );
 

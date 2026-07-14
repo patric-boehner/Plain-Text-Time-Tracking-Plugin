@@ -241,14 +241,11 @@ class PLTT_Admin {
 	public static function render_invoicing_page() {
 		self::require_access();
 
-		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only view switch.
-		$view = ( isset( $_GET['view'] ) && 'invoiced' === sanitize_key( wp_unslash( $_GET['view'] ) ) ) ? 'invoiced' : 'ready';
-
-		if ( 'invoiced' === $view ) {
-			$log = PLTT_Billing::get_invoiced_log();
-		} else {
-			$queue = PLTT_Billing::get_invoicing_queue();
-		}
+		// The Billing page is a ledger + doorway: outstanding work grouped by client
+		// (each project card links into the detailed view to select + commit) and the
+		// record of what's already been billed. Both sections show at once — no toggle.
+		$queue = PLTT_Billing::get_invoicing_queue();
+		$log   = PLTT_Billing::get_invoiced_log();
 
 		include PLTT_PLUGIN_DIR . 'templates/reports-invoicing.php';
 	}
@@ -499,9 +496,16 @@ class PLTT_Admin {
 		}
 
 		// Commit-in-a-modal for the Billing (Invoicing) queue. Reports/Insights is
-		// read-only now — billing happens on the Billing page, so this no longer
-		// loads there.
-		if ( 'time-tracker_page_pltt-invoicing' === $hook ) {
+		// Billing page queue, and Reports/Insights where the "Line items" copy modal
+		// (billing-copy-dialog.php) is now a peer to Record bill. invoicing.js drives
+		// the copy modal (open / source-swap / copy); it self-guards on the presence
+		// of a .pltt-billing-form or [data-lineitems-dialog], so it no-ops otherwise
+		// and doesn't clash with billing-select.js's commit flow.
+		// Also the Project Detail report, whose billing-history table opens the same
+		// "View record" dialog (invoicing.js handles open / source-swap / copy).
+		if ( 'time-tracker_page_pltt-invoicing' === $hook
+			|| 'time-tracker_page_pltt-reports' === $hook
+			|| ( 'time-tracker_page_pltt-projects' === $hook && 'view' === $projects_action ) ) {
 			wp_enqueue_script(
 				'pltt-invoicing',
 				PLTT_PLUGIN_URL . 'assets/js/invoicing.js',
@@ -554,6 +558,15 @@ class PLTT_Admin {
 				'pltt-reports',
 				PLTT_PLUGIN_URL . 'assets/js/reports.js',
 				array( 'pltt-shared', 'pltt-tag-picker', 'pltt-tooltip' ),
+				$version,
+				true
+			);
+			// Billing from the detailed view: the "Include in bill" select row +
+			// Record-bill modal on a single hourly project. Self-guards on its DOM.
+			wp_enqueue_script(
+				'pltt-billing-select',
+				PLTT_PLUGIN_URL . 'assets/js/billing-select.js',
+				array( 'pltt-shared' ),
 				$version,
 				true
 			);

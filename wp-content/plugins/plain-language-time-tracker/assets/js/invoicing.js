@@ -13,8 +13,10 @@
 ( function () {
 	'use strict';
 
-	// Only the Billing (Invoicing) queue renders these now.
-	if ( ! document.querySelector( '.pltt-billing-form' ) ) {
+	// Activate where there's something to drive: a commit form (the detailed-view
+	// scope panel) or a copy dialog (the Billing ledger's "View line items"). The
+	// handlers are all delegated and target-checked, so binding is otherwise inert.
+	if ( ! document.querySelector( '.pltt-billing-form' ) && ! document.querySelector( '[data-lineitems-dialog]' ) ) {
 		return;
 	}
 

@@ -43,6 +43,36 @@
 	border-top: 1px solid #e0e0e0;
 }
 
+/* Standalone billing card — sits to the LEFT of the info card on the Reports
+   single-project detailed view (moved out of the info card). It's a summary
+   .card, so it inherits bg/border/padding/radius. */
+.pltt-summary-cards .card.pltt-project-billing-card {
+	min-width: 230px;
+	max-width: 300px;
+	gap: 12px;
+	justify-content: flex-start;
+}
+/* Inner scope block: drop its own box entirely (the panel .card frames it) —
+   no accent line for now. */
+.pltt-project-billing-card .pltt-bill-card {
+	border: 0;
+	border-radius: 0;
+	padding: 0;
+	background: transparent;
+}
+
+/* Group the info card + billing card as one "identity / intention" set, spaced
+   apart from the report metric cards that follow it. */
+.pltt-project-summary-group {
+	display: flex;
+	gap: 20px;
+	align-items: stretch;
+	flex-wrap: nowrap;   /* keep billing + info side by side… */
+	flex-shrink: 0;      /* …and wrap the whole group to its own row if space is tight */
+	/* Push the group to the far right on desktop; metrics stay tight-left. */
+	margin-left: auto;
+}
+
 .pltt-pcc-bill-scope + .pltt-pcc-bill-scope {
 	margin-top: 12px;
 	padding-top: 12px;
@@ -206,12 +236,14 @@
 	text-decoration: line-through;
 }
 
+/* Footer band: full-width divider above the buttons, matching the shared chrome. */
 .pltt-billing-actions {
 	display: flex;
 	align-items: center;
 	gap: 12px;
-	padding-top: 8px;
-	border-top: 1px solid #f0f0f1;
+	margin: 20px -25px -25px;
+	padding: 15px 25px;
+	border-top: 1px solid var(--pltt-border-light);
 }
 
 .pltt-billing-leaveopen {
@@ -229,8 +261,10 @@
 	margin-top: 4px;
 }
 
-.pltt-billing-history-desc {
-	color: #50575e;
+.pltt-billing-history-action {
+	width: 1%;
+	white-space: nowrap;
+	text-align: right;
 }
 
 /* ---- Invoicing page ---- */
@@ -456,10 +490,11 @@
 
 /* Billing dialog (the commit modal on the invoicing page) */
 .pltt-bill-dialog {
-	width: min(560px, calc(100vw - 32px));
-	padding: 24px;
+	position: relative;
+	width: min(600px, calc(100vw - 40px));
+	padding: 25px;
 	border: 1px solid var(--pltt-border);
-	border-radius: 6px;
+	border-radius: 4px;
 	box-shadow: var(--pltt-shadow-modal);
 }
 
@@ -467,8 +502,11 @@
 	background-color: var(--pltt-overlay);
 }
 
+/* Header band: title + divider, matching the shared modal chrome. */
 .pltt-bill-dialog-title {
-	margin: 0 0 2px;
+	margin: -25px -25px 16px;
+	padding: 15px 48px 15px 25px;
+	border-bottom: 1px solid var(--pltt-border-light);
 	font-size: 16px;
 	color: var(--pltt-text-dark);
 }
@@ -704,10 +742,11 @@
 
 /* ---- Copy line items dialog ---- */
 .pltt-billcopy-dialog {
-	width: min(560px, calc(100vw - 32px));
-	padding: 24px;
+	position: relative;
+	width: min(600px, calc(100vw - 40px));
+	padding: 25px;
 	border: 1px solid var(--pltt-border);
-	border-radius: 6px;
+	border-radius: 4px;
 	box-shadow: var(--pltt-shadow-modal);
 }
 
@@ -716,7 +755,9 @@
 }
 
 .pltt-billcopy-title {
-	margin: 0 0 16px;
+	margin: -25px -25px 16px;
+	padding: 15px 48px 15px 25px;
+	border-bottom: 1px solid var(--pltt-border-light);
 	font-size: 16px;
 	color: var(--pltt-text-dark);
 }
@@ -743,7 +784,40 @@
 .pltt-billcopy-actions {
 	display: flex;
 	justify-content: flex-end;
-	margin-top: 16px;
+	margin: 20px -25px -25px;
+	padding: 15px 25px;
+	border-top: 1px solid var(--pltt-border-light);
+}
+
+/* ---- Record-detail dialog (entry manifest + copyable line items) ---- */
+.pltt-record-dialog {
+	width: min(680px, calc(100vw - 40px));
+}
+
+.pltt-record-meta {
+	margin: 0 0 16px;
+}
+
+.pltt-record-subhead {
+	margin: 18px 0 8px;
+	font-size: 12px;
+	font-weight: 600;
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
+	color: var(--pltt-text-muted, #646970);
+}
+
+/* Manifest can get long — cap it and let it scroll inside the dialog. */
+.pltt-record-manifest {
+	max-height: 260px;
+	overflow-y: auto;
+	border: 1px solid var(--pltt-border-light);
+	border-radius: 3px;
+}
+
+.pltt-record-manifest table {
+	margin: 0;
+	border: 0;
 }
 
 @media screen and (max-width: 782px) {
@@ -761,4 +835,199 @@
 	color: var(--pltt-warning-text);
 	border-radius: 6px;
 	font-size: 13px;
+}
+
+/* ==========================================================================
+   Billing ledger (the Billing page): outstanding cards grouped by client +
+   the record of past bills. No entries live here — cards are doorways into
+   the detailed view where selection + commit happen.
+   ========================================================================== */
+.pltt-bill-subhead {
+	max-width: 60ch;
+	margin: 0 0 24px;
+	color: var(--pltt-text-muted, #646970);
+	font-size: 13px;
+}
+
+.pltt-bill-sectitle {
+	font-size: 15px;
+	font-weight: 600;
+	margin: 0 0 12px;
+}
+.pltt-bill-sectitle--records {
+	margin-top: 36px;
+}
+
+.pltt-bill-lead {
+	margin: 0 0 16px;
+	color: var(--pltt-text-muted, #646970);
+	font-size: 13px;
+}
+.pltt-bill-lead strong {
+	color: var(--pltt-text-dark);
+}
+
+/* --- client group --- */
+.pltt-bill-clientgroup {
+	margin-bottom: 24px;
+}
+.pltt-bill-clienthead {
+	display: flex;
+	align-items: baseline;
+	justify-content: space-between;
+	gap: 12px;
+	padding-bottom: 8px;
+	margin-bottom: 12px;
+	border-bottom: 1px solid var(--pltt-border-light);
+}
+.pltt-bill-clientname {
+	font-size: 15px;
+	font-weight: 600;
+	margin: 0;
+}
+.pltt-bill-clienttotal {
+	font-size: 13px;
+	color: var(--pltt-text-muted, #646970);
+	font-variant-numeric: tabular-nums;
+	white-space: nowrap;
+}
+
+/* --- project cards --- */
+.pltt-bill-cards {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+	gap: 14px;
+}
+.pltt-bill-card {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+	background: var(--pltt-bg-white);
+	border: 1px solid var(--pltt-border-light);
+	border-radius: 4px;
+	padding: 16px 18px;
+}
+.pltt-bill-card-head {
+	display: flex;
+	align-items: baseline;
+	justify-content: space-between;
+	gap: 8px;
+}
+.pltt-bill-card-proj {
+	font-weight: 600;
+}
+.pltt-bill-card-range {
+	display: flex;
+	align-items: center;
+	gap: 4px;
+	font-size: 12px;
+	color: var(--pltt-text-muted, #646970);
+	font-variant-numeric: tabular-nums;
+}
+.pltt-bill-card-range .dashicons {
+	font-size: 15px;
+	width: 15px;
+	height: 15px;
+	opacity: 0.7;
+}
+.pltt-bill-card-amount {
+	font-size: 22px;
+	font-weight: 600;
+	font-variant-numeric: tabular-nums;
+	margin-top: 2px;
+}
+.pltt-bill-card-basis {
+	font-size: 12px;
+	color: var(--pltt-text-muted, #646970);
+}
+.pltt-bill-card-action {
+	margin-top: 8px;
+	align-self: flex-start;
+}
+
+/* --- records table --- */
+.pltt-bill-records-table .pltt-bill-records-action {
+	text-align: right;
+	white-space: nowrap;
+}
+.pltt-bill-absorbed {
+	color: var(--pltt-text-muted, #646970);
+	font-size: 12px;
+}
+.pltt-bill-recordnote {
+	max-width: 70ch;
+	margin-top: 12px;
+	color: var(--pltt-text-muted, #646970);
+}
+
+/* ==========================================================================
+   Billing from the detailed view: the "Include in bill" select row on the
+   entry table + the docked "Bill selected" bar. Modal reuses .pltt-bill-dialog.
+   ========================================================================== */
+.pltt-bill-select-col {
+	width: 30px;
+	text-align: center;
+	vertical-align: middle;
+}
+
+.pltt-billsel-bar {
+	position: sticky;
+	bottom: 16px;
+	z-index: 20;
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	margin-top: 16px;
+	padding: 11px 16px;
+	background: #1d2327;
+	color: #fff;
+	border-radius: 8px;
+	box-shadow: 0 6px 20px rgba(0, 0, 0, 0.22);
+}
+.pltt-billsel-bar[hidden] {
+	display: none;
+}
+.pltt-billsel-summary {
+	font-size: 13px;
+}
+.pltt-billsel-summary strong {
+	font-weight: 600;
+}
+.pltt-billsel-total {
+	font-variant-numeric: tabular-nums;
+}
+.pltt-billsel-spacer {
+	flex: 1;
+}
+
+/* Buttons sit on the dark charcoal bar — the default WP secondary button
+   (blue text on a blue outline) is low-contrast here, so give the bar its
+   own high-contrast ghost + filled treatment. */
+.pltt-billsel-bar .button {
+	background: transparent;
+	border-color: rgba(255, 255, 255, 0.55);
+	color: #fff;
+	text-shadow: none;
+}
+.pltt-billsel-bar .button:hover,
+.pltt-billsel-bar .button:focus {
+	background: rgba(255, 255, 255, 0.12);
+	border-color: #fff;
+	color: #fff;
+	box-shadow: none;
+}
+.pltt-billsel-bar .button:focus-visible {
+	outline: 2px solid #fff;
+	outline-offset: 1px;
+}
+.pltt-billsel-bar .button-primary {
+	background: #2271b1;
+	border-color: #2271b1;
+	color: #fff;
+}
+.pltt-billsel-bar .button-primary:hover,
+.pltt-billsel-bar .button-primary:focus {
+	background: #135e96;
+	border-color: #135e96;
+	color: #fff;
 }

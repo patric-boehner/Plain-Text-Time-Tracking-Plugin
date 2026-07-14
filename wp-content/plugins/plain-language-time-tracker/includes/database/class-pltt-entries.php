@@ -1011,6 +1011,19 @@ class PLTT_Entries {
 			$prepare[] = $args['billed'] ? 1 : 0;
 		}
 
+		// Exclude specific entry IDs (e.g. entries already covered by a committed
+		// billing record, hidden while reviewing a new bill).
+		if ( ! empty( $args['exclude_entry_ids'] ) && is_array( $args['exclude_entry_ids'] ) ) {
+			$exclude_ids = array_filter( array_map( 'absint', $args['exclude_entry_ids'] ) );
+			if ( ! empty( $exclude_ids ) ) {
+				$placeholders = implode( ',', array_fill( 0, count( $exclude_ids ), '%d' ) );
+				$where[]      = "{$entry_id_col} NOT IN ({$placeholders})";
+				foreach ( $exclude_ids as $exclude_id ) {
+					$prepare[] = $exclude_id;
+				}
+			}
+		}
+
 		return array(
 			'where'   => $where,
 			'prepare' => $prepare,
