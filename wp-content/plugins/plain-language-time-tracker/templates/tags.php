@@ -150,11 +150,13 @@ if ( ! empty( $ungrouped_tags ) ) {
 			</p>
 			<p>
 				<label for="pltt-tag-keyword-input"><?php esc_html_e( 'Keywords (optional)', 'plain-language-time-tracker' ); ?></label>
-				<span class="pltt-alias-field-hint"><?php esc_html_e( 'Words or phrases in your notes that should pre-fill this tag. Type and press Enter.', 'plain-language-time-tracker' ); ?></span>
-				<div class="pltt-alias-chips" data-alias-chips data-remove-label="<?php esc_attr_e( 'Remove keyword', 'plain-language-time-tracker' ); ?>">
-					<div class="pltt-alias-chip-list"></div>
-					<input type="text" id="pltt-tag-keyword-input" class="pltt-alias-input" placeholder="<?php esc_attr_e( 'Add keyword…', 'plain-language-time-tracker' ); ?>" autocomplete="off">
-					<div class="pltt-alias-hidden"></div>
+				<div class="pltt-alias-group">
+					<div class="pltt-alias-chips" data-alias-chips data-remove-label="<?php esc_attr_e( 'Remove keyword', 'plain-language-time-tracker' ); ?>">
+						<div class="pltt-alias-chip-list"></div>
+						<input type="text" id="pltt-tag-keyword-input" class="pltt-alias-input" placeholder="<?php esc_attr_e( 'Add a word or phrase from your notes…', 'plain-language-time-tracker' ); ?>" autocomplete="off">
+						<div class="pltt-alias-hidden"></div>
+					</div>
+					<span class="pltt-alias-field-hint"><?php esc_html_e( 'Words or phrases in your notes that should pre-fill this tag. Type and press Enter to add one.', 'plain-language-time-tracker' ); ?></span>
 				</div>
 			</p>
 			<p class="pltt-modal-actions">

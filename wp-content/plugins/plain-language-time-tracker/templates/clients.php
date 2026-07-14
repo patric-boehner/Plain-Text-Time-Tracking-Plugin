@@ -167,12 +167,17 @@ if ( ! empty( $clients ) ) {
 			</div>
 			</p>
 			<p>
-				<label for="pltt-client-alias-input"><?php esc_html_e( 'Aliases (optional)', 'plain-language-time-tracker' ); ?></label>
-				<span class="pltt-alias-field-hint"><?php esc_html_e( 'Shorthand in your notes that maps to this client. Type and press Enter; matches at full confidence.', 'plain-language-time-tracker' ); ?></span>
-				<div class="pltt-alias-chips" data-alias-chips data-remove-label="<?php esc_attr_e( 'Remove alias', 'plain-language-time-tracker' ); ?>">
-					<div class="pltt-alias-chip-list"></div>
-					<input type="text" id="pltt-client-alias-input" class="pltt-alias-input" placeholder="<?php esc_attr_e( 'Add alias…', 'plain-language-time-tracker' ); ?>" autocomplete="off">
-					<div class="pltt-alias-hidden"></div>
+				<label for="pltt-client-alias-input"><?php esc_html_e( 'Known as', 'plain-language-time-tracker' ); ?></label>
+				<div class="pltt-alias-group">
+					<div class="pltt-alias-chips" data-alias-chips data-remove-label="<?php esc_attr_e( 'Remove alias', 'plain-language-time-tracker' ); ?>">
+						<div class="pltt-alias-chip-list"></div>
+						<input type="text" id="pltt-client-alias-input" class="pltt-alias-input" placeholder="<?php esc_attr_e( 'Add a name you write in your notes…', 'plain-language-time-tracker' ); ?>" autocomplete="off">
+						<div class="pltt-alias-hidden"></div>
+					</div>
+					<span class="pltt-alias-learn-note">
+						<span class="dashicons dashicons-lightbulb" aria-hidden="true"></span>
+						<span><?php esc_html_e( 'You rarely need to touch this — the app learns these names automatically as you confirm entries for this client. To add one by hand so a match works right away, type it and press Enter.', 'plain-language-time-tracker' ); ?></span>
+					</span>
 				</div>
 			</p>
 			<div class="pltt-modal-actions">

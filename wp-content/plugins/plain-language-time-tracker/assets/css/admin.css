@@ -125,6 +125,9 @@
    its own row just below. */
 .pltt-daily-log-nav-row {
 	margin-bottom: 20px;
+	/* Right-align the date navigation so it sits under the Today · History toggle
+	   (the row is a flex container via .pltt-daily-log-nav). */
+	justify-content: flex-end;
 }
 
 /* Date display */
@@ -652,17 +655,47 @@ a.pltt-pcc-project:focus {
 }
 
 .pltt-modal-content {
+	position: relative;
 	background: var(--pltt-bg-white);
 	padding: 25px;
 	border-radius: 4px;
-	min-width: 350px;
-	max-width: 400px;
+	width: min(600px, calc(100vw - 40px));
 	box-shadow: var(--pltt-shadow-modal);
 }
 
-.pltt-modal-content h3 {
-	margin-top: 0;
-	margin-bottom: 20px;
+/* Modal header: the title becomes a full-width band with a divider under it;
+   the injected × sits top-right (see shared.js). */
+.pltt-modal-content > h2,
+.pltt-modal-content > h3 {
+	margin: -25px -25px 20px;
+	padding: 15px 48px 15px 25px;
+	border-bottom: 1px solid var(--pltt-border-light);
+	font-size: 16px;
+}
+
+.pltt-modal-x {
+	position: absolute;
+	top: 9px;
+	right: 12px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 32px;
+	height: 32px;
+	padding: 0;
+	border: 0;
+	border-radius: 4px;
+	background: transparent;
+	color: var(--pltt-text-muted);
+	font-size: 20px;
+	line-height: 1;
+	cursor: pointer;
+	z-index: 1;
+}
+.pltt-modal-x:hover,
+.pltt-modal-x:focus {
+	/* background: var(--pltt-bg-light); */
+	color: var(--pltt-text-dark);
 }
 
 .pltt-modal-content label {
@@ -719,11 +752,18 @@ a.pltt-pcc-project:focus {
 	border-left: 1px solid var(--pltt-border);
 }
 
+/* Modal footer: main buttons in a full-width band with a divider above.
+   The delete-left / actions-right split still works via .pltt-modal-actions-right's
+   margin-left: auto; non-delete modals right-align their buttons. */
 .pltt-modal-actions {
 	display: flex;
 	align-items: center;
+	justify-content: flex-end;
 	gap: 8px;
-	margin-top: 20px;
+	margin: 20px -25px -25px;
+	padding: 15px 25px;
+	border-top: 1px solid var(--pltt-border-light);
+	background: #fbfbfb;
 }
 
 .pltt-modal-actions-right {
@@ -1325,6 +1365,22 @@ fieldset.pltt-date-nav-custom-inputs input[type="date"] {
 	line-height: 1.4;
 	color: var(--pltt-text-muted);
 }
+
+/* Small color dot per type — colors match the type badges (.pltt-badge-*). */
+.pltt-typecard-dot {
+	display: inline-block;
+	width: 9px;
+	height: 9px;
+	margin-right: 7px;
+	border-radius: 50%;
+	vertical-align: middle;
+	background: var(--pltt-badge-text);
+}
+.pltt-typecard[data-type="hourly"] .pltt-typecard-dot { background: var(--pltt-badge-success-text); }
+.pltt-typecard[data-type="recurring"] .pltt-typecard-dot { background: var(--pltt-badge-info-text); }
+.pltt-typecard[data-type="fixed"] .pltt-typecard-dot { background: var(--pltt-badge-purple-text); }
+.pltt-typecard[data-type="none"] .pltt-typecard-dot { background: var(--pltt-badge-text); }
+
 @media (max-width: 480px) {
 	.pltt-typepick { grid-template-columns: 1fr; }
 }
