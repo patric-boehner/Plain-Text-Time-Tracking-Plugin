@@ -256,4 +256,20 @@
 			}
 		} );
 	}
+
+	// ── Prev / Next navigation ───────────────────────────────────────────
+
+	if ( prevBtn ) {
+		prevBtn.addEventListener( 'click', function() {
+			var range = shiftRange( fromInput.value, toInput.value, -1 );
+			applyRange( range.from, range.to );
+		} );
+	}
+
+	if ( nextBtn ) {
+		nextBtn.addEventListener( 'click', function() {
+			var range = shiftRange( fromInput.value, toInput.value, 1 );
+			applyRange( range.from, range.to );
+		} );
+	}
 } )();
