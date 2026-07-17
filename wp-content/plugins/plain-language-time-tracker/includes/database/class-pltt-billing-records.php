@@ -143,6 +143,87 @@ class PLTT_Billing_Records {
 	}
 
 	/**
+	 * Filtered, paginated slice of the cross-project ledger, plus aggregate totals
+	 * over the FULL filtered set (not just the page) — powers the Billed history
+	 * view's table + summary cards.
+	 *
+	 * @param array $args {
+	 *     @type string     $date_from    Inclusive lower bound on marked_at (Y-m-d) or ''.
+	 *     @type string     $date_to      Inclusive upper bound on marked_at (Y-m-d) or ''.
+	 *     @type string     $billing_type One of self::TYPES, or '' for any.
+	 *     @type int[]|null $project_ids  Restrict to these project IDs (client filter);
+	 *                                    null = no restriction, [] = match nothing.
+	 *     @type int        $limit        Page size; 0 = totals only, no rows fetched.
+	 *     @type int        $offset       Row offset for pagination.
+	 * }
+	 * @return array{rows: array<int, object>, total: int, billed: float, absorbed: float}
+	 */
+	public static function query( $args = array() ) {
+		global $wpdb;
+		$table = PLTT_Database::get_table_name( 'billing_records' );
+
+		$defaults = array(
+			'date_from'    => '',
+			'date_to'      => '',
+			'billing_type' => '',
+			'project_ids'  => null,
+			'limit'        => 0,
+			'offset'       => 0,
+		);
+		$args = array_merge( $defaults, $args );
+
+		$where   = array( '1=1' );
+		$prepare = array();
+
+		if ( '' !== $args['date_from'] ) {
+			$where[]   = 'marked_at >= %s';
+			$prepare[] = $args['date_from'] . ' 00:00:00';
+		}
+		if ( '' !== $args['date_to'] ) {
+			$where[]   = 'marked_at <= %s';
+			$prepare[] = $args['date_to'] . ' 23:59:59';
+		}
+		if ( '' !== $args['billing_type'] ) {
+			$where[]   = 'billing_type = %s';
+			$prepare[] = $args['billing_type'];
+		}
+		if ( is_array( $args['project_ids'] ) ) {
+			if ( empty( $args['project_ids'] ) ) {
+				// A client filter that resolves to no projects matches nothing.
+				return array( 'rows' => array(), 'total' => 0, 'billed' => 0.0, 'absorbed' => 0.0 );
+			}
+			$ids        = array_map( 'intval', $args['project_ids'] );
+			$where[]    = 'project_id IN (' . implode( ',', array_fill( 0, count( $ids ), '%d' ) ) . ')';
+			$prepare    = array_merge( $prepare, $ids );
+		}
+
+		$where_sql = implode( ' AND ', $where );
+
+		// Aggregate over the full filtered set (for the summary cards + pagination).
+		$agg_sql = "SELECT COUNT(*) AS total, COALESCE(SUM(billed_amount),0) AS billed, COALESCE(SUM(absorbed_amount),0) AS absorbed FROM {$table} WHERE {$where_sql}";
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.NotPrepared
+		$agg = empty( $prepare )
+			? $wpdb->get_row( $agg_sql )
+			: $wpdb->get_row( $wpdb->prepare( $agg_sql, $prepare ) );
+
+		$result = array(
+			'rows'     => array(),
+			'total'    => $agg ? (int) $agg->total : 0,
+			'billed'   => $agg ? round( (float) $agg->billed, 2 ) : 0.0,
+			'absorbed' => $agg ? round( (float) $agg->absorbed, 2 ) : 0.0,
+		);
+
+		if ( (int) $args['limit'] > 0 && $result['total'] > 0 ) {
+			$rows_sql       = "SELECT * FROM {$table} WHERE {$where_sql} ORDER BY marked_at DESC, id DESC LIMIT %d OFFSET %d";
+			$rows_prepare   = array_merge( $prepare, array( (int) $args['limit'], (int) $args['offset'] ) );
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.NotPrepared
+			$result['rows'] = $wpdb->get_results( $wpdb->prepare( $rows_sql, $rows_prepare ) );
+		}
+
+		return $result;
+	}
+
+	/**
 	 * All records for a project, newest first — the read-only billing history.
 	 *
 	 * @param int $project_id Project ID.

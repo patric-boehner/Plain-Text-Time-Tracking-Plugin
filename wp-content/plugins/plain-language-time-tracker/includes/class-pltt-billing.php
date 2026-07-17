@@ -289,26 +289,72 @@ class PLTT_Billing {
 	}
 
 	/**
-	 * The cross-project invoiced ledger — every committed billing record, newest
-	 * first, enriched with client + project names for display.
+	 * The cross-project invoiced ledger — committed billing records newest first,
+	 * enriched with client + project names, filtered + paginated for the Billed
+	 * history view. Totals are over the FULL filtered set, not just the page.
 	 *
+	 * @param array $args {
+	 *     @type string $date_from    Lower bound on marked_at (Y-m-d) or ''.
+	 *     @type string $date_to      Upper bound on marked_at (Y-m-d) or ''.
+	 *     @type int    $client_id    Restrict to one client (0 = all).
+	 *     @type string $billing_type One of PLTT_Billing_Records::TYPES, or '' for any.
+	 *     @type int    $paged        1-based page number.
+	 *     @type int    $per_page     Page size.
+	 * }
 	 * @return array{
 	 *     rows: array<int, array{record: object, client_name: string, project_name: string}>,
 	 *     total_billed: float,
 	 *     total_absorbed: float,
 	 *     count: int,
+	 *     paged: int,
+	 *     per_page: int,
+	 *     total_pages: int,
 	 * }
 	 */
-	public static function get_invoiced_log() {
-		$records = PLTT_Billing_Records::get_all();
+	public static function get_invoiced_log( $args = array() ) {
+		$defaults = array(
+			'date_from'    => '',
+			'date_to'      => '',
+			'client_id'    => 0,
+			'billing_type' => '',
+			'paged'        => 1,
+			'per_page'     => 25,
+		);
+		$args = array_merge( $defaults, $args );
 
-		$project_ids = array();
-		foreach ( $records as $r ) {
-			if ( ! empty( $r->project_id ) ) {
-				$project_ids[] = (int) $r->project_id;
+		$paged    = max( 1, (int) $args['paged'] );
+		$per_page = max( 1, (int) $args['per_page'] );
+
+		// A client filter resolves to that client's project IDs — records carry only
+		// project_id, not client_id. null = no client restriction.
+		$project_ids = null;
+		if ( (int) $args['client_id'] > 0 ) {
+			$project_ids = array();
+			foreach ( PLTT_Projects::get_by_client( (int) $args['client_id'], false ) as $p ) {
+				$project_ids[] = (int) $p->id;
 			}
 		}
-		$projects = PLTT_Projects::get_multiple( array_unique( $project_ids ) );
+
+		$q = PLTT_Billing_Records::query(
+			array(
+				'date_from'    => (string) $args['date_from'],
+				'date_to'      => (string) $args['date_to'],
+				'billing_type' => (string) $args['billing_type'],
+				'project_ids'  => $project_ids,
+				'limit'        => $per_page,
+				'offset'       => ( $paged - 1 ) * $per_page,
+			)
+		);
+
+		$records = $q['rows'];
+
+		$page_project_ids = array();
+		foreach ( $records as $r ) {
+			if ( ! empty( $r->project_id ) ) {
+				$page_project_ids[] = (int) $r->project_id;
+			}
+		}
+		$projects = PLTT_Projects::get_multiple( array_unique( $page_project_ids ) );
 
 		$client_ids = array();
 		foreach ( $projects as $p ) {
@@ -318,10 +364,7 @@ class PLTT_Billing {
 		}
 		$clients = PLTT_Clients::get_multiple( array_unique( $client_ids ) );
 
-		$rows           = array();
-		$total_billed   = 0.0;
-		$total_absorbed = 0.0;
-
+		$rows = array();
 		foreach ( $records as $r ) {
 			$project = isset( $projects[ (int) $r->project_id ] ) ? $projects[ (int) $r->project_id ] : null;
 			$client  = ( $project && isset( $clients[ (int) $project->client_id ] ) ) ? $clients[ (int) $project->client_id ] : null;
@@ -331,16 +374,39 @@ class PLTT_Billing {
 				'client_name'  => $client ? $client->name : '',
 				'project_name' => $project ? $project->name : __( '(deleted project)', 'plain-language-time-tracker' ),
 			);
-
-			$total_billed   += (float) $r->billed_amount;
-			$total_absorbed += (float) $r->absorbed_amount;
 		}
 
 		return array(
 			'rows'           => $rows,
-			'total_billed'   => round( $total_billed, 2 ),
-			'total_absorbed' => round( $total_absorbed, 2 ),
-			'count'          => count( $rows ),
+			'total_billed'   => $q['billed'],
+			'total_absorbed' => $q['absorbed'],
+			'count'          => $q['total'],
+			'paged'          => $paged,
+			'per_page'       => $per_page,
+			'total_pages'    => (int) max( 1, ceil( $q['total'] / $per_page ) ),
+		);
+	}
+
+	/**
+	 * Billed + absorbed totals over a marked_at window — backs the "Billed / Absorbed
+	 * this month" cards on the Ready-to-bill view. No row fetch.
+	 *
+	 * @param string $date_from Lower bound (Y-m-d) or ''.
+	 * @param string $date_to   Upper bound (Y-m-d) or ''.
+	 * @return array{billed: float, absorbed: float, count: int}
+	 */
+	public static function get_billed_totals( $date_from = '', $date_to = '' ) {
+		$q = PLTT_Billing_Records::query(
+			array(
+				'date_from' => (string) $date_from,
+				'date_to'   => (string) $date_to,
+				'limit'     => 0,
+			)
+		);
+		return array(
+			'billed'   => $q['billed'],
+			'absorbed' => $q['absorbed'],
+			'count'    => $q['total'],
 		);
 	}
 

@@ -877,31 +877,6 @@
    the record of past bills. No entries live here — cards are doorways into
    the detailed view where selection + commit happen.
    ========================================================================== */
-.pltt-bill-subhead {
-	max-width: 60ch;
-	margin: 0 0 24px;
-	color: var(--pltt-text-muted, #646970);
-	font-size: 13px;
-}
-
-.pltt-bill-sectitle {
-	font-size: 15px;
-	font-weight: 600;
-	margin: 0 0 12px;
-}
-.pltt-bill-sectitle--records {
-	margin-top: 36px;
-}
-
-.pltt-bill-lead {
-	margin: 0 0 16px;
-	color: var(--pltt-text-muted, #646970);
-	font-size: 13px;
-}
-.pltt-bill-lead strong {
-	color: var(--pltt-text-dark);
-}
-
 /* --- client group --- */
 .pltt-bill-clientgroup {
 	margin-bottom: 24px;
@@ -991,6 +966,29 @@
 	max-width: 70ch;
 	margin-top: 12px;
 	color: var(--pltt-text-muted, #646970);
+}
+
+/* --- summary cards (both views) --- */
+.pltt-bill-cards-summary {
+	margin-bottom: 24px;
+}
+.pltt-bill-outstanding-value {
+	color: var(--pltt-warning-text, #b45309);
+}
+.pltt-bill-absorbed-value {
+	color: var(--pltt-text-muted, #646970);
+}
+
+/* --- history table cells --- */
+.pltt-bill-record-id {
+	color: var(--pltt-text-muted, #646970);
+	font-size: 12px;
+	margin-left: 4px;
+	font-variant-numeric: tabular-nums;
+}
+.pltt-bill-record-covers {
+	color: var(--pltt-text-muted, #646970);
+	font-size: 13px;
 }
 
 /* ==========================================================================
