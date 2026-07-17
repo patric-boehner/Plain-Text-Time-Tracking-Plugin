@@ -73,24 +73,6 @@ $card_label = static function ( $base, $phrase ) {
 };
 ?>
 
-<div class="pltt-summary-cards pltt-bill-cards-summary">
-	<div class="card">
-		<div class="card-label"><?php echo esc_html( $card_label( __( 'Records', 'plain-language-time-tracker' ), $active_phrase ) ); ?></div>
-		<div class="card-value"><?php echo esc_html( number_format_i18n( (int) $log['count'] ) ); ?></div>
-		<div class="card-secondary"><?php echo esc_html( $range_label ); ?></div>
-	</div>
-	<div class="card">
-		<div class="card-label"><?php echo esc_html( $card_label( __( 'Billed', 'plain-language-time-tracker' ), $active_phrase ) ); ?></div>
-		<div class="card-value"><?php echo esc_html( pltt_format_currency( (float) $log['total_billed'] ) ); ?></div>
-		<div class="card-secondary"><?php echo esc_html( $range_label ); ?></div>
-	</div>
-	<div class="card">
-		<div class="card-label"><?php echo esc_html( $card_label( __( 'Absorbed', 'plain-language-time-tracker' ), $active_phrase ) ); ?></div>
-		<div class="card-value pltt-bill-absorbed-value"><?php echo esc_html( pltt_format_currency( (float) $log['total_absorbed'] ) ); ?></div>
-		<div class="card-secondary"><?php esc_html_e( 'written down at bill time', 'plain-language-time-tracker' ); ?></div>
-	</div>
-</div>
-
 <form method="get" action="" class="pltt-report-filters-form pltt-bill-history-filters">
 	<input type="hidden" name="page" value="pltt-invoicing">
 	<input type="hidden" name="view" value="history">
@@ -133,6 +115,24 @@ $card_label = static function ( $base, $phrase ) {
 		</div>
 	</div>
 </form>
+
+<div class="pltt-summary-cards pltt-bill-cards-summary">
+	<div class="card">
+		<div class="card-label"><?php echo esc_html( $card_label( __( 'Records', 'plain-language-time-tracker' ), $active_phrase ) ); ?></div>
+		<div class="card-value"><?php echo esc_html( number_format_i18n( (int) $log['count'] ) ); ?></div>
+		<div class="card-secondary"><?php echo esc_html( $range_label ); ?></div>
+	</div>
+	<div class="card">
+		<div class="card-label"><?php echo esc_html( $card_label( __( 'Billed', 'plain-language-time-tracker' ), $active_phrase ) ); ?></div>
+		<div class="card-value"><?php echo esc_html( pltt_format_currency( (float) $log['total_billed'] ) ); ?></div>
+		<div class="card-secondary"><?php echo esc_html( $range_label ); ?></div>
+	</div>
+	<div class="card">
+		<div class="card-label"><?php echo esc_html( $card_label( __( 'Absorbed', 'plain-language-time-tracker' ), $active_phrase ) ); ?></div>
+		<div class="card-value pltt-bill-absorbed-value"><?php echo esc_html( pltt_format_currency( (float) $log['total_absorbed'] ) ); ?></div>
+		<div class="card-secondary"><?php esc_html_e( 'written down at bill time', 'plain-language-time-tracker' ); ?></div>
+	</div>
+</div>
 
 <?php if ( empty( $log['rows'] ) ) : ?>
 	<div class="pltt-card pltt-bill-empty">
