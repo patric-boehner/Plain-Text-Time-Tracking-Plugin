@@ -224,16 +224,55 @@ class PLTT_Admin {
 	}
 
 	/**
-	 * Render the invoicing page — the cross-project ready-to-invoice queue.
+	 * Render the invoicing page — two views under one Billing workspace:
+	 *   - ready:   outstanding work grouped by client (the "Review & bill" cards)
+	 *              + this-month activity cards.
+	 *   - history: the filtered, paginated ledger of committed records + cards.
 	 */
 	public static function render_invoicing_page() {
 		self::require_access();
 
-		// The Billing page is a ledger + doorway: outstanding work grouped by client
-		// (each project card links into the detailed view to select + commit) and the
-		// record of what's already been billed. Both sections show at once — no toggle.
-		$queue = PLTT_Billing::get_invoicing_queue();
-		$log   = PLTT_Billing::get_invoiced_log();
+		$view = isset( $_GET['view'] ) ? sanitize_text_field( wp_unslash( $_GET['view'] ) ) : 'ready';
+		if ( ! in_array( $view, array( 'ready', 'history' ), true ) ) {
+			$view = 'ready';
+		}
+
+		// Defaults so the template can reference either view's vars safely.
+		$queue       = null;
+		$mtd         = null;
+		$log         = null;
+		$all_clients = array();
+		$date_from   = '';
+		$date_to     = '';
+		$h_client_id = 0;
+		$h_type      = '';
+
+		if ( 'history' === $view ) {
+			// Default to This Month; the date-nav narrows/steps from there.
+			$date_from   = isset( $_GET['from'] ) ? pltt_sanitize_date( wp_unslash( $_GET['from'] ) ) : current_time( 'Y-m-01' );
+			$date_to     = isset( $_GET['to'] ) ? pltt_sanitize_date( wp_unslash( $_GET['to'] ) ) : pltt_get_current_date();
+			$h_client_id = isset( $_GET['client_id'] ) ? absint( $_GET['client_id'] ) : 0;
+			$h_type      = isset( $_GET['type'] ) ? sanitize_text_field( wp_unslash( $_GET['type'] ) ) : '';
+			if ( ! in_array( $h_type, PLTT_Billing_Records::TYPES, true ) ) {
+				$h_type = '';
+			}
+			$h_paged = isset( $_GET['paged'] ) ? max( 1, absint( $_GET['paged'] ) ) : 1;
+
+			$log = PLTT_Billing::get_invoiced_log(
+				array(
+					'date_from'    => $date_from,
+					'date_to'      => $date_to,
+					'client_id'    => $h_client_id,
+					'billing_type' => $h_type,
+					'paged'        => $h_paged,
+				)
+			);
+			$all_clients = PLTT_Clients::get_all();
+		} else {
+			$queue = PLTT_Billing::get_invoicing_queue();
+			// This-month billed/absorbed activity for the summary cards.
+			$mtd = PLTT_Billing::get_billed_totals( current_time( 'Y-m-01' ), pltt_get_current_date() );
+		}
 
 		include PLTT_PLUGIN_DIR . 'templates/reports-invoicing.php';
 	}
@@ -534,6 +573,18 @@ class PLTT_Admin {
 				'pltt-invoicing',
 				PLTT_PLUGIN_URL . 'assets/js/invoicing.js',
 				array( 'pltt-shared' ),
+				$version,
+				true
+			);
+		}
+
+		// Shared date-navigator widget for the Billing history view's filter bar.
+		// (Overview still carries its own copy inside reports.js — OPT-DUP18.)
+		if ( 'time-tracker_page_pltt-invoicing' === $hook ) {
+			wp_enqueue_script(
+				'pltt-date-nav',
+				PLTT_PLUGIN_URL . 'assets/js/pltt-date-nav.js',
+				array(),
 				$version,
 				true
 			);
