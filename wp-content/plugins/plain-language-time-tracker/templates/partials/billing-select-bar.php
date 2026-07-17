@@ -21,9 +21,20 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-// Full outstanding hourly scope — used only for sensible defaults (the live
-// figures come from the selection). Null when nothing is outstanding.
-$scope = PLTT_Billing::get_scope( $project, 'hourly', null );
+// Two modes, by project type:
+//   hourly    → per-entry select; the bar tallies the checked rows (starts empty).
+//   recurring → confirm-the-number; the bar shows the period's overage and bills
+//               the period as a whole (no per-entry picking). The period comes from
+//               the current range start (the retainer card's "Review & bill" opens
+//               the view on period_start..period_end).
+$pltt_bill_confirm = ( 'recurring' === pltt_get_billing_type( $project ) );
+if ( $pltt_bill_confirm ) {
+	$pltt_bill_period = isset( $date_from ) ? $date_from : null;
+	$scope            = $pltt_bill_period ? PLTT_Billing::get_scope( $project, 'retainer_overage', $pltt_bill_period ) : null;
+} else {
+	$pltt_bill_period = '';
+	$scope            = PLTT_Billing::get_scope( $project, 'hourly', null );
+}
 if ( empty( $scope ) ) {
 	return;
 }
@@ -32,22 +43,28 @@ $client_name = ! empty( $context_client ) ? $context_client->name : '';
 
 // Scope view-model: the default description plus the structured list / AI prompt,
 // shared with the "Line items" copy dialog (billing-copy-dialog.php) below.
-$v                  = pltt_build_billing_scope_view( $scope, $client_name );
+$v                   = pltt_build_billing_scope_view( $scope, $client_name );
 $default_description = $v['default_desc'];
-$remainder          = number_format( (float) $scope['unbilled'], 2, '.', '' );
+$remainder           = number_format( (float) $scope['unbilled'], 2, '.', '' );
 ?>
 
-<div class="pltt-billsel-bar" hidden aria-live="polite">
+<div class="pltt-billsel-bar"<?php echo $pltt_bill_confirm ? ' data-confirm' : ' hidden'; ?> aria-live="polite">
 	<span class="pltt-billsel-summary">
-		<strong class="pltt-billsel-count">0</strong> <?php esc_html_e( 'entries selected', 'plain-language-time-tracker' ); ?>
-		· <span class="pltt-billsel-total">$0.00</span>
+		<?php if ( $pltt_bill_confirm ) : ?>
+			<strong class="pltt-billsel-total"><?php echo esc_html( pltt_format_currency( (float) $scope['unbilled'] ) ); ?></strong>
+			<?php esc_html_e( 'over allocation', 'plain-language-time-tracker' ); ?>
+			<?php if ( ! empty( $v['date_range'] ) ) : ?> · <?php echo esc_html( $v['date_range'] ); ?><?php endif; ?>
+		<?php else : ?>
+			<strong class="pltt-billsel-count">0</strong> <?php esc_html_e( 'entries selected', 'plain-language-time-tracker' ); ?>
+			· <span class="pltt-billsel-total">$0.00</span>
+		<?php endif; ?>
 	</span>
 	<span class="pltt-billsel-spacer"></span>
 	<button type="button" class="button pltt-billsel-lineitems" data-lineitems-dialog="pltt-billcopy-<?php echo esc_attr( $v['uid'] ); ?>">
 		<?php esc_html_e( 'Line items…', 'plain-language-time-tracker' ); ?>
 	</button>
 	<button type="button" class="button button-primary pltt-billsel-open" data-open-billsel>
-		<?php esc_html_e( 'Bill selected', 'plain-language-time-tracker' ); ?> &rarr;
+		<?php echo $pltt_bill_confirm ? esc_html__( 'Bill overage', 'plain-language-time-tracker' ) : esc_html__( 'Bill selected', 'plain-language-time-tracker' ); ?> &rarr;
 	</button>
 </div>
 
@@ -55,32 +72,26 @@ $remainder          = number_format( (float) $scope['unbilled'], 2, '.', '' );
 	<button type="button" class="pltt-modal-x" data-close aria-label="<?php esc_attr_e( 'Close', 'plain-language-time-tracker' ); ?>">&times;</button>
 	<form class="pltt-billsel-form">
 		<input type="hidden" name="project_id" value="<?php echo esc_attr( (int) $project->id ); ?>">
-		<input type="hidden" name="billing_type" value="hourly">
-		<input type="hidden" name="period" value="">
+		<input type="hidden" name="billing_type" value="<?php echo $pltt_bill_confirm ? 'retainer_overage' : 'hourly'; ?>">
+		<input type="hidden" name="period" value="<?php echo esc_attr( (string) $pltt_bill_period ); ?>">
 		<input type="hidden" name="date_from" value="">
 		<input type="hidden" name="date_to" value="">
 
-		<h2 id="pltt-billsel-title" class="pltt-bill-dialog-title">
-			<?php
-			if ( '' !== $client_name ) {
-				printf(
-					/* translators: 1: client name, 2: project name. */
-					esc_html__( 'Record bill — %1$s · %2$s', 'plain-language-time-tracker' ),
-					esc_html( $client_name ),
-					esc_html( $project->name )
-				);
-			} else {
-				printf(
-					/* translators: %s: project name. */
-					esc_html__( 'Record bill — %s', 'plain-language-time-tracker' ),
-					esc_html( $project->name )
-				);
-			}
-			?>
-		</h2>
+		<h2 id="pltt-billsel-title" class="pltt-bill-dialog-title"><?php esc_html_e( 'Record Bill', 'plain-language-time-tracker' ); ?></h2>
+		<p class="pltt-bill-dialog-proj"><?php echo esc_html( '' !== $client_name ? $client_name . ' · ' . $project->name : $project->name ); ?></p>
+		<?php if ( ! empty( $v['date_range'] ) ) : ?>
+			<?php // Date range, formatted per project type by pltt_build_billing_scope_view(): retainer = its period label; hourly = the span of the entries. ?>
+			<p class="pltt-bill-dialog-range">
+				<?php echo esc_html( $v['date_range'] ); ?>
+			</p>
+		<?php endif; ?>
 		<p class="pltt-bill-dialog-sub">
-			<strong class="pltt-billsel-count">0</strong> <?php esc_html_e( 'entries selected', 'plain-language-time-tracker' ); ?>
-			· <span class="pltt-billsel-calc">$0.00</span>
+			<?php if ( $pltt_bill_confirm ) : ?>
+				<?php echo esc_html( $v['derivation'] ); ?>
+			<?php else : ?>
+				<strong class="pltt-billsel-count">0</strong> <?php esc_html_e( 'entries selected', 'plain-language-time-tracker' ); ?>
+				· <span class="pltt-billsel-calc">$0.00</span>
+			<?php endif; ?>
 		</p>
 
 		<div class="pltt-billing-amount-row">

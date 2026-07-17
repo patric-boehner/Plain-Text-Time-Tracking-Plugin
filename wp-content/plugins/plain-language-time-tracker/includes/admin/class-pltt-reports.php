@@ -115,19 +115,7 @@ class PLTT_Reports {
 			}
 		}
 
-		// Global "billable time outside your date range" notification — summary
-		// view only. One aggregate signal across all projects (excluding fixed-fee
-		// and archived), replacing the former per-project indicators.
-		//
-		// Only surface it when the viewed range includes today: looking at a current
-		// window (today / this week / this month / a custom range through now) is the
-		// "what do I still need to bill" context. Looking at a closed past range is a
-		// retrospective view where the stranded-time nudge would just be noise.
-		$unbilled_notice = null;
-		$today           = pltt_get_current_date();
-		if ( 'summary' === $view && $today >= $date_from && $today <= $date_to ) {
-			$unbilled_notice = PLTT_Entries::get_unbilled_outside_range_summary( $date_from, $date_to, $filter_args );
-		}
+		$today = pltt_get_current_date();
 
 		// Get summary stats in one query (independent of view/pagination).
 		$stats = PLTT_Entries::get_stats( $filter_args );
@@ -170,11 +158,6 @@ class PLTT_Reports {
 		// Overall Effective Hourly Rate (Card 5).
 		$overall_ehr = $stats ? pltt_effective_rate( $stats->billable_amount, $stats->total_minutes ) : 0;
 
-		// Top projects for the period (Card 1) — up to 2 highest-hours client-facing projects.
-		$top_projects = $total_entries > 0
-			? PLTT_Entries::get_top_projects_for_period( $date_from, $date_to, $filter_args, 2 )
-			: array();
-
 		// View-specific data.
 		$entries     = array();
 		$summary     = array();
@@ -187,12 +170,22 @@ class PLTT_Reports {
 		// Chart data (summary view only). Populated below; the partial unpacks it.
 		$chart = null;
 
+		// All-time outstanding (summary view only; the "Unbilled so far" card).
+		$outstanding_total = 0.0;
+
 		if ( 'summary' === $view ) {
 			$summary = PLTT_Entries::get_summary_by_project( $date_from, $date_to, $filter_args );
 
 			// Volume chart context (buckets + folded daily totals), shared with the
 			// Project Detail chart via pltt_build_period_chart_data().
 			$chart = pltt_build_period_chart_data( $date_from, $date_to, $filter_args );
+
+			// All-time outstanding for the "Unbilled so far" card — the same figure
+			// the Billing page shows. It's a standing backlog independent of the
+			// viewed date range, which is why the card links out to Billing rather
+			// than acting in place.
+			$billing_queue     = PLTT_Billing::get_invoicing_queue();
+			$outstanding_total = isset( $billing_queue['grand_total'] ) ? (float) $billing_queue['grand_total'] : 0.0;
 
 			// For projects with a budget, fetch allocation-aware stats.
 			// Recurring: hours within the selected date range vs monthly allocation.

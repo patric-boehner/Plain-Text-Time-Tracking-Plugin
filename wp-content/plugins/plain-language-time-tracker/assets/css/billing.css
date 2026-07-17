@@ -131,6 +131,28 @@
 	height: 18px;
 }
 
+/* Backlog: outstanding billable work outside the current filter range. */
+.pltt-pcc-billing-backlog {
+	display: flex;
+	align-items: flex-start;
+	gap: 6px;
+	margin: 12px 0 0;
+	color: #50575e;
+	font-size: 13px;
+}
+
+.pltt-pcc-billing-backlog .dashicons {
+	color: #996800; /* amber — worth noticing, not an error */
+	font-size: 18px;
+	width: 18px;
+	height: 18px;
+	flex-shrink: 0;
+}
+
+.pltt-pcc-billing-backlog a {
+	white-space: nowrap;
+}
+
 .pltt-pcc-billing-history-link {
 	margin: 12px 0 0;
 	font-size: 13px;
@@ -509,6 +531,19 @@
 	border-bottom: 1px solid var(--pltt-border-light);
 	font-size: 16px;
 	color: var(--pltt-text-dark);
+}
+
+.pltt-bill-dialog-proj {
+	margin: 0 0 3px;
+	font-size: 14px;
+	font-weight: 600;
+	color: var(--pltt-text-dark);
+}
+
+.pltt-bill-dialog-range {
+	margin: 0 0 14px;
+	color: var(--pltt-text-subtle);
+	font-size: 13px;
 }
 
 .pltt-bill-dialog-sub {
@@ -906,6 +941,13 @@
 	border: 1px solid var(--pltt-border-light);
 	border-radius: 4px;
 	padding: 16px 18px;
+	/* Anchor jump from the Insights backlog notice clears the admin bar. */
+	scroll-margin-top: 50px;
+}
+/* Brief highlight so the jumped-to project card is easy to spot. */
+.pltt-bill-card:target {
+	border-color: var(--pltt-accent, #2271b1);
+	box-shadow: 0 0 0 2px rgba(34, 113, 177, 0.18);
 }
 .pltt-bill-card-head {
 	display: flex;
@@ -917,18 +959,9 @@
 	font-weight: 600;
 }
 .pltt-bill-card-range {
-	display: flex;
-	align-items: center;
-	gap: 4px;
 	font-size: 12px;
 	color: var(--pltt-text-muted, #646970);
 	font-variant-numeric: tabular-nums;
-}
-.pltt-bill-card-range .dashicons {
-	font-size: 15px;
-	width: 15px;
-	height: 15px;
-	opacity: 0.7;
 }
 .pltt-bill-card-amount {
 	font-size: 22px;

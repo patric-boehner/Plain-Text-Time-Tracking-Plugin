@@ -193,45 +193,6 @@
 	border-bottom: 1px dotted var(--pltt-border);
 }
 
-/* Top Projects card: compact list of up to 2 client-facing projects (name + hours stacked). */
-.pltt-top-projects-list {
-	list-style: none;
-	margin: 0;
-	padding: 0;
-	display: flex;
-	flex-direction: column;
-	gap: 10px;
-}
-
-.pltt-top-project {
-	display: flex;
-	flex-direction: column;
-	gap: 2px;
-	min-width: 0;
-	margin: 0;
-}
-
-.pltt-top-project:last-child {
-	margin-bottom: 0;
-}
-
-.pltt-top-project-name {
-	font-size: 14px;
-	font-weight: 600;
-	line-height: 1.2;
-	color: var(--pltt-text-dark);
-	white-space: nowrap;
-	overflow: hidden;
-	text-overflow: ellipsis;
-}
-
-.pltt-top-project-stats {
-	font-size: 12px;
-	line-height: 1.2;
-	color: var(--pltt-text-muted);
-	white-space: nowrap;
-}
-
 .card-label {
 	font-size: 13px;
 	color: var(--pltt-text-muted);
@@ -894,7 +855,8 @@ a.pltt-pcc-project:focus {
 	margin-bottom: 20px;
 }
 
-.pltt-header .pltt-date-nav-row {
+.pltt-header .pltt-date-nav-row,
+.pltt-header .pltt-daily-log-nav-row {
 	margin-bottom: 0;
 }
 

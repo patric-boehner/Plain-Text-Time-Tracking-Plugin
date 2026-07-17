@@ -354,68 +354,8 @@
 	box-shadow: inset 3px 0 0 var(--pltt-primary);
 }
 
-/* Global "billable time outside your date range" notification (summary view). */
-.pltt-unbilled-notice {
-	display: flex;
-	align-items: center;
-	gap: 12px;
-	padding: 12px 16px;
-	margin: 0 0 16px;
-	/* Warm cream, matching the overage row tint in the detailed view — quieter
-	   than the saturated badge yellow. */
-	background: var(--pltt-bg-overage);
-	border: 1px solid color-mix(in srgb, var(--pltt-warning) 45%, transparent);
-	border-radius: 6px;
-}
-
-.pltt-unbilled-notice-icon {
-	display: inline-flex;
-	align-items: center;
-	justify-content: center;
-	flex: 0 0 auto;
-	width: 24px;
-	height: 24px;
-	border-radius: 50%;
-	background: var(--pltt-warning);
-	color: var(--pltt-text-dark);
-	font-size: 14px;
-	font-weight: 700;
-	line-height: 1;
-}
-
-.pltt-unbilled-notice-body {
-	flex: 1 1 auto;
-	min-width: 0;
-	margin: 0;
-	font-weight: 600;
-	color: var(--pltt-badge-warning-text);
-}
-
-.pltt-unbilled-notice-action {
-	flex: 0 0 auto;
-	font-size: 13px;
-	white-space: nowrap;
-}
-
-.pltt-unbilled-notice-dismiss {
-	flex: 0 0 auto;
-	display: inline-flex;
-	align-items: center;
-	justify-content: center;
-	width: 24px;
-	height: 24px;
-	padding: 0;
-	border: 0;
-	background: transparent;
-	color: var(--pltt-text-muted);
-	font-size: 20px;
-	line-height: 1;
-	cursor: pointer;
-	border-radius: 3px;
-}
-
-.pltt-unbilled-notice-dismiss:hover,
-.pltt-unbilled-notice-dismiss:focus-visible {
-	color: var(--pltt-danger);
-	background: color-mix(in srgb, var(--pltt-warning) 18%, transparent);
+/* "Unbilled so far" card — all-time outstanding, an amber standing figure that
+   deliberately breaks the period frame (hence the Billing link, not a metric). */
+.pltt-unbilled-card-value {
+	color: var(--pltt-warning-text);
 }

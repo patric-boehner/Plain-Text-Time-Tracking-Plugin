@@ -427,7 +427,7 @@
 
 				activeRow = row;
 				document.getElementById( 'pltt-new-project-client-id' ).value = clientSelect.value;
-				PLTT.showModal( 'pltt-project-modal' );
+				if ( window.PlttProjectType ) { PlttProjectType.reset(); } PLTT.showModal( 'pltt-project-modal' );
 				this.value = '';
 			} else {
 				var pRowVis = this.closest( '.pltt-entry-row' );
@@ -586,12 +586,12 @@
 	const saveProjectBtn = document.getElementById( 'pltt-save-project' );
 	if ( saveProjectBtn ) {
 		saveProjectBtn.addEventListener( 'click', function() {
-			const nameInput = document.getElementById( 'pltt-new-project-name' );
 			const clientIdInput = document.getElementById( 'pltt-new-project-client-id' );
-			const rateInput = document.getElementById( 'pltt-new-project-rate' );
-			const name = nameInput.value.trim();
+			const nameInput = document.getElementById( 'pltt-project-name' );
+			const vals = window.PlttProjectType ? PlttProjectType.getValues() : { name: nameInput ? nameInput.value.trim() : '', hourly_rate: '', budget_hours: '', budget_fee: '', recurring_period: '', non_billable: '0' };
+			const name = vals.name;
 			const clientId = clientIdInput.value;
-			const rate = PLTT.parseCurrencyValue( rateInput.value );
+			const rate = PLTT.parseCurrencyValue( vals.hourly_rate );
 
 			if ( ! name ) {
 				alert( 'Please enter a project name.' );
@@ -604,7 +604,11 @@
 			PLTT.ajax( 'pltt_create_project', {
 				name: name,
 				client_id: clientId,
-				hourly_rate: rate
+				hourly_rate: rate,
+				budget_hours: vals.budget_hours,
+				budget_fee: PLTT.parseCurrencyValue( vals.budget_fee ),
+				recurring_period: vals.recurring_period,
+				non_billable: vals.non_billable
 			}, function( response ) {
 				saveProjectBtn.disabled = false;
 
@@ -628,8 +632,7 @@
 					}
 
 					PLTT.hideModal( 'pltt-project-modal' );
-					nameInput.value = '';
-					rateInput.value = '';
+					if ( window.PlttProjectType ) { PlttProjectType.reset(); }
 				} else {
 					alert( response.data || 'Error creating project.' );
 				}
@@ -1283,7 +1286,7 @@
 				}
 				activeFormRow = formRow;
 				document.getElementById( 'pltt-new-project-client-id' ).value = clientSelect.value;
-				PLTT.showModal( 'pltt-project-modal' );
+				if ( window.PlttProjectType ) { PlttProjectType.reset(); } PLTT.showModal( 'pltt-project-modal' );
 				e.target.value = '';
 				return;
 			}
@@ -1408,12 +1411,12 @@
 	const saveProjectBtn = document.getElementById( 'pltt-save-project' );
 	if ( saveProjectBtn ) {
 		saveProjectBtn.addEventListener( 'click', function() {
-			const nameInput = document.getElementById( 'pltt-new-project-name' );
 			const clientIdInput = document.getElementById( 'pltt-new-project-client-id' );
-			const rateInput = document.getElementById( 'pltt-new-project-rate' );
-			const name = nameInput.value.trim();
+			const nameInput = document.getElementById( 'pltt-project-name' );
+			const vals = window.PlttProjectType ? PlttProjectType.getValues() : { name: nameInput ? nameInput.value.trim() : '', hourly_rate: '', budget_hours: '', budget_fee: '', recurring_period: '', non_billable: '0' };
+			const name = vals.name;
 			const clientId = clientIdInput.value;
-			const rate = PLTT.parseCurrencyValue( rateInput.value );
+			const rate = PLTT.parseCurrencyValue( vals.hourly_rate );
 
 			if ( ! name ) {
 				alert( 'Please enter a project name.' );
@@ -1422,7 +1425,7 @@
 			}
 
 			this.disabled = true;
-			PLTT.ajax( 'pltt_create_project', { name: name, client_id: clientId, hourly_rate: rate }, function( response ) {
+			PLTT.ajax( 'pltt_create_project', { name: name, client_id: clientId, hourly_rate: rate, budget_hours: vals.budget_hours, budget_fee: PLTT.parseCurrencyValue( vals.budget_fee ), recurring_period: vals.recurring_period, non_billable: vals.non_billable }, function( response ) {
 				saveProjectBtn.disabled = false;
 				if ( response.success && response.data.project ) {
 					const project = response.data.project;
@@ -1439,8 +1442,7 @@
 						projectSelect.dispatchEvent( new Event( 'change' ) );
 					}
 					PLTT.hideModal( 'pltt-project-modal' );
-					nameInput.value = '';
-					rateInput.value = '';
+					if ( window.PlttProjectType ) { PlttProjectType.reset(); }
 				} else {
 					alert( response.data || 'Error creating project.' );
 				}
