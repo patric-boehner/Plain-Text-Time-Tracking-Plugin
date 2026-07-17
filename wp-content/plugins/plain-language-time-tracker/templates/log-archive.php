@@ -29,12 +29,10 @@ if ( ! defined( 'ABSPATH' ) ) {
 <div class="wrap pltt-wrap">
 	<div class="pltt-header">
 		<h1><?php esc_html_e( 'History', 'plain-language-time-tracker' ); ?></h1>
-		<?php include PLTT_PLUGIN_DIR . 'templates/partials/today-tabs.php'; ?>
-	</div>
 
+	<?php // Date nav sits in the header (top-right), where the Today · History toggle used to be. ?>
 	<form method="get" action="" class="pltt-report-filters-form">
-		<input type="hidden" name="page" value="pltt-time-tracker">
-		<input type="hidden" name="screen" value="history">
+		<input type="hidden" name="page" value="pltt-log-archive">
 		<input type="hidden" name="from" id="pltt-date-from" value="<?php echo esc_attr( $date_from ); ?>">
 		<input type="hidden" name="to"   id="pltt-date-to"   value="<?php echo esc_attr( $date_to ); ?>">
 
@@ -112,6 +110,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 			<?php endif; ?>
 		</div>
 		</form>
+	</div>
 
 	<?php if ( $total_logs > 0 ) : ?>
 		<div class="pltt-summary-cards">

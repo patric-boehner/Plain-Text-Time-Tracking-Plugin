@@ -42,7 +42,6 @@ $return_to     = $return_to_raw ? wp_validate_redirect( $return_to_raw, '' ) : '
 <div class="wrap pltt-wrap">
 	<div class="pltt-header">
 		<h1><?php esc_html_e( 'Today', 'plain-language-time-tracker' ); ?></h1>
-		<?php include PLTT_PLUGIN_DIR . 'templates/partials/today-tabs.php'; ?>
 		<?php
 		// OPT-DUP1: display success/error notices via shared helper. Inside the
 		// header div on purpose — see memory: WordPress JS relocates notices
@@ -60,8 +59,8 @@ $return_to     = $return_to_raw ? wp_validate_redirect( $return_to_raw, '' ) : '
 			)
 		);
 		?>
-	</div>
 
+	<?php // Date nav sits in the header (top-right), where the Today · History toggle used to be. ?>
 	<div class="pltt-daily-log-nav pltt-daily-log-nav-row">
 			<div class="pltt-date-nav pltt-date-nav-single"
 				role="group"
@@ -94,6 +93,7 @@ $return_to     = $return_to_raw ? wp_validate_redirect( $return_to_raw, '' ) : '
 				</a>
 			<?php endif; ?>
 		</div>
+	</div>
 
 	<?php if ( $return_to ) : ?>
 		<p class="pltt-back-link">

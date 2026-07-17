@@ -185,6 +185,11 @@
 
 .pltt-chart-plot {
 	position: relative; /* containing block for the average reference line */
+	/* Confine the chart's internal z-indexes (avg line = 2, value chips = 3) to
+	   its own stacking context so they can't paint over page overlays like the
+	   open date-range dropdown. Without this the avg line escapes to the root
+	   context and covers the dropdown. */
+	isolation: isolate;
 	flex: 1 1 auto;
 	display: flex;
 	align-items: stretch;

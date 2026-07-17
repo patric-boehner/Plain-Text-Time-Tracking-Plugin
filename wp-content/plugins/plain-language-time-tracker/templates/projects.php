@@ -304,85 +304,7 @@ if ( ! empty( $projects ) ) {
 				<label for="pltt-project-name"><?php esc_html_e( 'Project Name', 'plain-language-time-tracker' ); ?></label>
 				<input type="text" id="pltt-project-name" name="name" class="regular-text widefat" required>
 			</p>
-			<p>
-				<label id="pltt-project-billing-type-label"><?php esc_html_e( 'How is it billed?', 'plain-language-time-tracker' ); ?></label>
-				<span class="pltt-typepick" role="radiogroup" aria-labelledby="pltt-project-billing-type-label">
-					<button type="button" class="pltt-typecard" data-type="hourly" role="radio" aria-checked="false">
-						<span class="pltt-typecard-t"><span class="pltt-typecard-dot" aria-hidden="true"></span><?php esc_html_e( 'Hourly', 'plain-language-time-tracker' ); ?></span>
-						<span class="pltt-typecard-d"><?php esc_html_e( 'Bill for time at an hourly rate. Every entry is billable by default.', 'plain-language-time-tracker' ); ?></span>
-					</button>
-					<button type="button" class="pltt-typecard" data-type="recurring" role="radio" aria-checked="false">
-						<span class="pltt-typecard-t"><span class="pltt-typecard-dot" aria-hidden="true"></span><?php esc_html_e( 'Monthly retainer', 'plain-language-time-tracker' ); ?></span>
-						<span class="pltt-typecard-d"><?php esc_html_e( 'A set allocation of hours each period. Time is covered; only overage is billable.', 'plain-language-time-tracker' ); ?></span>
-					</button>
-					<button type="button" class="pltt-typecard" data-type="fixed" role="radio" aria-checked="false">
-						<span class="pltt-typecard-t"><span class="pltt-typecard-dot" aria-hidden="true"></span><?php esc_html_e( 'Fixed budget', 'plain-language-time-tracker' ); ?></span>
-						<span class="pltt-typecard-d"><?php esc_html_e( 'A total project budget. Track burn; bill on your own schedule, non-billable by default.', 'plain-language-time-tracker' ); ?></span>
-					</button>
-					<button type="button" class="pltt-typecard" data-type="none" role="radio" aria-checked="false">
-						<span class="pltt-typecard-t"><span class="pltt-typecard-dot" aria-hidden="true"></span><?php esc_html_e( 'Internal', 'plain-language-time-tracker' ); ?></span>
-						<span class="pltt-typecard-d"><?php esc_html_e( 'Your own work. Tracked for insight, never billed.', 'plain-language-time-tracker' ); ?></span>
-					</button>
-				</span>
-				<?php // Value holder read/written by the modal JS; type itself isn't submitted — it's derived server-side from the fields below. ?>
-				<input type="hidden" id="pltt-project-billing-type" value="hourly">
-			</p>
-
-			<!-- Type-specific settings box: shown for Fixed Fee and Recurring only -->
-			<div id="pltt-project-billing-settings" class="pltt-billing-settings pltt-hidden">
-				<p class="pltt-billing-settings-label" id="pltt-billing-settings-title"></p>
-				<div id="pltt-billing-settings-fields">
-					<div id="pltt-project-recurring-group" class="pltt-hidden">
-						<label for="pltt-project-recurring-period"><?php esc_html_e( 'Recurring Period', 'plain-language-time-tracker' ); ?></label>
-						<select id="pltt-project-recurring-period" name="recurring_period" class="widefat">
-							<option value=""><?php esc_html_e( '— None', 'plain-language-time-tracker' ); ?></option>
-							<option value="monthly"><?php esc_html_e( 'Monthly', 'plain-language-time-tracker' ); ?></option>
-						</select>
-					</div>
-					<div id="pltt-project-budget-mode-group" class="pltt-hidden">
-						<label for="pltt-project-budget-mode"><?php esc_html_e( 'Track Budget By', 'plain-language-time-tracker' ); ?></label>
-						<select id="pltt-project-budget-mode" class="widefat">
-							<option value="hours"><?php esc_html_e( 'Hours', 'plain-language-time-tracker' ); ?></option>
-							<option value="fee"><?php esc_html_e( 'Project Fee', 'plain-language-time-tracker' ); ?></option>
-						</select>
-					</div>
-					<div id="pltt-project-budget-value-group">
-						<div id="pltt-budget-hours-wrap">
-							<label id="pltt-project-budget-label" for="pltt-project-budget-hours"><?php esc_html_e( 'Hour Budget', 'plain-language-time-tracker' ); ?> <span class="pltt-optional"><?php esc_html_e( '(optional)', 'plain-language-time-tracker' ); ?></span></label>
-							<div class="pltt-input-adornment-wrap">
-							<input type="number" id="pltt-project-budget-hours" name="budget_hours" step="0.5" min="0" class="widefat" placeholder="0">
-							<span class="pltt-adornment pltt-adornment-suffix">hr</span>
-						</div>
-						</div>
-						<div id="pltt-budget-fee-wrap" class="pltt-hidden">
-							<label for="pltt-project-budget-fee"><?php esc_html_e( 'Total Fee ($)', 'plain-language-time-tracker' ); ?> <span class="pltt-optional"><?php esc_html_e( '(optional)', 'plain-language-time-tracker' ); ?></span></label>
-							<div class="pltt-input-adornment-wrap">
-							<span class="pltt-adornment pltt-adornment-prefix">$</span>
-							<input type="text" inputmode="decimal" id="pltt-project-budget-fee" name="budget_fee" class="widefat pltt-currency-input" placeholder="0.00">
-						</div>
-						</div>
-					</div>
-				</div>
-				<p class="description" id="pltt-billing-settings-desc"></p>
-			</div>
-
-			<hr class="pltt-form-separator">
-
-			<p id="pltt-project-rate-group">
-				<label for="pltt-project-rate"><?php esc_html_e( 'Hourly Rate', 'plain-language-time-tracker' ); ?> <span class="pltt-optional"><?php esc_html_e( '(optional)', 'plain-language-time-tracker' ); ?></span></label>
-				<div class="pltt-input-adornment-wrap">
-				<span class="pltt-adornment pltt-adornment-prefix">$</span>
-				<input type="text" inputmode="decimal" id="pltt-project-rate" name="hourly_rate" class="widefat pltt-currency-input" placeholder="0.00">
-			</div>
-				<small class="description" id="pltt-rate-description"><?php esc_html_e( 'Leave blank to use client rate.', 'plain-language-time-tracker' ); ?></small>
-			</p>
-			<p id="pltt-project-nonbillable-group">
-				<label>
-					<input type="checkbox" id="pltt-project-non-billable" name="non_billable" value="1">
-					<?php esc_html_e( 'Non-billable project', 'plain-language-time-tracker' ); ?>
-				</label>
-				<small class="description" id="pltt-nonbillable-description"><?php esc_html_e( 'Entries default to non-billable. Can be overridden per entry.', 'plain-language-time-tracker' ); ?></small>
-			</p>
+			<?php include PLTT_PLUGIN_DIR . 'templates/partials/project-billing-fields.php'; ?>
 
 			<div id="pltt-project-status-group" class="pltt-hidden">
 				<hr class="pltt-form-separator">
@@ -429,139 +351,8 @@ if ( ! empty( $projects ) ) {
 
 	function el(id) { return document.getElementById(id); }
 
-	var BILLING_DESCRIPTIONS = {
-		rate: {
-			hourly:    '<?php echo esc_js( __( 'Leave blank to use client rate.', 'plain-language-time-tracker' ) ); ?>',
-			fixed:     '<?php echo esc_js( __( 'Used to calculate implied effective rate. Leave blank to use client rate.', 'plain-language-time-tracker' ) ); ?>',
-			recurring: '<?php echo esc_js( __( 'Used for overage billing. Leave blank to use client rate.', 'plain-language-time-tracker' ) ); ?>',
-			none:      '<?php echo esc_js( __( 'Not applicable for internal projects.', 'plain-language-time-tracker' ) ); ?>'
-		},
-		nonbillable: {
-			hourly:    '<?php echo esc_js( __( 'Entries default to billable at this rate. Check the box to default new entries to non-billable instead.', 'plain-language-time-tracker' ) ); ?>',
-			fixed:     '<?php echo esc_js( __( 'Entries default to non-billable — you decide when and what to bill against the budget.', 'plain-language-time-tracker' ) ); ?>',
-			recurring: '<?php echo esc_js( __( 'Time within the allocation is non-billable, covered by the retainer. Hours over the plan are billed as overage.', 'plain-language-time-tracker' ) ); ?>',
-			none:      '<?php echo esc_js( __( 'Internal work is never billed — it still shows in Insights so you can see where your own time goes.', 'plain-language-time-tracker' ) ); ?>'
-		}
-	};
 
-	function applyBillingTypeUI(type, setDefaults) {
-		var rateField        = el('pltt-project-rate');
-		var rateGroup        = el('pltt-project-rate-group');
-		var settingsBox      = el('pltt-project-billing-settings');
-		var settingsTitle    = el('pltt-billing-settings-title');
-		var settingsFields   = el('pltt-billing-settings-fields');
-		var settingsDesc     = el('pltt-billing-settings-desc');
-		var recurringGroup   = el('pltt-project-recurring-group');
-		var recurringSelect  = el('pltt-project-recurring-period');
-		var budgetModeGroup  = el('pltt-project-budget-mode-group');
-		var budgetLabel      = el('pltt-project-budget-label');
-		var nonBillableGroup = el('pltt-project-nonbillable-group');
-		var nonBillable      = el('pltt-project-non-billable');
-		var hoursInput       = el('pltt-project-budget-hours');
-		var feeInput         = el('pltt-project-budget-fee');
 
-		// Reset disabled/greyed states first.
-		rateField.disabled = false;
-		rateGroup.classList.remove('pltt-field-disabled');
-		nonBillableGroup.classList.remove('pltt-field-disabled');
-		// Default the per-entry billable setting visible; retainer/fixed-fee hide it
-		// below (their billing is computed at the period level, not per entry).
-		nonBillableGroup.classList.remove('pltt-hidden');
-
-		// Update dynamic descriptions.
-		el('pltt-rate-description').textContent = BILLING_DESCRIPTIONS.rate[type];
-		el('pltt-nonbillable-description').textContent = BILLING_DESCRIPTIONS.nonbillable[type];
-
-		if (type === 'hourly') {
-			settingsBox.classList.add('pltt-hidden');
-			hoursInput.disabled      = true;
-			feeInput.disabled        = true;
-			recurringSelect.disabled = true;
-			hoursInput.required      = false;
-			feeInput.required        = false;
-			if (setDefaults) { nonBillable.checked = false; }
-
-		} else if (type === 'fixed') {
-			settingsBox.classList.remove('pltt-hidden');
-			settingsTitle.textContent = '<?php echo esc_js( __( 'FIXED BUDGET SETTINGS', 'plain-language-time-tracker' ) ); ?>';
-			settingsFields.classList.add('pltt-grid');
-			recurringGroup.classList.add('pltt-hidden');
-			budgetModeGroup.classList.remove('pltt-hidden');
-			budgetLabel.firstChild.textContent = '<?php echo esc_js( __( 'Hour Budget', 'plain-language-time-tracker' ) ); ?> ';
-			settingsDesc.textContent = '<?php echo esc_js( __( 'Entries default to non-billable — you decide when and what to bill against the budget.', 'plain-language-time-tracker' ) ); ?>';
-			recurringSelect.disabled = true;
-			hoursInput.required      = true;
-			feeInput.required        = true;
-			var hoursOptional = budgetLabel.querySelector('.pltt-optional');
-			if (hoursOptional) hoursOptional.classList.add('pltt-hidden');
-			var feeLabel = el('pltt-budget-fee-wrap').querySelector('label');
-			var feeOptional = feeLabel ? feeLabel.querySelector('.pltt-optional') : null;
-			if (feeOptional) feeOptional.classList.add('pltt-hidden');
-			// Infer mode from current values so switching away and back preserves the user's entry.
-			var budgetMode = (feeInput.value !== '') ? 'fee' : 'hours';
-			el('pltt-project-budget-mode').value = budgetMode;
-			applyBudgetModeUI(budgetMode);
-			// Fixed-fee dollars come from the flat fee, not time × rate — default entries to
-			// non-billable and hide the per-entry billable setting (it does nothing here).
-			if (setDefaults) { nonBillable.checked = true; }
-			nonBillableGroup.classList.add('pltt-hidden');
-
-		} else if (type === 'recurring') {
-			settingsBox.classList.remove('pltt-hidden');
-			settingsTitle.textContent = '<?php echo esc_js( __( 'RECURRING SETTINGS', 'plain-language-time-tracker' ) ); ?>';
-			settingsFields.classList.add('pltt-grid');
-			recurringGroup.classList.remove('pltt-hidden');
-			budgetModeGroup.classList.add('pltt-hidden');
-			el('pltt-project-budget-mode').value = 'hours';
-			budgetLabel.firstChild.textContent = '<?php echo esc_js( __( 'Hour Allocation', 'plain-language-time-tracker' ) ); ?> ';
-			settingsDesc.textContent = '<?php echo esc_js( __( 'Hours included per period. Time within the allocation is covered by the retainer; hours over the plan are billed as overage when you invoice.', 'plain-language-time-tracker' ) ); ?>';
-			recurringSelect.disabled = false;
-			feeInput.disabled        = true;
-			hoursInput.disabled      = false;
-			hoursInput.required      = false;
-			feeInput.required        = false;
-			var hoursOptional = budgetLabel.querySelector('.pltt-optional');
-			if (hoursOptional) hoursOptional.classList.remove('pltt-hidden');
-			if (setDefaults) {
-				nonBillable.checked = true;
-				if (recurringSelect.value === '') { recurringSelect.value = 'monthly'; }
-			}
-			// Within-allocation time is covered by the flat fee and overage is billed at
-			// the period level — the per-entry billable setting does nothing here. Hide it.
-			nonBillableGroup.classList.add('pltt-hidden');
-
-		} else if (type === 'none') {
-			settingsBox.classList.add('pltt-hidden');
-			rateField.disabled = true;
-			rateGroup.classList.add('pltt-field-disabled');
-			nonBillable.checked = true;
-			nonBillableGroup.classList.add('pltt-field-disabled'); // visual lock only; not HTML disabled so it still submits
-			hoursInput.disabled      = true;
-			feeInput.disabled        = true;
-			recurringSelect.disabled = true;
-			hoursInput.required      = false;
-			feeInput.required        = false;
-		}
-	}
-
-	function applyBudgetModeUI(mode) {
-		var hoursWrap  = el('pltt-budget-hours-wrap');
-		var feeWrap    = el('pltt-budget-fee-wrap');
-		var hoursInput = el('pltt-project-budget-hours');
-		var feeInput   = el('pltt-project-budget-fee');
-		if (!hoursWrap || !feeWrap) return;
-		if (mode === 'fee') {
-			hoursWrap.classList.add('pltt-hidden');
-			feeWrap.classList.remove('pltt-hidden');
-			hoursInput.disabled = true;
-			feeInput.disabled   = false;
-		} else {
-			hoursWrap.classList.remove('pltt-hidden');
-			feeWrap.classList.add('pltt-hidden');
-			hoursInput.disabled = false;
-			feeInput.disabled   = true;
-		}
-	}
 
 	// Notice params are stripped from the URL by PLTT.cleanNoticeParams() in shared.js.
 
@@ -580,7 +371,7 @@ if ( ! empty( $projects ) ) {
 			document.getElementById('pltt-project-status-group').classList.add('pltt-hidden');
 			document.getElementById('pltt-project-status').value = 'active';
 			document.getElementById('pltt-delete-project-btn').classList.remove('visible');
-			selectBillingType('hourly', true);
+			PlttProjectType.select('hourly', true);
 			PLTT.showModal('pltt-project-modal');
 		});
 	}
@@ -589,28 +380,8 @@ if ( ! empty( $projects ) ) {
 	// the source of truth (the rest of the modal JS reads/writes its .value);
 	// selecting a card updates that value, the cards' selected state, and the
 	// field UI in one place.
-	function selectBillingType(type, setDefaults) {
-		el('pltt-project-billing-type').value = type;
-		document.querySelectorAll('.pltt-typecard').forEach(function(card) {
-			var on = card.dataset.type === type;
-			card.classList.toggle('is-selected', on);
-			card.setAttribute('aria-checked', on ? 'true' : 'false');
-		});
-		applyBillingTypeUI(type, setDefaults);
-	}
 
-	document.querySelectorAll('.pltt-typecard').forEach(function(card) {
-		card.addEventListener('click', function() {
-			selectBillingType(this.dataset.type, true);
-		});
-	});
 
-	var budgetModeSelect = el('pltt-project-budget-mode');
-	if (budgetModeSelect) {
-		budgetModeSelect.addEventListener('change', function() {
-			applyBudgetModeUI(this.value);
-		});
-	}
 
 	// Edit Project links (row-actions).
 	document.querySelectorAll('.pltt-edit-project').forEach(function(link) {
@@ -629,7 +400,7 @@ if ( ! empty( $projects ) ) {
 			document.getElementById('pltt-project-budget-fee').value = row.dataset.budgetFee || '';
 			// Set the type (and its field UI) after the budget values are in place, so
 			// fixed-fee can infer hours-vs-fee mode from the populated inputs.
-			selectBillingType(row.dataset.billingType || 'hourly', false);
+			PlttProjectType.select(row.dataset.billingType || 'hourly', false);
 			document.getElementById('pltt-project-non-billable').checked = row.dataset.billabilityDefault === '0';
 
 			document.getElementById('pltt-project-status-group').classList.remove('pltt-hidden');

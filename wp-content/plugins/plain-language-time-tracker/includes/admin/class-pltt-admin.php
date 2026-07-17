@@ -22,7 +22,6 @@ class PLTT_Admin {
 		add_action( 'admin_menu', array( __CLASS__, 'add_admin_menu' ) );
 		add_action( 'admin_enqueue_scripts', array( __CLASS__, 'enqueue_assets' ) );
 		add_action( 'admin_init', array( __CLASS__, 'maybe_redirect_finalized_review' ) );
-		add_action( 'admin_init', array( __CLASS__, 'redirect_legacy_log_archive' ) );
 	}
 
 	/**
@@ -75,32 +74,6 @@ class PLTT_Admin {
 	}
 
 	/**
-	 * Redirect the retired Log History page to Today's History sub-view.
-	 *
-	 * Log History lost its own menu item; it now lives at
-	 * ?page=pltt-time-tracker&screen=history. Old bookmarks and any stray
-	 * ?page=pltt-log-archive links land here and are forwarded, preserving the
-	 * month range + pagination. Runs on admin_init (before output).
-	 */
-	public static function redirect_legacy_log_archive() {
-		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only routing.
-		$page = isset( $_GET['page'] ) ? sanitize_key( wp_unslash( $_GET['page'] ) ) : '';
-		if ( 'pltt-log-archive' !== $page ) {
-			return;
-		}
-		$args = array();
-		foreach ( array( 'from', 'to', 'paged' ) as $key ) {
-			// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only routing.
-			if ( isset( $_GET[ $key ] ) ) {
-				// phpcs:ignore WordPress.Security.NonceVerification.Recommended
-				$args[ $key ] = sanitize_text_field( wp_unslash( $_GET[ $key ] ) );
-			}
-		}
-		wp_safe_redirect( pltt_get_admin_url( 'history', $args ) );
-		exit;
-	}
-
-	/**
 	 * Register admin menu pages.
 	 */
 	public static function add_admin_menu() {
@@ -135,15 +108,23 @@ class PLTT_Admin {
 			array( __CLASS__, 'render_page' )
 		);
 
-		// (Log History is no longer its own menu item — it's the History sub-view of
-		// Today, reached via the Today · History toggle and rendered by render_page's
-		// 'history' screen. Old ?page=pltt-log-archive URLs redirect there.)
-
-		// Insights — reporting (slug kept as pltt-reports).
+		// History — the log archive / month browser, its own destination again
+		// (slug kept as pltt-log-archive). It sits right after Today because it's
+		// the "look back at past days" companion to the day view.
 		add_submenu_page(
 			'pltt-time-tracker',
-			__( 'Insights', 'plain-language-time-tracker' ),
-			__( 'Insights', 'plain-language-time-tracker' ),
+			__( 'History', 'plain-language-time-tracker' ),
+			__( 'History', 'plain-language-time-tracker' ),
+			'manage_options',
+			'pltt-log-archive',
+			array( __CLASS__, 'render_history_page' )
+		);
+
+		// Overview — reporting (slug kept as pltt-reports).
+		add_submenu_page(
+			'pltt-time-tracker',
+			__( 'Overview', 'plain-language-time-tracker' ),
+			__( 'Overview', 'plain-language-time-tracker' ),
 			'manage_options',
 			'pltt-reports',
 			array( __CLASS__, 'render_reports_page' )
@@ -215,15 +196,22 @@ class PLTT_Admin {
 			case 'review':
 				PLTT_Review::render();
 				break;
-			case 'history':
-				// History is now a sub-view of Today (the old Log History page),
-				// reached via the Today · History toggle rather than its own menu item.
-				PLTT_Log_Archive::render();
-				break;
 			default:
 				PLTT_Daily_Log::render();
 				break;
 		}
+	}
+
+	/**
+	 * Render the History page — the log archive / month browser.
+	 *
+	 * Its own menu destination (?page=pltt-log-archive) again, no longer a
+	 * sub-view of Today.
+	 */
+	public static function render_history_page() {
+		self::require_access();
+
+		PLTT_Log_Archive::render();
 	}
 
 	/**
@@ -300,6 +288,7 @@ class PLTT_Admin {
 		// Only load on our plugin pages.
 		$plugin_pages = array(
 			'toplevel_page_pltt-time-tracker',
+			'time-tracker_page_pltt-log-archive',
 			'time-tracker_page_pltt-reports',
 			'time-tracker_page_pltt-invoicing',
 			'time-tracker_page_pltt-clients',
@@ -348,31 +337,66 @@ class PLTT_Admin {
 					'confirm'    => __( 'Are you sure?', 'plain-language-time-tracker' ),
 					'processing' => __( 'Processing...', 'plain-language-time-tracker' ),
 				),
+				// Strings for the shared project billing-type picker
+				// (assets/js/project-type-picker.js), used by the Projects modal
+				// and the entry-editor "Add project" quick-add.
+				'projectType'      => array(
+					'rate'        => array(
+						'hourly'    => __( 'Leave blank to use client rate.', 'plain-language-time-tracker' ),
+						'fixed'     => __( 'Used to calculate implied effective rate. Leave blank to use client rate.', 'plain-language-time-tracker' ),
+						'recurring' => __( 'Used for overage billing. Leave blank to use client rate.', 'plain-language-time-tracker' ),
+						'none'      => __( 'Not applicable for internal projects.', 'plain-language-time-tracker' ),
+					),
+					'nonbillable' => array(
+						'hourly'    => __( 'Entries default to billable at this rate. Check the box to default new entries to non-billable instead.', 'plain-language-time-tracker' ),
+						'fixed'     => __( 'Entries default to non-billable — you decide when and what to bill against the budget.', 'plain-language-time-tracker' ),
+						'recurring' => __( 'Time within the allocation is non-billable, covered by the retainer. Hours over the plan are billed as overage.', 'plain-language-time-tracker' ),
+						'none'      => __( 'Internal work is never billed — it still shows in the Overview so you can see where your own time goes.', 'plain-language-time-tracker' ),
+					),
+					'fixedTitle'     => __( 'FIXED BUDGET SETTINGS', 'plain-language-time-tracker' ),
+					'hourBudget'     => __( 'Hour Budget', 'plain-language-time-tracker' ) . ' ',
+					'fixedDesc'      => __( 'Entries default to non-billable — you decide when and what to bill against the budget.', 'plain-language-time-tracker' ),
+					'recurringTitle' => __( 'RECURRING SETTINGS', 'plain-language-time-tracker' ),
+					'hourAllocation' => __( 'Hour Allocation', 'plain-language-time-tracker' ) . ' ',
+					'recurringDesc'  => __( 'Hours included per period. Time within the allocation is covered by the retainer; hours over the plan are billed as overage when you invoice.', 'plain-language-time-tracker' ),
+				),
 			)
 		);
 
 		// Page-specific assets.
+
+		// Shared project billing-type picker: the Projects-page modal and the
+		// entry-editor "Add project" quick-add (Today / review) both drive
+		// project-billing-fields.php with it. Strings come from plttData (pltt-shared).
+		if ( 'time-tracker_page_pltt-projects' === $hook || 'toplevel_page_pltt-time-tracker' === $hook ) {
+			wp_enqueue_script(
+				'pltt-project-type-picker',
+				PLTT_PLUGIN_URL . 'assets/js/project-type-picker.js',
+				array( 'pltt-shared' ),
+				$version,
+				true
+			);
+		}
+
+		// History — the log archive / month browser, its own page again.
+		if ( 'time-tracker_page_pltt-log-archive' === $hook ) {
+			wp_enqueue_style(
+				'pltt-log-archive',
+				PLTT_PLUGIN_URL . 'assets/css/log-archive.css',
+				array( 'pltt-admin' ),
+				$version
+			);
+			wp_enqueue_script(
+				'pltt-log-archive',
+				PLTT_PLUGIN_URL . 'assets/js/log-archive.js',
+				array( 'pltt-shared' ),
+				$version,
+				true
+			);
+		}
+
 		if ( 'toplevel_page_pltt-time-tracker' === $hook ) {
 			$screen = isset( $_GET['screen'] ) ? sanitize_text_field( wp_unslash( $_GET['screen'] ) ) : 'daily-log';
-
-			// History sub-view (the retired Log History page) — only needs its own
-			// month-navigator assets, nothing from the capture/review bundle.
-			if ( 'history' === $screen ) {
-				wp_enqueue_style(
-					'pltt-log-archive',
-					PLTT_PLUGIN_URL . 'assets/css/log-archive.css',
-					array( 'pltt-admin' ),
-					$version
-				);
-				wp_enqueue_script(
-					'pltt-log-archive',
-					PLTT_PLUGIN_URL . 'assets/js/log-archive.js',
-					array( 'pltt-shared' ),
-					$version,
-					true
-				);
-				return;
-			}
 
 			// Inline entry-editor bundle — shared by the review screen and the
 			// Daily Log (Today) inline editor. review.js IIFE 2 binds it wherever

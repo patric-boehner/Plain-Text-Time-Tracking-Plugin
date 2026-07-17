@@ -48,6 +48,7 @@ $reports_base = admin_url( 'admin.php' );
 			· <?php echo (int) count( $queue['clients'] ); ?> <?php esc_html_e( 'clients', 'plain-language-time-tracker' ); ?>
 		</p>
 
+		<?php $seen_proj = array(); // First card per project gets an anchor id (a project can have several period cards). ?>
 		<?php foreach ( $queue['clients'] as $group ) : ?>
 			<?php $client_name = $group['client'] ? $group['client']->name : __( '(Unknown client)', 'plain-language-time-tracker' ); ?>
 			<section class="pltt-bill-clientgroup">
@@ -70,6 +71,14 @@ $reports_base = admin_url( 'admin.php' );
 						$v          = pltt_build_billing_scope_view( $scope, $client_name );
 						$proj       = $scope['project'];
 						$is_hourly  = ( 'hourly' === $scope['billing_type'] );
+
+						// Anchor target for the Insights backlog notice — only the first
+						// card of each project (ids must be unique).
+						$card_id = '';
+						if ( ! isset( $seen_proj[ (int) $proj->id ] ) ) {
+							$seen_proj[ (int) $proj->id ] = true;
+							$card_id                      = 'pltt-bill-proj-' . (int) $proj->id;
+						}
 
 						// Open the detailed view on the range this scope bills, so all the
 						// billable work is in view: retainer = its period; hourly/fixed =
@@ -112,14 +121,13 @@ $reports_base = admin_url( 'admin.php' );
 							$basis = $v['derivation'];
 						}
 						?>
-						<div class="pltt-bill-card">
+						<div class="pltt-bill-card"<?php echo $card_id ? ' id="' . esc_attr( $card_id ) . '"' : ''; ?>>
 							<div class="pltt-bill-card-head">
 								<span class="pltt-bill-card-proj"><?php echo esc_html( $proj->name ); ?></span>
 								<span class="pltt-badge <?php echo esc_attr( pltt_billing_type_badge_class( $scope['billing_type'] ) ); ?>"><?php echo esc_html( $v['type_label'] ); ?></span>
 							</div>
 							<?php if ( ! empty( $v['date_range'] ) ) : ?>
 								<div class="pltt-bill-card-range">
-									<span class="dashicons dashicons-calendar-alt" aria-hidden="true"></span>
 									<?php echo esc_html( $v['date_range'] ); ?>
 								</div>
 							<?php endif; ?>
@@ -148,7 +156,8 @@ $reports_base = admin_url( 'admin.php' );
 			<thead>
 				<tr>
 					<th><?php esc_html_e( 'Billed on', 'plain-language-time-tracker' ); ?></th>
-					<th><?php esc_html_e( 'Client · Project', 'plain-language-time-tracker' ); ?></th>
+					<th><?php esc_html_e( 'Client', 'plain-language-time-tracker' ); ?></th>
+					<th><?php esc_html_e( 'Project', 'plain-language-time-tracker' ); ?></th>
 					<th class="pltt-amount-col"><?php esc_html_e( 'Hours', 'plain-language-time-tracker' ); ?></th>
 					<th class="pltt-amount-col"><?php esc_html_e( 'Amount', 'plain-language-time-tracker' ); ?></th>
 					<th class="pltt-bill-records-action"></th>
@@ -157,16 +166,20 @@ $reports_base = admin_url( 'admin.php' );
 			<tbody>
 				<?php foreach ( $log['rows'] as $row ) : ?>
 					<?php
-					$rec   = $row['record'];
-					$label = '' !== $row['client_name']
-						? $row['client_name'] . ' · ' . $row['project_name']
-						: $row['project_name'];
+					$rec       = $row['record'];
 					$dialog_id = 'pltt-recordcopy-' . (int) $rec->id;
 					?>
 					<tr>
 						<td class="pltt-time-cell"><?php echo esc_html( date_i18n( 'M j, Y', strtotime( $rec->marked_at ) ) ); ?></td>
 						<td>
-							<?php echo esc_html( $label ); ?>
+							<?php
+							echo '' !== $row['client_name']
+								? esc_html( $row['client_name'] )
+								: '<span class="pltt-empty">&mdash;</span>';
+							?>
+						</td>
+						<td>
+							<?php echo esc_html( $row['project_name'] ); ?>
 							<?php if ( (float) $rec->absorbed_amount > 0 ) : ?>
 								<span class="pltt-bill-absorbed">
 									<?php

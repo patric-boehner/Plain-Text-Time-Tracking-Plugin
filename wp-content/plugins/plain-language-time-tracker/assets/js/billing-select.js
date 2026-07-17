@@ -18,6 +18,10 @@
 		return;
 	}
 
+	// Recurring "confirm the number" mode: the bar is always visible, there's no
+	// per-entry selection, and the commit bills the period overage as a whole.
+	const isConfirm = bar.hasAttribute( 'data-confirm' );
+
 	function formatCurrency( n ) {
 		return '$' + Number( n ).toLocaleString( 'en-US', {
 			minimumFractionDigits: 2,
@@ -37,6 +41,10 @@
 
 	// Reflect the current selection into the bar (count + total, visibility).
 	function refreshBar() {
+		if ( isConfirm ) {
+			bar.hidden = false;
+			return;
+		}
 		const boxes = selected();
 		const total = selectionTotal( boxes );
 		bar.hidden = boxes.length === 0;
@@ -46,6 +54,10 @@
 
 	// Sync the modal to the current selection when it opens.
 	function syncDialog() {
+		if ( isConfirm ) {
+			refreshSubmitLabel();
+			return;
+		}
 		const boxes = selected();
 		const total = selectionTotal( boxes );
 		dialog.querySelectorAll( '.pltt-billsel-count' ).forEach( function ( el ) { el.textContent = String( boxes.length ); } );
@@ -79,7 +91,7 @@
 		if ( ! e.target.closest( '[data-open-billsel]' ) ) {
 			return;
 		}
-		if ( ! selected().length ) {
+		if ( ! isConfirm && ! selected().length ) {
 			return;
 		}
 		syncDialog();
@@ -128,8 +140,8 @@
 			errorEl.textContent = '';
 		}
 
-		const included = selected().map( function ( c ) { return c.dataset.entryId; } ).join( ',' );
-		if ( ! included ) {
+		const included = isConfirm ? '' : selected().map( function ( c ) { return c.dataset.entryId; } ).join( ',' );
+		if ( ! isConfirm && ! included ) {
 			return;
 		}
 

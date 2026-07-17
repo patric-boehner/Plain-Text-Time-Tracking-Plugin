@@ -379,6 +379,16 @@ function pltt_get_internal_client_id() {
  * @return string Admin page URL.
  */
 function pltt_get_admin_url( $screen = 'daily-log', $args = array() ) {
+	// History is its own top-level page (slug pltt-log-archive), not a screen of
+	// the Today page — resolve it there so the archive's month-nav/pagination and
+	// any "History" links point at the real page.
+	if ( 'history' === $screen ) {
+		return add_query_arg(
+			array_merge( array( 'page' => 'pltt-log-archive' ), $args ),
+			admin_url( 'admin.php' )
+		);
+	}
+
 	$base_args = array( 'page' => 'pltt-time-tracker' );
 
 	if ( 'daily-log' !== $screen ) {

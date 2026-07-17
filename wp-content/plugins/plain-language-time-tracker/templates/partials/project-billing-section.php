@@ -9,12 +9,16 @@
  * row + the docked "Bill selected" bar take over (see billing-select-bar.php).
  * This card is the entry point; it doesn't commit anything itself.
  *
- * Outstanding scopes are driven by the billing MODEL, not the current date
- * filter: hourly = all-time uncovered, retainer = each open overage period.
+ * Retainer overage is period-based, so it respects the report's date filter: only
+ * periods intersecting the range show as cards; earlier unbilled periods roll into
+ * one "backlog" alert that points to the Billing page. Hourly/fixed are NOT
+ * period-scoped (a running tab of uncovered work), so they always show regardless
+ * of the filter — that's how you bill them (and keeps the select row + bar alive).
  *
  * Expects in scope (set by project-context-card.php / PLTT_Reports::render):
- *   $project        — the single project object.
- *   $context_client — owning client object (may be empty).
+ *   $project             — the single project object.
+ *   $context_client      — owning client object (may be empty).
+ *   $date_from, $date_to — the report's current filter range.
  *
  * @package PlainLanguageTimeTracker
  */
@@ -27,15 +31,35 @@ if ( empty( $project ) ) {
 	return;
 }
 
-// WITH entries: we need each scope's entries to compute its date span.
-$ready_scopes = ( 'active' === ( $project->status ?? '' ) )
-	? PLTT_Billing::get_ready_to_invoice( $project, true )
-	: array();
+$is_active = ( 'active' === ( $project->status ?? '' ) );
+
+// Retainer overage is period-based → respect the report's date filter: show only
+// periods intersecting the range; roll earlier unbilled periods into a backlog
+// alert. Hourly/fixed are a running tab of uncovered work (not period-scoped), so
+// they always show — otherwise a month filter would hide older unbilled entries
+// and kill the hourly select row + "Bill selected" bar.
+$range_from     = isset( $date_from ) ? $date_from : null;
+$range_to       = isset( $date_to ) ? $date_to : null;
+$ready_scopes   = array();
+$backlog_amount = 0.0;
+if ( $is_active ) {
+	foreach ( PLTT_Billing::get_ready_to_invoice( $project, true ) as $s ) {
+		if ( 'retainer_overage' === $s['billing_type'] && $range_from && $range_to
+			&& ! ( (string) $s['period_start'] <= $range_to && (string) $s['period_end'] >= $range_from ) ) {
+			// Retainer period entirely outside the filter range → backlog.
+			$backlog_amount += (float) $s['unbilled'];
+		} else {
+			$ready_scopes[] = $s;
+		}
+	}
+}
+$backlog_amount = round( $backlog_amount, 2 );
+$has_backlog    = ( $backlog_amount > 0.005 );
 
 $billing_history = PLTT_Billing::get_for_project_history( (int) $project->id );
 
-// No outstanding work and no record of past billing — render no footprint.
-if ( empty( $ready_scopes ) && empty( $billing_history ) ) {
+// Nothing in range, no backlog, no past billing — render no footprint.
+if ( empty( $ready_scopes ) && ! $has_backlog && empty( $billing_history ) ) {
 	return;
 }
 
@@ -99,7 +123,6 @@ $detail_base = add_query_arg(
 				</div>
 				<?php if ( ! empty( $v['date_range'] ) ) : ?>
 					<div class="pltt-bill-card-range">
-						<span class="dashicons dashicons-calendar-alt" aria-hidden="true"></span>
 						<?php echo esc_html( $v['date_range'] ); ?>
 					</div>
 				<?php endif; ?>
@@ -117,7 +140,7 @@ $detail_base = add_query_arg(
 					<?php endif; ?>
 			</div>
 		<?php endforeach; ?>
-	<?php elseif ( ! empty( $billed_period ) ) : ?>
+	<?php elseif ( ! $has_backlog && ! empty( $billed_period ) ) : ?>
 		<?php // Settled: the shown retainer period has a committed record (set by project-context-card.php). ?>
 		<p class="pltt-pcc-bill-billed">
 			<span class="dashicons dashicons-yes" aria-hidden="true"></span>
@@ -130,10 +153,27 @@ $detail_base = add_query_arg(
 			);
 			?>
 		</p>
-	<?php elseif ( ! empty( $billing_history ) ) : ?>
+	<?php elseif ( ! $has_backlog && ! empty( $billing_history ) ) : ?>
 		<p class="pltt-pcc-billing-caughtup">
 			<span class="dashicons dashicons-yes" aria-hidden="true"></span>
 			<?php esc_html_e( 'Nothing to bill right now.', 'plain-language-time-tracker' ); ?>
+		</p>
+	<?php endif; ?>
+
+	<?php if ( $has_backlog ) : ?>
+		<?php // Outstanding work outside the current range — one line, not a stack of old period cards. ?>
+		<p class="pltt-pcc-billing-backlog">
+			<span class="dashicons dashicons-info-outline" aria-hidden="true"></span>
+			<span>
+				<?php
+				printf(
+					/* translators: %s: backlog amount, e.g. "$2,400". */
+					esc_html__( '%s in earlier unbilled work sits outside this range.', 'plain-language-time-tracker' ),
+					esc_html( pltt_format_currency( $backlog_amount ) )
+				);
+				?>
+				<a href="<?php echo esc_url( admin_url( 'admin.php?page=pltt-invoicing' ) . '#pltt-bill-proj-' . (int) $project->id ); ?>"><?php esc_html_e( 'Review in Billing', 'plain-language-time-tracker' ); ?></a>
+			</span>
 		</p>
 	<?php endif; ?>
 

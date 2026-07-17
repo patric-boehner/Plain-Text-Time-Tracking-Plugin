@@ -139,7 +139,7 @@ $tab_base_url = add_query_arg( $filter_params, admin_url( 'admin.php' ) );
 
 <div class="wrap pltt-wrap">
 	<div class="pltt-header">
-		<h1><?php esc_html_e( 'Time Entries', 'plain-language-time-tracker' ); ?></h1>
+		<h1><?php echo esc_html( 'summary' === $view ? __( 'Summary', 'plain-language-time-tracker' ) : __( 'Entries', 'plain-language-time-tracker' ) ); ?></h1>
 		<div class="pltt-view-toggle">
 			<a href="<?php echo esc_url( add_query_arg( 'view', 'summary', $tab_base_url ) ); ?>"
 				class="button <?php echo 'summary' === $view ? 'button-primary' : ''; ?>">
@@ -147,7 +147,7 @@ $tab_base_url = add_query_arg( $filter_params, admin_url( 'admin.php' ) );
 			</a>
 			<a href="<?php echo esc_url( add_query_arg( 'view', 'detailed', $tab_base_url ) ); ?>"
 				class="button <?php echo 'detailed' === $view ? 'button-primary' : ''; ?>">
-				<?php esc_html_e( 'Detailed', 'plain-language-time-tracker' ); ?>
+				<?php esc_html_e( 'Entries', 'plain-language-time-tracker' ); ?>
 			</a>
 		</div>
 	</div>
@@ -406,27 +406,7 @@ $tab_base_url = add_query_arg( $filter_params, admin_url( 'admin.php' ) );
 
 			<?php if ( $total_entries > 0 ) : ?>
 
-			<?php if ( ! $is_single_project_view ) : ?>
-			<!-- Card 1: Top Projects for the period -->
-			<div class="card pltt-top-projects-card">
-				<div class="card-label"><?php esc_html_e( 'Top Projects', 'plain-language-time-tracker' ); ?></div>
-				<?php if ( ! empty( $top_projects ) ) : ?>
-					<ol class="pltt-top-projects-list">
-						<?php foreach ( $top_projects as $tp ) : ?>
-							<li class="pltt-top-project">
-								<span class="pltt-top-project-name" title="<?php echo esc_attr( $tp->project_name ); ?>"><?php echo esc_html( $tp->project_name ); ?></span>
-								<span class="pltt-top-project-stats"><?php echo esc_html( pltt_format_duration( (int) $tp->total_minutes ) ); ?></span>
-							</li>
-						<?php endforeach; ?>
-					</ol>
-				<?php else : ?>
-					<div class="card-value pltt-card-value-empty">&mdash;</div>
-					<div class="card-secondary"><?php esc_html_e( 'No client work tracked', 'plain-language-time-tracker' ); ?></div>
-				<?php endif; ?>
-			</div>
-			<?php endif; ?>
-
-			<!-- Card 2: Total Hours -->
+			<!-- Card: Total Hours -->
 			<div class="card">
 				<div class="card-label"><?php esc_html_e( 'Total Hours', 'plain-language-time-tracker' ); ?></div>
 				<div class="card-value" <?php echo pltt_decimal_hint_attrs( (int) $stats->total_minutes ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>><?php echo esc_html( pltt_format_duration( (int) $stats->total_minutes ) ); ?></div>
@@ -534,6 +514,17 @@ $tab_base_url = add_query_arg( $filter_params, admin_url( 'admin.php' ) );
 				</div>
 			</div>
 
+			<!-- Card 5: Unbilled so far — all-time outstanding, links out to Billing -->
+			<?php if ( 'summary' === $view && $outstanding_total > 0 ) : ?>
+			<div class="card pltt-unbilled-card">
+				<div class="card-label"><?php esc_html_e( 'Unbilled so far', 'plain-language-time-tracker' ); ?></div>
+				<div class="card-value pltt-unbilled-card-value"><?php echo esc_html( pltt_format_currency( $outstanding_total ) ); ?></div>
+				<div class="card-secondary">
+					<a href="<?php echo esc_url( admin_url( 'admin.php?page=pltt-invoicing' ) ); ?>"><?php esc_html_e( 'Go to Billing', 'plain-language-time-tracker' ); ?> &rsaquo;</a>
+				</div>
+			</div>
+			<?php endif; ?>
+
 							<?php endif; /* total_entries > 0 */ ?>
 
 			<?php if ( $is_single_project_view && ! empty( $context_projects ) ) : ?>
@@ -564,64 +555,6 @@ $tab_base_url = add_query_arg( $filter_params, admin_url( 'admin.php' ) );
 	<div id="pltt-report-content" class="pltt-report-content">
 
 		<?php if ( 'summary' === $view ) : ?>
-
-			<?php
-			// Global "billable time outside your date range" notification, under the
-			// chart and above the summary table. One aggregate signal across all
-			// non-archived, non-fixed-fee projects.
-			if ( $unbilled_notice ) :
-				// Expand to cover all stranded time; keep current edges if already wider.
-				$un_from = min( $date_from, $unbilled_notice->earliest );
-				$un_to   = max( $date_to, $unbilled_notice->latest );
-				// Action lands on the actionable view: expanded range + Billable=yes,
-				// preserving the current client/project/tag filters. (No billed=0 —
-				// the per-entry flag is no longer the source of truth.)
-				$un_args = array(
-					'page'     => 'pltt-reports',
-					'view'     => 'summary',
-					'from'     => $un_from,
-					'to'       => $un_to,
-					'billable' => 1,
-				);
-				foreach ( array( 'client_id', 'project_id', 'tag', 'client_negate', 'project_negate', 'tag_negate' ) as $carry ) {
-					if ( ! empty( $$carry ) ) {
-						$un_args[ $carry ] = $$carry;
-					}
-				}
-				$un_url = add_query_arg( $un_args, admin_url( 'admin.php' ) );
-				?>
-				<div class="pltt-unbilled-notice" data-pltt-unbilled-notice>
-					<span class="pltt-unbilled-notice-icon" aria-hidden="true">!</span>
-					<p class="pltt-unbilled-notice-body">
-						<?php
-						$un_count_phrase = sprintf( _n( '%s entry', '%s entries', (int) $unbilled_notice->entry_count, 'plain-language-time-tracker' ), number_format_i18n( (int) $unbilled_notice->entry_count ) );
-						$un_amount       = isset( $unbilled_notice->total_amount ) ? (float) $unbilled_notice->total_amount : 0;
-						if ( $un_amount > 0 ) {
-							printf(
-								/* translators: 1: entry count phrase, e.g. "4 entries"; 2: total duration, e.g. "3h 15m"; 3: approximate dollar value, e.g. "$795.00". */
-								esc_html__( 'There\'s billable time outside your current date range — %1$s totaling %2$s (≈ %3$s not yet invoiced)', 'plain-language-time-tracker' ),
-								esc_html( $un_count_phrase ),
-								esc_html( pltt_format_duration( (int) $unbilled_notice->total_minutes ) ),
-								esc_html( pltt_format_currency( $un_amount ) )
-							);
-						} else {
-							printf(
-								/* translators: 1: entry count phrase, e.g. "4 entries"; 2: total duration, e.g. "3h 15m". */
-								esc_html__( 'There\'s billable time outside your current date range — %1$s totaling %2$s', 'plain-language-time-tracker' ),
-								esc_html( $un_count_phrase ),
-								esc_html( pltt_format_duration( (int) $unbilled_notice->total_minutes ) )
-							);
-						}
-						?>
-					</p>
-					<a href="<?php echo esc_url( $un_url ); ?>" class="pltt-unbilled-notice-action">
-						<?php esc_html_e( 'Expand range to show all unbilled', 'plain-language-time-tracker' ); ?>
-					</a>
-					<button type="button" class="pltt-unbilled-notice-dismiss" aria-label="<?php esc_attr_e( 'Dismiss this notice', 'plain-language-time-tracker' ); ?>">
-						<span aria-hidden="true">&times;</span>
-					</button>
-				</div>
-			<?php endif; ?>
 
 			<?php if ( ! empty( $summary ) ) : ?>
 				<table class="widefat pltt-summary-table">
@@ -791,9 +724,14 @@ $tab_base_url = add_query_arg( $filter_params, admin_url( 'admin.php' ) );
 				// computed number, no per-entry selection).
 				// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only mode flag.
 				$billing_mode       = ! empty( $_GET['bill'] );
-				$bill_select_active = ( $billing_mode && $is_single_project_view && ! empty( $context_projects[0] )
-					&& 'active' === ( $context_projects[0]->status ?? '' )
-					&& 'hourly' === pltt_get_billing_type( $context_projects[0] ) );
+				$bill_project       = ! empty( $context_projects[0] ) ? $context_projects[0] : null;
+				$bill_active_single = ( $billing_mode && $is_single_project_view && $bill_project
+					&& 'active' === ( $bill_project->status ?? '' ) );
+				$bill_project_type  = $bill_project ? pltt_get_billing_type( $bill_project ) : '';
+				// Hourly bills per selected entry (select row + bar). Recurring bills the
+				// period overage as a whole — a confirm-the-number bar, no per-entry row.
+				$bill_select_active  = ( $bill_active_single && 'hourly' === $bill_project_type );
+				$bill_confirm_active = ( $bill_active_single && 'recurring' === $bill_project_type );
 				?>
 
 
@@ -878,10 +816,10 @@ $tab_base_url = add_query_arg( $filter_params, admin_url( 'admin.php' ) );
 				$base_url = add_query_arg( 'view', $view, $tab_base_url );
 				pltt_render_pagination( $paged, $total_pages, $total_entries, $base_url, 'entry', 'entries' );
 
-				// Docked "Bill selected" bar + Record-bill modal (hourly single
-				// project). The select row lives on the entries above; this tallies
-				// the selection and commits it.
-				if ( $bill_select_active ) {
+				// Docked bill bar + Record-bill modal (single project). Hourly tallies
+				// the select row above; recurring confirms the period overage as a
+				// whole. billing-select-bar.php picks its mode from the project type.
+				if ( $bill_select_active || $bill_confirm_active ) {
 					$project = $context_projects[0];
 					include PLTT_PLUGIN_DIR . 'templates/partials/billing-select-bar.php';
 				}
