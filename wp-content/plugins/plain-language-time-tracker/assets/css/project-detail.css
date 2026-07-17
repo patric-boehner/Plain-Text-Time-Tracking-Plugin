@@ -488,3 +488,116 @@
 	}
 }
 
+/* ==========================================================================
+   Type-aware report hero — headline gauge/figure above the stat cards.
+   ========================================================================== */
+.pltt-report-hero {
+	display: grid;
+	grid-template-columns: 1.3fr 1fr;
+	border: 1px solid var(--pltt-border-light, #dcdcde);
+	border-radius: 4px;
+	overflow: hidden;
+	background: #fff;
+	margin-bottom: 16px;
+}
+.pltt-hero-left {
+	padding: 20px 22px;
+	min-width: 0;
+}
+.pltt-hero-right {
+	padding: 16px 22px;
+	border-left: 1px solid var(--pltt-border-light, #dcdcde);
+	background: var(--pltt-bg-subtle, #fbfbfc);
+	display: flex;
+	flex-direction: column;
+	justify-content: center;
+	gap: 2px;
+}
+
+.pltt-hero-tag {
+	font-size: 11px;
+	text-transform: uppercase;
+	letter-spacing: 0.05em;
+	color: var(--pltt-text-muted, #646970);
+}
+.pltt-hero-period {
+	text-transform: none;
+	letter-spacing: 0;
+	font-weight: 600;
+	color: var(--pltt-text-dark, #1d2327);
+}
+
+.pltt-hero-figure {
+	font-size: 32px;
+	font-weight: 600;
+	margin: 6px 0 4px;
+	font-variant-numeric: tabular-nums;
+	color: var(--pltt-text-dark, #1d2327);
+}
+.pltt-hero-figure small {
+	font-size: 16px;
+	font-weight: 400;
+	color: var(--pltt-text-muted, #646970);
+}
+
+.pltt-hero-note {
+	color: var(--pltt-text-muted, #646970);
+	font-size: 13px;
+}
+
+/* Gauge track — two proportional segments (within-limit + overage), mirroring
+   the Reports allocation bar so the overage magnitude is visible. */
+.pltt-hero-track {
+	display: flex;
+	height: 16px;
+	background: #eceded;
+	border-radius: 9px;
+	overflow: hidden;
+	margin: 14px 0 6px;
+}
+.pltt-hero-track i {
+	display: block;
+	height: 100%;
+}
+/* Within-limit fill = admin blue; overage = the light-blue overage color the
+   allocation bar uses (never red — overage is billable, not a failure). */
+.pltt-hero-seg-within { background: var(--pltt-primary, #2271b1); }
+.pltt-hero-seg-over   { background: var(--pltt-primary-light, #72aee6); }
+
+.pltt-hero-trackcap {
+	display: flex;
+	justify-content: space-between;
+	gap: 12px;
+	font-size: 12px;
+	color: var(--pltt-text-muted, #646970);
+	font-variant-numeric: tabular-nums;
+}
+.pltt-hero-trackcap b { color: var(--pltt-text-dark, #1d2327); }
+.pltt-hero-cap { white-space: nowrap; }
+.pltt-gauge-cap-warn { color: var(--pltt-warning-text, #b45309); }
+.pltt-gauge-cap-over { color: var(--pltt-primary, #2271b1); font-weight: 600; }
+
+/* Right-column mini-rows */
+.pltt-hero-row {
+	display: flex;
+	justify-content: space-between;
+	gap: 12px;
+	padding: 6px 0;
+	border-bottom: 1px dashed var(--pltt-border-light, #dcdcde);
+	font-size: 13px;
+}
+.pltt-hero-row:last-child { border-bottom: 0; }
+.pltt-hero-row-lbl { color: var(--pltt-text-muted, #646970); }
+.pltt-hero-row b { font-variant-numeric: tabular-nums; }
+.pltt-hero-row-accent { color: var(--pltt-primary, #2271b1); }
+
+@media (max-width: 782px) {
+	.pltt-report-hero {
+		grid-template-columns: 1fr;
+	}
+	.pltt-hero-right {
+		border-left: 0;
+		border-top: 1px solid var(--pltt-border-light, #dcdcde);
+	}
+}
+

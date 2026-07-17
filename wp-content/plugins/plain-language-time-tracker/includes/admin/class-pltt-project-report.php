@@ -128,7 +128,8 @@ class PLTT_Project_Report {
 
 		return array(
 			'has_entries'        => ( isset( $stats->total_minutes ) ? (int) $stats->total_minutes : 0 ) > 0,
-			'cards'              => self::build_cards( $project, $card_stats, $rate, $window ),
+			'hero'               => self::build_hero( $project, $stats, $rate, $project_id, $window ),
+			'cards'              => self::build_cards( $project, $card_stats, $rate, $window, $stats ),
 			'groupings'          => $bar_groupings,        // windowed — "Where the time went".
 			'timeline_groupings' => $timeline_groupings,   // lifetime — swimlane.
 			'default_group'      => self::pick_default_group( $timeline_groupings ),
@@ -167,13 +168,13 @@ class PLTT_Project_Report {
 	 * @param array|null  $window  Active period window (recurring period lens).
 	 * @return array
 	 */
-	private static function build_cards( $project, $stats, $rate, $window = null ) {
+	private static function build_cards( $project, $stats, $rate, $window = null, $lifetime = null ) {
 		switch ( pltt_get_billing_type( $project ) ) {
 			case 'fixed':
 				$items = self::cards_fixed( $project, $stats, $rate );
 				break;
 			case 'recurring':
-				$items = self::cards_recurring( $project, $stats, $rate, $window );
+				$items = self::cards_recurring( $project, $stats, $rate, $window, $lifetime );
 				break;
 			case 'none':
 				$items = self::cards_internal( $project, $stats );
@@ -320,80 +321,106 @@ class PLTT_Project_Report {
 	}
 
 	/**
-	 * Retainer lineup: total hours, months active, average per month vs allocation, monthly fee.
+	 * Retainer lineup, tailored to the active scope.
 	 *
-	 * @param object      $project Project row.
-	 * @param object|null $stats   Aggregate stats.
-	 * @param float       $rate    Resolved hourly rate.
+	 * Period view (the default): This period vs allocation · Overage billable ·
+	 * Avg / month (lifetime) · Lifetime hours. Full view: Total hours · Avg / month
+	 * vs allocation · Months active · Allocation. Never a blank "Monthly fee" card —
+	 * these retainers price by allocation, not a stored fee.
+	 *
+	 * @param object      $project  Project row.
+	 * @param object|null $stats    Scope stats (period stats in period view; lifetime in full).
+	 * @param float       $rate     Resolved hourly rate.
+	 * @param array|null  $window   Active period lens window.
+	 * @param object|null $lifetime Lifetime stats (for the avg/lifetime context cards).
 	 * @return array[]
 	 */
-	private static function cards_recurring( $project, $stats, $rate, $window = null ) {
-		$total_minutes = isset( $stats->total_minutes ) ? (int) $stats->total_minutes : 0;
+	private static function cards_recurring( $project, $stats, $rate, $window = null, $lifetime = null ) {
 		$alloc_minutes = (int) round( self::num( $project->budget_hours ) * 60 );
-		$fee           = self::num( $project->budget_fee );
+		$life          = ( null !== $lifetime ) ? $lifetime : $stats;
+		$life_minutes  = isset( $life->total_minutes ) ? (int) $life->total_minutes : 0;
+		$months        = self::months_between( $life->first_entry_date ?? '', $life->last_entry_date ?? '' );
+		$avg_minutes   = $months > 0 ? (int) round( $life_minutes / $months ) : $life_minutes;
 
-		// Period view: a single billing period, so an "average per month" and a
-		// "months active" count are meaningless. Show the period's hours against
-		// the allocation directly, and drop the months card.
-		if ( ! empty( $window['is_period'] ) ) {
-			$used = self::card( __( 'Hours', 'plain-language-time-tracker' ), pltt_format_duration( $total_minutes ) );
+		// Avg / month vs allocation (shared by both views).
+		$avg = self::card( __( 'Avg / month', 'plain-language-time-tracker' ), pltt_format_duration( $avg_minutes ) );
+		if ( $alloc_minutes > 0 ) {
+			$avg_pct             = (int) round( $avg_minutes / $alloc_minutes * 100 );
+			/* translators: %s: hour allocation per period. */
+			$avg['value_suffix'] = sprintf( __( 'of %s', 'plain-language-time-tracker' ), pltt_format_duration( $alloc_minutes ) );
+			/* translators: %d: percent of allocation used. */
+			$avg['sub']          = sprintf( __( '%d%% of allocation', 'plain-language-time-tracker' ), $avg_pct );
+			$avg['attention']    = $avg_pct > 100;
+		}
+
+		// ── Period view: the selected/most-recent period against its allocation ──
+		if ( $window && ! empty( $window['is_period'] ) ) {
+			$used_minutes = isset( $stats->total_minutes ) ? (int) $stats->total_minutes : 0;
+			$over_minutes = $alloc_minutes > 0 ? max( 0, $used_minutes - $alloc_minutes ) : 0;
+			$overage      = round( ( $over_minutes / 60.0 ) * $rate, 2 );
+
+			$used = self::card( __( 'This period', 'plain-language-time-tracker' ), pltt_format_duration( $used_minutes ) );
 			if ( $alloc_minutes > 0 ) {
-				$pct = (int) round( $total_minutes / $alloc_minutes * 100 );
-				/* translators: %s: monthly hour allocation. */
+				$pct = (int) round( $used_minutes / $alloc_minutes * 100 );
+				/* translators: %s: hour allocation per period. */
 				$used['value_suffix'] = sprintf( __( 'of %s', 'plain-language-time-tracker' ), pltt_format_duration( $alloc_minutes ) );
 				/* translators: %d: percent of the period's allocation used. */
 				$used['sub']          = sprintf( __( '%d%% of allocation', 'plain-language-time-tracker' ), $pct );
 				$used['attention']    = $pct > 100;
 			}
 
-			return array(
-				$used,
-				self::card(
-					__( 'Monthly fee', 'plain-language-time-tracker' ),
-					$fee > 0 ? pltt_format_currency_compact( $fee ) : '',
-					array(
-						'sub' => $alloc_minutes > 0
-							/* translators: %s: monthly hour allocation. */
-							? sprintf( __( '%s/mo', 'plain-language-time-tracker' ), pltt_format_duration( $alloc_minutes ) )
-							: '',
-					)
-				),
-			);
-		}
-
-		$months        = self::months_between( $stats->first_entry_date ?? '', $stats->last_entry_date ?? '' );
-		$avg_minutes   = $months > 0 ? (int) round( $total_minutes / $months ) : $total_minutes;
-
-		$avg = self::card( __( 'Avg / month', 'plain-language-time-tracker' ), pltt_format_duration( $avg_minutes ) );
-		if ( $alloc_minutes > 0 ) {
-			$pct                = (int) round( $avg_minutes / $alloc_minutes * 100 );
-			/* translators: %s: monthly hour allocation. */
-			$avg['value_suffix'] = sprintf( __( 'of %s', 'plain-language-time-tracker' ), pltt_format_duration( $alloc_minutes ) );
-			/* translators: %d: percent of monthly allocation used. */
-			$avg['sub']          = sprintf( __( '%d%% of allocation', 'plain-language-time-tracker' ), $pct );
-			$avg['attention']    = $pct > 100;
-		}
-
-		return array(
-			self::card( __( 'Total hours', 'plain-language-time-tracker' ), pltt_format_duration( $total_minutes ) ),
-			self::card(
-				__( 'Months active', 'plain-language-time-tracker' ),
-				$months > 0
-					/* translators: %d: number of months. */
-					? sprintf( _n( '%d month', '%d months', $months, 'plain-language-time-tracker' ), $months )
-					: ''
-			),
-			$avg,
-			self::card(
-				__( 'Monthly fee', 'plain-language-time-tracker' ),
-				$fee > 0 ? pltt_format_currency_compact( $fee ) : '',
+			$overage_card = self::card(
+				__( 'Overage billable', 'plain-language-time-tracker' ),
+				pltt_format_currency_compact( $overage ),
 				array(
-					'sub' => $alloc_minutes > 0
-						/* translators: %s: monthly hour allocation. */
-						? sprintf( __( '%s/mo', 'plain-language-time-tracker' ), pltt_format_duration( $alloc_minutes ) )
+					'sub'       => $over_minutes > 0
+						/* translators: %s: hours over allocation. */
+						? sprintf( __( '%s over allocation', 'plain-language-time-tracker' ), pltt_format_duration( $over_minutes ) )
+						: __( 'within allocation', 'plain-language-time-tracker' ),
+					'attention' => $over_minutes > 0,
+				)
+			);
+
+			$lifetime_card = self::card(
+				__( 'Lifetime', 'plain-language-time-tracker' ),
+				pltt_format_duration( $life_minutes ),
+				array(
+					'sub' => $months > 0
+						/* translators: %d: number of months active. */
+						? sprintf( _n( 'over %d month', 'over %d months', $months, 'plain-language-time-tracker' ), $months )
 						: '',
 				)
-			),
+			);
+
+			return array( $used, $overage_card, $avg, $lifetime_card );
+		}
+
+		// ── Full (lifetime) view ──
+		$months_card = self::card(
+			__( 'Months active', 'plain-language-time-tracker' ),
+			$months > 0
+				/* translators: %d: number of months. */
+				? sprintf( _n( '%d month', '%d months', $months, 'plain-language-time-tracker' ), $months )
+				: ''
+		);
+
+		$period_word = array(
+			'weekly'    => __( 'per week', 'plain-language-time-tracker' ),
+			'monthly'   => __( 'per month', 'plain-language-time-tracker' ),
+			'quarterly' => __( 'per quarter', 'plain-language-time-tracker' ),
+			'yearly'    => __( 'per year', 'plain-language-time-tracker' ),
+		);
+		$alloc_card = self::card(
+			__( 'Allocation', 'plain-language-time-tracker' ),
+			$alloc_minutes > 0 ? pltt_format_duration( $alloc_minutes ) : '',
+			array( 'sub' => isset( $period_word[ $project->recurring_period ] ) ? $period_word[ $project->recurring_period ] : '' )
+		);
+
+		return array(
+			self::card( __( 'Total hours', 'plain-language-time-tracker' ), pltt_format_duration( $life_minutes ) ),
+			$avg,
+			$months_card,
+			$alloc_card,
 		);
 	}
 
@@ -423,6 +450,295 @@ class PLTT_Project_Report {
 					: ''
 			),
 		);
+	}
+
+	/**
+	 * Type-aware hero: the headline block above the cards.
+	 *
+	 * Hourly  → "Earned to date" figure + Billed / Unbilled / Effective-rate rows.
+	 * Fixed   → "Budget consumed" gauge + Remaining / Hours / Effective-rate rows.
+	 * Retainer→ current-period "This period" allocation gauge + Overage / Avg / Fee rows.
+	 * Internal→ no hero (nothing billable to headline); returns null.
+	 *
+	 * Kept strictly factual — no pace projections or "went over N of M" framing.
+	 *
+	 * @param object      $project    Project row.
+	 * @param object|null $stats      Lifetime aggregate stats.
+	 * @param float       $rate       Resolved hourly rate.
+	 * @param int         $project_id Project ID (for the billed/absorbed lookup).
+	 * @return array|null Hero view-model, or null when the type has no hero.
+	 */
+	private static function build_hero( $project, $stats, $rate, $project_id, $window = null ) {
+		switch ( pltt_get_billing_type( $project ) ) {
+			case 'fixed':
+				return self::hero_fixed( $project, $stats, $rate );
+			case 'recurring':
+				return self::hero_recurring( $project, $stats, $rate, $window );
+			case 'none':
+				return null;
+			default:
+				return self::hero_hourly( $project, $stats, $rate, $project_id );
+		}
+	}
+
+	/**
+	 * Hourly hero: lifetime earned value, split into billed / unbilled.
+	 *
+	 * Every billable entry's value is either frozen onto a record (billed or
+	 * absorbed) or still uncovered (unbilled), so unbilled = earned − billed −
+	 * absorbed. That avoids a second coverage query.
+	 *
+	 * @param object      $project    Project row.
+	 * @param object|null $stats      Lifetime stats.
+	 * @param float       $rate       Resolved hourly rate.
+	 * @param int         $project_id Project ID.
+	 * @return array
+	 */
+	private static function hero_hourly( $project, $stats, $rate, $project_id ) {
+		$earned        = isset( $stats->billable_amount ) ? (float) $stats->billable_amount : 0.0;
+		$total_minutes = isset( $stats->total_minutes ) ? (int) $stats->total_minutes : 0;
+
+		$rec      = PLTT_Billing_Records::query( array( 'project_ids' => array( (int) $project_id ), 'limit' => 0 ) );
+		$billed   = (float) $rec['billed'];
+		$absorbed = (float) $rec['absorbed'];
+		$unbilled = max( 0.0, round( $earned - $billed - $absorbed, 2 ) );
+		$ehr      = pltt_effective_rate( $earned, $total_minutes );
+
+		$rows = array(
+			array( 'label' => __( 'Billed', 'plain-language-time-tracker' ), 'value' => pltt_format_currency( $billed ) ),
+			array( 'label' => __( 'Unbilled', 'plain-language-time-tracker' ), 'value' => pltt_format_currency( $unbilled ), 'accent' => $unbilled > 0 ),
+			array( 'label' => __( 'Effective rate', 'plain-language-time-tracker' ), 'value' => $ehr > 0 ? self::rate_str( $ehr ) : '—' ),
+		);
+		if ( $absorbed > 0 ) {
+			$rows[] = array( 'label' => __( 'Absorbed', 'plain-language-time-tracker' ), 'value' => pltt_format_currency( $absorbed ) );
+		}
+
+		return array(
+			'type'          => 'hourly',
+			'mode'          => 'figure',
+			'tag'           => __( 'Earned to date', 'plain-language-time-tracker' ),
+			'period'        => '',
+			'figure'        => pltt_format_currency( $earned ),
+			'figure_suffix' => '· ' . pltt_format_duration( $total_minutes ),
+			'note'          => $rate > 0
+				/* translators: %s: hourly rate, e.g. "$100/hr". */
+				? sprintf( __( 'All-time billable value at %s.', 'plain-language-time-tracker' ), self::rate_str( $rate ) )
+				: __( 'All-time billable value.', 'plain-language-time-tracker' ),
+			'gauge'         => null,
+			'minirows'      => $rows,
+		);
+	}
+
+	/**
+	 * Fixed-budget hero: value consumed against the fixed fee.
+	 *
+	 * @param object      $project Project row.
+	 * @param object|null $stats   Lifetime stats.
+	 * @param float       $rate    Resolved hourly rate.
+	 * @return array
+	 */
+	private static function hero_fixed( $project, $stats, $rate ) {
+		$total_minutes = isset( $stats->total_minutes ) ? (int) $stats->total_minutes : 0;
+		$budget        = self::num( $project->budget_fee );
+		// Value burned = hours × rate (fixed-fee entries are non-billable, so
+		// billable_amount is $0 — mirror the Reports allocation bar's spent_dollars).
+		$consumed  = round( ( $total_minutes / 60.0 ) * $rate, 2 );
+		$remaining = round( $budget - $consumed, 2 );
+		$pct       = $budget > 0 ? ( $consumed / $budget ) : 0.0;
+		$ehr       = pltt_effective_rate( $budget, $total_minutes );
+		$seg       = self::gauge_segments( $consumed, $budget );
+
+		return array(
+			'type'     => 'fixed',
+			'mode'     => 'gauge',
+			'tag'      => __( 'Budget consumed', 'plain-language-time-tracker' ),
+			'period'   => '',
+			'gauge'    => array(
+				'pct'        => $pct,
+				'state'      => self::gauge_state( $pct ),
+				'within_pct' => $seg['within'],
+				'over_pct'   => $seg['over'],
+				'used'  => pltt_format_currency( $consumed ),
+				'total' => pltt_format_currency( max( 0.0, $budget ) ),
+				'cap'   => $remaining >= 0
+					/* translators: %s: dollars remaining. */
+					? sprintf( __( '%s left', 'plain-language-time-tracker' ), pltt_format_currency( $remaining ) )
+					/* translators: %s: dollars over budget. */
+					: sprintf( __( '%s over', 'plain-language-time-tracker' ), pltt_format_currency( abs( $remaining ) ) ),
+				'note'  => $budget > 0
+					/* translators: 1: percent used; 2: hours logged. */
+					? sprintf( __( '%1$d%% used · %2$s logged', 'plain-language-time-tracker' ), (int) round( $pct * 100 ), pltt_format_duration( $total_minutes ) )
+					: __( 'no budget set', 'plain-language-time-tracker' ),
+			),
+			'minirows' => array(
+				array( 'label' => __( 'Remaining', 'plain-language-time-tracker' ), 'value' => pltt_format_currency( $remaining ), 'accent' => $remaining < 0 ),
+				array( 'label' => __( 'Hours logged', 'plain-language-time-tracker' ), 'value' => pltt_format_duration( $total_minutes ) ),
+				array( 'label' => __( 'Effective rate', 'plain-language-time-tracker' ), 'value' => $ehr > 0 ? self::rate_str( $ehr ) : '—' ),
+			),
+		);
+	}
+
+	/**
+	 * Retainer hero: an allocation-period usage gauge.
+	 *
+	 * Follows the page's period lens — stepping the lens to a month re-points the
+	 * gauge to that month. With no period selected (Full scope) it defaults to the
+	 * LATEST period that had activity, so a retainer whose most recent work was
+	 * last month never headlines an empty "this month" gauge.
+	 *
+	 * @param object      $project Project row.
+	 * @param object|null $stats   Lifetime stats.
+	 * @param float       $rate    Resolved hourly rate.
+	 * @param array|null  $window  Active period lens window (from the controller).
+	 * @return array
+	 */
+	private static function hero_recurring( $project, $stats, $rate, $window = null ) {
+		$alloc_minutes = (int) round( self::num( $project->budget_hours ) * 60 );
+		$fee           = self::num( $project->budget_fee );
+		$today         = pltt_get_current_date();
+
+		$follows_lens = is_array( $window ) && ! empty( $window['is_period'] );
+		if ( $follows_lens ) {
+			$p_start = (string) $window['from'];
+			$p_end   = (string) $window['to'];
+		} else {
+			// Default: the latest period that had activity (falls back to today when
+			// there are no entries — the hero doesn't render in that case anyway).
+			$ref_date = ! empty( $stats->last_entry_date ) ? $stats->last_entry_date : $today;
+			list( $p_start, $p_end ) = pltt_get_allocation_period_bounds( $project, $ref_date );
+		}
+
+		$used_minutes = 0;
+		if ( $p_start && $p_end ) {
+			$ps = PLTT_Entries::get_stats( array( 'project_id' => (int) $project->id, 'date_from' => $p_start, 'date_to' => $p_end ) );
+			$used_minutes = isset( $ps->total_minutes ) ? (int) $ps->total_minutes : 0;
+		}
+
+		$is_current = ( $p_start && $p_end && $today >= $p_start && $today <= $p_end );
+
+		// With no allocation configured there's nothing to be "over" — a retainer
+		// missing budget_hours is misconfigured, so show plain usage, not overage.
+		$has_alloc = $alloc_minutes > 0;
+		$pct       = $has_alloc ? ( $used_minutes / $alloc_minutes ) : 0.0;
+		$over_min  = $has_alloc ? max( 0, $used_minutes - $alloc_minutes ) : 0;
+		$rem_min   = $has_alloc ? max( 0, $alloc_minutes - $used_minutes ) : 0;
+		$overage   = round( ( $over_min / 60.0 ) * $rate, 2 );
+
+		// Lifetime average per month, for context.
+		$life_minutes = isset( $stats->total_minutes ) ? (int) $stats->total_minutes : 0;
+		$months       = self::months_between( $stats->first_entry_date ?? '', $stats->last_entry_date ?? '' );
+		$avg_minutes  = $months > 0 ? (int) round( $life_minutes / $months ) : $life_minutes;
+
+		// Caption: overage / remaining when there's an allocation; plain usage when not.
+		if ( ! $has_alloc ) {
+			/* translators: %s: hours logged this period. */
+			$cap = sprintf( __( '%s logged', 'plain-language-time-tracker' ), pltt_format_duration( $used_minutes ) );
+		} elseif ( $over_min > 0 ) {
+			/* translators: 1: hours over allocation; 2: overage dollars. */
+			$cap = sprintf( __( '%1$s over · %2$s', 'plain-language-time-tracker' ), pltt_format_duration( $over_min ), pltt_format_currency( $overage ) );
+		} else {
+			/* translators: %s: hours remaining in the allocation. */
+			$cap = sprintf( __( '%s remaining', 'plain-language-time-tracker' ), pltt_format_duration( $rem_min ) );
+		}
+
+		// Tag: "This period" when the shown period is live; a stepped-to period is
+		// just "Period" (the label names which); the default fallback is "Latest".
+		if ( $is_current ) {
+			$tag = __( 'This period', 'plain-language-time-tracker' );
+		} elseif ( $follows_lens ) {
+			$tag = __( 'Period', 'plain-language-time-tracker' );
+		} else {
+			$tag = __( 'Latest period', 'plain-language-time-tracker' );
+		}
+
+		// Third mini-row: the monthly fee when one is set, else the allocation
+		// (always meaningful for a real retainer — avoids a blank "Monthly fee").
+		if ( $fee > 0 ) {
+			$fee_row = array( 'label' => __( 'Monthly fee', 'plain-language-time-tracker' ), 'value' => pltt_format_currency( $fee ) );
+		} else {
+			$fee_row = array( 'label' => __( 'Allocation', 'plain-language-time-tracker' ), 'value' => $has_alloc ? pltt_format_duration( $alloc_minutes ) : '—' );
+		}
+
+		$seg = self::gauge_segments( $used_minutes, $alloc_minutes );
+
+		return array(
+			'type'     => 'recurring',
+			'mode'     => 'gauge',
+			'tag'      => $tag,
+			'period'   => ( $p_start && $p_end ) ? self::period_label( $project, $p_start, $p_end ) : '',
+			'gauge'    => array(
+				'pct'        => $pct,
+				'state'      => self::gauge_state( $pct ),
+				'within_pct' => $seg['within'],
+				'over_pct'   => $seg['over'],
+				'used'  => pltt_format_duration( $used_minutes ),
+				'total' => $has_alloc ? pltt_format_duration( $alloc_minutes ) : '—',
+				'cap'   => $cap,
+				'note'  => $has_alloc
+					/* translators: %d: percent of allocation used. */
+					? sprintf( __( '%d%% of allocation', 'plain-language-time-tracker' ), (int) round( $pct * 100 ) )
+					: __( 'no allocation set', 'plain-language-time-tracker' ),
+			),
+			'minirows' => array(
+				array( 'label' => __( 'Overage this period', 'plain-language-time-tracker' ), 'value' => $overage > 0 ? pltt_format_currency( $overage ) : '—', 'accent' => $overage > 0 ),
+				array( 'label' => __( 'Avg / month', 'plain-language-time-tracker' ), 'value' => pltt_format_duration( $avg_minutes ) ),
+				$fee_row,
+			),
+		);
+	}
+
+	/**
+	 * Classify gauge fill into a state color: ok / warn (>=85%) / over (>100%).
+	 *
+	 * @param float $pct Fraction used (0..>1).
+	 * @return string
+	 */
+	private static function gauge_state( $pct ) {
+		if ( $pct > 1.0 ) {
+			return 'over';
+		}
+		return $pct >= 0.85 ? 'warn' : 'ok';
+	}
+
+	/**
+	 * Split a used/total pair into within-limit and overage bar segments (percent
+	 * of the full track), mirroring pltt_render_allocation_bar: when over, the bar
+	 * fills 100% split proportionally so the overage magnitude is visible; when
+	 * under, a single segment fills used/total.
+	 *
+	 * @param float $used  Amount used (minutes or dollars).
+	 * @param float $total Limit (allocation minutes or budget dollars).
+	 * @return array{within: float, over: float}
+	 */
+	private static function gauge_segments( $used, $total ) {
+		if ( $total > 0 && $used > $total ) {
+			$within = ( $total / $used ) * 100;
+			return array( 'within' => $within, 'over' => 100 - $within );
+		}
+		return array(
+			'within' => $total > 0 ? min( 100.0, ( $used / $total ) * 100 ) : 0.0,
+			'over'   => 0.0,
+		);
+	}
+
+	/**
+	 * Human label for an allocation period: "July 2026" for a calendar month,
+	 * "2026" for a full year, else a date range.
+	 *
+	 * @param object $project Project row (for recurring_period).
+	 * @param string $start   Period start (Y-m-d).
+	 * @param string $end     Period end (Y-m-d).
+	 * @return string
+	 */
+	private static function period_label( $project, $start, $end ) {
+		$period = isset( $project->recurring_period ) ? $project->recurring_period : '';
+		if ( 'monthly' === $period ) {
+			return date_i18n( 'F Y', strtotime( $start ) );
+		}
+		if ( 'yearly' === $period ) {
+			return date_i18n( 'Y', strtotime( $start ) );
+		}
+		return date_i18n( 'M j', strtotime( $start ) ) . ' – ' . date_i18n( 'M j, Y', strtotime( $end ) );
 	}
 
 	/**

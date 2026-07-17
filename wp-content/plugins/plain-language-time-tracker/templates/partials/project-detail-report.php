@@ -36,6 +36,12 @@ $is_period   = ! empty( $window['is_period'] );
 	<?php return; ?>
 <?php endif; ?>
 
+<?php
+// Type-aware hero — headline gauge/figure above the cards. Null for internal.
+$hero = $report['hero'] ?? null;
+include PLTT_PLUGIN_DIR . 'templates/partials/project-report-hero.php';
+?>
+
 <!-- Stat cards (per billing type; shared .pltt-summary-cards / .card pattern, as on Reports) -->
 <div class="pltt-summary-cards pltt-stat-cards">
 	<?php foreach ( $cards['items'] as $card ) : ?>
