@@ -29,11 +29,22 @@
 	display: flex;
 	justify-content: space-between;
 	align-items: center;
-	padding: 10px 14px;
+	/* Same height as the Entries day-card header — these are the same component
+	   wearing different labels, so they hold the same vertical rhythm. */
+	padding: 16px 14px;
 	background: var(--pltt-bg-white);
 	border: 1px solid var(--pltt-border);
 	border-bottom: none;
 	border-radius: 4px 4px 0 0;
+}
+
+/* Week totals, right-aligned (spec §10) — mirrors the day card's time · amount. */
+.pltt-week-group-meta {
+	display: inline-flex;
+	align-items: baseline;
+	gap: 8px;
+	font-size: 12px;
+	color: var(--pltt-text-muted);
 }
 
 .pltt-week-group-title {

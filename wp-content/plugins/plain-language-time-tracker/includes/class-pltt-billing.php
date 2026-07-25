@@ -538,6 +538,123 @@ class PLTT_Billing {
 	}
 
 	/**
+	 * Whole-run summary of a retainer, period by period.
+	 *
+	 * The project report's lifetime view asks a different question from the
+	 * billing surface: not "what can I bill right now" but "is this retainer
+	 * healthy across its whole run" — so this counts EVERY period the project was
+	 * active in, including the ones that stayed within allocation and the ones
+	 * already billed. Walks the same period bounds build_retainer_scopes() does.
+	 *
+	 * @param object      $project   Project row.
+	 * @param string|null $date_from Restrict to periods from this date on ('Y-m-d');
+	 *                               null scans from the project's first entry.
+	 * @param string|null $date_to   Restrict to periods up to this date ('Y-m-d'),
+	 *                               clamped to today; null scans through today.
+	 * @return array {
+	 *     @type int    $periods            Allocation periods scanned.
+	 *     @type int    $over_periods       How many of those went over allocation.
+	 *     @type float  $overage_amount     Σ chargeable overage — INCLUDES a still-open
+	 *                                      period, because the work happened.
+	 *     @type float  $unbilled_amount    Σ overage not yet covered by a record,
+	 *                                      CLOSED periods only — an open period isn't
+	 *                                      waiting to be billed, it isn't finished.
+	 *     @type int    $unbilled_periods   Closed periods with an unbilled remainder.
+	 *     @type int    $open_periods       Periods in range that are still running.
+	 *     @type string $open_period_label  The open period's name, e.g. "July 2026".
+	 *     @type int    $allocation_minutes The per-period allocation.
+	 * }
+	 */
+	public static function get_retainer_summary( $project, $date_from = null, $date_to = null ) {
+		$out = array(
+			'periods'            => 0,
+			'over_periods'       => 0,
+			'overage_amount'     => 0.0,
+			'unbilled_amount'    => 0.0,
+			'unbilled_periods'   => 0,
+			'open_periods'       => 0,
+			'open_period_label'  => '',
+			'allocation_minutes' => (int) pltt_budgeted_minutes( $project ),
+		);
+
+		if ( 'recurring' !== pltt_get_billing_type( $project ) ) {
+			return $out;
+		}
+
+		$rate  = pltt_resolve_billable_rate( (int) $project->client_id, (int) $project->id );
+		$today = current_time( 'Y-m-d' );
+		$tz    = wp_timezone();
+
+		// Scan start: the range start when given, else the project's first entry.
+		// Scan end: the range end clamped to today — a period that hasn't happened
+		// yet has nothing to report. Same bounds build_retainer_scopes() uses.
+		$ref = $date_from ? $date_from : self::earliest_entry_date( $project );
+		if ( ! $ref ) {
+			return $out;
+		}
+		$scan_end = ( $date_to && $date_to < $today ) ? $date_to : $today;
+
+		$guard = 0;
+		while ( $ref <= $scan_end && $guard < 500 ) {
+			$guard++;
+
+			list( $period_start, $period_end ) = pltt_get_allocation_period_bounds( $project, $ref );
+			if ( ! $period_start || ! $period_end ) {
+				break;
+			}
+
+			$out['periods']++;
+
+			// A period still running can't be billed — billing it would mean either
+			// a second record for the month or a partial one, which breaks the
+			// one-record-per-period assumption the model rests on. It still counts
+			// toward hours and overage (that work happened); it just can't count
+			// toward what's waiting to be invoiced.
+			$is_open = ( $period_end >= $today );
+			if ( $is_open ) {
+				$out['open_periods']++;
+				$out['open_period_label'] = self::format_period_label( $period_start, $period_end, $project->recurring_period );
+			}
+
+			$threshold = pltt_compute_overage_threshold(
+				$project,
+				array(
+					'date_from' => $period_start,
+					'date_to'   => $period_end,
+				)
+			);
+
+			if ( 'over' === $threshold['state'] ) {
+				$calculated = round( pltt_billable_amount( (int) $threshold['overage_minutes'], $rate ), 2 );
+
+				$out['over_periods']++;
+				$out['overage_amount'] += $calculated;
+
+				if ( ! $is_open ) {
+					$sums     = PLTT_Billing_Records::sum_billed( (int) $project->id, 'retainer_overage', $period_start );
+					$unbilled = round( $calculated - $sums['billed'] - $sums['absorbed'], 2 );
+					if ( $unbilled > self::EPSILON ) {
+						$out['unbilled_amount'] += $unbilled;
+						$out['unbilled_periods']++;
+					}
+				}
+			}
+
+			try {
+				$next = ( new DateTimeImmutable( $period_end, $tz ) )->modify( '+1 day' );
+			} catch ( Exception $e ) {
+				break;
+			}
+			$ref = $next->format( 'Y-m-d' );
+		}
+
+		$out['overage_amount']  = round( $out['overage_amount'], 2 );
+		$out['unbilled_amount'] = round( $out['unbilled_amount'], 2 );
+
+		return $out;
+	}
+
+	/**
 	 * Build retainer-overage scopes, one per allocation period that is over
 	 * allocation AND has an unbilled remainder. Scans the periods intersecting
 	 * [date_from, date_to]; with no range it scans from the project's first entry
@@ -682,7 +799,7 @@ class PLTT_Billing {
 	 * @param string $recurring_period weekly|monthly|quarterly|yearly.
 	 * @return string
 	 */
-	private static function format_period_label( $period_start, $period_end, $recurring_period ) {
+	public static function format_period_label( $period_start, $period_end, $recurring_period ) {
 		$start = strtotime( $period_start );
 		$end   = strtotime( $period_end );
 

@@ -480,6 +480,11 @@ function pltt_format_date_range( $from, $to ) {
 	$from_d  = $from_dt->format( 'j' );
 	$to_d    = $to_dt->format( 'j' );
 
+	// A single day is a date, not a range — "Jul 3, 2026", never "Jul 3–3, 2026".
+	if ( $from === $to ) {
+		return $from_dt->format( 'M j, Y' );
+	}
+
 	// Full calendar year: Jan 1 – Dec 31 of the same year.
 	if ( $from_y === $to_y && '1' === $from_m && '1' === $from_d && '12' === $to_dt->format( 'n' ) && '31' === $to_dt->format( 'j' ) ) {
 		return $from_y;
@@ -1365,34 +1370,6 @@ function pltt_pct_change_indicator( $curr, $prev ) {
 }
 
 /**
- * Render the overage threshold marker row inside an entry table.
- *
- * Spans the full table width. Styled as chrome (dashed amber borders, warm
- * gradient bg), not a data row.
- *
- * @param int    $colspan   Number of columns in the parent table.
- * @param string $primary   Primary label (e.g. "Allocation reached · 10h used").
- * @param string $secondary Secondary label (e.g. "Entries below are overage candidates").
- */
-function pltt_render_threshold_marker_row( $colspan, $primary, $secondary = '' ) {
-	?>
-	<tr class="pltt-threshold-marker-row">
-		<td colspan="<?php echo esc_attr( (int) $colspan ); ?>">
-			<div class="pltt-threshold-marker">
-				<span class="pltt-threshold-icon" aria-hidden="true">⚑</span>
-				<div class="pltt-threshold-labels">
-					<span class="pltt-threshold-primary"><?php echo esc_html( $primary ); ?></span>
-					<?php if ( '' !== $secondary ) : ?>
-						<span class="pltt-threshold-secondary"><?php echo esc_html( $secondary ); ?></span>
-					<?php endif; ?>
-				</div>
-			</div>
-		</td>
-	</tr>
-	<?php
-}
-
-/**
  * Render an entry table.
  *
  * Outputs a complete <table> with entry rows showing description,
@@ -1408,10 +1385,6 @@ function pltt_render_threshold_marker_row( $colspan, $primary, $secondary = '' )
  *     @type string $table_class                Additional CSS class for the table element.
  *     @type bool   $inline_edit                Whether to render interactive inline edit controls. Default false.
  *     @type array  $all_tags                   All available tag name strings. Required when inline_edit is true.
- *     @type array  $overage_entry_ids          Entry IDs to flag with the .pltt-row-overage class.
- *     @type int    $threshold_marker_before    Insert a threshold marker row immediately before the row matching this entry ID.
- *     @type string $threshold_marker_primary   Marker primary label text.
- *     @type string $threshold_marker_secondary Marker secondary label text.
  * }
  */
 function pltt_render_entry_table( $entries, $options = array() ) {
@@ -1432,29 +1405,23 @@ function pltt_render_entry_table( $entries, $options = array() ) {
 	// of actions. Until a second concrete use exists, it stays billing-specific.
 	$billing_select = ! empty( $options['billing_select'] );
 
-	// Overage decision-support options.
-	$overage_lookup          = ! empty( $options['overage_entry_ids'] )
-		? array_flip( array_map( 'intval', (array) $options['overage_entry_ids'] ) )
-		: array();
-	$threshold_marker_before = isset( $options['threshold_marker_before'] ) ? (int) $options['threshold_marker_before'] : 0;
-	$marker_primary          = isset( $options['threshold_marker_primary'] ) ? (string) $options['threshold_marker_primary'] : '';
-	$marker_secondary        = isset( $options['threshold_marker_secondary'] ) ? (string) $options['threshold_marker_secondary'] : '';
-
-	// Covered mode: when a covered-entry set is supplied (Reports single-project
-	// detailed view), tint membership rows blue from billing-record coverage and
-	// retire the manual per-entry "Inv." toggle — the commit never wrote that flag,
-	// so record coverage is the truth here.
-	$covered_lookup = ! empty( $options['covered_entry_ids'] )
+	// Coverage — an entry is "covered" when a committed bill record froze its ID
+	// into billing_record_entries. That is the ONLY source for billed state; the
+	// legacy per-entry `billed` flag was a manual tick nothing verified, and it
+	// disagrees with reality (159 rows flagged, 29 actually covered). A caller with
+	// a project-scoped set passes it in; everyone else gets the global set, so the
+	// Status column reads the same truth on every screen rather than falling back
+	// to the fossil when no set was supplied.
+	$covered_lookup = isset( $options['covered_entry_ids'] )
 		? array_flip( array_map( 'intval', (array) $options['covered_entry_ids'] ) )
-		: array();
-	$covered_mode      = isset( $options['covered_entry_ids'] );
-	// Optional per-entry labels (entry_id => "Invoiced · record #N · period") for
+		: array_flip( PLTT_Billing_Record_Entries::get_all_covered_entry_ids() );
+	// Optional per-entry labels (entry_id => "Billed · record #N · period") for
 	// the covered-row marker's tooltip — the record pointer the snapshot enables.
 	$covered_meta      = ! empty( $options['covered_entry_meta'] ) ? (array) $options['covered_entry_meta'] : array();
 	// One read-only Status column replaces the old editable "Inv." toggle and the
 	// covered "Invoiced" checkmark. It reads the real billing state (record
-	// coverage + project type + overage), never the legacy per-entry billed flag.
-	$show_status_col = $inline_edit || $covered_mode;
+	// coverage + project type), never the legacy per-entry billed flag.
+	$show_status_col = $inline_edit || isset( $options['covered_entry_ids'] );
 
 	if ( empty( $entries ) ) {
 		return;
@@ -1483,30 +1450,24 @@ function pltt_render_entry_table( $entries, $options = array() ) {
 	// Billable column appears only when at least one entry's project uses the
 	// per-entry billable flag (plain hourly). Retainer/fixed-fee tables, where
 	// billing is computed at the period level, drop the column entirely.
-	$show_billable_col = false;
-	foreach ( $entries as $e ) {
-		$p = ! empty( $e->project_id ) && isset( $projects_cache[ (int) $e->project_id ] ) ? $projects_cache[ (int) $e->project_id ] : null;
-		if ( pltt_billable_flag_applies( $p ) ) {
-			$show_billable_col = true;
-			break;
+	//
+	// A caller rendering several tables that must line up (e.g. the Overview's
+	// per-day tables, table-layout: fixed) can pass 'force_billable_col' to pin the
+	// column on/off across all of them — otherwise an all-retainer day drops it and
+	// the tables misalign. When set, it overrides the per-table detection below.
+	if ( isset( $options['force_billable_col'] ) ) {
+		$show_billable_col = (bool) $options['force_billable_col'];
+	} else {
+		$show_billable_col = false;
+		foreach ( $entries as $e ) {
+			$p = ! empty( $e->project_id ) && isset( $projects_cache[ (int) $e->project_id ] ) ? $projects_cache[ (int) $e->project_id ] : null;
+			if ( pltt_billable_flag_applies( $p ) ) {
+				$show_billable_col = true;
+				break;
+			}
 		}
 	}
 
-	// Colspan for the threshold marker row: Desc, Tags, Time, Duration
-	// (+1 each for the select box, Billable, Inv., and Amount when shown).
-	$colspan = 4;
-	if ( $billing_select ) {
-		$colspan++;
-	}
-	if ( $show_billable_col ) {
-		$colspan++;
-	}
-	if ( $show_status_col ) {
-		$colspan++;
-	}
-	if ( $show_amount ) {
-		$colspan++;
-	}
 	?>
 	<table class="widefat<?php echo esc_attr( $table_class ); ?>">
 		<thead>
@@ -1535,27 +1496,15 @@ function pltt_render_entry_table( $entries, $options = array() ) {
 				$client       = ! empty( $entry->client_id ) && isset( $clients_cache[ $entry->client_id ] ) ? $clients_cache[ $entry->client_id ] : null;
 				$project      = ! empty( $entry->project_id ) && isset( $projects_cache[ $entry->project_id ] ) ? $projects_cache[ $entry->project_id ] : null;
 				$entry_tags   = $tags_by_entry[ (int) $entry->id ] ?? array();
-				$is_billed    = ! empty( $entry->billed );
 				$is_billable  = ! empty( $entry->billable );
 				$entry_id_int = (int) $entry->id;
 
-				// Insert the threshold marker immediately before the boundary entry.
-				if ( $threshold_marker_before && $entry_id_int === $threshold_marker_before ) {
-					pltt_render_threshold_marker_row( $colspan, $marker_primary, $marker_secondary );
-				}
+				$is_covered = isset( $covered_lookup[ $entry_id_int ] );
 
+				// One tint, one meaning: this entry sits on a committed bill record.
 				$tr_classes = array();
-				if ( $covered_mode ) {
-					// Record-coverage is the source of truth; the legacy per-entry
-					// pltt-billed tint is suppressed in this view.
-					if ( isset( $covered_lookup[ $entry_id_int ] ) ) {
-						$tr_classes[] = 'pltt-row-covered';
-					}
-				} elseif ( $is_billed ) {
-					$tr_classes[] = 'pltt-billed';
-				}
-				if ( isset( $overage_lookup[ $entry_id_int ] ) ) {
-					$tr_classes[] = 'pltt-row-overage';
+				if ( $is_covered ) {
+					$tr_classes[] = 'pltt-row-covered';
 				}
 				$class_attr = $tr_classes ? ' class="' . esc_attr( implode( ' ', $tr_classes ) ) . '"' : '';
 				?>
@@ -1599,8 +1548,8 @@ function pltt_render_entry_table( $entries, $options = array() ) {
 						</td>
 					<?php endif; ?>
 					<td class="pltt-entry-desc-cell">
-						<?php if ( $is_billed && ! $inline_edit ) : ?>
-							<span class="screen-reader-text"><?php esc_html_e( 'Invoiced:', 'plain-language-time-tracker' ); ?></span>
+						<?php if ( $is_covered && ! $inline_edit ) : ?>
+							<span class="screen-reader-text"><?php esc_html_e( 'Billed:', 'plain-language-time-tracker' ); ?></span>
 						<?php endif; ?>
 						<span class="pltt-entry-desc-text"><?php echo esc_html( $entry->description ); ?></span>
 						<?php
@@ -1642,7 +1591,18 @@ function pltt_render_entry_table( $entries, $options = array() ) {
 					<?php if ( $show_billable_col ) : ?>
 						<td class="pltt-billable-indicator">
 							<?php if ( ! pltt_billable_flag_applies( $project ) ) : ?>
-								<?php /* Retainer/fixed-fee entry: billing is period-level, so no per-entry flag. */ ?>
+								<?php /* Retainer, fixed fee or internal: no per-entry flag to set.
+								         A dash, matching the Projects list and spec §4 — an empty
+								         cell reads as missing rather than as not-applicable. */ ?>
+								<span class="pltt-empty" aria-label="<?php esc_attr_e( 'Not billed per entry', 'plain-language-time-tracker' ); ?>">&mdash;</span>
+							<?php elseif ( $is_covered ) : ?>
+								<?php /* Locked: a committed record froze this entry's amount, so the
+								         flag can't move without contradicting money already billed
+								         (spec §4). Greyed but still readable — the value stays
+								         legible, it just isn't a control any more. */ ?>
+								<span class="pltt-billable-symbol pltt-billable-locked <?php echo $is_billable ? 'is-billable' : 'not-billable'; ?>"
+									aria-label="<?php echo $is_billable ? esc_attr__( 'Billable — locked, this entry is on a bill record', 'plain-language-time-tracker' ) : esc_attr__( 'Not billable — locked, this entry is on a bill record', 'plain-language-time-tracker' ); ?>"
+									title="<?php esc_attr_e( 'On a bill record — delete the record to change this', 'plain-language-time-tracker' ); ?>">$</span>
 							<?php elseif ( $inline_edit ) : ?>
 								<button type="button"
 									class="pltt-billable-symbol pltt-inline-toggle <?php echo $is_billable ? 'is-billable' : 'not-billable'; ?>"
@@ -1658,24 +1618,29 @@ function pltt_render_entry_table( $entries, $options = array() ) {
 						</td>
 					<?php endif; ?>
 					<?php if ( $show_status_col ) :
-						// Billing status only — has this entry been invoiced, or is it
-						// billable and still waiting? Everything that isn't part of that
-						// question (non-billable, internal, fixed-fee, within-plan retainer
-						// time) reads as a muted dash. Coverage from a committed record is
-						// the truth; the legacy billed flag is the fallback in the
-						// multi-project view, where no coverage set is passed.
-						$status_is_covered  = $covered_mode && isset( $covered_lookup[ $entry_id_int ] );
-						$status_is_invoiced = $status_is_covered || ( ! $covered_mode && $is_billed );
+						// Three states plus a dash (spec §4). Coverage decides "Billed" and
+						// wins over everything else — a record exists, so this entry was
+						// charged for, whatever the per-entry flag says now. Below that:
+						//
+						//   Unbilled     chargeable, not on a record yet
+						//   Not charged  hourly work switched off — a DECISION, which is
+						//                why it can't share the dash with the rest
+						//   —            retainer within allocation, fixed fee, internal:
+						//                three unrelated states sharing a glyph, none of
+						//                which is a decision about this entry
+						$status_flag_applies = pltt_billable_flag_applies( $project );
 						?>
 						<td class="pltt-status-col">
-							<?php if ( $status_is_invoiced ) :
-								$status_inv_label = $status_is_covered && isset( $covered_meta[ $entry_id_int ] )
+							<?php if ( $is_covered ) :
+								$status_billed_label = isset( $covered_meta[ $entry_id_int ] )
 									? $covered_meta[ $entry_id_int ]
-									: __( 'On a committed invoice', 'plain-language-time-tracker' );
+									: __( 'Covered by a committed bill record', 'plain-language-time-tracker' );
 								?>
-								<span class="pltt-badge pltt-badge-info" title="<?php echo esc_attr( $status_inv_label ); ?>"><?php esc_html_e( 'Invoiced', 'plain-language-time-tracker' ); ?></span>
-							<?php elseif ( $is_billable ) : ?>
-								<span class="pltt-badge pltt-badge-success" title="<?php esc_attr_e( 'Billable — not yet invoiced', 'plain-language-time-tracker' ); ?>"><?php esc_html_e( 'Unbilled', 'plain-language-time-tracker' ); ?></span>
+								<span class="pltt-badge pltt-badge-billed" title="<?php echo esc_attr( $status_billed_label ); ?>"><?php esc_html_e( 'Billed', 'plain-language-time-tracker' ); ?></span>
+							<?php elseif ( $status_flag_applies && $is_billable ) : ?>
+								<span class="pltt-badge pltt-badge-success" title="<?php esc_attr_e( 'Chargeable — not on a bill record yet', 'plain-language-time-tracker' ); ?>"><?php esc_html_e( 'Unbilled', 'plain-language-time-tracker' ); ?></span>
+							<?php elseif ( $status_flag_applies ) : ?>
+								<span class="pltt-badge pltt-badge-notcharged" title="<?php esc_attr_e( 'Billable was switched off for this entry', 'plain-language-time-tracker' ); ?>"><?php esc_html_e( 'Not charged', 'plain-language-time-tracker' ); ?></span>
 							<?php else : ?>
 								<span class="pltt-empty" aria-label="<?php esc_attr_e( 'Not separately billed', 'plain-language-time-tracker' ); ?>">&mdash;</span>
 							<?php endif; ?>
@@ -1729,6 +1694,746 @@ function pltt_format_billing_period( $record ) {
 	}
 
 	return '—';
+}
+
+/**
+ * Billing-aware scope-block figures for the Reports single-project view.
+ *
+ * The figure row + optional action bar that replace the old parked billing +
+ * context cards. Type-specific (see pltt-billing-by-type.html):
+ *   - hourly: Total hours · Billable amount · Ready to bill (amber) · Billed to
+ *     date. Plus a "Review & bill" bar when something is outstanding.
+ *   - fixed:  Total hours (with budget %) · Billable amount (the agreed fee) ·
+ *     Billed to date. No bar — fixed-fee projects don't generate billing records
+ *     (the fee is invoiced externally); the effective-rate stat lives on the
+ *     project report only.
+ * Returns null for retainer/internal/other, so the caller falls back to the
+ * generic Total/Billable metric cards (retainer's billing UI is unchanged for now).
+ *
+ * Basis strings may contain safe inline HTML (mono spans, the "View records"
+ * link); the caller echoes them without re-escaping.
+ *
+ * @param object      $project      The single project object.
+ * @param object|null $stats        Aggregate stats for the filtered range.
+ * @param string      $billing_type Resolved billing type.
+ * @return array|null { figures: array<{label,value,basis,over}>, bar: array|null }
+ */
+/**
+ * Figure 4 for one retainer period: "Not yet billed" or "Billed".
+ *
+ * The four states (ui/pltt-figure-four.html, spec §3 "Period states"):
+ *
+ * | Period                 | Label          | Value        | Basis      |
+ * |------------------------|----------------|--------------|------------|
+ * | Open                   | Not yet billed | `—` grey     | *empty*    |
+ * | Closed, unbilled       | Not yet billed | amount ochre | *empty*    |
+ * | Closed, billed         | Billed         | amount grey  | Record #N ›|
+ * | Closed, nothing over   | Not yet billed | $0.00 grey   | *empty*    |
+ *
+ * A dash rather than a zero while the period is open: `$0.00` claims nothing is
+ * owed, a dash says the question isn't answerable yet. The basis line holds ONLY
+ * links — no close date, no bill date — so three of the four states have none.
+ *
+ * Earlier unbilled periods append as a count + link ("N more unbilled ›"),
+ * independent of this period's own state: a billed month can still have one
+ * behind it.
+ *
+ * Shared by the filtered-Entries scope block and the project report's period
+ * lens, so the two can't drift into disagreeing about the same period.
+ *
+ * @param object        $project      Project row.
+ * @param string        $period_start Period first day ('Y-m-d').
+ * @param string        $period_end   Period last day ('Y-m-d').
+ * @param float         $gross        Chargeable overage for the period, in dollars.
+ * @param bool          $is_over      Whether the period went over allocation.
+ * @param bool          $is_closed    Whether the period has ended.
+ * @param object[]|null $records      Pre-loaded project records, to avoid a re-query.
+ * @return array {
+ *     @type array $figure       { label, value, basis (safe inline HTML), over, muted }.
+ *     @type float $unbilled     Chargeable remainder not yet on a record.
+ *     @type bool  $billable_now Closed with a remainder — the one state that offers a bar.
+ * }
+ */
+function pltt_retainer_period_status_figure( $project, $period_start, $period_end, $gross, $is_over, $is_closed, $records = null ) {
+	$sums     = PLTT_Billing_Records::sum_billed( (int) $project->id, 'retainer_overage', $period_start );
+	$paid     = (float) $sums['billed'] + (float) $sums['absorbed'];
+	$unbilled = round( (float) $gross - $paid, 2 );
+	$settled  = ( $paid > 0.005 && $unbilled <= 0.005 );
+
+	$billable_now = false;
+
+	if ( ! $is_closed ) {
+		// Billing waits for the period to end — a retainer period is also the
+		// billing unit, so billing mid-period means either a second record or a
+		// partial one. (The Billing page can still do it when genuinely needed.)
+		$figure = array( 'label' => __( 'Not yet billed', 'plain-language-time-tracker' ), 'value' => '—', 'basis' => '', 'over' => false, 'muted' => true );
+	} elseif ( $settled ) {
+		if ( null === $records ) {
+			$records = PLTT_Billing::get_for_project_history( (int) $project->id );
+		}
+		$rec_link = '';
+		$hist_url = add_query_arg( 'tab', 'report', PLTT_Project_Detail::get_url( (int) $project->id ) ) . '#pltt-billing-history';
+		foreach ( $records as $rec ) {
+			if ( isset( $rec->period_start ) && (string) $rec->period_start === (string) $period_start ) {
+				$rec_link = '<a class="pltt-lk" href="' . esc_url( $hist_url ) . '">' . sprintf(
+					/* translators: %d: billing record id. */
+					esc_html__( 'Record #%d', 'plain-language-time-tracker' ),
+					(int) $rec->id
+				) . ' &rsaquo;</a>';
+				break;
+			}
+		}
+		$figure = array( 'label' => __( 'Billed', 'plain-language-time-tracker' ), 'value' => pltt_format_currency( (float) $sums['billed'] ), 'basis' => $rec_link, 'over' => false, 'muted' => true );
+	} elseif ( $is_over && $unbilled > 0.005 ) {
+		$figure       = array( 'label' => __( 'Not yet billed', 'plain-language-time-tracker' ), 'value' => pltt_format_currency( $unbilled ), 'basis' => '', 'over' => true, 'muted' => false );
+		$billable_now = true;
+	} else {
+		$figure = array( 'label' => __( 'Not yet billed', 'plain-language-time-tracker' ), 'value' => pltt_format_currency( 0 ), 'basis' => '', 'over' => false, 'muted' => true );
+	}
+
+	// Backlog — earlier unbilled periods, appended to whatever the basis holds.
+	$backlog = 0;
+	if ( 'active' === ( $project->status ?? '' ) ) {
+		foreach ( PLTT_Billing::get_ready_to_invoice( $project, false ) as $scope ) {
+			if ( 'retainer_overage' === $scope['billing_type'] && (string) $scope['period_start'] !== (string) $period_start ) {
+				$backlog++;
+			}
+		}
+	}
+	if ( $backlog > 0 ) {
+		$bl_link = '<a class="pltt-lk pltt-lk-over" href="' . esc_url( admin_url( 'admin.php?page=pltt-invoicing' ) . '#pltt-bill-proj-' . (int) $project->id ) . '">' . sprintf(
+			/* translators: %d: number of earlier unbilled periods. */
+			esc_html( _n( '%d more unbilled', '%d more unbilled', $backlog, 'plain-language-time-tracker' ) ),
+			$backlog
+		) . ' &rsaquo;</a>';
+		$figure['basis'] = ( '' !== $figure['basis'] ) ? $figure['basis'] . ' · ' . $bl_link : $bl_link;
+	}
+
+	return array(
+		'figure'       => $figure,
+		'unbilled'     => $unbilled,
+		'billable_now' => $billable_now,
+	);
+}
+
+/**
+ * Retainer figures when the range sits INSIDE one allocation period.
+ *
+ * The range is smaller than the billing unit, so neither allocation status nor
+ * billing status is answerable from it — both are properties of the whole
+ * period. Rather than divide a monthly allocation across a partial month (the
+ * frame division §3 forbids), the block mixes frames and says which is which:
+ *
+ *   1  Total hours              → the range
+ *   2  Against June's 3h included → the whole period
+ *   3  Billable amount in June  → the whole period
+ *   4  Not yet billed           → the whole period
+ *
+ * Naming the period in the label does the frame work — the existing §3 rule
+ * ("the label names the span, in ordinary words"), applied to a case §3 didn't
+ * enumerate. No bar: billing a partial period breaks one-record-per-period.
+ *
+ * @param object      $project          Project row.
+ * @param object|null $stats            Aggregate stats for the filtered range.
+ * @param array       $context_overage  Resolved threshold for the containing period.
+ * @return array { figures: array, bar: null }
+ */
+function pltt_build_retainer_partial_figures( $project, $stats, $context_overage ) {
+	$range_min = $stats ? (int) $stats->total_minutes : 0;
+	$used_min  = (int) $context_overage['used_minutes'];
+	$alloc_min = (int) $context_overage['allocation_minutes'];
+	$over_min  = (int) $context_overage['overage_minutes'];
+	$p_start   = (string) $context_overage['period_start'];
+	$p_end     = (string) $context_overage['period_end'];
+	$is_over   = ( 'over' === $context_overage['state'] );
+	$rate      = pltt_resolve_billable_rate( (int) $project->client_id, (int) $project->id );
+	$period    = PLTT_Billing::format_period_label( $p_start, $p_end, $project->recurring_period ?? '' );
+	$is_closed = ( $p_end && $p_end < pltt_get_current_date() );
+
+	$figures = array();
+
+	// 1 — the range, which is what the table below contains.
+	$count     = ( $stats && isset( $stats->total_count ) ) ? (int) $stats->total_count : 0;
+	$figures[] = array(
+		'label' => __( 'Total hours', 'plain-language-time-tracker' ),
+		'value' => pltt_format_duration( $range_min ),
+		'basis' => $count > 0
+			? sprintf(
+				/* translators: %s: entry count in the filtered range. */
+				esc_html( _n( '%s entry in this range', '%s entries in this range', $count, 'plain-language-time-tracker' ) ),
+				esc_html( number_format_i18n( $count ) )
+			)
+			: esc_html__( 'No entries in this range', 'plain-language-time-tracker' ),
+		'over'  => false,
+	);
+
+	// 2 — the period's standing against its allocation. Label names the period,
+	// so the jump in frame is stated rather than implied.
+	$pct       = $alloc_min > 0 ? (int) round( $used_min / $alloc_min * 100 ) : 0;
+	$figures[] = array(
+		'label' => sprintf(
+			/* translators: 1: period name, e.g. "June 2026"; 2: allocation, e.g. "3h". */
+			__( 'Against %1$s\'s %2$s included', 'plain-language-time-tracker' ),
+			$period,
+			pltt_format_duration( $alloc_min )
+		),
+		'value' => pltt_format_duration( $used_min ),
+		'basis' => sprintf(
+			/* translators: %d: percent of the period's allocation used. */
+			esc_html__( '%d%% of the period used', 'plain-language-time-tracker' ),
+			$pct
+		),
+		'over'  => $is_over,
+	);
+
+	// 3 — what the period's overage is worth. Whole period, not the range.
+	$gross     = $is_over ? round( pltt_billable_amount( $over_min, $rate ), 2 ) : 0.0;
+	$figures[] = array(
+		'label' => sprintf(
+			/* translators: %s: period name, e.g. "June 2026". */
+			__( 'Billable amount in %s', 'plain-language-time-tracker' ),
+			$period
+		),
+		'value' => pltt_format_currency( $gross ),
+		'basis' => $is_over
+			? '<span class="pltt-mono">' . esc_html( pltt_format_duration( $over_min ) . ' × ' . pltt_format_currency( $rate ) . '/hr' ) . '</span>'
+			: esc_html__( 'Nothing over allocation', 'plain-language-time-tracker' ),
+		'over'  => false,
+		'muted' => ( $gross <= 0.0 ),
+	);
+
+	// 4 — the period's billing status, from the shared state machine.
+	$status    = pltt_retainer_period_status_figure( $project, $p_start, $p_end, $gross, $is_over, $is_closed );
+	$figures[] = $status['figure'];
+
+	// No bar: a partial period can't produce a record (§3).
+	return array(
+		'figures' => $figures,
+		'bar'     => null,
+	);
+}
+
+/**
+ * Retainer figures when the range covers SEVERAL allocation periods.
+ *
+ * The per-period set answers "what do I bill for this month". A span answers a
+ * different question — is this retainer running at the size it was sold at —
+ * so it reports across the periods in view (ui/pltt-scope-by-type.html §02,
+ * range-scoped rather than lifetime):
+ *
+ *   Total hours · Average per period · Overage billable · Not yet billed
+ *
+ * **Never sums the allocation.** Five months at 3h is not a 15h budget, so the
+ * comparison is the average against the per-period allocation, plus how many
+ * periods ran over.
+ *
+ * No bar, ever. A retainer period is the billing unit, so a span of them can't
+ * commit a single record — same reasoning as an open period, and the same
+ * treatment: state the numbers, link to where the billing lives, offer no
+ * action here.
+ *
+ * @param object      $project   Project row.
+ * @param object|null $stats     Aggregate stats for the filtered range.
+ * @param string|null $date_from Range start ('Y-m-d').
+ * @param string|null $date_to   Range end ('Y-m-d').
+ * @return array|null { figures: array, bar: null } — null when the project has
+ *                    no allocation to measure against.
+ */
+function pltt_build_retainer_span_figures( $project, $stats, $date_from = null, $date_to = null ) {
+	$summary   = PLTT_Billing::get_retainer_summary( $project, $date_from, $date_to );
+	$periods   = (int) $summary['periods'];
+	$alloc_min = (int) $summary['allocation_minutes'];
+
+	// With no allocation configured there is nothing to measure against, and with
+	// no periods in range there is nothing to report.
+	if ( $periods < 1 || $alloc_min < 1 ) {
+		return null;
+	}
+
+	$total_min = $stats ? (int) $stats->total_minutes : 0;
+	$avg_min   = (int) round( $total_min / $periods );
+
+	// RAGGED vs whole-period multi (amendment §3): a range with a partial period
+	// at either end. Figure 1 still follows the literal range — it's the readout
+	// of the table below — but figures 2–4 are computed over whole periods, so
+	// they say so. The two won't reconcile, and that's correct: prorating a
+	// monthly allocation across a partial month is the frame division §3 forbids.
+	$is_ragged = false;
+	if ( $date_from && $date_to ) {
+		list( $first_ps ) = pltt_get_allocation_period_bounds( $project, $date_from );
+		list( , $last_pe ) = pltt_get_allocation_period_bounds( $project, $date_to );
+		$is_ragged = ( ( $first_ps && $date_from > $first_ps ) || ( $last_pe && $date_to < $last_pe ) );
+	}
+
+	// Cadence in words, so the basis lines name the real period.
+	$period_words = array(
+		'weekly'    => array( __( 'weekly', 'plain-language-time-tracker' ), __( 'Average per week', 'plain-language-time-tracker' ) ),
+		'monthly'   => array( __( 'monthly', 'plain-language-time-tracker' ), __( 'Average per month', 'plain-language-time-tracker' ) ),
+		'quarterly' => array( __( 'quarterly', 'plain-language-time-tracker' ), __( 'Average per quarter', 'plain-language-time-tracker' ) ),
+		'yearly'    => array( __( 'yearly', 'plain-language-time-tracker' ), __( 'Average per year', 'plain-language-time-tracker' ) ),
+	);
+	list( $adj, $avg_label ) = $period_words[ $project->recurring_period ?? '' ] ?? $period_words['monthly'];
+
+	$figures = array();
+
+	// 1 — Total hours. Whole-period ranges name the periods here; a ragged range
+	// names what the table below holds instead, and the period frame moves onto
+	// figure 2 where it starts applying.
+	$figures[] = array(
+		'label' => __( 'Total hours', 'plain-language-time-tracker' ),
+		'value' => pltt_format_duration( $total_min ),
+		'basis' => $is_ragged
+			? esc_html__( 'Everything in this range', 'plain-language-time-tracker' )
+			: sprintf(
+				/* translators: 1: number of periods; 2: cadence adjective, e.g. "monthly". */
+				esc_html( _n( 'Across %1$d %2$s period', 'Across %1$d %2$s periods', $periods, 'plain-language-time-tracker' ) ),
+				$periods,
+				esc_html( $adj )
+			),
+		'over'  => false,
+	);
+
+	// 2 — Average per period against the allocation. The load-bearing figure:
+	// it's the one that starts a conversation about resizing the retainer.
+	$avg_pct   = (int) round( $avg_min / $alloc_min * 100 );
+	$avg_basis = sprintf(
+		/* translators: 1: percent of allocation; 2: allocation duration (HTML); 3: periods over; 4: total periods. */
+		esc_html__( '%1$d%% of the %2$s included · %3$d of %4$d over', 'plain-language-time-tracker' ),
+		$avg_pct,
+		'<span class="pltt-mono">' . esc_html( pltt_format_duration( $alloc_min ) ) . '</span>',
+		(int) $summary['over_periods'],
+		$periods
+	);
+	if ( $is_ragged ) {
+		// State the snap: this figure and the two after it are whole-period
+		// numbers, so they will not add up to figure 1. Saying so beats
+		// prorating, which would be a lie with a decimal point on it.
+		$avg_basis = sprintf(
+			/* translators: 1: number of whole periods; 2: cadence adjective. */
+			esc_html( _n( 'Across %1$d whole %2$s period', 'Across %1$d whole %2$s periods', $periods, 'plain-language-time-tracker' ) ),
+			$periods,
+			esc_html( $adj )
+		) . ' · ' . $avg_basis;
+	}
+	$figures[] = array(
+		'label' => $avg_label,
+		'value' => pltt_format_duration( $avg_min ),
+		'basis' => $avg_basis,
+		'over'  => $avg_min > $alloc_min,
+	);
+
+	// 3 — What the overage across those periods is worth.
+	$overage = (float) $summary['overage_amount'];
+	$figures[] = array(
+		'label' => __( 'Overage billable', 'plain-language-time-tracker' ),
+		'value' => pltt_format_currency( $overage ),
+		'basis' => $summary['over_periods'] > 0
+			? sprintf(
+				/* translators: 1: periods over allocation; 2: cadence adjective. */
+				esc_html( _n( 'Sum of %1$d %2$s overage', 'Sum of %1$d %2$s overages', (int) $summary['over_periods'], 'plain-language-time-tracker' ) ),
+				(int) $summary['over_periods'],
+				esc_html( $adj )
+			)
+			: esc_html__( 'Never over allocation', 'plain-language-time-tracker' ),
+		'over'  => false,
+		'muted' => $overage <= 0.0,
+	);
+
+	// 4 — What of it is still owed. CLOSED periods only (amendment §4): a figure
+	// that silently included the open period's overage would report money that
+	// can't be billed as though it were waiting to be. The basis names the
+	// exclusion so the gap against figure 3 is stated, not hidden.
+	$unbilled   = (float) $summary['unbilled_amount'];
+	$open_count = (int) $summary['open_periods'];
+	$all_open   = ( $open_count >= $periods );
+
+	$f4_parts = array();
+	if ( $summary['unbilled_periods'] > 0 ) {
+		$f4_parts[] = '<a class="pltt-lk pltt-lk-over" href="' .
+			esc_url( admin_url( 'admin.php?page=pltt-invoicing' ) . '#pltt-bill-proj-' . (int) $project->id ) . '">' .
+			sprintf(
+				/* translators: %d: number of periods with unbilled overage. */
+				esc_html( _n( '%d period', '%d periods', (int) $summary['unbilled_periods'], 'plain-language-time-tracker' ) ),
+				(int) $summary['unbilled_periods']
+			) . ' &rsaquo;</a>';
+	} elseif ( ! $all_open && count( PLTT_Billing::get_for_project_history( (int) $project->id ) ) > 0 ) {
+		$f4_parts[] = '<a class="pltt-lk" href="' .
+			esc_url( add_query_arg( 'tab', 'report', PLTT_Project_Detail::get_url( (int) $project->id ) ) . '#pltt-billing-history' ) . '">' .
+			esc_html__( 'View records', 'plain-language-time-tracker' ) . ' &rsaquo;</a>';
+	}
+	if ( $open_count > 0 && ! $all_open && '' !== $summary['open_period_label'] ) {
+		$f4_parts[] = sprintf(
+			/* translators: %s: the open period's name, e.g. "July 2026". */
+			esc_html__( '%s still open', 'plain-language-time-tracker' ),
+			esc_html( $summary['open_period_label'] )
+		);
+	}
+
+	// Every period in range is still running → the question isn't answerable
+	// yet, so a dash rather than a zero, exactly as §3's open-period rule.
+	$figures[] = array(
+		'label' => __( 'Not yet billed', 'plain-language-time-tracker' ),
+		'value' => $all_open ? '—' : pltt_format_currency( $unbilled ),
+		'basis' => $all_open ? '' : implode( ' · ', $f4_parts ),
+		'over'  => ( ! $all_open && $unbilled > 0 ),
+		'muted' => ( $all_open || $unbilled <= 0.0 ),
+	);
+
+	return array(
+		'figures' => $figures,
+		'bar'     => null,
+	);
+}
+
+function pltt_build_single_project_scope_figures( $project, $stats, $billing_type, $context_overage = null, $date_from = null, $date_to = null ) {
+	if ( ! in_array( $billing_type, array( 'hourly', 'fixed', 'recurring' ), true ) ) {
+		return null;
+	}
+
+	$rate         = pltt_resolve_billable_rate( (int) $project->client_id, (int) $project->id );
+	$total_min    = $stats ? (int) $stats->total_minutes : 0;
+	$billable_min = $stats ? (int) $stats->billable_minutes : 0;
+	$billable_amt = $stats ? (float) $stats->billable_amount : 0.0;
+
+	// Billed to date — all committed records for this project (lifetime).
+	$records      = PLTT_Billing::get_for_project_history( (int) $project->id );
+	$record_count = count( $records );
+	$billed_total = 0.0;
+	foreach ( $records as $rec ) {
+		$billed_total += (float) $rec->billed_amount;
+	}
+	if ( $record_count > 0 ) {
+		$history_url  = add_query_arg( 'tab', 'report', PLTT_Project_Detail::get_url( (int) $project->id ) ) . '#pltt-billing-history';
+		$billed_basis = sprintf(
+			/* translators: %d: number of committed bill records. */
+			esc_html( _n( '%d bill record', '%d bill records', $record_count, 'plain-language-time-tracker' ) ),
+			$record_count
+		) . ' · <a class="pltt-lk" href="' . esc_url( $history_url ) . '">' . esc_html__( 'View records', 'plain-language-time-tracker' ) . ' &rsaquo;</a>';
+	} else {
+		$billed_basis = esc_html__( 'No bill record yet', 'plain-language-time-tracker' );
+	}
+	$billed_figure = array(
+		'label' => __( 'Billed to date', 'plain-language-time-tracker' ),
+		'value' => pltt_format_currency( $billed_total ),
+		'basis' => $billed_basis,
+		'over'  => false,
+	);
+
+	// ---- Retainer. Two shapes, chosen by how much of the calendar is in view:
+	//
+	//   ONE allocation period ($context_overage resolves to over/within) → the
+	//   period figures, with figure 4 as that period's billing status.
+	//
+	//   SEVERAL periods (the range spans them, so $context_overage is
+	//   'unavailable') → the multi-period set below. It can't be billed here —
+	//   a retainer period IS the billing unit, so a span of them has no single
+	//   record to commit — but it can still report and link, exactly like an
+	//   open period does.
+	if ( 'recurring' === $billing_type ) {
+		if ( empty( $context_overage ) || ! in_array( $context_overage['state'], array( 'over', 'within' ), true ) ) {
+			return pltt_build_retainer_span_figures( $project, $stats, $date_from, $date_to );
+		}
+
+		// PARTIAL range (amendment §3): the filter sits inside one period without
+		// filling it. The overage engine resolves the period and answers for the
+		// WHOLE of it, so figures 2–4 are period-framed while the table below shows
+		// only the range — a mismatch the labels have to state. Figure 1 follows the
+		// range (it's the readout of what's on screen); the rest name the period.
+		$is_partial = (
+			$date_from && $date_to
+			&& ( $date_from > (string) $context_overage['period_start'] || $date_to < (string) $context_overage['period_end'] )
+		);
+		if ( $is_partial ) {
+			return pltt_build_retainer_partial_figures( $project, $stats, $context_overage );
+		}
+		$used_min   = (int) $context_overage['used_minutes'];
+		$alloc_min  = (int) $context_overage['allocation_minutes'];
+		$over_min   = (int) $context_overage['overage_minutes'];
+		$rem_min    = (int) $context_overage['remaining_minutes'];
+		$p_start    = (string) $context_overage['period_start'];
+		$p_end      = (string) $context_overage['period_end'];
+		$is_over    = ( 'over' === $context_overage['state'] );
+		$pct        = $alloc_min > 0 ? (int) round( $used_min / $alloc_min * 100 ) : 0;
+		$period_lbl = $p_start ? date_i18n( 'F Y', strtotime( $p_start ) ) : '';
+		$today      = pltt_get_current_date();
+		$is_closed  = ( $p_end && $p_end < $today );
+
+		$r_figures = array();
+		// 1 — Total hours (% against allocation on basis).
+		$r_figures[] = array(
+			'label' => __( 'Total hours', 'plain-language-time-tracker' ),
+			'value' => pltt_format_duration( $used_min ),
+			'basis' => sprintf(
+				/* translators: 1: allocation duration (HTML); 2: percent of allocation used. */
+				esc_html__( 'Against %1$s included · %2$d%%', 'plain-language-time-tracker' ),
+				'<span class="pltt-mono">' . esc_html( pltt_format_duration( $alloc_min ) ) . '</span>',
+				$pct
+			),
+			'over'  => false,
+		);
+		// 2 — Over allocation — the chargeable portion.
+		$r_figures[] = array(
+			'label' => __( 'Over allocation', 'plain-language-time-tracker' ),
+			'value' => pltt_format_duration( $is_over ? $over_min : 0 ),
+			'basis' => $is_over
+				? esc_html__( 'The chargeable portion', 'plain-language-time-tracker' )
+				: sprintf(
+					/* translators: %s: remaining allocation (HTML). */
+					esc_html__( 'Within allocation · %s remaining', 'plain-language-time-tracker' ),
+					'<span class="pltt-mono">' . esc_html( pltt_format_duration( $rem_min ) ) . '</span>'
+				),
+			'over'  => $is_over,
+		);
+		// 3 — Billable amount — overage only (gross chargeable).
+		$gross = $is_over ? round( pltt_billable_amount( $over_min, $rate ), 2 ) : 0.0;
+		$r_figures[] = array(
+			'label' => __( 'Billable amount', 'plain-language-time-tracker' ),
+			'value' => pltt_format_currency( $gross ),
+			'basis' => $is_over
+				? '<span class="pltt-mono">' . esc_html( pltt_format_duration( $over_min ) . ' × ' . pltt_format_currency( $rate ) . '/hr' ) . '</span>'
+				: esc_html__( 'Nothing over allocation', 'plain-language-time-tracker' ),
+			'over'  => false,
+		);
+
+		// 4 — Not yet billed / Billed, from the shared state machine.
+		$f4_state     = pltt_retainer_period_status_figure( $project, $p_start, $p_end, $gross, $is_over, $is_closed, $records );
+		$f4           = $f4_state['figure'];
+		$unbilled_rem = $f4_state['unbilled'];
+		$show_bar     = $f4_state['billable_now'];
+		$bar_amt      = $show_bar ? $unbilled_rem : 0.0;
+		$r_figures[]  = $f4;
+
+		// Bar — only "Closed, unbilled" offers Review & bill (one action per screen).
+		$r_bar = null;
+		if ( $show_bar ) {
+			$review_url = add_query_arg(
+				array(
+					'page'       => 'pltt-reports',
+					'view'       => 'detailed',
+					'client_id'  => (int) $project->client_id,
+					'project_id' => (int) $project->id,
+					'from'       => $p_start,
+					'to'         => $p_end,
+					'bill'       => 1,
+				),
+				admin_url( 'admin.php' )
+			);
+			$r_bar = array(
+				'amount'     => pltt_format_currency( $bar_amt ),
+				/* translators: %s: billing period label, e.g. "June 2026". */
+				'desc'       => sprintf( esc_html__( 'for %s', 'plain-language-time-tracker' ), esc_html( $period_lbl ) ),
+				'review_url' => $review_url,
+			);
+		}
+
+		return array(
+			'figures' => $r_figures,
+			'bar'     => $r_bar,
+			'backlog' => null,
+		);
+	}
+
+	$figures = array();
+	$bar     = null;
+
+	if ( 'hourly' === $billing_type ) {
+		// Total hours.
+		$figures[] = array(
+			'label' => __( 'Total hours', 'plain-language-time-tracker' ),
+			'value' => pltt_format_duration( $total_min ),
+			'basis' => esc_html__( 'All entries in this range', 'plain-language-time-tracker' ),
+			'over'  => false,
+		);
+		// Billable amount.
+		$figures[] = array(
+			'label' => __( 'Billable amount', 'plain-language-time-tracker' ),
+			'value' => pltt_format_currency( $billable_amt ),
+			'basis' => '<span class="pltt-mono">' . esc_html( pltt_format_duration( $billable_min ) . ' × ' . pltt_format_currency( $rate ) . '/hr' ) . '</span>',
+			'over'  => false,
+		);
+
+		// Not yet billed — uncovered unbilled work, SCOPED TO THE RANGE (amendment
+		// §6). The figure describes what's on screen: filtered to one day, it
+		// answers for that day, the same as figures 1 and 2. Work outside the
+		// range doesn't disappear — it becomes a count and a link on the basis
+		// line, which is the only place it can appear without the figure lying
+		// about its own frame.
+		$is_active = ( 'active' === ( $project->status ?? '' ) );
+
+		$ready_total = 0.0;
+		$ready_count = 0;
+		$oldest      = '';
+		$ready_scopes = $is_active
+			? PLTT_Billing::get_ready_to_invoice( $project, true, $date_from, $date_to )
+			: array();
+		foreach ( $ready_scopes as $s ) {
+			$ready_total += (float) $s['unbilled'];
+			foreach ( $s['entries'] as $e ) {
+				$ready_count++;
+				if ( '' === $oldest || $e->entry_date < $oldest ) {
+					$oldest = $e->entry_date;
+				}
+			}
+		}
+		$ready_total = round( $ready_total, 2 );
+		$has_ready   = ( $ready_total > 0.005 );
+
+		// Backlog — unbilled entries the filter can't reach. Derived by taking the
+		// all-time set and subtracting what's in range, so at "All time" it comes
+		// out at zero and the line is absent, exactly as it should be: nothing is
+		// outside everything.
+		$backlog_count = 0;
+		if ( $is_active ) {
+			$all_count = 0;
+			foreach ( PLTT_Billing::get_ready_to_invoice( $project, true ) as $s ) {
+				$all_count += count( $s['entries'] );
+			}
+			$backlog_count = max( 0, $all_count - $ready_count );
+		}
+
+		if ( $has_ready ) {
+			$ready_basis = sprintf(
+				/* translators: %d: number of unbilled entries in the filtered range. */
+				esc_html( _n( '%d unbilled entry', '%d unbilled entries', $ready_count, 'plain-language-time-tracker' ) ),
+				$ready_count
+			);
+			if ( $oldest ) {
+				$ready_basis .= ' · ' . esc_html__( 'oldest', 'plain-language-time-tracker' ) . ' <span class="pltt-mono">' . esc_html( date_i18n( 'M j', strtotime( $oldest ) ) ) . '</span>';
+			}
+		} else {
+			$ready_basis = esc_html__( 'Nothing outstanding', 'plain-language-time-tracker' );
+		}
+
+		if ( $backlog_count > 0 ) {
+			$backlog_url = admin_url( 'admin.php?page=pltt-invoicing' ) . '#pltt-bill-proj-' . (int) $project->id;
+			$ready_basis .= ' · <a class="pltt-lk pltt-lk-over" href="' . esc_url( $backlog_url ) . '">' . sprintf(
+				/* translators: %d: unbilled entries outside the filtered range. */
+				esc_html( _n( '%d outside this range', '%d outside this range', $backlog_count, 'plain-language-time-tracker' ) ),
+				$backlog_count
+			) . ' &rsaquo;</a>';
+		}
+
+		// One name for this slot on every type and every range (amendment §7):
+		// "Not yet billed" names the STATE. "Ready to bill" / "Sitting unbilled"
+		// named the readiness or the age — and the age is already on the basis
+		// line ("oldest Feb 17"), so the label was duplicating it.
+		$figures[] = array(
+			'label' => __( 'Not yet billed', 'plain-language-time-tracker' ),
+			'value' => pltt_format_currency( $ready_total ),
+			'basis' => $ready_basis,
+			'over'  => $has_ready,
+			// Faint warm wash on the cell whenever work is stranded outside the
+			// filter — the only other signal that the figure isn't the whole story.
+			'tint'  => ( $backlog_count > 0 ),
+		);
+
+		$figures[] = $billed_figure;
+
+		// Action bar — only when something is ready to bill. The button jumps to
+		// the select-row flow (bill=1) over the span of unbilled entries.
+		if ( $has_ready ) {
+			// Bill exactly what the figure above states: the filtered range. Using
+			// the all-time span here made the number, the button and the table
+			// below disagree about what was being billed.
+			$today      = pltt_get_current_date();
+			$from       = $date_from ? $date_from : ( $oldest ? $oldest : $today );
+			$bar_to     = $date_to ? $date_to : $today;
+			$review_url = add_query_arg(
+				array(
+					'page'       => 'pltt-reports',
+					'view'       => 'detailed',
+					'client_id'  => (int) $project->client_id,
+					'project_id' => (int) $project->id,
+					'from'       => $from,
+					'to'         => $bar_to,
+					'bill'       => 1,
+				),
+				admin_url( 'admin.php' )
+			);
+			$bar = array(
+				'amount'     => pltt_format_currency( $ready_total ),
+				'desc'       => sprintf(
+					/* translators: %d: number of unbilled entries. */
+					esc_html( _n( 'across %d unbilled entry', 'across %d unbilled entries', $ready_count, 'plain-language-time-tracker' ) ),
+					$ready_count
+				),
+				'review_url' => $review_url,
+			);
+		}
+	} else {
+		// Fixed budget — awareness figures, no bill action (no records generated).
+		// The budget is a LIFETIME quantity, so the budget figure compares
+		// whole-project hours to it; the date filter only scopes figure 1. Never
+		// divide a filtered period's hours by the lifetime budget (handoff spec,
+		// "Period figures vs lifetime figures").
+		$life_stats = PLTT_Entries::get_stats( array( 'project_id' => (int) $project->id ) );
+		$life_min   = $life_stats ? (int) $life_stats->total_minutes : 0;
+		$budget_min = pltt_budgeted_minutes( $project, $rate );
+
+		// 1 — Hours for the filtered span. The label names the span unless the
+		// filter covers the whole project (frames agree → plain "Total hours").
+		$first = $life_stats->first_entry_date ?? '';
+		$last  = $life_stats->last_entry_date ?? '';
+		$whole = ( $first && $last && $date_from && $date_to && $date_from <= $first && $date_to >= $last );
+		if ( $whole ) {
+			$f1_label = __( 'Total hours', 'plain-language-time-tracker' );
+			$f1_basis = esc_html__( 'All entries on this project', 'plain-language-time-tracker' );
+		} else {
+			// Matches the date-nav's own "month" step: starts on the 1st and stays
+			// within that month — so a full month AND a partial "this month"
+			// (1st → today) both read as the month, not "Hours logged".
+			$is_month = ( $date_from && $date_to
+				&& $date_from === date_i18n( 'Y-m-01', strtotime( $date_from ) )
+				&& date_i18n( 'Y-m', strtotime( $date_from ) ) === date_i18n( 'Y-m', strtotime( $date_to ) ) );
+			$f1_label = $is_month
+				/* translators: %s: month and year, e.g. "June 2026". */
+				? sprintf( __( 'Hours in %s', 'plain-language-time-tracker' ), date_i18n( 'F Y', strtotime( $date_from ) ) )
+				: __( 'Hours logged', 'plain-language-time-tracker' );
+			$f1_basis = '';
+		}
+		$figures[] = array(
+			'label' => $f1_label,
+			'value' => pltt_format_duration( $total_min ),
+			'basis' => $f1_basis,
+			'over'  => false,
+		);
+
+		// 2 — Budget left / Budget overrun (lifetime). Value is the actionable
+		// number; the basis carries "<used> of <budget> used · N%".
+		if ( $budget_min > 0 ) {
+			$pct   = (int) round( $life_min / $budget_min * 100 );
+			$basis = sprintf(
+				/* translators: 1: lifetime hours used (HTML); 2: budgeted duration (HTML); 3: percent of budget used. */
+				esc_html__( '%1$s of %2$s used · %3$d%%', 'plain-language-time-tracker' ),
+				'<span class="pltt-mono">' . esc_html( pltt_format_duration( $life_min ) ) . '</span>',
+				'<span class="pltt-mono">' . esc_html( pltt_format_duration( $budget_min ) ) . '</span>',
+				$pct
+			);
+			if ( $life_min > $budget_min ) {
+				$figures[] = array( 'label' => __( 'Budget overrun', 'plain-language-time-tracker' ), 'value' => pltt_format_duration( $life_min - $budget_min ), 'basis' => $basis, 'over' => true );
+			} else {
+				$figures[] = array( 'label' => __( 'Budget left', 'plain-language-time-tracker' ), 'value' => pltt_format_duration( $budget_min - $life_min ), 'basis' => $basis, 'over' => false );
+			}
+		} else {
+			$figures[] = array( 'label' => __( 'Total on project', 'plain-language-time-tracker' ), 'value' => pltt_format_duration( $life_min ), 'basis' => esc_html__( 'All entries on this project', 'plain-language-time-tracker' ), 'over' => false );
+		}
+
+		// 3 — The project fee (the agreed amount). No basis line: the model badge
+		// and the terms line above already say it's fixed.
+		$fee = isset( $project->budget_fee ) ? (float) $project->budget_fee : 0.0;
+		$figures[] = array(
+			'label' => __( 'Project fee', 'plain-language-time-tracker' ),
+			'value' => pltt_format_currency( $fee ),
+			'basis' => '',
+			'over'  => false,
+		);
+	}
+
+	return array(
+		'figures' => $figures,
+		'bar'     => $bar,
+		'backlog' => null,
+	);
 }
 
 /**
@@ -1845,6 +2550,52 @@ function pltt_build_billing_scope_view( $scope, $client_name ) {
 		'date_range'   => $date_range,
 		'hours_label'  => pltt_format_duration( $basis ),
 		'count'        => count( $entries ),
+	);
+}
+
+/**
+ * Build the Overview detailed-view URL that "reviews" a committed billing record.
+ *
+ * Lands on the single-project detailed entries view scoped to the record's
+ * covered range, with record_id set so the view swaps its bill bar for a
+ * read-only "Line items" bar (see templates/partials/billing-record-bar.php).
+ * The mirror of the "Bill" gateway link, minus bill=1 — same view, no commit.
+ *
+ * @param object $record  Billing record row (needs id, project_id, period_start/end).
+ * @param array  $entries Frozen covered entries (oldest-first) for the hourly span
+ *                        fallback when the record has no period_start.
+ * @return string Admin URL, or '' if the project is gone.
+ */
+function pltt_billing_record_view_url( $record, array $entries = array() ) {
+	$proj = PLTT_Projects::get( (int) $record->project_id );
+	if ( ! $proj ) {
+		return '';
+	}
+
+	// Covered range: retainer names its stored period; hourly (no period_start)
+	// falls back to the span of its frozen entries.
+	if ( ! empty( $record->period_start ) ) {
+		$from = (string) $record->period_start;
+		$to   = ! empty( $record->period_end ) ? (string) $record->period_end : $from;
+	} elseif ( ! empty( $entries ) ) {
+		$from = (string) $entries[0]->entry_date;
+		$to   = (string) $entries[ count( $entries ) - 1 ]->entry_date;
+	} else {
+		$from = pltt_get_current_date();
+		$to   = $from;
+	}
+
+	return add_query_arg(
+		array(
+			'page'       => 'pltt-reports',
+			'view'       => 'detailed',
+			'client_id'  => (int) $proj->client_id,
+			'project_id' => (int) $proj->id,
+			'from'       => $from,
+			'to'         => $to,
+			'record_id'  => (int) $record->id,
+		),
+		admin_url( 'admin.php' )
 	);
 }
 
@@ -2056,7 +2807,14 @@ function pltt_billable_flag_applies( $project ) {
 		return true;
 	}
 	$type = pltt_get_billing_type( $project );
-	return 'recurring' !== $type && 'fixed' !== $type;
+	// Retainer and fixed fee bill at the period level, so a per-entry flag has
+	// nothing to decide. Internal is excluded for a different reason: there is no
+	// client, no rate and no path to a bill record, so "billable internal work"
+	// isn't a state the app can act on — every internal entry in the database is
+	// already billable = 0. Leaving it in made internal rows show a live toggle in
+	// Entries and a greyed "$" on the Projects list where every other
+	// never-billed type shows a dash.
+	return 'recurring' !== $type && 'fixed' !== $type && 'none' !== $type;
 }
 
 /**
@@ -2066,10 +2824,10 @@ function pltt_billable_flag_applies( $project ) {
  */
 function pltt_render_billing_type_badge( $billing_type ) {
 	$styles = array(
-		'none'      => array( '', __( 'Internal', 'plain-language-time-tracker' ) ),
-		'recurring' => array( 'pltt-badge-info', __( 'Monthly', 'plain-language-time-tracker' ) ),
-		'fixed'     => array( 'pltt-badge-purple', __( 'Fixed Budget', 'plain-language-time-tracker' ) ),
-		'hourly'    => array( 'pltt-badge-success', __( 'Hourly', 'plain-language-time-tracker' ) ),
+		'none'      => array( 'pltt-badge-model-internal', __( 'Internal', 'plain-language-time-tracker' ) ),
+		'recurring' => array( 'pltt-badge-model-monthly', __( 'Monthly', 'plain-language-time-tracker' ) ),
+		'fixed'     => array( 'pltt-badge-model-fixed', __( 'Fixed Budget', 'plain-language-time-tracker' ) ),
+		'hourly'    => array( 'pltt-badge-model-hourly', __( 'Hourly', 'plain-language-time-tracker' ) ),
 	);
 	list( $class, $label ) = $styles[ $billing_type ] ?? $styles['hourly'];
 	$class                 = trim( 'pltt-badge ' . $class );
@@ -2088,11 +2846,13 @@ function pltt_billing_type_badge_class( $billing_type ) {
 	switch ( $billing_type ) {
 		case 'recurring':
 		case 'retainer_overage':
-			return 'pltt-badge-info';
+			return 'pltt-badge-model-monthly';
 		case 'fixed':
-			return 'pltt-badge-purple';
+			return 'pltt-badge-model-fixed';
+		case 'none':
+			return 'pltt-badge-model-internal';
 		default:
-			return 'pltt-badge-success'; // hourly.
+			return 'pltt-badge-model-hourly'; // hourly.
 	}
 }
 

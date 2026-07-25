@@ -1,12 +1,14 @@
 <?php
 /**
- * Report tab — period lens + stat cards + volume chart + "Where the time went"
- * bars + swimlane timeline.
+ * Report tab — period lens + type-aware hero + stat cards + volume chart.
  *
  * For recurring projects a period lens (Full / step-by-period) re-scopes the
- * cards, the volume chart, and the "Where the time went" bars to the chosen
- * window; the swimlane always shows the full lifetime arc. Every other billing
- * type stays on the full lifetime span with no control.
+ * cards and the volume chart to the chosen window. Every other billing type
+ * stays on the full lifetime span with no control.
+ *
+ * The per-tag "Where the time went" bars and the "Activity over time" swimlane
+ * were removed 2026-07-18 — see docs/removed-project-report-sections.md for the
+ * design + how to rebuild them.
  *
  * Expects $report (from PLTT_Project_Report::build()) and $project in scope.
  *
@@ -18,11 +20,8 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-$cards    = $report['cards'];
-$bar_groups = $report['groupings'];                                  // Windowed — "Where the time went".
-$dimensions = $report['timeline_groupings'] ?? $report['groupings']; // Lifetime — swimlane + the toggle's dimension set.
-$default  = $report['default_group'];
-$window   = $report['window'] ?? null;
+$cards  = $report['cards'];
+$window = $report['window'] ?? null;
 
 $has_entries = ! empty( $report['has_entries'] );
 $is_period   = ! empty( $window['is_period'] );
@@ -37,32 +36,103 @@ $is_period   = ! empty( $window['is_period'] );
 <?php endif; ?>
 
 <?php
-// Type-aware hero — headline gauge/figure above the cards. Null for internal.
+// Scope block — this screen IS a scope with agreed terms, so identity and
+// figures live in one bordered object (see pltt-system.css). Identity is the
+// project's lifetime; the figure row (cards) re-scopes with the period lens.
+$scope_terms = ( isset( $client ) && $client && ! empty( $client->name ) )
+	? $client->name
+	: __( 'Internal', 'plain-language-time-tracker' );
+if ( 'hourly' === $billing_type ) {
+	$hr_rate = pltt_resolve_billable_rate( (int) $project->client_id, (int) $project->id );
+	if ( $hr_rate > 0 ) {
+		/* translators: %s: hourly rate, e.g. "$100.00". */
+		$scope_terms .= ' · ' . sprintf( __( '%s/hr', 'plain-language-time-tracker' ), pltt_format_currency( $hr_rate ) );
+	}
+}
+
+$span_first = $stats->first_entry_date ?? '';
+$span_last  = $stats->last_entry_date ?? '';
+$span_txt   = '';
+if ( $span_first && $span_last ) {
+	$span_txt = ( $span_first === $span_last )
+		? date_i18n( 'M j, Y', strtotime( $span_first ) )
+		: date_i18n( 'M j, Y', strtotime( $span_first ) ) . ' – ' . date_i18n( 'M j, Y', strtotime( $span_last ) );
+}
+$span_count = isset( $stats->total_count ) ? (int) $stats->total_count : 0;
+?>
+<div class="pltt-scope-block">
+	<div class="pltt-scope-id">
+		<div class="pltt-scope-titlerow">
+			<h1 class="pltt-scope-title"><?php echo esc_html( $project->name ); ?></h1>
+			<?php pltt_render_billing_type_badge( $billing_type ); ?>
+			<?php if ( 'archived' === $project->status ) : ?>
+				<span class="pltt-badge pltt-badge-archived"><?php esc_html_e( 'Archived', 'plain-language-time-tracker' ); ?></span>
+			<?php endif; ?>
+		</div>
+		<div class="pltt-scope-terms"><?php echo esc_html( $scope_terms ); ?></div>
+		<?php if ( '' !== $span_txt || $span_count > 0 ) : ?>
+			<div class="pltt-scope-when">
+				<span><?php esc_html_e( 'Showing', 'plain-language-time-tracker' ); ?></span>
+				<?php if ( '' !== $span_txt ) : ?>
+					<span class="pltt-mono"><?php echo esc_html( $span_txt ); ?></span>
+				<?php endif; ?>
+				<?php if ( $span_count > 0 ) : ?>
+					<span>&middot; <?php echo esc_html( sprintf( _n( '%s entry', '%s entries', $span_count, 'plain-language-time-tracker' ), number_format_i18n( $span_count ) ) ); ?></span>
+				<?php endif; ?>
+			</div>
+		<?php endif; ?>
+	</div>
+
+	<!-- Figure row: the shared number bar (label / value / basis). -->
+	<div class="pltt-summary-cards pltt-numbar pltt-stat-cards">
+		<?php foreach ( $cards['items'] as $card ) : ?>
+			<div class="card">
+				<div class="card-label"><?php echo esc_html( $card['label'] ); ?></div>
+				<?php if ( $card['is_empty'] ) : ?>
+					<div class="card-value pltt-card-value-empty">&mdash;</div>
+				<?php else : ?>
+					<?php
+					$card_value_class = 'card-value';
+					if ( ! empty( $card['over'] ) ) {
+						$card_value_class .= ' pltt-numbar-over';
+					} elseif ( ! empty( $card['muted'] ) ) {
+						$card_value_class .= ' pltt-numbar-muted';
+					}
+					?>
+					<div class="<?php echo esc_attr( $card_value_class ); ?>">
+						<?php echo esc_html( $card['value'] ); ?>
+						<?php if ( '' !== $card['value_suffix'] ) : ?>
+							<span class="pltt-card-value-of"><?php echo esc_html( $card['value_suffix'] ); ?></span>
+						<?php endif; ?>
+					</div>
+				<?php endif; ?>
+				<?php
+				// Basis line: plain text, an inline link, both joined with " · ", or
+				// pre-built HTML from a shared figure helper.
+				$card_link = ! empty( $card['sub_link'] ) ? $card['sub_link'] : null;
+				$card_html = ! empty( $card['sub_html'] ) ? $card['sub_html'] : '';
+				if ( '' !== $card['sub'] || $card_link || '' !== $card_html ) :
+					?>
+					<div class="card-secondary<?php echo $card['attention'] ? ' pltt-alloc-over' : ''; ?>">
+						<?php echo esc_html( $card['sub'] ); ?>
+						<?php echo $card_html; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- assembled from escaped parts in pltt_retainer_period_status_figure(). ?>
+						<?php if ( $card_link ) : ?>
+							<?php echo ( '' !== $card['sub'] ) ? ' &middot; ' : ''; ?>
+							<a class="pltt-lk" href="<?php echo esc_url( $card_link['url'] ); ?>"><?php echo esc_html( $card_link['label'] ); ?> &rsaquo;</a>
+						<?php endif; ?>
+					</div>
+				<?php endif; ?>
+			</div>
+		<?php endforeach; ?>
+	</div>
+</div>
+
+<?php
+// Type-aware hero — the gauge/figure headline, now a detail card below the
+// block (the block's number bar carries the top-line figures). Null for internal.
 $hero = $report['hero'] ?? null;
 include PLTT_PLUGIN_DIR . 'templates/partials/project-report-hero.php';
 ?>
-
-<!-- Stat cards (per billing type; shared .pltt-summary-cards / .card pattern, as on Reports) -->
-<div class="pltt-summary-cards pltt-stat-cards">
-	<?php foreach ( $cards['items'] as $card ) : ?>
-		<div class="card">
-			<div class="card-label"><?php echo esc_html( $card['label'] ); ?></div>
-			<?php if ( $card['is_empty'] ) : ?>
-				<div class="card-value pltt-card-value-empty">&mdash;</div>
-			<?php else : ?>
-				<div class="card-value">
-					<?php echo esc_html( $card['value'] ); ?>
-					<?php if ( '' !== $card['value_suffix'] ) : ?>
-						<span class="pltt-card-value-of"><?php echo esc_html( $card['value_suffix'] ); ?></span>
-					<?php endif; ?>
-				</div>
-			<?php endif; ?>
-			<?php if ( '' !== $card['sub'] ) : ?>
-				<div class="card-secondary<?php echo $card['attention'] ? ' pltt-alloc-over' : ''; ?>"><?php echo esc_html( $card['sub'] ); ?></div>
-			<?php endif; ?>
-		</div>
-	<?php endforeach; ?>
-</div>
 
 <?php
 // Ready to invoice — one prompt per outstanding scope, linking to the billing
@@ -197,310 +267,11 @@ if ( ! empty( $report['chart'] ) && $window ) :
 endif;
 ?>
 
-<!-- Where the time went -->
-<div class="pltt-card pltt-where-card">
-	<div class="pltt-where-header">
-		<h2 class="pltt-where-title"><?php esc_html_e( 'Where the time went', 'plain-language-time-tracker' ); ?></h2>
-		<?php if ( count( $dimensions ) > 1 ) : ?>
-			<div class="pltt-groupby">
-				<span class="pltt-groupby-label"><?php esc_html_e( 'Group by', 'plain-language-time-tracker' ); ?></span>
-				<div class="pltt-groupby-toggle" role="group" aria-label="<?php esc_attr_e( 'Group by', 'plain-language-time-tracker' ); ?>">
-					<?php foreach ( $dimensions as $gkey => $gdata ) : ?>
-						<?php $is_default = ( $gkey === $default ); ?>
-						<button
-							type="button"
-							class="button pltt-groupby-btn<?php echo $is_default ? ' button-primary' : ''; ?>"
-							data-group-target="<?php echo esc_attr( $gkey ); ?>"
-							aria-pressed="<?php echo $is_default ? 'true' : 'false'; ?>"
-						><?php echo esc_html( $gdata['label'] ); ?></button>
-					<?php endforeach; ?>
-				</div>
-			</div>
-		<?php endif; ?>
-	</div>
-
-	<?php foreach ( $dimensions as $gkey => $dim ) : ?>
-		<?php
-		// Bars use the windowed slice for this dimension; the lifetime dimension
-		// set drives the keys so the group-by toggle stays in sync with the
-		// (lifetime) swimlane below.
-		$wg      = isset( $bar_groups[ $gkey ] ) ? $bar_groups[ $gkey ] : null;
-		$buckets = ( $wg && ! empty( $wg['buckets'] ) ) ? $wg['buckets'] : array();
-		$g_desc  = ( $wg && ! empty( $wg['description'] ) ) ? $wg['description'] : ( $dim['description'] ?? '' );
-		?>
-		<div class="pltt-bars-group" data-group="<?php echo esc_attr( $gkey ); ?>" <?php echo ( $gkey === $default ) ? '' : 'hidden'; ?>>
-			<?php if ( ! empty( $g_desc ) ) : ?>
-				<p class="pltt-where-desc"><?php echo esc_html( $g_desc ); ?></p>
-			<?php endif; ?>
-			<?php if ( empty( $buckets ) ) : ?>
-				<p class="description pltt-bars-empty">
-					<?php
-					if ( $is_period ) {
-						/* translators: %s: grouping label. */
-						printf( esc_html__( 'No %s tags in this period.', 'plain-language-time-tracker' ), esc_html( strtolower( $dim['label'] ) ) );
-					} else {
-						/* translators: %s: grouping label. */
-						printf( esc_html__( 'No %s tags on this project.', 'plain-language-time-tracker' ), esc_html( strtolower( $dim['label'] ) ) );
-					}
-					?>
-				</p>
-			<?php else : ?>
-				<?php
-				$max         = max( 1, (int) $wg['max_minutes'] );
-				$color_index = 0;
-				?>
-				<ul class="pltt-bars">
-					<?php foreach ( $buckets as $bucket ) : ?>
-						<?php
-						$width      = (int) round( ( $bucket['minutes'] / $max ) * 100 );
-						$pct        = (int) round( $bucket['pct'] * 100 );
-						$color_cls  = $bucket['is_untagged'] ? '' : ' pltt-bar-color-' . ( $color_index % 8 );
-						if ( ! $bucket['is_untagged'] ) {
-							$color_index++;
-						}
-
-						// Formatted hover tooltip — adds the active date range, which isn't shown inline.
-						$bar_range = '';
-						if ( ! empty( $bucket['first_date'] ) && ! empty( $bucket['last_date'] ) ) {
-							$bar_range = ( $bucket['first_date'] === $bucket['last_date'] )
-								? date_i18n( 'M j, Y', strtotime( $bucket['first_date'] ) )
-								: date_i18n( 'M j', strtotime( $bucket['first_date'] ) ) . ' – ' . date_i18n( 'M j, Y', strtotime( $bucket['last_date'] ) );
-						}
-						$bar_rows = array(
-							array( __( 'Time', 'plain-language-time-tracker' ), pltt_format_duration( (int) $bucket['minutes'] ) ),
-							array(
-								__( 'Share', 'plain-language-time-tracker' ),
-								/* translators: %d: percent of project total. */
-								sprintf( __( '%d%% of total', 'plain-language-time-tracker' ), (int) $pct ),
-							),
-						);
-						if ( '' !== $bar_range ) {
-							$bar_rows[] = array( __( 'Active span', 'plain-language-time-tracker' ), $bar_range );
-						}
-						$bar_rows[] = array(
-							__( 'Worked', 'plain-language-time-tracker' ),
-							/* translators: %d: number of days worked. */
-							sprintf( _n( '%d day', '%d days', (int) $bucket['worked_days'], 'plain-language-time-tracker' ), (int) $bucket['worked_days'] ),
-						);
-						?>
-						<li
-							class="pltt-bar-row<?php echo $bucket['is_untagged'] ? ' pltt-bar-untagged' : ''; ?><?php echo esc_attr( $color_cls ); ?>"
-							data-pltt-tip
-							data-tip-title="<?php echo esc_attr( $bucket['label'] ); ?>"
-							data-tip-rows='<?php echo esc_attr( wp_json_encode( $bar_rows ) ); ?>'
-						>
-							<div class="pltt-bar-labelwrap">
-								<span class="pltt-bar-dot" aria-hidden="true"></span>
-								<span class="pltt-bar-label"><?php echo esc_html( $bucket['label'] ); ?></span>
-							</div>
-							<div class="pltt-bar-main">
-								<div class="pltt-bar-track">
-									<div class="pltt-bar-fill" style="width: <?php echo esc_attr( $width ); ?>%;"></div>
-								</div>
-								<span class="pltt-bar-meta">
-									<span class="pltt-bar-hours"><?php echo esc_html( pltt_format_duration( $bucket['minutes'] ) ); ?></span>
-									<span class="pltt-bar-meta-sub">
-										<?php
-										printf(
-											/* translators: 1: percent of total, 2: span in days, 3: worked days. */
-											esc_html__( '· %1$d%% over %2$dd · worked %3$dd', 'plain-language-time-tracker' ),
-											(int) $pct,
-											(int) $bucket['span_days'],
-											(int) $bucket['worked_days']
-										);
-										?>
-									</span>
-								</span>
-							</div>
-						</li>
-					<?php endforeach; ?>
-				</ul>
-			<?php endif; ?>
-		</div>
-	<?php endforeach; ?>
-</div>
-
-<?php $axis = $report['axis']; ?>
 <?php
-// Budget-crossing line: project-level, grouping-independent. Position is the
-// same in every group, so it lands once here and holds still as lanes regroup.
-$budget_line = $report['budget_line'] ?? null;
-$bl_pct      = null;
-$bl_rows     = array();
-if ( ! empty( $budget_line ) && ! empty( $axis ) ) {
-	$bl_pct  = round( PLTT_Project_Report::axis_pct( $axis, $budget_line['date'] ), 2 );
-	$bl_rows = array(
-		array( __( 'Crossed', 'plain-language-time-tracker' ), date_i18n( 'M j, Y', strtotime( $budget_line['date'] ) ) ),
-		array( __( 'Over by', 'plain-language-time-tracker' ), pltt_format_duration( (int) $budget_line['overage_minutes'] ) ),
-	);
-}
+// "Where the time went" bars + "Activity over time" swimlane were removed here
+// on 2026-07-18 (they felt like too much on the project page). The volume chart
+// above stays. Rebuild notes: docs/removed-project-report-sections.md.
 ?>
-<?php if ( ! empty( $axis ) ) : ?>
-<!-- Activity over time (swimlane timeline) — always the full lifetime arc -->
-<div class="pltt-card pltt-timeline-card">
-	<div class="pltt-where-header">
-		<h2 class="pltt-where-title"><?php esc_html_e( 'Activity over time', 'plain-language-time-tracker' ); ?></h2>
-	</div>
-	<p class="pltt-where-desc">
-		<?php if ( null !== $bl_pct ) : ?>
-			<?php esc_html_e( 'One lane per group; each bar spans from that group’s first logged day to its last. The amber line marks where cumulative hours crossed the budget — anything to its right is over-budget time, so you can see which groups ran in the red. Hover a bar, a gap, or the line for detail.', 'plain-language-time-tracker' ); ?>
-		<?php else : ?>
-			<?php esc_html_e( 'One lane per group; each bar spans from that group’s first logged day to its last. The bar breaks where 7+ days passed with nothing logged — a dashed connector marks the pause. Hover a bar or gap for detail.', 'plain-language-time-tracker' ); ?>
-		<?php endif; ?>
-	</p>
-
-	<?php foreach ( $dimensions as $gkey => $gdata ) : ?>
-		<div class="pltt-timeline-group" data-group="<?php echo esc_attr( $gkey ); ?>" <?php echo ( $gkey === $default ) ? '' : 'hidden'; ?>>
-			<?php if ( empty( $gdata['buckets'] ) ) : ?>
-				<p class="description pltt-bars-empty"><?php esc_html_e( 'Nothing to plot for this grouping.', 'plain-language-time-tracker' ); ?></p>
-			<?php else : ?>
-				<div class="pltt-timeline">
-					<!-- Month axis -->
-					<div class="pltt-tl-head">
-						<div class="pltt-tl-headlabel"></div>
-						<div class="pltt-tl-axis" aria-hidden="true">
-							<?php foreach ( $axis['months'] as $m ) : ?>
-								<span class="pltt-tl-month" style="left: <?php echo esc_attr( round( $m['pct'], 2 ) ); ?>%;">
-									<?php echo esc_html( $m['is_jan'] ? $m['label'] . ' ' . $m['year'] : $m['label'] ); ?>
-								</span>
-							<?php endforeach; ?>
-							<?php if ( null !== $bl_pct ) : ?>
-								<span class="pltt-tl-over-label<?php echo ( $bl_pct > 70 ) ? ' pltt-tl-over-label--flip' : ''; ?>" style="left: <?php echo esc_attr( $bl_pct ); ?>%;">
-									<span class="pltt-tl-over-caret" aria-hidden="true">&#9662;</span>
-									<?php esc_html_e( 'over budget', 'plain-language-time-tracker' ); ?>
-								</span>
-							<?php endif; ?>
-						</div>
-					</div>
-
-					<div class="pltt-tl-body">
-						<div class="pltt-tl-grid" aria-hidden="true">
-							<?php foreach ( $axis['months'] as $m ) : ?>
-								<?php if ( $m['gridline'] ) : ?>
-									<span class="pltt-tl-gridline" style="left: <?php echo esc_attr( round( $m['pct'], 2 ) ); ?>%;"></span>
-								<?php endif; ?>
-							<?php endforeach; ?>
-						</div>
-
-						<?php if ( null !== $bl_pct ) : ?>
-							<div class="pltt-tl-overlay">
-								<span class="pltt-tl-over-zone" aria-hidden="true" style="left: <?php echo esc_attr( $bl_pct ); ?>%;"></span>
-								<span
-									class="pltt-tl-budget-line"
-									style="left: <?php echo esc_attr( $bl_pct ); ?>%;"
-									data-pltt-tip
-									data-tip-title="<?php esc_attr_e( 'Over budget', 'plain-language-time-tracker' ); ?>"
-									data-tip-color="none"
-									data-tip-rows='<?php echo esc_attr( wp_json_encode( $bl_rows ) ); ?>'
-								></span>
-								<span class="screen-reader-text">
-									<?php
-									printf(
-										/* translators: 1: crossing date, 2: amount over budget. */
-										esc_html__( 'Budget crossed on %1$s; %2$s over budget.', 'plain-language-time-tracker' ),
-										esc_html( date_i18n( 'M j, Y', strtotime( $budget_line['date'] ) ) ),
-										esc_html( pltt_format_duration( (int) $budget_line['overage_minutes'] ) )
-									);
-									?>
-								</span>
-							</div>
-						<?php endif; ?>
-
-						<?php $tcolor = 0; ?>
-						<?php foreach ( $gdata['buckets'] as $bucket ) : ?>
-							<?php
-							$tcolor_cls = $bucket['is_untagged'] ? ' pltt-bar-untagged' : ' pltt-bar-color-' . ( $tcolor % 8 );
-							if ( ! $bucket['is_untagged'] ) {
-								$tcolor++;
-							}
-							$segments = $bucket['segments'];
-							?>
-							<div class="pltt-tl-track<?php echo esc_attr( $tcolor_cls ); ?>">
-								<div class="pltt-tl-labelwrap">
-									<span class="pltt-bar-dot" aria-hidden="true"></span>
-									<span class="pltt-tl-label"><?php echo esc_html( $bucket['label'] ); ?></span>
-								</div>
-								<div class="pltt-tl-lane">
-									<?php
-									$prev_end = null;
-									foreach ( $segments as $seg ) :
-										$seg_l = PLTT_Project_Report::axis_pct( $axis, $seg['start'] );
-										$seg_r = PLTT_Project_Report::axis_pct( $axis, $seg['end'] );
-
-										// Dashed connector spanning the gap before this segment.
-										if ( null !== $prev_end ) :
-											$cl   = PLTT_Project_Report::axis_pct( $axis, $prev_end );
-											$idle = (int) floor( ( strtotime( $seg['start'] ) - strtotime( $prev_end ) ) / DAY_IN_SECONDS );
-
-											$gap_rows = array(
-												array(
-													__( 'Span', 'plain-language-time-tracker' ),
-													date_i18n( 'M j', strtotime( $prev_end ) ) . ' – ' . date_i18n( 'M j', strtotime( $seg['start'] ) ),
-												),
-												array(
-													__( 'Idle', 'plain-language-time-tracker' ),
-													/* translators: %d: number of idle days. */
-													sprintf( _n( '%d day', '%d days', $idle, 'plain-language-time-tracker' ), $idle ),
-												),
-											);
-											?>
-											<span
-												class="pltt-tl-connector"
-												style="left: <?php echo esc_attr( round( $cl, 2 ) ); ?>%; width: <?php echo esc_attr( round( max( 0, $seg_l - $cl ), 2 ) ); ?>%;"
-												data-pltt-tip
-												data-tip-title="<?php esc_attr_e( 'Idle gap', 'plain-language-time-tracker' ); ?>"
-												data-tip-color="none"
-												data-tip-rows='<?php echo esc_attr( wp_json_encode( $gap_rows ) ); ?>'
-											></span>
-										<?php endif; ?>
-
-										<?php
-										$range_label = ( $seg['start'] === $seg['end'] )
-											? date_i18n( 'M j', strtotime( $seg['start'] ) )
-											: date_i18n( 'M j', strtotime( $seg['start'] ) ) . ' – ' . date_i18n( 'M j', strtotime( $seg['end'] ) );
-										$seg_rows = array(
-											array( __( 'Span', 'plain-language-time-tracker' ), $range_label ),
-											array( __( 'Time', 'plain-language-time-tracker' ), pltt_format_duration( (int) $seg['minutes'] ) ),
-											array(
-												__( 'Worked', 'plain-language-time-tracker' ),
-												/* translators: %d: number of days worked. */
-												sprintf( _n( '%d day', '%d days', (int) $seg['worked_days'], 'plain-language-time-tracker' ), (int) $seg['worked_days'] ),
-											),
-										);
-										?>
-										<span
-											class="pltt-tl-seg"
-											style="left: <?php echo esc_attr( round( $seg_l, 2 ) ); ?>%; width: <?php echo esc_attr( round( max( 0, $seg_r - $seg_l ), 2 ) ); ?>%;"
-											data-pltt-tip
-											data-tip-title="<?php echo esc_attr( $bucket['label'] ); ?>"
-											data-tip-rows='<?php echo esc_attr( wp_json_encode( $seg_rows ) ); ?>'
-										></span>
-										<?php
-										$prev_end = $seg['end'];
-									endforeach;
-									?>
-								</div>
-								<span class="screen-reader-text">
-									<?php
-									printf(
-										/* translators: 1: bucket label, 2: worked days, 3: span days, 4: active-stretch count. */
-										esc_html__( '%1$s: worked %2$d of %3$d days in %4$d active stretches.', 'plain-language-time-tracker' ),
-										esc_html( $bucket['label'] ),
-										(int) $bucket['worked_days'],
-										(int) $bucket['span_days'],
-										count( $segments )
-									);
-									?>
-								</span>
-							</div>
-						<?php endforeach; ?>
-					</div>
-				</div>
-			<?php endif; ?>
-		</div>
-	<?php endforeach; ?>
-</div>
-<?php endif; ?>
 
 <?php
 // Billing history — the full read-only ledger of records for this project. Unlike

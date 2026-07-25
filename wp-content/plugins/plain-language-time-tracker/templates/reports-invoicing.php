@@ -31,7 +31,18 @@ $history_url  = add_query_arg( array( 'page' => 'pltt-invoicing', 'view' => 'his
 
 <div class="wrap pltt-wrap pltt-billing-ledger">
 	<div class="pltt-header">
-		<h1><?php esc_html_e( 'Billing', 'plain-language-time-tracker' ); ?></h1>
+		<div class="pltt-light-header">
+			<div class="pltt-lh-titlerow">
+				<h1><?php esc_html_e( 'Billing', 'plain-language-time-tracker' ); ?></h1>
+			</div>
+			<?php if ( 'history' === $view ) : ?>
+				<div class="pltt-lh-l2"><?php esc_html_e( 'Committed bill records', 'plain-language-time-tracker' ); ?></div>
+				<div class="pltt-lh-l3"><span class="pltt-mono"><?php echo esc_html( pltt_format_date_range( $date_from, $date_to ) ); ?></span></div>
+			<?php else : ?>
+				<div class="pltt-lh-l2"><?php esc_html_e( 'Outstanding work, grouped by client', 'plain-language-time-tracker' ); ?></div>
+				<div class="pltt-lh-l3"><?php printf( esc_html__( 'As of %s', 'plain-language-time-tracker' ), '<span class="pltt-mono">' . esc_html( pltt_format_date( pltt_get_current_date() ) ) . '</span>' ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?></div>
+			<?php endif; ?>
+		</div>
 		<div class="pltt-view-toggle">
 			<a href="<?php echo esc_url( $ready_url ); ?>"
 				class="button <?php echo 'ready' === $view ? 'button-primary' : ''; ?>">

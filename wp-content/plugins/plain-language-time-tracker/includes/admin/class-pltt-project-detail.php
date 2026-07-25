@@ -43,6 +43,7 @@ class PLTT_Project_Detail {
 		$stats        = PLTT_Entries::get_stats( array( 'project_id' => $project_id ) );
 		$billing_type = pltt_get_billing_type( $project );
 		$list_url     = admin_url( 'admin.php?page=pltt-projects' );
+		$client       = ! empty( $project->client_id ) ? PLTT_Clients::get( (int) $project->client_id ) : null;
 
 		// Period lens (recurring projects only): scope + period drive the cards,
 		// the "Where the time went" bars, and the volume chart. Read-only GET nav,
@@ -66,7 +67,7 @@ class PLTT_Project_Detail {
 		$subhead_stats = $is_period
 			? PLTT_Entries::get_stats( array( 'project_id' => $project_id, 'date_from' => $window['from'], 'date_to' => $window['to'] ) )
 			: $stats;
-		$subhead = self::build_subhead( $project, $subhead_stats, $billing_type, $window );
+		$subhead = self::build_subhead( $project, $subhead_stats, $billing_type, $window, $client );
 
 		// Pass $subhead_stats through as the windowed stats so build() reuses them
 		// instead of re-running the same windowed get_stats() (OPT-N-A).
@@ -78,8 +79,11 @@ class PLTT_Project_Detail {
 	/**
 	 * Build the subhead line shown under the H1.
 	 *
-	 * Format: "{Type} · {first–last span} · {N entries}". Pieces with no data are
-	 * omitted (e.g. a project with no entries shows just the type).
+	 * Format: "{Client} · {first–last span} · {N entries}". The lead piece is the
+	 * client name; the billing type is intentionally NOT repeated here because it
+	 * already shows as a badge beside the H1. Clientless projects fall back to the
+	 * type label so the line still leads with something. Pieces with no data are
+	 * omitted (e.g. a project with no entries shows just the lead piece).
 	 *
 	 * @param object      $project      Project row.
 	 * @param object|null $stats        Aggregate stats from PLTT_Entries::get_stats()
@@ -87,9 +91,10 @@ class PLTT_Project_Detail {
 	 * @param string      $billing_type Resolved billing type.
 	 * @param array|null  $window       Active period window; when scope is 'period'
 	 *                                  the date piece becomes the period label.
+	 * @param object|null $client       Owning client row (for the lead name).
 	 * @return string Middot-joined, already-escaped-safe plain text (caller escapes).
 	 */
-	private static function build_subhead( $project, $stats, $billing_type, $window = null ) {
+	private static function build_subhead( $project, $stats, $billing_type, $window = null, $client = null ) {
 		$type_labels = array(
 			'hourly'    => __( 'Hourly', 'plain-language-time-tracker' ),
 			'recurring' => __( 'Monthly', 'plain-language-time-tracker' ),
@@ -97,7 +102,12 @@ class PLTT_Project_Detail {
 			'none'      => __( 'Internal', 'plain-language-time-tracker' ),
 		);
 
-		$parts = array( $type_labels[ $billing_type ] ?? $type_labels['hourly'] );
+		// Lead with the client name; fall back to the type label only when the
+		// project has no client (the type badge by the H1 already names the type).
+		$lead  = ( $client && ! empty( $client->name ) )
+			? $client->name
+			: ( $type_labels[ $billing_type ] ?? $type_labels['hourly'] );
+		$parts = array( $lead );
 
 		if ( ! empty( $window['is_period'] ) ) {
 			// Period view: show the period itself (e.g. "June 2026"), not the span.

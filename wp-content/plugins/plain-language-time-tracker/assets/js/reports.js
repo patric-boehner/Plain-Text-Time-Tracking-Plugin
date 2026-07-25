@@ -533,7 +533,7 @@
 		 *
 		 * @param {Object} opts
 		 *   selector  - CSS selector for the toggle button (matched via .closest).
-		 *   field     - server field name ('billable' or 'billed').
+		 *   field     - server field name ('billable' or 'tags').
 		 *   classes   - { on, off } classes to toggle on the button.
 		 *   labels    - { on, off } accessible label strings.
 		 *   apply     - fn( btn, row, isOn ) - extra UI changes when state flips on/off.
@@ -582,8 +582,8 @@
 			} );
 		}
 
-		// Billable toggle: also shows/hides the Inv. toggle and clears invoiced
-		// state when turning billable off on a previously-invoiced row.
+		// Billable toggle. Billed state is not a per-entry field any more — it
+		// comes from bill-record coverage — so there is nothing to cascade into.
 		bindInlineToggle( {
 			selector: '.pltt-billable-symbol.pltt-inline-toggle',
 			field:    'billable',
@@ -591,29 +591,6 @@
 			labels:   {
 				on:  'Billable — click to toggle',
 				off: 'Not billable — click to toggle'
-			},
-			apply: function( btn, row, isBillable ) {
-				if ( ! row ) { return; }
-				var invoicedBtn = row.querySelector( '.pltt-invoiced-toggle' );
-				if ( ! invoicedBtn ) { return; }
-				if ( isBillable ) {
-					invoicedBtn.style.visibility = '';
-				} else {
-					invoicedBtn.style.visibility = 'hidden';
-					if ( invoicedBtn.dataset.value === '1' ) {
-						// Cascade: clear invoiced state when billable goes off.
-						invoicedBtn.classList.remove( 'is-invoiced' );
-						invoicedBtn.classList.add( 'not-invoiced' );
-						invoicedBtn.dataset.value = '0';
-						invoicedBtn.textContent   = '○';
-						row.classList.remove( 'pltt-billed' );
-						PLTT.ajax( 'pltt_update_entry_field', {
-							entry_id: invoicedBtn.dataset.entryId,
-							field:    'billed',
-							value:    '0'
-						}, function() {} );
-					}
-				}
 			},
 			onSuccess: function( btn, row, data ) {
 				// Update the Amount cell with the server-calculated value, then push
@@ -647,22 +624,6 @@
 			}
 		} );
 
-		// Invoiced toggle: simpler - flips the checkmark and the row tint.
-		bindInlineToggle( {
-			selector: '.pltt-invoiced-toggle',
-			field:    'billed',
-			classes:  { on: 'is-invoiced', off: 'not-invoiced' },
-			labels:   {
-				on:  'Invoiced — click to toggle',
-				off: 'Not invoiced — click to toggle'
-			},
-			apply: function( btn, row, isInvoiced ) {
-				btn.textContent = isInvoiced ? '✓' : '○';
-				if ( row ) {
-					row.classList.toggle( 'pltt-billed', isInvoiced );
-				}
-			}
-		} );
 
 		/**
 		 * Initialize inline tag pickers on all .pltt-tag-input-wrap elements in the report table.

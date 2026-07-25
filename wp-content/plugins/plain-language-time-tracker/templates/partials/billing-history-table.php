@@ -3,8 +3,12 @@
  * Billing history table — the read-only ledger of committed records for one
  * project, newest first. A record with billed_amount = 0 is fully absorbed.
  *
- * Shared by the Project Detail report and the Reports single-project card.
- * Not period-scoped — it's the lifetime ledger.
+ * Shared by the Project Detail report and the Reports single-project card. Mirrors
+ * the Billing page's Billed-history table (same columns, same "View record"
+ * behavior) minus the Client/Project columns, which are redundant in a
+ * single-project context. Not period-scoped — it's the lifetime ledger.
+ * "View record" opens the record inside the Overview detailed view (read-only),
+ * not an in-page modal.
  *
  * Expects in scope:
  *   $billing_history — array of record objects (PLTT_Billing::get_for_project_history()).
@@ -20,8 +24,8 @@ if ( empty( $billing_history ) ) {
 	return;
 }
 
-// Build each record's view-model once (loads its entries) so the Period column
-// and the "View record" dialog share one entry-derived range.
+// Build each record's view-model once (loads its entries) so the Covers column
+// and the "View record" link share one entry-derived range.
 $history_views = array();
 foreach ( $billing_history as $rec ) {
 	$history_views[] = array(
@@ -33,8 +37,9 @@ foreach ( $billing_history as $rec ) {
 <table class="widefat striped pltt-billing-history-table">
 	<thead>
 		<tr>
-			<th><?php esc_html_e( 'Billed on', 'plain-language-time-tracker' ); ?></th>
-			<th><?php esc_html_e( 'Period', 'plain-language-time-tracker' ); ?></th>
+			<th><?php esc_html_e( 'Billed', 'plain-language-time-tracker' ); ?></th>
+			<th><?php esc_html_e( 'Type', 'plain-language-time-tracker' ); ?></th>
+			<th><?php esc_html_e( 'Covers', 'plain-language-time-tracker' ); ?></th>
 			<th class="pltt-amount-col"><?php esc_html_e( 'Amount', 'plain-language-time-tracker' ); ?></th>
 			<th class="pltt-amount-col"><?php esc_html_e( 'Absorbed', 'plain-language-time-tracker' ); ?></th>
 			<th class="pltt-billing-history-action"></th>
@@ -43,30 +48,46 @@ foreach ( $billing_history as $rec ) {
 	<tbody>
 		<?php foreach ( $history_views as $view ) : ?>
 			<?php
-			$rec       = $view['rec'];
-			$rv        = $view['rv'];
-			$dialog_id = 'pltt-recordview-' . (int) $rec->id;
+			$rec      = $view['rec'];
+			$rv       = $view['rv'];
+			$is_over  = ( 'retainer_overage' === $rec->billing_type );
+			$type_lbl = $is_over ? __( 'Overage', 'plain-language-time-tracker' ) : __( 'Hourly', 'plain-language-time-tracker' );
+
+			// Covers: retainer names its period + overage hours; hourly names its
+			// entry count + span. Mirrors the Billed-history table.
+			if ( $is_over ) {
+				$covers = $rv['period'];
+				if ( '' !== $rv['minutes_label'] ) {
+					/* translators: 1: period, e.g. "June 2026"; 2: overage duration, e.g. "3h 0m". */
+					$covers = sprintf( __( '%1$s · %2$s over', 'plain-language-time-tracker' ), $rv['period'], $rv['minutes_label'] );
+				}
+			} else {
+				$n = count( $rv['entries'] );
+				/* translators: 1: entry count phrase; 2: date span. */
+				$covers = sprintf(
+					__( '%1$s · %2$s', 'plain-language-time-tracker' ),
+					sprintf( _n( '%s entry', '%s entries', $n, 'plain-language-time-tracker' ), number_format_i18n( $n ) ),
+					$rv['period']
+				);
+			}
 			?>
 			<tr>
-				<td class="pltt-time-cell"><?php echo esc_html( $rv['billed_on'] ); ?></td>
-				<td><?php echo esc_html( $rv['period'] ); ?></td>
+				<td class="pltt-time-cell">
+					<?php echo esc_html( $rv['billed_on'] ); ?>
+					<span class="pltt-bill-record-id">#<?php echo (int) $rec->id; ?></span>
+				</td>
+				<td>
+					<span class="pltt-badge <?php echo esc_attr( pltt_billing_type_badge_class( $rec->billing_type ) ); ?>"><?php echo esc_html( $type_lbl ); ?></span>
+				</td>
+				<td class="pltt-bill-record-covers"><?php echo esc_html( $covers ); ?></td>
 				<td class="pltt-amount-col"><?php echo esc_html( pltt_format_currency( $rv['amount'] ) ); ?></td>
-				<td class="pltt-amount-col"><?php echo $rv['absorbed'] > 0.0 ? esc_html( pltt_format_currency( $rv['absorbed'] ) ) : '—'; ?></td>
+				<td class="pltt-amount-col"><?php echo $rv['absorbed'] > 0.0 ? esc_html( pltt_format_currency( $rv['absorbed'] ) ) : '<span class="pltt-empty">&mdash;</span>'; ?></td>
 				<td class="pltt-billing-history-action">
-					<button type="button" class="button-link" data-lineitems-dialog="<?php echo esc_attr( $dialog_id ); ?>">
+					<a class="button-link" href="<?php echo esc_url( pltt_billing_record_view_url( $rec, $rv['entries'] ) ); ?>">
 						<?php esc_html_e( 'View record', 'plain-language-time-tracker' ); ?>
-					</button>
+					</a>
 				</td>
 			</tr>
 		<?php endforeach; ?>
 	</tbody>
 </table>
-
-<?php // Record-detail dialogs (a <dialog> can't sit inside a <tbody>). ?>
-<?php foreach ( $history_views as $view ) : ?>
-	<?php
-	$rv        = $view['rv'];
-	$dialog_id = 'pltt-recordview-' . (int) $view['rec']->id;
-	include PLTT_PLUGIN_DIR . 'templates/partials/billing-record-dialog.php';
-	?>
-<?php endforeach; ?>

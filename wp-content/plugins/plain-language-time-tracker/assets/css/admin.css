@@ -762,6 +762,16 @@ a.pltt-pcc-project:focus {
 	color: var(--pltt-text-placeholder);
 }
 
+/* Locked — the entry is on a committed bill record, so the flag can't move
+   (spec §4). Greyed and non-interactive, but still legible: the value is real
+   information, it just isn't editable any more. Overrides the colour states
+   above, which is why it comes after them. */
+.pltt-billable-symbol.pltt-billable-locked {
+	color: var(--pltt-text-placeholder);
+	opacity: 0.75;
+	cursor: not-allowed;
+}
+
 .pltt-billable-indicator {
 	text-align: center;
 }
@@ -1223,7 +1233,8 @@ fieldset.pltt-date-nav-custom-inputs input[type="date"] {
 	display: flex;
 	justify-content: space-between;
 	align-items: center;
-	padding: 10px 14px;
+	/* Matches the Entries day-card and History week-band headers. */
+	padding: 16px 14px;
 	background: var(--pltt-bg-white);
 	border: 1px solid var(--pltt-border);
 	border-bottom: none;

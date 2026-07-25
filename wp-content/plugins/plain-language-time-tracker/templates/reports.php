@@ -10,8 +10,7 @@
  * @var int      $client_id     Selected client ID (0 = all).
  * @var int      $project_id    Selected project ID (0 = all).
  * @var string   $tag           Selected tag ('' = all).
- * @var int|null $billable      Billable filter (null = all, 1 = billable, 0 = non-billable).
- * @var int|null $billed        Billed/invoiced filter (null = all, 1 = billed, 0 = unbilled).
+ * @var string   $billing_status Billing filter: '' (all), 'unbilled', 'billed' or 'not_charged'.
  * @var int      $client_negate  Whether to negate the client filter (0 or 1).
  * @var int      $project_negate Whether to negate the project filter (0 or 1).
  * @var int      $tag_negate     Whether to negate the tag filter (0 or 1).
@@ -118,11 +117,8 @@ if ( $project_id > 0 ) {
 if ( '' !== $tag ) {
 	$filter_params['tag'] = $tag;
 }
-if ( null !== $billable ) {
-	$filter_params['billable'] = $billable;
-}
-if ( null !== $billed ) {
-	$filter_params['billed'] = $billed;
+if ( '' !== $billing_status ) {
+	$filter_params['billing'] = $billing_status;
 }
 if ( $client_negate ) {
 	$filter_params['client_negate'] = 1;
@@ -139,7 +135,29 @@ $tab_base_url = add_query_arg( $filter_params, admin_url( 'admin.php' ) );
 
 <div class="wrap pltt-wrap">
 	<div class="pltt-header">
-		<h1><?php echo esc_html( 'summary' === $view ? __( 'Summary', 'plain-language-time-tracker' ) : __( 'Entries', 'plain-language-time-tracker' ) ); ?></h1>
+		<?php
+		// Light header — this screen is not a single scope with terms, so it gets
+		// the three-line identity (no figures inside; those sit in the number bar
+		// below). Line 2 states what's true about the view; line 3 the literal dates.
+		$range_label_hdr = pltt_format_date_range( $date_from, $date_to );
+		if ( $stats && (int) $stats->total_minutes > 0 ) {
+			$scope_line_hdr = sprintf(
+				/* translators: 1: entry count; 2: total time logged (e.g. "95h 39m"). */
+				esc_html__( '%1$s · %2$s logged', 'plain-language-time-tracker' ),
+				esc_html( sprintf( _n( '%s entry', '%s entries', $total_entries, 'plain-language-time-tracker' ), number_format_i18n( $total_entries ) ) ),
+				esc_html( pltt_format_duration( (int) $stats->total_minutes ) )
+			);
+		} else {
+			$scope_line_hdr = esc_html( sprintf( _n( '%s entry', '%s entries', $total_entries, 'plain-language-time-tracker' ), number_format_i18n( $total_entries ) ) );
+		}
+		?>
+		<div class="pltt-light-header">
+			<div class="pltt-lh-titlerow">
+				<h1><?php echo esc_html( 'summary' === $view ? __( 'Summary', 'plain-language-time-tracker' ) : __( 'Entries', 'plain-language-time-tracker' ) ); ?></h1>
+			</div>
+			<div class="pltt-lh-l2"><?php echo $scope_line_hdr; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?></div>
+			<div class="pltt-lh-l3"><span class="pltt-mono"><?php echo esc_html( $range_label_hdr ); ?></span></div>
+		</div>
 		<div class="pltt-view-toggle">
 			<a href="<?php echo esc_url( add_query_arg( 'view', 'summary', $tab_base_url ) ); ?>"
 				class="button <?php echo 'summary' === $view ? 'button-primary' : ''; ?>">
@@ -347,27 +365,39 @@ $tab_base_url = add_query_arg( $filter_params, admin_url( 'admin.php' ) );
 					</div>
 				</div>
 
+				<?php
+				// One Billing filter, its options taken straight from the Status
+				// column (spec §4). Two dropdowns let you build "not billable AND
+				// billed", which has no answer; these three states are exhaustive
+				// and mutually exclusive. No "—" option: that glyph covers retainer
+				// within allocation, fixed fee and internal — three unrelated things
+				// the Project filter already separates.
+				?>
 				<div class="pltt-filter-group">
-					<label for="pltt-filter-billable"><?php esc_html_e( 'Billable', 'plain-language-time-tracker' ); ?></label>
-					<select name="billable" id="pltt-filter-billable">
-						<option value="" <?php selected( null === $billable ); ?>><?php esc_html_e( 'All', 'plain-language-time-tracker' ); ?></option>
-						<option value="1" <?php selected( 1, $billable ); ?>><?php esc_html_e( 'Billable Only', 'plain-language-time-tracker' ); ?></option>
-						<option value="0" <?php selected( 0, $billable ); ?>><?php esc_html_e( 'Non-Billable Only', 'plain-language-time-tracker' ); ?></option>
+					<label for="pltt-filter-billing"><?php esc_html_e( 'Billing', 'plain-language-time-tracker' ); ?></label>
+					<select name="billing" id="pltt-filter-billing">
+						<option value="" <?php selected( '', $billing_status ); ?>><?php esc_html_e( 'All', 'plain-language-time-tracker' ); ?></option>
+						<option value="unbilled" <?php selected( 'unbilled', $billing_status ); ?>><?php esc_html_e( 'Unbilled', 'plain-language-time-tracker' ); ?></option>
+						<option value="billed" <?php selected( 'billed', $billing_status ); ?>><?php esc_html_e( 'Billed', 'plain-language-time-tracker' ); ?></option>
+						<option value="not_charged" <?php selected( 'not_charged', $billing_status ); ?>><?php esc_html_e( 'Not charged', 'plain-language-time-tracker' ); ?></option>
 					</select>
 				</div>
 
-				<div class="pltt-filter-group">
-					<label for="pltt-filter-billed"><?php esc_html_e( 'Invoiced', 'plain-language-time-tracker' ); ?></label>
-					<select name="billed" id="pltt-filter-billed">
-						<option value="" <?php selected( null === $billed ); ?>><?php esc_html_e( 'All', 'plain-language-time-tracker' ); ?></option>
-						<option value="0" <?php selected( 0, $billed ); ?>><?php esc_html_e( 'Uninvoiced Only', 'plain-language-time-tracker' ); ?></option>
-						<option value="1" <?php selected( 1, $billed ); ?>><?php esc_html_e( 'Invoiced Only', 'plain-language-time-tracker' ); ?></option>
-					</select>
-				</div>
-
+				<?php
+				// Clear drops the filters, not the view. Summary/Entries is
+				// navigation — which page you're looking at — so clearing a filter
+				// shouldn't move you to a different screen.
+				$clear_url = add_query_arg(
+					array(
+						'page' => 'pltt-reports',
+						'view' => $view,
+					),
+					admin_url( 'admin.php' )
+				);
+				?>
 				<div class="pltt-filter-group pltt-filter-actions">
 					<button type="submit" class="button button-primary"><?php esc_html_e( 'Apply Filter', 'plain-language-time-tracker' ); ?></button>
-					<a href="<?php echo esc_url( admin_url( 'admin.php?page=pltt-reports' ) ); ?>" class="button"><?php esc_html_e( 'Clear', 'plain-language-time-tracker' ); ?></a>
+					<a href="<?php echo esc_url( $clear_url ); ?>" class="button"><?php esc_html_e( 'Clear', 'plain-language-time-tracker' ); ?></a>
 				</div>
 			</div>
 		</div>
@@ -395,16 +425,105 @@ $tab_base_url = add_query_arg( $filter_params, admin_url( 'admin.php' ) );
 	);
 	?>
 
+	<?php
+	// Scope switch (spec §3): filtered to a single client+project → full scope
+	// block (identity + figure row). Any other state (unfiltered, client-only,
+	// multi) → the plain number bar; the page keeps its light header.
+	$scope_project = ( $is_single_project_view && ! empty( $context_projects ) ) ? $context_projects[0] : null;
+	$sb_type       = $scope_project ? pltt_get_billing_type( $scope_project ) : '';
+	// Billing-aware figure set (+ optional Review & bill bar) for hourly/fixed
+	// single-project scopes; null for retainer/internal → generic metric cards.
+	$sp_fig = $scope_project ? pltt_build_single_project_scope_figures( $scope_project, $stats, $sb_type, $context_overage, $date_from, $date_to ) : null;
+	// Show the Review & bill bar (one action) unless the select flow is already
+	// active (bill=1). Backlog isn't here — it rides on figure 4's basis line.
+	// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only mode flag.
+	$sp_show_bar = ( $sp_fig && ! empty( $sp_fig['bar'] ) && empty( $_GET['bill'] ) );
+	?>
 	<?php if ( ! empty( $context_client ) || $total_entries > 0 ) : ?>
-		<div class="pltt-summary-cards">
 
-			<?php if ( $is_single_project_view && ! empty( $context_projects ) ) : ?>
-									
-			<?php elseif ( ! empty( $context_client ) ) : ?>
-				<?php include PLTT_PLUGIN_DIR . 'templates/partials/client-context-card.php'; ?>
-			<?php endif; ?>
+		<?php if ( $scope_project ) :
+			// Line 2: client · terms in plain language, by billing model (spec §3).
+			$sb_terms = ( $context_client && ! empty( $context_client->name ) )
+				? $context_client->name
+				: __( 'Internal', 'plain-language-time-tracker' );
+			$sb_rate = pltt_resolve_billable_rate( (int) $scope_project->client_id, (int) $scope_project->id );
+			if ( 'hourly' === $sb_type && $sb_rate > 0 ) {
+				/* translators: %s: hourly rate, e.g. "$100". */
+				$sb_terms .= ' · ' . sprintf( __( '%s/hr', 'plain-language-time-tracker' ), pltt_format_currency_compact( $sb_rate ) );
+			} elseif ( 'fixed' === $sb_type ) {
+				$sb_fee     = isset( $scope_project->budget_fee ) ? (float) $scope_project->budget_fee : 0.0;
+				$sb_budgmin = pltt_budgeted_minutes( $scope_project, $sb_rate );
+				if ( $sb_fee > 0 && $sb_budgmin > 0 && $sb_rate > 0 ) {
+					$sb_terms .= ' · ' . sprintf(
+						/* translators: 1: fixed fee; 2: budgeted duration; 3: hourly rate. */
+						__( '%1$s, budgeted as %2$s at %3$s/hr', 'plain-language-time-tracker' ),
+						pltt_format_currency_compact( $sb_fee ),
+						pltt_format_duration( $sb_budgmin ),
+						pltt_format_currency_compact( $sb_rate )
+					);
+				} elseif ( $sb_fee > 0 ) {
+					$sb_terms .= ' · ' . pltt_format_currency_compact( $sb_fee );
+				}
+			} elseif ( 'recurring' === $sb_type && $sb_rate > 0 ) {
+				$sb_alloc = pltt_budgeted_minutes( $scope_project, $sb_rate );
+				if ( $sb_alloc > 0 ) {
+					$sb_period_words = array(
+						'weekly'    => __( 'each week', 'plain-language-time-tracker' ),
+						'monthly'   => __( 'each month', 'plain-language-time-tracker' ),
+						'quarterly' => __( 'each quarter', 'plain-language-time-tracker' ),
+						'yearly'    => __( 'each year', 'plain-language-time-tracker' ),
+					);
+					$sb_period = $sb_period_words[ $scope_project->recurring_period ?? '' ] ?? __( 'each period', 'plain-language-time-tracker' );
+					$sb_terms .= ' · ' . sprintf(
+						/* translators: 1: allocation duration; 2: period phrase, e.g. "each month"; 3: hourly rate. */
+						__( '%1$s included %2$s at %3$s/hr', 'plain-language-time-tracker' ),
+						pltt_format_duration( $sb_alloc ),
+						$sb_period,
+						pltt_format_currency_compact( $sb_rate )
+					);
+				}
+			}
+			?>
+			<div class="pltt-scope-block<?php echo $sp_show_bar ? ' pltt-has-bar' : ''; ?>">
+				<div class="pltt-scope-id">
+					<div class="pltt-scope-titlerow">
+						<h1 class="pltt-scope-title"><?php echo esc_html( $scope_project->name ); ?></h1>
+						<?php pltt_render_billing_type_badge( $sb_type ); ?>
+						<?php if ( 'archived' === ( $scope_project->status ?? '' ) ) : ?>
+							<span class="pltt-badge pltt-badge-archived"><?php esc_html_e( 'Archived', 'plain-language-time-tracker' ); ?></span>
+						<?php endif; ?>
+					</div>
+					<div class="pltt-scope-terms"><?php echo esc_html( $sb_terms ); ?></div>
+					<div class="pltt-scope-when">
+						<span><?php esc_html_e( 'Showing', 'plain-language-time-tracker' ); ?></span>
+						<span class="pltt-mono"><?php echo esc_html( pltt_format_date_range( $date_from, $date_to ) ); ?></span>
+						<?php if ( $total_entries > 0 ) : ?>
+							<span>&middot; <?php echo esc_html( sprintf( _n( '%s entry', '%s entries', $total_entries, 'plain-language-time-tracker' ), number_format_i18n( $total_entries ) ) ); ?></span>
+						<?php endif; ?>
+					</div>
+				</div>
+				<div class="pltt-summary-cards pltt-numbar">
+		<?php else : ?>
+			<div class="pltt-summary-cards pltt-numbar">
+				<?php if ( ! empty( $context_client ) ) : ?>
+					<?php include PLTT_PLUGIN_DIR . 'templates/partials/client-context-card.php'; ?>
+				<?php endif; ?>
+		<?php endif; ?>
 
-			<?php if ( $total_entries > 0 ) : ?>
+			<?php if ( $sp_fig ) : ?>
+				<?php // Billing-aware figures: label · value · basis. Figure 4 may be
+				// muted (grey, settled/dash), amber (owed), or have no basis line. ?>
+				<?php foreach ( $sp_fig['figures'] as $fig ) : ?>
+					<?php // Warm tint marks a figure with work stranded outside the filter. ?>
+					<div class="card<?php echo ! empty( $fig['tint'] ) ? ' pltt-numbar-tint' : ''; ?>">
+						<div class="card-label"><?php echo esc_html( $fig['label'] ); ?></div>
+						<div class="card-value<?php echo $fig['over'] ? ' pltt-numbar-over' : ( ! empty( $fig['muted'] ) ? ' pltt-numbar-muted' : '' ); ?>"><?php echo esc_html( $fig['value'] ); ?></div>
+						<?php if ( '' !== $fig['basis'] ) : ?>
+							<div class="card-secondary"><?php echo $fig['basis']; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- basis built with safe inline HTML in pltt_build_single_project_scope_figures() ?></div>
+						<?php endif; ?>
+					</div>
+				<?php endforeach; ?>
+			<?php elseif ( $total_entries > 0 ) : ?>
 
 			<!-- Card: Total Hours -->
 			<div class="card">
@@ -527,21 +646,35 @@ $tab_base_url = add_query_arg( $filter_params, admin_url( 'admin.php' ) );
 
 							<?php endif; /* total_entries > 0 */ ?>
 
-			<?php if ( $is_single_project_view && ! empty( $context_projects ) ) : ?>
-				<div class="pltt-project-summary-group">
-					<?php
-					// Identity/intention set, after the metric cards: billing (left) + info (right).
-					if ( 'detailed' === $view ) {
-						$project = $context_projects[0];
-						include PLTT_PLUGIN_DIR . 'templates/partials/project-billing-section.php';
-					}
-					?>
-					<?php include PLTT_PLUGIN_DIR . 'templates/partials/project-context-card.php'; ?>
+			</div><?php // .pltt-summary-cards ?>
+			<?php if ( $scope_project ) : ?>
+			</div><?php // .pltt-scope-block ?>
+			<?php endif; ?>
+
+			<?php
+			// Action bar — Review & bill, attached to the block's bottom with no gap
+			// (info in the block, action in the bar). Only hourly with outstanding
+			// work reaches here; absent otherwise, never present-and-empty.
+			if ( $sp_show_bar ) :
+				$sp_bar = $sp_fig['bar'];
+				?>
+				<div class="pltt-bbar pltt-bbar-ready">
+					<span class="pltt-bbar-dot" aria-hidden="true"></span>
+					<span><strong><?php esc_html_e( 'Ready to bill', 'plain-language-time-tracker' ); ?></strong> &mdash; <span class="pltt-mono"><?php echo esc_html( $sp_bar['amount'] ); ?></span> <?php echo esc_html( $sp_bar['desc'] ); ?></span>
+					<span class="pltt-bbar-spacer"></span>
+					<a class="button button-primary" href="<?php echo esc_url( $sp_bar['review_url'] ); ?>"><?php esc_html_e( 'Review &amp; bill', 'plain-language-time-tracker' ); ?> &rarr;</a>
 				</div>
 			<?php endif; ?>
 
-		</div>
-	<?php endif; ?>
+			<?php
+			// The parked billing gateway + project context card used to sit here as
+			// a fallback for scopes with no figure set of their own. Every project
+			// type now has one — hourly and fixed dissolved theirs into the figures
+			// and bar, and the retainer's multi-period span was the last gap — so
+			// the fallback is gone along with both partials.
+			?>
+
+		<?php endif; /* context_client || total_entries */ ?>
 
 
 	<?php
@@ -665,44 +798,40 @@ $tab_base_url = add_query_arg( $filter_params, admin_url( 'admin.php' ) );
 					$entries_by_date[ $entry->entry_date ][] = $entry;
 				}
 
-				// Resolve overage-marker placement for the single-project alloc view.
-				$marker_day_key        = null;
-				$marker_primary_text   = '';
-				$marker_secondary_text = '';
-				$visible_overage_ids   = array();
-
-				if ( ! empty( $context_overage ) && 'over' === $context_overage['state'] ) {
-					// Tint only the overage entries actually visible on this page.
-					$page_ids            = array_map( function ( $e ) { return (int) $e->id; }, $entries );
-					$visible_overage_ids = array_values( array_intersect( $context_overage['overage_entry_ids'], $page_ids ) );
-
-					if ( ! empty( $context_overage['boundary_time'] ) ) {
-						$marker_primary_text = sprintf(
-							/* translators: 1: clock time the allocation was crossed, e.g. "3:45pm"; 2: hours/minutes used, e.g. "3h 0m". */
-							__( 'Allocation reached at %1$s · %2$s used', 'plain-language-time-tracker' ),
-							$context_overage['boundary_time'],
-							pltt_format_duration( $context_overage['allocation_minutes'] )
-						);
-					} else {
-						$marker_primary_text = sprintf(
-							/* translators: %s: hours/minutes used to date, e.g. "10h 0m". */
-							__( 'Allocation reached · %s used', 'plain-language-time-tracker' ),
-							pltt_format_duration( $context_overage['allocation_minutes'] )
-						);
-					}
-					$marker_secondary_text = __( 'Entries below are overage candidates', 'plain-language-time-tracker' );
-
-					// Find which day group hosts the boundary entry (may be on another page).
-					$mid = (int) $context_overage['marker_entry_id'];
-					foreach ( $entries_by_date as $d => $rows ) {
-						foreach ( $rows as $r ) {
-							if ( (int) $r->id === $mid ) {
-								$marker_day_key = $d;
-								break 2;
-							}
-						}
+				// Decide the Billable column ONCE across the whole result set, then
+				// force it on every per-day table below. Each table has table-layout:
+				// fixed, so if some days computed the column in and others out (an
+				// all-retainer/internal day drops it), the day tables wouldn't line up.
+				// Mirrors pltt_render_entry_table()'s own detection (null project = on).
+				$billable_project_ids = array();
+				foreach ( $entries as $entry ) {
+					if ( ! empty( $entry->project_id ) ) {
+						$billable_project_ids[] = (int) $entry->project_id;
 					}
 				}
+				$billable_projects  = PLTT_Projects::get_multiple( array_unique( $billable_project_ids ) );
+				// Client cache too — the per-day billable total below resolves rates
+				// through the project → client → default cascade, and must not do it
+				// with a cold cache once per entry.
+				$day_client_ids = array();
+				foreach ( $entries as $entry ) {
+					if ( ! empty( $entry->client_id ) ) {
+						$day_client_ids[] = (int) $entry->client_id;
+					}
+				}
+				$day_clients = PLTT_Clients::get_multiple( array_unique( $day_client_ids ) );
+
+				$show_billable_col_all = false;
+				foreach ( $entries as $entry ) {
+					$ep = ! empty( $entry->project_id ) && isset( $billable_projects[ (int) $entry->project_id ] )
+						? $billable_projects[ (int) $entry->project_id ]
+						: null;
+					if ( pltt_billable_flag_applies( $ep ) ) {
+						$show_billable_col_all = true;
+						break;
+					}
+				}
+
 				?>
 
 				<?php
@@ -732,61 +861,85 @@ $tab_base_url = add_query_arg( $filter_params, admin_url( 'admin.php' ) );
 				// period overage as a whole — a confirm-the-number bar, no per-entry row.
 				$bill_select_active  = ( $bill_active_single && 'hourly' === $bill_project_type );
 				$bill_confirm_active = ( $bill_active_single && 'recurring' === $bill_project_type );
+
+				// Record-view mode: arrived from a "View record" link (record_id set).
+				// Read-only — swaps the bill bar for a "Line items" bar on the committed
+				// record. Gated to the single project the record belongs to.
+				// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only mode flag.
+				$record_view_id = ! empty( $_GET['record_id'] ) ? (int) $_GET['record_id'] : 0;
+				$record_view    = null;
+				if ( $record_view_id > 0 && $is_single_project_view && $bill_project ) {
+					$maybe_record = PLTT_Billing_Records::get( $record_view_id );
+					if ( $maybe_record && (int) $maybe_record->project_id === (int) $bill_project->id ) {
+						$record_view = $maybe_record;
+					}
+				}
 				?>
 
-
-				<?php
-				// SEC-M12: whitelist the query params that survive the round-trip
-				// into the Review screen's back-link, so attacker-injected params
-				// like pltt_error_message can't ride along.
-				$return_allowed = array_flip( array(
-					'page',
-					'view',
-					'from',
-					'to',
-					'client_id',
-					'project_id',
-					'tag',
-					'billable',
-					'billed',
-					'client_negate',
-					'project_negate',
-					'tag_negate',
-					'paged',
-				) );
-				// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only query for building a back-link.
-				$return_params = array_intersect_key( wp_unslash( $_GET ), $return_allowed );
-				// SEC-L3: sanitize each surviving value (keys are already allowlisted);
-				// drop any non-scalar so an array param can't slip into the back-link.
-				$return_params = array_map(
-					static function ( $value ) {
-						return is_scalar( $value ) ? sanitize_text_field( $value ) : '';
-					},
-					$return_params
-				);
-				$return_url = add_query_arg( $return_params, admin_url( 'admin.php' ) );
-				?>
 
 				<?php foreach ( $entries_by_date as $group_date => $group_entries ) :
-					$date_obj    = new DateTimeImmutable( $group_date, wp_timezone() );
-					$is_today    = $group_date === pltt_get_current_date();
-					$date_label  = $is_today
+					$date_obj = new DateTimeImmutable( $group_date, wp_timezone() );
+					$is_today = $group_date === pltt_get_current_date();
+					// The date IS the link (spec §7) — it opens Today at that date,
+					// which is this screen's only route to the raw log and to the
+					// journal lines that never became entries. No trailing "Open day
+					// log" link beside it, and no day-level kebab: one action is a
+					// link, not a menu.
+					// The year appears only when the day isn't in the current one —
+					// "June 25" reads cleaner for the common case, but a range that
+					// reaches back past January would otherwise be ambiguous.
+					$day_url   = pltt_get_admin_url( 'daily-log', array( 'date' => $group_date ) );
+					$day_format = ( $date_obj->format( 'Y' ) === $now_dt->format( 'Y' ) ) ? 'F j' : 'F j, Y';
+					$day_label = $is_today
 						? __( 'Today', 'plain-language-time-tracker' )
-						: $date_obj->format( 'F j, Y' ) . ' · ' . $date_obj->format( 'l' );
+						: $date_obj->format( $day_format );
+					// Day totals sit at the right of the header (spec §2.3), where the
+					// Edit button used to be. Editing an entry is the row menu's job.
+					//
+					// Time and billable amount — the two figures the table's own
+					// columns add up to. The amount sums exactly the entries the
+					// Amount column shows a figure for (billable only), so the header
+					// and the rows below it can't disagree.
+					$day_minutes = 0;
+					$day_amount  = 0.0;
+					foreach ( $group_entries as $group_entry ) {
+						$day_minutes += (int) $group_entry->duration_minutes;
+
+						if ( empty( $group_entry->billable ) || (int) $group_entry->duration_minutes <= 0 ) {
+							continue;
+						}
+						if ( null !== $group_entry->billable_amount ) {
+							// The amount frozen at verification time wins.
+							$day_amount += (float) $group_entry->billable_amount;
+						} else {
+							$day_amount += pltt_billable_amount(
+								(int) $group_entry->duration_minutes,
+								pltt_resolve_billable_rate( (int) $group_entry->client_id, (int) $group_entry->project_id, $day_clients, $billable_projects )
+							);
+						}
+					}
 					?>
 					<div class="pltt-date-group">
 						<div class="pltt-date-group-header">
-							<span class="pltt-date-group-title"><?php echo esc_html( $date_label ); ?></span>
+							<span class="pltt-date-group-title">
+								<a class="pltt-day-link" href="<?php echo esc_url( $day_url ); ?>"><?php echo esc_html( $day_label ); ?></a>
+								<span class="pltt-day-dow"><?php echo esc_html( $date_obj->format( 'l' ) ); ?></span>
+							</span>
 							<span class="pltt-date-group-meta">
-								<a href="<?php echo esc_url( pltt_get_admin_url( 'review', array( 'date' => $group_date, 'return_to' => urlencode( $return_url ) ) ) ); ?>" class="button"><?php esc_html_e( 'Edit', 'plain-language-time-tracker' ); ?></a>
+								<span class="pltt-mono"><?php echo esc_html( pltt_format_duration( $day_minutes ) ); ?></span>
+								<?php if ( $day_amount > 0 ) : ?>
+									&middot;
+									<span class="pltt-mono"><?php echo esc_html( pltt_format_currency( $day_amount ) ); ?></span>
+								<?php endif; ?>
 							</span>
 						</div>
 						<?php
 						$entry_table_opts = array(
-							'show_amount'       => true,
-							'inline_edit'       => true,
-							'all_tags'          => $all_tags,
-							'overage_entry_ids' => $visible_overage_ids,
+							'show_amount'        => true,
+							'inline_edit'        => true,
+							'all_tags'           => $all_tags,
+							// Same column set on every day table so they line up.
+							'force_billable_col' => $show_billable_col_all,
 						);
 						if ( $is_single_project_view ) {
 							// Covered mode: tint record-covered rows + mark them with the
@@ -800,11 +953,6 @@ $tab_base_url = add_query_arg( $filter_params, admin_url( 'admin.php' ) );
 							// column right to make room for it (see reports.css).
 							$entry_table_opts['billing_select'] = true;
 							$entry_table_opts['table_class']    = 'pltt-has-billselect';
-						}
-						if ( $marker_day_key && $group_date === $marker_day_key ) {
-							$entry_table_opts['threshold_marker_before']    = (int) $context_overage['marker_entry_id'];
-							$entry_table_opts['threshold_marker_primary']   = $marker_primary_text;
-							$entry_table_opts['threshold_marker_secondary'] = $marker_secondary_text;
 						}
 						pltt_render_entry_table( $group_entries, $entry_table_opts );
 						?>
@@ -822,6 +970,11 @@ $tab_base_url = add_query_arg( $filter_params, admin_url( 'admin.php' ) );
 				if ( $bill_select_active || $bill_confirm_active ) {
 					$project = $context_projects[0];
 					include PLTT_PLUGIN_DIR . 'templates/partials/billing-select-bar.php';
+				} elseif ( $record_view ) {
+					// Read-only "View record" landing: a Line-items bar over the record.
+					$rv        = pltt_build_billing_record_view( $record_view );
+					$dialog_id = 'pltt-recordview-' . (int) $record_view->id;
+					include PLTT_PLUGIN_DIR . 'templates/partials/billing-record-bar.php';
 				}
 				?>
 

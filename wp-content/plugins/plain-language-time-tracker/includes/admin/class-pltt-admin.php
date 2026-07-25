@@ -341,11 +341,20 @@ class PLTT_Admin {
 
 		$version = defined( 'WP_DEBUG' ) && WP_DEBUG ? time() : PLTT_VERSION;
 
+		// Design language — tokens, type, and the header/number-bar primitives.
+		// Loaded first so every per-screen sheet can build against it.
+		wp_enqueue_style(
+			'pltt-system',
+			PLTT_PLUGIN_URL . 'assets/css/pltt-system.css',
+			array(),
+			$version
+		);
+
 		// Shared admin styles.
 		wp_enqueue_style(
 			'pltt-admin',
 			PLTT_PLUGIN_URL . 'assets/css/admin.css',
-			array(),
+			array( 'pltt-system' ),
 			$version
 		);
 
@@ -525,17 +534,13 @@ class PLTT_Admin {
 				array( 'pltt-admin', 'pltt-tooltip', 'pltt-chart' ),
 				$version
 			);
+			// Tooltip script powers the volume chart's hover tooltips. (The
+			// project-detail.js group-by switch was removed with the "Where the
+			// time went" / "Activity over time" sections — 2026-07-18.)
 			wp_enqueue_script(
 				'pltt-tooltip',
 				PLTT_PLUGIN_URL . 'assets/js/pltt-tooltip.js',
 				array(),
-				$version,
-				true
-			);
-			wp_enqueue_script(
-				'pltt-project-detail',
-				PLTT_PLUGIN_URL . 'assets/js/project-detail.js',
-				array( 'pltt-shared', 'pltt-tooltip' ),
 				$version,
 				true
 			);

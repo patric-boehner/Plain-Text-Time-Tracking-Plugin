@@ -116,7 +116,7 @@ $card_label = static function ( $base, $phrase ) {
 	</div>
 </form>
 
-<div class="pltt-summary-cards pltt-bill-cards-summary">
+<div class="pltt-summary-cards pltt-numbar pltt-bill-cards-summary">
 	<div class="card">
 		<div class="card-label"><?php echo esc_html( $card_label( __( 'Records', 'plain-language-time-tracker' ), $active_phrase ) ); ?></div>
 		<div class="card-value"><?php echo esc_html( number_format_i18n( (int) $log['count'] ) ); ?></div>
@@ -157,6 +157,7 @@ $card_label = static function ( $base, $phrase ) {
 				<th><?php esc_html_e( 'Billed', 'plain-language-time-tracker' ); ?></th>
 				<th><?php esc_html_e( 'Client', 'plain-language-time-tracker' ); ?></th>
 				<th><?php esc_html_e( 'Project', 'plain-language-time-tracker' ); ?></th>
+				<th><?php esc_html_e( 'Type', 'plain-language-time-tracker' ); ?></th>
 				<th><?php esc_html_e( 'Covers', 'plain-language-time-tracker' ); ?></th>
 				<th class="pltt-amount-col"><?php esc_html_e( 'Amount', 'plain-language-time-tracker' ); ?></th>
 				<th class="pltt-amount-col"><?php esc_html_e( 'Absorbed', 'plain-language-time-tracker' ); ?></th>
@@ -166,11 +167,10 @@ $card_label = static function ( $base, $phrase ) {
 		<tbody>
 			<?php foreach ( $history_views as $hv ) : ?>
 				<?php
-				$row       = $hv['row'];
-				$rv        = $hv['rv'];
-				$rec       = $row['record'];
-				$dialog_id = 'pltt-recordview-' . (int) $rec->id;
-				$is_over   = ( 'retainer_overage' === $rec->billing_type );
+				$row     = $hv['row'];
+				$rv      = $hv['rv'];
+				$rec     = $row['record'];
+				$is_over = ( 'retainer_overage' === $rec->billing_type );
 				$type_lbl  = $is_over ? __( 'Overage', 'plain-language-time-tracker' ) : __( 'Hourly', 'plain-language-time-tracker' );
 
 				// Covers: retainer names its period + overage hours; hourly names its
@@ -204,16 +204,29 @@ $card_label = static function ( $base, $phrase ) {
 						?>
 					</td>
 					<td>
-						<?php echo esc_html( $row['project_name'] ); ?>
+						<?php
+						$project_url = add_query_arg(
+							array(
+								'page'       => 'pltt-projects',
+								'action'     => 'view',
+								'project_id' => (int) $rec->project_id,
+								'tab'        => 'report',
+							),
+							admin_url( 'admin.php' )
+						);
+						?>
+						<a href="<?php echo esc_url( $project_url ); ?>"><?php echo esc_html( $row['project_name'] ); ?></a>
+					</td>
+					<td>
 						<span class="pltt-badge <?php echo esc_attr( pltt_billing_type_badge_class( $rec->billing_type ) ); ?>"><?php echo esc_html( $type_lbl ); ?></span>
 					</td>
 					<td class="pltt-bill-record-covers"><?php echo esc_html( $covers ); ?></td>
 					<td class="pltt-amount-col"><?php echo esc_html( pltt_format_currency( $rv['amount'] ) ); ?></td>
 					<td class="pltt-amount-col"><?php echo $rv['absorbed'] > 0.0 ? esc_html( pltt_format_currency( $rv['absorbed'] ) ) : '<span class="pltt-empty">&mdash;</span>'; ?></td>
 					<td class="pltt-bill-records-action">
-						<button type="button" class="button-link" data-lineitems-dialog="<?php echo esc_attr( $dialog_id ); ?>">
+						<a class="button-link" href="<?php echo esc_url( pltt_billing_record_view_url( $rec, $rv['entries'] ) ); ?>">
 							<?php esc_html_e( 'View record', 'plain-language-time-tracker' ); ?>
-						</button>
+						</a>
 					</td>
 				</tr>
 			<?php endforeach; ?>
@@ -244,14 +257,8 @@ $card_label = static function ( $base, $phrase ) {
 	);
 	?>
 
-	<?php // Record-detail dialogs live outside the table (a <dialog> can't sit in a <tbody>). ?>
-	<?php foreach ( $history_views as $hv ) : ?>
-		<?php
-		$rv        = $hv['rv'];
-		$dialog_id = 'pltt-recordview-' . (int) $hv['row']['record']->id;
-		include PLTT_PLUGIN_DIR . 'templates/partials/billing-record-dialog.php';
-		?>
-	<?php endforeach; ?>
+	<?php // "View record" opens the committed record inside the Overview detailed
+	// view (read-only, with its Line-items dialog) — no in-page modal here. ?>
 
 	<p class="description pltt-bill-recordnote">
 		<?php esc_html_e( 'A record freezes what you billed and marks those entries billed, so “outstanding” resolves itself. There’s no sent/paid tracking — that’s your invoicing tool’s job.', 'plain-language-time-tracker' ); ?>

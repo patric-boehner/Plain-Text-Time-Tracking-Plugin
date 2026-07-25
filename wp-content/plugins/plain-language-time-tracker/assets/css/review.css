@@ -509,21 +509,7 @@
 	box-shadow: inset 3px 0 0 #d9a020;
 }
 
-/* Needs-review dot in the status column (guessed / unset). */
-.pltt-status-dot {
-	display: inline-block;
-	width: 8px;
-	height: 8px;
-	border-radius: 50%;
-	background: #d9a020;
-	vertical-align: middle;
-}
-
-.pltt-status-dot.pltt-status-unset {
-	background: #d9821f;
-}
-
-/* Guessed project — dashed select (inline cue alongside the status dot). */
+/* Guessed project — dashed select cues the needs-confirming state. */
 .pltt-review-table tr[data-resolution-state="guessed"] .pltt-project-select {
 	border-style: dashed;
 	border-color: #d9a020;
