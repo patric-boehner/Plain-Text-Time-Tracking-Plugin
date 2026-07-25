@@ -1,0 +1,402 @@
+<meta charset="utf-8">
+<title>PLTT — Scope block, reinstated</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;450;500;600&family=IBM+Plex+Mono:wght@400;450;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --paper:#fff; --canvas:#f4f3f1; --sunk:#faf9f7;
+    --rule:#e4e2de; --rule-2:#efedea;
+    --ink:#1a1c1e; --ink-2:#55595e; --ink-3:#8a8d91;
+    --blue:#2271b1;
+    --c-hourly:#146b42;  --c-hourly-bg:#e0f0e7;
+    --c-monthly:#175d87; --c-monthly-bg:#e0edf7;
+    --c-fixed:#5540a5;   --c-fixed-bg:#eae5f9;
+    --c-own:#666360;     --c-own-bg:#eeedea;
+    --c-over:#9a6a10;    --c-over-bg:#fbefd8;
+    --c-tag:#1d5f8a;     --c-tag-bg:#e4eef7;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:#e3e1de;font:14px/1.6 "IBM Plex Sans",system-ui,sans-serif;color:var(--ink);-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+  .wrap{max-width:1180px;margin:0 auto;padding:36px 24px 100px}
+  .typed{font-family:"IBM Plex Mono",monospace;font-variant-numeric:tabular-nums;letter-spacing:-.12px}
+
+  .doc{background:var(--ink);color:#fff;padding:32px 36px;border-radius:6px}
+  .doc h1{margin:0 0 12px;font-size:23px;font-weight:600;letter-spacing:-.35px}
+  .doc p{margin:0 0 10px;color:#b9bcc0;max-width:76ch;line-height:1.75}
+  .doc p:last-child{margin:0}
+  .doc b{color:#fff;font-weight:500}
+
+  .sec{margin-top:48px}
+  .sec-head{padding-bottom:12px;border-bottom:2px solid var(--ink);margin-bottom:22px;display:flex;align-items:baseline;gap:13px}
+  .sec-num{font:500 12px/1 "IBM Plex Mono",monospace;color:var(--ink-3);letter-spacing:.7px}
+  .sec-head h2{margin:0;font-size:18px;font-weight:600;letter-spacing:-.25px}
+  .sec-head .say{margin-left:auto;font-size:13px;color:var(--ink-2)}
+  .lead{max-width:80ch;color:var(--ink-2);margin:0 0 22px;line-height:1.8}
+
+  .pill{display:inline-block;padding:2px 10px;border-radius:3px;font-size:12px;line-height:20px;letter-spacing:.1px}
+  .p-hourly{background:var(--c-hourly-bg);color:var(--c-hourly)}
+  .p-monthly{background:var(--c-monthly-bg);color:var(--c-monthly)}
+  .p-fixed{background:var(--c-fixed-bg);color:var(--c-fixed)}
+  .p-own{background:var(--c-own-bg);color:var(--c-own)}
+  .p-tag{background:var(--c-tag-bg);color:var(--c-tag)}
+
+  .wp{background:var(--canvas);border:1px solid #cbc9c5;border-radius:6px;overflow:hidden}
+  .wp-bar{background:var(--ink);color:#8a8d91;font:11px/1 "IBM Plex Mono",monospace;padding:9px 15px}
+  .wp-body{padding:28px 30px 34px}
+  .row{display:flex;align-items:center;gap:12px}
+  .grow{flex:1}
+  .muted{color:var(--ink-3)}
+
+  /* ---------- FULL SCOPE BLOCK ---------- */
+  .scope{background:var(--paper);border:1px solid var(--rule);border-radius:6px;margin-bottom:20px}
+  .scope-id{padding:20px 24px 18px;border-bottom:1px solid var(--rule-2)}
+  .scope-id h1{margin:0;font-size:24px;font-weight:600;letter-spacing:-.45px;line-height:1.2;display:inline}
+  .scope-l2{color:var(--ink-2);font-size:14px;margin-top:8px}
+  .scope-when{display:inline-flex;align-items:baseline;gap:9px;margin-top:12px;background:var(--sunk);border:1px solid var(--rule-2);border-radius:4px;padding:6px 13px;font-size:13px;color:var(--ink-2)}
+  .scope-nums{display:flex;flex-wrap:wrap}
+  .fig{padding:17px 24px 19px;border-right:1px solid var(--rule-2);flex:1;min-width:210px}
+  .fig:last-child{border-right:0}
+  .fig .lab{font-size:13px;color:var(--ink-2)}
+  .fig .val{font:450 27px/1.2 "IBM Plex Mono",monospace;letter-spacing:-1px;margin-top:4px;font-variant-numeric:tabular-nums}
+  .fig .val.over{color:var(--c-over)}
+  .fig .basis{font-size:12.5px;color:var(--ink-3);margin-top:5px;line-height:1.55}
+
+  /* ---------- LIGHT HEADER ---------- */
+  .hd{display:flex;align-items:flex-start;gap:16px;margin-bottom:22px}
+  .hd h1{margin:0;font-size:26px;font-weight:450;letter-spacing:-.5px;line-height:1.2}
+  .hd .l2{color:var(--ink-2);font-size:13.5px;margin-top:6px}
+  .hd .l3{color:var(--ink-3);font-size:13px;margin-top:3px}
+
+  .btn{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--blue);background:var(--paper);color:var(--blue);padding:7px 14px;border-radius:4px;font-size:13.5px;white-space:nowrap}
+  .btn.p{background:var(--blue);color:#fff}
+  .btn.q{border-color:#c2bfba;color:var(--ink-2)}
+  .btn.sm{padding:5px 11px;font-size:12.5px}
+  .seg{display:inline-flex;border:1px solid var(--rule);border-radius:4px;overflow:hidden;background:var(--paper)}
+  .seg span{padding:7px 16px;font-size:13.5px;color:var(--ink-2);border-right:1px solid var(--rule)}
+  .seg span:last-child{border-right:0}
+  .seg span.on{background:var(--ink);color:#fff}
+  .stepper{display:inline-flex;align-items:center;border:1px solid #c2bfba;border-radius:4px;overflow:hidden;background:var(--paper)}
+  .stepper .arw{padding:7px 13px;color:var(--ink-2);border-right:1px solid var(--rule)}
+  .stepper .arw.r{border-right:0;border-left:1px solid var(--rule)}
+  .stepper .dt{padding:7px 17px;font:13px/1 "IBM Plex Mono",monospace}
+
+  .card{background:var(--paper);border:1px solid var(--rule);border-radius:6px}
+  .card-h{padding:15px 20px;border-bottom:1px solid var(--rule-2);font-weight:600;font-size:14px;display:flex;align-items:center;gap:12px}
+  .card-h .lite{font-weight:400;color:var(--ink-3);font-size:13px}
+
+  table{width:100%;border-collapse:collapse}
+  th{text-align:left;font-weight:450;color:var(--ink-3);font-size:11.5px;letter-spacing:.5px;text-transform:uppercase;padding:11px 20px;border-bottom:1px solid var(--rule);background:var(--sunk)}
+  th.c{text-align:center} th.n{text-align:right}
+  td{padding:15px 20px;border-bottom:1px solid var(--rule-2);vertical-align:middle}
+  td.c{text-align:center} td.n{text-align:right}
+  tr:last-child td{border-bottom:0}
+  .sub{display:block;color:var(--ink-3);font-size:12.5px;margin-top:3px}
+  a.lk{color:var(--blue);text-decoration:none}
+  .dash{color:#cfccc7}
+  .amt{font-family:"IBM Plex Mono",monospace;font-variant-numeric:tabular-nums;font-weight:500}
+
+  .daybar{padding:12px 20px;background:var(--sunk);border-bottom:1px solid var(--rule);display:flex;align-items:baseline;gap:12px;font-size:13.5px}
+  .daybar a{font-weight:600;color:var(--blue);text-decoration:none;letter-spacing:-.1px}
+
+  .stat{padding:16px 20px 18px;border-right:1px solid var(--rule-2);flex:1;min-width:160px}
+  .stat:last-child{border-right:0}
+  .stat .k{font-size:12.5px;color:var(--ink-2)}
+  .stat .v{font:450 26px/1.2 "IBM Plex Mono",monospace;letter-spacing:-.9px;margin-top:4px;font-variant-numeric:tabular-nums}
+  .stat .m{font-size:12.5px;color:var(--ink-3);margin-top:4px}
+
+  .meter{height:6px;background:#e9e7e3;border-radius:3px;overflow:hidden}
+  .meter i{display:block;height:100%;background:var(--blue)}
+  .meter i.over{background:#c08f2a}
+
+  .editor{background:var(--paper);border:1px solid var(--rule);border-radius:6px;overflow:hidden}
+  .editor textarea{width:100%;border:0;padding:22px 26px;font:13.5px/2 "IBM Plex Mono",monospace;resize:none;outline:none;color:var(--ink);display:block}
+  .editor-foot{border-top:1px solid var(--rule-2);padding:11px 18px;display:flex;align-items:center;gap:18px;font-size:12.5px;color:var(--ink-3);background:var(--sunk)}
+  kbd{font:11px/1 "IBM Plex Mono",monospace;background:var(--paper);border:1px solid var(--rule);border-bottom-width:2px;border-radius:3px;padding:3px 6px;color:var(--ink-2)}
+
+  .note{background:var(--sunk);border:1px solid var(--rule);border-left:3px solid var(--blue);border-radius:5px;padding:16px 20px;margin-top:18px}
+  .note h4{margin:0 0 7px;font-size:13.5px;font-weight:600}
+  .note p{margin:0;font-size:13px;color:var(--ink-2);line-height:1.75}
+  .note p + p{margin-top:9px}
+
+  .rule-tbl{width:100%;border-collapse:collapse;background:var(--paper);border:1px solid var(--rule);border-radius:6px;overflow:hidden}
+  .rule-tbl td{font-size:13.5px}
+</style>
+
+<div class="wrap">
+
+<div class="doc">
+  <h1>Scope block, reinstated</h1>
+  <p>One rule: <b>if the screen is a scope, it gets the full block.</b> A project, a bill, a filtered view — something with terms, and figures measured against those terms. The basis line under each figure is the point, because "$244.50" without "overage only" needs you to remember how retainers work.</p>
+  <p><b>If the screen isn't a scope, it gets the light header.</b> Today is a day. It has no terms and its figures need no basis. Same three lines, no block, no basis.</p>
+</div>
+
+<!-- ===== 01 RULE ===== -->
+<div class="sec">
+  <div class="sec-head"><span class="sec-num">01</span><h2>Which screens get which</h2></div>
+  <table class="rule-tbl">
+    <thead><tr><th style="width:30%">Screen</th><th style="width:22%">Treatment</th><th>Because</th></tr></thead>
+    <tbody>
+      <tr><td><b>A project</b></td><td>Full block</td><td>Has terms — hours included, fee agreed — and every figure is relative to them.</td></tr>
+      <tr><td><b>Entries, filtered to a scope</b></td><td>Full block</td><td>The filter defines a scope with a rate, and the amounts derive from it.</td></tr>
+      <tr><td><b>A bill</b></td><td>Full block</td><td>You're about to charge money against agreed terms. The most consequential screen in the app.</td></tr>
+      <tr><td><b>Today</b></td><td>Light header</td><td>A day has no terms. Hours and amount need no basis line — they're just what happened.</td></tr>
+      <tr><td><b>Entries, unfiltered</b></td><td>Light header</td><td>No single scope, so no terms to state. Figures stay in the strip you already have.</td></tr>
+      <tr><td><b>Lists — projects, clients, billing</b></td><td>Light header</td><td>The scope is every row, not the page.</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- ===== 02 RETAINER ===== -->
+<div class="sec">
+  <div class="sec-head"><span class="sec-num">02</span><h2>A project — full block</h2><span class="say">Terms up top, every figure measured against them.</span></div>
+
+  <div class="wp">
+    <div class="wp-bar">Plain Text Time Tracker</div>
+    <div class="wp-body">
+      <div class="row" style="margin-bottom:20px;justify-content:flex-end">
+        <div class="seg"><span>Full</span><span class="on">By month</span></div>
+        <span class="stepper"><span class="arw">‹</span><span class="dt">June 2026</span><span class="arw r">›</span></span>
+        <span class="btn q sm">Settings</span>
+        <span class="btn q sm">← Projects</span>
+      </div>
+
+      <div class="scope">
+        <div class="scope-id">
+          <h1>Website Care Plan Time</h1> <span class="pill p-monthly" style="vertical-align:4px;margin-left:8px">Monthly retainer</span>
+          <div class="scope-l2">Democrats of Rossmor · 3 hours included each month at $90/hr</div>
+          <div class="scope-when">Showing <b class="typed" style="color:var(--ink);font-weight:500">Jun 1 – Jun 30, 2026</b> <span>· 18 entries</span></div>
+        </div>
+        <div class="scope-nums">
+          <div class="fig"><div class="lab">Time logged</div><div class="val">5h 43m</div><div class="basis">All time recorded in this period</div></div>
+          <div class="fig"><div class="lab">Against the 3h included</div><div class="val over">2h 43m over</div><div class="basis">191% of the monthly allocation</div></div>
+          <div class="fig"><div class="lab">Earned this period</div><div class="val">$244.50</div><div class="basis">Overage only · <span class="typed">2h 43m × $90/hr</span></div></div>
+          <div class="fig"><div class="lab">Not yet billed</div><div class="val over">$244.50</div><div class="basis">No bill recorded for June yet</div></div>
+        </div>
+      </div>
+
+      <div class="card" style="margin-bottom:20px">
+        <div style="padding:18px 22px 20px">
+          <div class="meter"><i class="over" style="width:100%"></i></div>
+          <div class="row" style="margin-top:11px;font-size:13px;color:var(--ink-2)">
+            <span class="typed">5h 43m</span><span>of</span><span class="typed">3h</span>
+            <div class="grow"></div>
+            <span class="typed" style="color:var(--c-over)">2h 43m over · $244.50</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-h">Hours by day <span class="lite">· avg 38m</span></div>
+        <div style="padding:24px 22px 18px">
+          <div style="display:flex;align-items:flex-end;gap:6px;height:120px;border-bottom:1px solid var(--rule)">
+            <div style="flex:1"><div style="height:74px;background:#3f9166"></div></div>
+            <div style="flex:1"><div style="height:46px;background:#3f9166"></div></div>
+            <div style="flex:1"><div style="height:6px;background:#3f9166"></div></div>
+            <div style="flex:1"></div><div style="flex:1"></div><div style="flex:1"></div><div style="flex:1"></div>
+            <div style="flex:1"><div style="height:4px;background:#3f9166"></div></div>
+            <div style="flex:1"><div style="height:56px;background:#3f9166"></div></div>
+            <div style="flex:1"></div><div style="flex:1"></div><div style="flex:1"></div><div style="flex:1"></div>
+            <div style="flex:1"><div style="height:5px;background:#3f9166"></div></div>
+            <div style="flex:1"></div><div style="flex:1"></div><div style="flex:1"></div><div style="flex:1"></div><div style="flex:1"></div>
+            <div style="flex:1"><div style="height:20px;background:#3f9166"></div></div>
+            <div style="flex:1"><div style="height:10px;background:#3f9166"></div></div>
+            <div style="flex:1"><div style="height:82px;background:#3f9166"></div></div>
+            <div style="flex:1"></div><div style="flex:1"></div><div style="flex:1"></div>
+          </div>
+          <div class="row" style="margin-top:9px;font-size:11.5px;color:var(--ink-3)">
+            <span class="typed">6/1</span><div class="grow"></div><span class="typed">6/15</span><div class="grow"></div><span class="typed">6/30</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== 03 FIXED ===== -->
+<div class="sec">
+  <div class="sec-head"><span class="sec-num">03</span><h2>A fixed fee — same block</h2><span class="say">Different terms, identical shape.</span></div>
+
+  <div class="wp">
+    <div class="wp-bar">Plain Text Time Tracker</div>
+    <div class="wp-body">
+      <div class="row" style="margin-bottom:20px;justify-content:flex-end">
+        <span class="btn q sm">Settings</span><span class="btn q sm">← Projects</span>
+      </div>
+
+      <div class="scope">
+        <div class="scope-id">
+          <h1>Website Redesign</h1> <span class="pill p-fixed" style="vertical-align:4px;margin-left:8px">Fixed budget</span>
+          <div class="scope-l2">Robin Mohr · $3,870 agreed, budgeted as 38h 42m at $100/hr</div>
+          <div class="scope-when">Showing <b class="typed" style="color:var(--ink);font-weight:500">Feb 19 – Jun 10, 2026</b> <span>· the whole project · 91 entries</span></div>
+        </div>
+        <div class="scope-nums">
+          <div class="fig"><div class="lab">Time logged</div><div class="val">96h 25m</div><div class="basis">All entries on this project</div></div>
+          <div class="fig"><div class="lab">Against the 38h 42m budgeted</div><div class="val over">57h 43m over</div><div class="basis">249% of the budget</div></div>
+          <div class="fig"><div class="lab">Earned</div><div class="val">$3,870.00</div><div class="basis">The agreed fee · fixed regardless of hours</div></div>
+          <div class="fig"><div class="lab">Effective rate</div><div class="val">$40/hr</div><div class="basis"><span class="typed">$3,870 ÷ 96h 25m</span> · target $100/hr</div></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-h">Hours by month <span class="lite">· avg 19h 17m</span></div>
+        <div style="padding:26px 24px 20px">
+          <div style="display:flex;align-items:flex-end;gap:28px;height:150px;border-bottom:1px solid var(--rule)">
+            <div style="flex:1"><div style="height:2px;background:#3f9166"></div></div>
+            <div style="flex:1"><div style="height:60px;background:#3f9166"></div></div>
+            <div style="flex:1"><div style="height:68px;background:#3f9166"></div></div>
+            <div style="flex:1"><div style="height:132px;background:#c08f2a"></div></div>
+            <div style="flex:1"><div style="height:28px;background:#3f9166"></div></div>
+          </div>
+          <div style="display:flex;gap:28px;margin-top:10px">
+            <div style="flex:1;text-align:center"><div style="font-size:13px">Feb</div><div class="typed muted" style="font-size:12px">23m</div></div>
+            <div style="flex:1;text-align:center"><div style="font-size:13px">Mar</div><div class="typed muted" style="font-size:12px">20h 02m</div></div>
+            <div style="flex:1;text-align:center"><div style="font-size:13px">Apr</div><div class="typed muted" style="font-size:12px">22h 35m</div></div>
+            <div style="flex:1;text-align:center"><div style="font-size:13px">May</div><div class="typed muted" style="font-size:12px">43h 57m</div></div>
+            <div style="flex:1;text-align:center"><div style="font-size:13px">Jun</div><div class="typed muted" style="font-size:12px">9h 28m</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== 04 ENTRIES FILTERED ===== -->
+<div class="sec">
+  <div class="sec-head"><span class="sec-num">04</span><h2>Entries filtered to a scope — full block</h2><span class="say">The filter has terms, so the block applies.</span></div>
+
+  <div class="wp">
+    <div class="wp-bar">Plain Text Time Tracker</div>
+    <div class="wp-body">
+      <div class="row" style="margin-bottom:20px;justify-content:flex-end">
+        <div class="seg"><span>Summary</span><span class="on">Entries</span></div>
+        <span class="stepper"><span class="arw">‹</span><span class="dt">Feb 17 – Jul 19</span><span class="arw r">›</span></span>
+      </div>
+
+      <div class="scope">
+        <div class="scope-id">
+          <h1>General Website Support</h1> <span class="pill p-hourly" style="vertical-align:4px;margin-left:8px">Hourly</span>
+          <div class="scope-l2">Daniel Mintie · $100/hr</div>
+          <div class="scope-when">Showing <b class="typed" style="color:var(--ink);font-weight:500">Feb 17 – May 19, 2026</b> <span>· not yet billed · 15 entries</span></div>
+        </div>
+        <div class="scope-nums">
+          <div class="fig"><div class="lab">Time logged</div><div class="val">7h 56m</div><div class="basis">The 15 entries below</div></div>
+          <div class="fig"><div class="lab">Earned</div><div class="val">$793.32</div><div class="basis"><span class="typed">7h 56m × $100/hr</span></div></div>
+          <div class="fig"><div class="lab">Sitting unbilled</div><div class="val over">151 days</div><div class="basis">Since the oldest entry, <span class="typed">Feb 17</span></div></div>
+          <div class="fig"><div class="lab">Billed before</div><div class="val">$0.00</div><div class="basis">No bill record on this project yet</div></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <table>
+          <thead><tr>
+            <th>Description</th><th style="width:140px">Tags</th><th style="width:160px">Time</th><th style="width:90px">Duration</th>
+            <th class="c" style="width:75px">Billable</th><th style="width:105px">Status</th><th class="n" style="width:100px">Amount</th><th style="width:48px"></th>
+          </tr></thead>
+        </table>
+        <div class="daybar"><a href="#">May 19</a> <span class="muted">Tuesday</span><div class="grow"></div><span class="muted typed">6m · $10.00</span></div>
+        <table><tbody>
+          <tr>
+            <td>Responding to Daniel's question about security.<span class="sub">Daniel Mintie · General Website Support</span></td>
+            <td style="width:140px"><span class="pill p-tag">Communication</span></td>
+            <td style="width:160px" class="typed muted">10:21 – 10:27am</td><td style="width:90px" class="typed">6m</td>
+            <td class="c" style="width:75px"><span style="color:var(--c-hourly);font-weight:600">$</span></td>
+            <td style="width:105px"><span class="pill p-hourly">Unbilled</span></td>
+            <td class="n" style="width:100px"><span class="amt">$10.00</span></td>
+            <td class="c" style="width:48px;color:var(--ink-3)">⋮</td>
+          </tr>
+        </tbody></table>
+        <div class="daybar" style="border-top:1px solid var(--rule)"><a href="#">Mar 16</a> <span class="muted">Monday</span><div class="grow"></div><span class="muted typed">2h 52m · $286.67</span></div>
+        <table><tbody>
+          <tr>
+            <td>Working on Daniels theme updates for PHP upgrade.<span class="sub">Daniel Mintie · General Website Support</span></td>
+            <td style="width:140px"><span class="pill p-tag">Development</span></td>
+            <td style="width:160px" class="typed muted">11:53am – 1:33pm</td><td style="width:90px" class="typed">1h 40m</td>
+            <td class="c" style="width:75px"><span style="color:var(--c-hourly);font-weight:600">$</span></td>
+            <td style="width:105px"><span class="pill p-hourly">Unbilled</span></td>
+            <td class="n" style="width:100px"><span class="amt">$166.67</span></td>
+            <td class="c" style="width:48px;color:var(--ink-3)">⋮</td>
+          </tr>
+          <tr>
+            <td>Continue testing issues with Daniel's website.<span class="sub">Daniel Mintie · General Website Support</span></td>
+            <td><span class="pill p-tag">Development</span></td>
+            <td class="typed muted">3:09 – 4:21pm</td><td class="typed">1h 12m</td>
+            <td class="c"><span style="color:var(--c-hourly);font-weight:600">$</span></td>
+            <td><span class="pill p-hourly">Unbilled</span></td>
+            <td class="n"><span class="amt">$120.00</span></td>
+            <td class="c" style="color:var(--ink-3)">⋮</td>
+          </tr>
+        </tbody></table>
+      </div>
+    </div>
+  </div>
+
+  <div class="note">
+    <h4>Unfiltered, this reverts</h4>
+    <p>With no client and project selected there's no scope and no terms, so the page keeps the light header and the stat strip you already have. The block appears when the filter narrows to something with a rate.</p>
+  </div>
+</div>
+
+<!-- ===== 05 TODAY ===== -->
+<div class="sec">
+  <div class="sec-head"><span class="sec-num">05</span><h2>Today — light header</h2><span class="say">A day has no terms.</span></div>
+
+  <div class="wp">
+    <div class="wp-bar">Plain Text Time Tracker</div>
+    <div class="wp-body">
+      <div class="hd">
+        <div>
+          <div class="row" style="gap:11px"><h1>Today</h1><span class="pill p-hourly">Processed</span></div>
+          <div class="l2">7 entries recorded · <span class="typed">6h 00m</span> logged · saved a moment ago</div>
+          <div class="l3"><span class="typed">Friday, July 3, 2026</span></div>
+        </div>
+        <div class="grow"></div>
+        <span class="btn q sm">Jump to today</span>
+        <span class="stepper"><span class="arw">‹</span><span class="dt">Jul 3, 2026</span><span class="arw r">›</span></span>
+      </div>
+
+      <div class="editor" style="margin-bottom:20px">
+<textarea rows="9" readonly>@9:30am - Working on LinkedIn Outreach
+@10:22am - Done
+- It still feels like I don't really know what I am doing.
+@10:24am - Responding to client emails
+@10:31am - Done.
+@10:31am - Working on final trip page updates for BTSA.
+@10:46am - Working on accounting.
+@11:08am - Done.
+@11:10am - Running website care plan updates</textarea>
+        <div class="editor-foot">
+          <span><kbd>@</kbd> timestamp</span><span><kbd>#</kbd> tag</span><span><kbd>done</kbd> end task</span>
+          <div class="grow"></div>
+          <span class="btn q sm">Save</span><span class="btn p sm">Process entries</span>
+        </div>
+      </div>
+
+      <div class="card" style="margin-bottom:20px;display:flex">
+        <div class="stat"><div class="k">Total hours</div><div class="v">6.00</div></div>
+        <div class="stat"><div class="k">Billable hours</div><div class="v">0.25</div></div>
+        <div class="stat"><div class="k">Billable amount</div><div class="v">$25.00</div></div>
+      </div>
+
+      <div class="card">
+        <div class="card-h">Recorded entries <span class="lite">· 7</span></div>
+        <table>
+          <thead><tr><th style="width:180px">Date / time</th><th style="width:95px">Duration</th><th>Description</th><th style="width:145px">Tags</th><th class="c" style="width:80px">Billable</th><th style="width:48px"></th></tr></thead>
+          <tbody>
+            <tr><td class="typed muted">Jul 3 · 9:30 – 10:22am</td><td class="typed">52m</td><td>Working on LinkedIn Outreach<span class="sub">Internal · Marketing</span></td><td><span class="pill p-tag">Outreach</span></td><td class="c"><span class="dash">—</span></td><td class="c" style="color:var(--ink-3)">⋮</td></tr>
+            <tr><td class="typed muted">Jul 3 · 10:24 – 10:31am</td><td class="typed">7m</td><td>Responding to client emails<span class="sub">Internal · Admin &amp; Operations</span></td><td><span class="pill p-tag">Communication</span></td><td class="c"><span class="dash">—</span></td><td class="c" style="color:var(--ink-3)">⋮</td></tr>
+            <tr><td class="typed muted">Jul 3 · 10:31 – 10:46am</td><td class="typed">15m</td><td>Working on final trip page updates for BTSA.<span class="sub">Behind The Scenes Adventures · General Website Support</span></td><td><span class="pill p-tag">Support</span></td><td class="c"><span style="color:var(--c-hourly);font-weight:600">$</span></td><td class="c" style="color:var(--ink-3)">⋮</td></tr>
+            <tr><td class="typed muted">Jul 3 · 12:37 – 2:14pm</td><td class="typed">1h 37m</td><td>Looking into Posties openai tag setup.<span class="sub">Postie · Website Care Plan Time</span></td><td><span class="pill p-tag">Development</span></td><td class="c"><span class="dash">—</span></td><td class="c" style="color:var(--ink-3)">⋮</td></tr>
+            <tr><td class="typed muted">Jul 3 · 3:40 – 5:05pm</td><td class="typed">1h 25m</td><td>Reviewing Danie's website content.<span class="sub">Daniel Herman · Website Design</span></td><td><span class="pill p-tag">Prep</span></td><td class="c"><span class="dash">—</span></td><td class="c" style="color:var(--ink-3)">⋮</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="note">
+    <h4>Same three lines, a third of the weight</h4>
+    <p>What it is, what's true about it, which date. No panel, no figures inside the header, no basis lines — because "6.00 hours" doesn't need explaining and a day has nothing it was agreed against.</p>
+    <p>This is the version you said worked. It sits below the block rather than replacing it, which is what I got wrong: they're the same pattern at two weights, not two competing ideas.</p>
+  </div>
+</div>
+
+</div>

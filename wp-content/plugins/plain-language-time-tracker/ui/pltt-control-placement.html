@@ -1,0 +1,247 @@
+<meta charset="utf-8">
+<title>PLTT — Control placement</title>
+<style>
+  :root{
+    --paper:#fff; --canvas:#f4f3f1; --sunk:#faf9f7;
+    --rule:#e4e2de; --rule-2:#efedea;
+    --ink:#1a1c1e; --ink-2:#55595e; --ink-3:#8a8d91;
+    --blue:#2271b1;
+    --c-hourly:#146b42; --c-hourly-bg:#e0f0e7;
+    --c-over:#9a6a10;
+    --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",sans-serif;
+    --mono:Menlo,Consolas,monaco,monospace;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:#e3e1de;font:14px/1.6 var(--sans);color:var(--ink);-webkit-font-smoothing:antialiased}
+  .wrap{max-width:1120px;margin:0 auto;padding:36px 24px 90px}
+  .typed{font-family:var(--mono);font-variant-numeric:tabular-nums}
+
+  .doc{background:var(--ink);color:#fff;padding:30px 34px;border-radius:6px}
+  .doc h1{margin:0 0 11px;font-size:22px;font-weight:600;letter-spacing:-.2px}
+  .doc p{margin:0 0 9px;color:#b9bcc0;max-width:76ch;line-height:1.75}
+  .doc p:last-child{margin:0}
+  .doc b{color:#fff;font-weight:500}
+
+  .sec{margin-top:42px}
+  .sec-head{padding-bottom:12px;border-bottom:2px solid var(--ink);margin-bottom:20px;display:flex;align-items:baseline;gap:13px}
+  .sec-num{font:500 12px/1 var(--mono);color:var(--ink-3);letter-spacing:.7px}
+  .sec-head h2{margin:0;font-size:18px;font-weight:600;letter-spacing:-.15px}
+  .sec-head .say{margin-left:auto;font-size:13px;color:var(--ink-2)}
+  .lead{max-width:80ch;color:var(--ink-2);margin:0 0 20px;line-height:1.8}
+
+  .wp{background:var(--canvas);border:1px solid #cbc9c5;border-radius:6px;overflow:hidden}
+  .wp-bar{background:var(--ink);color:#8a8d91;font:11px/1 var(--mono);padding:8px 14px}
+  .wp-body{padding:24px 26px 26px}
+  .row{display:flex;align-items:center;gap:12px}
+  .grow{flex:1}
+  .muted{color:var(--ink-3)}
+
+  h1.page{margin:0;font-size:26px;font-weight:450;letter-spacing:-.25px;line-height:1.2}
+
+  .btn{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--blue);background:var(--paper);color:var(--blue);padding:7px 14px;border-radius:4px;font-size:13.5px;white-space:nowrap}
+  .btn.q{border-color:#c2bfba;color:var(--ink-2)}
+  .btn.sm{padding:5px 11px;font-size:12.5px}
+  .seg{display:inline-flex;border:1px solid var(--rule);border-radius:4px;overflow:hidden;background:var(--paper)}
+  .seg span{padding:6px 14px;font-size:13.5px;color:var(--ink-2);border-right:1px solid var(--rule)}
+  .seg span:last-child{border-right:0}
+  .seg span.on{background:var(--ink);color:#fff}
+  .stepper{display:inline-flex;align-items:center;border:1px solid #c2bfba;border-radius:4px;overflow:hidden;background:var(--paper)}
+  .stepper .arw{padding:7px 12px;color:var(--ink-2);border-right:1px solid var(--rule)}
+  .stepper .arw.r{border-right:0;border-left:1px solid var(--rule)}
+  .stepper .dt{padding:7px 15px;font:13px/1 var(--mono)}
+
+  .filters{background:var(--paper);border:1px solid var(--rule);border-radius:6px;padding:13px 17px;display:flex;align-items:flex-end;gap:15px;flex-wrap:wrap}
+  .fld label{display:block;font-size:12.5px;color:var(--ink-2);margin-bottom:5px}
+  .sel{border:1px solid #8c8f94;border-radius:3px;background:#fff;padding:7px 30px 7px 11px;font-size:13.5px;position:relative;min-width:160px}
+  .sel::after{content:"▾";position:absolute;right:11px;color:var(--ink-3);font-size:10px}
+  .sel.set{border-color:var(--blue);color:var(--blue)}
+  .divider{width:1px;align-self:stretch;background:var(--rule);margin:0 3px}
+
+  .body-stub{background:var(--paper);border:1px solid var(--rule);border-radius:6px;padding:18px 20px;margin-top:16px;color:var(--ink-3);font-size:13px}
+
+  .tag{display:inline-block;font:500 10.5px/1 var(--mono);letter-spacing:.6px;padding:4px 7px;border-radius:3px;margin-bottom:9px}
+  .tag.a{background:#e0f0e7;color:#146b42}
+  .tag.b{background:#e4eef7;color:#1d5f8a}
+  .tag.now{background:#eeedea;color:#666360}
+
+  .note{background:var(--sunk);border:1px solid var(--rule);border-left:3px solid var(--blue);border-radius:5px;padding:15px 19px;margin-top:16px}
+  .note h4{margin:0 0 7px;font-size:13.5px;font-weight:600}
+  .note p{margin:0;font-size:13px;color:var(--ink-2);line-height:1.75}
+  .note p + p{margin-top:8px}
+
+  .cmp{width:100%;border-collapse:collapse;background:var(--paper);border:1px solid var(--rule);border-radius:6px;overflow:hidden;margin-top:8px}
+  .cmp th{text-align:left;font-weight:450;color:var(--ink-3);font-size:11.5px;letter-spacing:.5px;text-transform:uppercase;padding:11px 18px;border-bottom:1px solid var(--rule);background:var(--sunk)}
+  .cmp td{padding:13px 18px;border-bottom:1px solid var(--rule-2);font-size:13.5px;vertical-align:top}
+  .cmp tr:last-child td{border-bottom:0}
+</style>
+
+<div class="wrap">
+
+<div class="doc">
+  <h1>Where the controls go</h1>
+  <p>Two separate questions. <b>The view toggle</b> — settled, it moves next to the title. <b>The date control</b> — a genuine tradeoff between two defensible placements.</p>
+</div>
+
+<!-- ===== 01 TOGGLE ===== -->
+<div class="sec">
+  <div class="sec-head"><span class="sec-num">01</span><h2>The view toggle</h2><span class="say">Navigation, not scoping.</span></div>
+  <p class="lead">Summary and Entries are two pages. The toggle changes which one you're on and survives every filter change — it's navigation. Grouping it with the date control implies it does the same kind of work, which it doesn't.</p>
+
+  <div class="wp" style="margin-bottom:14px">
+    <div class="wp-bar">Current mockup</div>
+    <div class="wp-body">
+      <span class="tag now">GROUPED AT THE RIGHT</span>
+      <div class="row">
+        <h1 class="page">Entries</h1>
+        <div class="grow"></div>
+        <div class="seg"><span>Summary</span><span class="on">Entries</span></div>
+        <span class="stepper"><span class="arw">‹</span><span class="dt">Jun 1 – Jun 30, 2026</span><span class="arw r">›</span></span>
+      </div>
+    </div>
+  </div>
+
+  <div class="wp">
+    <div class="wp-bar">Proposed</div>
+    <div class="wp-body">
+      <span class="tag a">GROUPED BY KIND</span>
+      <div class="row">
+        <h1 class="page">Entries</h1>
+        <div class="seg" style="margin-left:6px"><span>Summary</span><span class="on">Entries</span></div>
+        <div class="grow"></div>
+        <span class="stepper"><span class="arw">‹</span><span class="dt">Jun 1 – Jun 30, 2026</span><span class="arw r">›</span></span>
+      </div>
+    </div>
+  </div>
+
+  <div class="note">
+    <h4>Why left</h4>
+    <p>The toggle belongs to the page name — it's naming a subview of Entries, so it reads as a tab pair when it sits against the title. That's also the WordPress convention: subviews near the title, tools at the right margin.</p>
+  </div>
+</div>
+
+<!-- ===== 02 OPTION A ===== -->
+<div class="sec">
+  <div class="sec-head"><span class="sec-num">02</span><h2>Option A · Date in the title row</h2><span class="say">One fixed position, on every screen.</span></div>
+
+  <div class="wp" style="margin-bottom:14px">
+    <div class="wp-bar">Entries — has filters</div>
+    <div class="wp-body">
+      <span class="tag a">A</span>
+      <div class="row" style="margin-bottom:16px">
+        <h1 class="page">Entries</h1>
+        <div class="seg" style="margin-left:6px"><span>Summary</span><span class="on">Entries</span></div>
+        <div class="grow"></div>
+        <span class="stepper"><span class="arw">‹</span><span class="dt">Jun 1 – Jun 30, 2026</span><span class="arw r">›</span></span>
+      </div>
+      <div class="filters">
+        <div class="fld"><label>Client</label><div class="sel set">Daniel Mintie</div></div>
+        <div class="fld"><label>Project</label><div class="sel">All projects</div></div>
+        <div class="fld"><label>Tag</label><div class="sel">All tags</div></div>
+        <div class="fld"><label>Billing</label><div class="sel">All</div></div>
+        <div class="grow"></div>
+        <span style="font-size:13.5px;color:var(--blue);padding-bottom:8px">Clear filters</span>
+      </div>
+      <div class="body-stub">Scope block, then table…</div>
+    </div>
+  </div>
+
+  <div class="wp">
+    <div class="wp-bar">Today — no filters</div>
+    <div class="wp-body">
+      <span class="tag a">A</span>
+      <div class="row">
+        <h1 class="page">Today</h1>
+        <div class="grow"></div>
+        <span class="btn q sm">Jump to today</span>
+        <span class="stepper"><span class="arw">‹</span><span class="dt">Jul 3, 2026</span><span class="arw r">›</span></span>
+      </div>
+      <div class="body-stub">Log, then entries…</div>
+    </div>
+  </div>
+
+  <div class="note">
+    <h4>The tradeoff</h4>
+    <p><b>For:</b> the date control is in exactly the same place on all seven screens, whether or not that screen filters. Nothing to hunt for. Filterless screens stay tight.</p>
+    <p><b>Against:</b> the date <i>is</i> a filter — it narrows data exactly as the dropdowns do — and this separates it from them. On Entries you set scope in two places, one row apart.</p>
+  </div>
+</div>
+
+<!-- ===== 03 OPTION B ===== -->
+<div class="sec">
+  <div class="sec-head"><span class="sec-num">03</span><h2>Option B · Date with the filters</h2><span class="say">Everything that narrows, in one bar.</span></div>
+
+  <div class="wp" style="margin-bottom:14px">
+    <div class="wp-bar">Entries — has filters</div>
+    <div class="wp-body">
+      <span class="tag b">B</span>
+      <div class="row" style="margin-bottom:16px">
+        <h1 class="page">Entries</h1>
+        <div class="seg" style="margin-left:6px"><span>Summary</span><span class="on">Entries</span></div>
+        <div class="grow"></div>
+        <span class="btn q sm">Export</span>
+      </div>
+      <div class="filters">
+        <div class="fld"><label>Client</label><div class="sel set">Daniel Mintie</div></div>
+        <div class="fld"><label>Project</label><div class="sel">All projects</div></div>
+        <div class="fld"><label>Tag</label><div class="sel">All tags</div></div>
+        <div class="fld"><label>Billing</label><div class="sel">All</div></div>
+        <div class="divider"></div>
+        <div class="fld"><label>Period</label>
+          <span class="stepper"><span class="arw">‹</span><span class="dt">Jun 1 – Jun 30, 2026</span><span class="arw r">›</span></span>
+        </div>
+        <div class="grow"></div>
+        <span style="font-size:13.5px;color:var(--blue);padding-bottom:8px">Clear all</span>
+      </div>
+      <div class="body-stub">Scope block, then table…</div>
+    </div>
+  </div>
+
+  <div class="wp">
+    <div class="wp-bar">Today — no filters, bar holds only the date</div>
+    <div class="wp-body">
+      <span class="tag b">B</span>
+      <div class="row" style="margin-bottom:16px">
+        <h1 class="page">Today</h1>
+        <div class="grow"></div>
+        <span class="btn q sm">Jump to today</span>
+      </div>
+      <div class="filters">
+        <div class="fld"><label>Period</label>
+          <span class="stepper"><span class="arw">‹</span><span class="dt">Jul 3, 2026</span><span class="arw r">›</span></span>
+        </div>
+        <div class="grow"></div>
+      </div>
+      <div class="body-stub">Log, then entries…</div>
+    </div>
+  </div>
+
+  <div class="note">
+    <h4>The tradeoff</h4>
+    <p><b>For:</b> everything that narrows the data lives in one bar, labelled the same way. "Clear all" can then genuinely clear everything including the period. Conceptually tidier.</p>
+    <p><b>Against:</b> filterless screens gain a bar holding one control, which is a lot of furniture for a date stepper — see Today above. And the bar's height varies by screen, so the page body starts at a different place depending on where you are.</p>
+  </div>
+</div>
+
+<!-- ===== 04 ===== -->
+<div class="sec">
+  <div class="sec-head"><span class="sec-num">04</span><h2>Side by side</h2></div>
+  <table class="cmp">
+    <thead><tr><th style="width:26%"></th><th style="width:37%">A · title row</th><th style="width:37%">B · filter bar</th></tr></thead>
+    <tbody>
+      <tr><td><b>Position consistency</b></td><td>Identical on all screens</td><td>Identical, but the bar around it changes size</td></tr>
+      <tr><td><b>Conceptual fit</b></td><td>Weaker — a filter separated from the filters</td><td>Stronger — all scoping in one place</td></tr>
+      <tr><td><b>Filterless screens</b></td><td>Stay tight, no extra chrome</td><td>Gain a bar for one control</td></tr>
+      <tr><td><b>Body start point</b></td><td>Constant</td><td>Shifts by screen</td></tr>
+      <tr><td><b>"Clear all"</b></td><td>Can't include the period</td><td>Can include the period</td></tr>
+      <tr><td><b>Vertical cost on Today</b></td><td>0</td><td>~70px</td></tr>
+    </tbody>
+  </table>
+
+  <div class="note">
+    <h4>Recommendation, weakly held</h4>
+    <p><b>A.</b> Today is the screen you open most, and giving it a filter bar containing a single date stepper is the wrong trade for a conceptual tidiness you'd notice once and then stop seeing. Consistent position beats consistent category.</p>
+    <p>The one thing that would flip it: if you find yourself reaching for the period control while already looking at the filter bar, and having to travel back up. That's a real cost and only using it will tell you.</p>
+  </div>
+</div>
+
+</div>

@@ -1,0 +1,401 @@
+<meta charset="utf-8">
+<title>PLTT — Today states &amp; status</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;450;500;600&family=IBM+Plex+Mono:wght@400;450;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --paper:#fff; --canvas:#f4f3f1; --sunk:#faf9f7;
+    --rule:#e4e2de; --rule-2:#efedea;
+    --ink:#1a1c1e; --ink-2:#55595e; --ink-3:#8a8d91;
+    --blue:#2271b1;
+    --c-hourly:#146b42; --c-hourly-bg:#e0f0e7;
+    --c-monthly:#175d87;--c-monthly-bg:#e0edf7;
+    --c-fixed:#5540a5;  --c-fixed-bg:#eae5f9;
+    --c-over:#9a6a10;   --c-over-bg:#fbefd8;
+    --c-tag:#1d5f8a;    --c-tag-bg:#e4eef7;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:#e3e1de;font:14px/1.6 "IBM Plex Sans",system-ui,sans-serif;color:var(--ink);-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+  .wrap{max-width:1180px;margin:0 auto;padding:36px 24px 100px}
+  .typed{font-family:"IBM Plex Mono",monospace;font-variant-numeric:tabular-nums;letter-spacing:-.12px}
+
+  .doc{background:var(--ink);color:#fff;padding:32px 36px;border-radius:6px}
+  .doc h1{margin:0 0 12px;font-size:23px;font-weight:600;letter-spacing:-.35px}
+  .doc p{margin:0 0 10px;color:#b9bcc0;max-width:76ch;line-height:1.75}
+  .doc p:last-child{margin:0}
+  .doc b{color:#fff;font-weight:500}
+
+  .sec{margin-top:48px}
+  .sec-head{padding-bottom:12px;border-bottom:2px solid var(--ink);margin-bottom:22px;display:flex;align-items:baseline;gap:13px}
+  .sec-num{font:500 12px/1 "IBM Plex Mono",monospace;color:var(--ink-3);letter-spacing:.7px}
+  .sec-head h2{margin:0;font-size:18px;font-weight:600;letter-spacing:-.25px}
+  .sec-head .say{margin-left:auto;font-size:13px;color:var(--ink-2)}
+  .lead{max-width:80ch;color:var(--ink-2);margin:0 0 22px;line-height:1.8}
+  .step{display:inline-block;font:500 11.5px/1 "IBM Plex Mono",monospace;letter-spacing:.6px;color:var(--ink-3);margin-bottom:10px}
+
+  .pill{display:inline-block;padding:2px 10px;border-radius:3px;font-size:12px;line-height:20px}
+  .p-hourly{background:var(--c-hourly-bg);color:var(--c-hourly)}
+  .p-tag{background:var(--c-tag-bg);color:var(--c-tag)}
+  .p-over{background:var(--c-over-bg);color:var(--c-over)}
+  .p-draft{background:#eeedea;color:#666360}
+
+  .wp{background:var(--canvas);border:1px solid #cbc9c5;border-radius:6px;overflow:hidden}
+  .wp-bar{background:var(--ink);color:#8a8d91;font:11px/1 "IBM Plex Mono",monospace;padding:9px 15px}
+  .wp-body{padding:28px 30px 34px}
+  .row{display:flex;align-items:center;gap:12px}
+  .grow{flex:1}
+  .muted{color:var(--ink-3)}
+
+  .hd{display:flex;align-items:flex-start;gap:16px;margin-bottom:20px}
+  .hd h1{margin:0;font-size:26px;font-weight:450;letter-spacing:-.5px;line-height:1.2}
+  .hd .l2{color:var(--ink-2);font-size:13.5px;margin-top:6px}
+  .hd .l3{color:var(--ink-3);font-size:13px;margin-top:3px}
+
+  .btn{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--blue);background:var(--paper);color:var(--blue);padding:7px 14px;border-radius:4px;font-size:13.5px;white-space:nowrap}
+  .btn.p{background:var(--blue);color:#fff}
+  .btn.q{border-color:#c2bfba;color:var(--ink-2)}
+  .btn.sm{padding:5px 11px;font-size:12.5px}
+  .stepper{display:inline-flex;align-items:center;border:1px solid #c2bfba;border-radius:4px;overflow:hidden;background:var(--paper)}
+  .stepper .arw{padding:7px 13px;color:var(--ink-2);border-right:1px solid var(--rule)}
+  .stepper .arw.r{border-right:0;border-left:1px solid var(--rule)}
+  .stepper .dt{padding:7px 17px;font:13px/1 "IBM Plex Mono",monospace}
+
+  .card{background:var(--paper);border:1px solid var(--rule);border-radius:6px}
+  .card-h{padding:15px 20px;border-bottom:1px solid var(--rule-2);font-weight:600;font-size:14px;display:flex;align-items:center;gap:12px}
+  .card-h .lite{font-weight:400;color:var(--ink-3);font-size:13px}
+
+  table{width:100%;border-collapse:collapse}
+  th{text-align:left;font-weight:450;color:var(--ink-3);font-size:11.5px;letter-spacing:.5px;text-transform:uppercase;padding:11px 20px;border-bottom:1px solid var(--rule);background:var(--sunk)}
+  th.c{text-align:center} th.n{text-align:right}
+  td{padding:15px 20px;border-bottom:1px solid var(--rule-2);vertical-align:middle}
+  td.c{text-align:center} td.n{text-align:right}
+  tr:last-child td{border-bottom:0}
+  .sub{display:block;color:var(--ink-3);font-size:12.5px;margin-top:3px}
+  a.lk{color:var(--blue);text-decoration:none}
+  .dash{color:#cfccc7}
+  .amt{font-family:"IBM Plex Mono",monospace;font-variant-numeric:tabular-nums;font-weight:500}
+
+  .stat{padding:16px 20px 18px;border-right:1px solid var(--rule-2);flex:1;min-width:150px}
+  .stat:last-child{border-right:0}
+  .stat .k{font-size:12.5px;color:var(--ink-2)}
+  .stat .v{font:450 26px/1.2 "IBM Plex Mono",monospace;letter-spacing:-.9px;margin-top:4px;font-variant-numeric:tabular-nums}
+
+  /* ---- log, three states ---- */
+  .log{background:var(--paper);border:1px solid var(--rule);border-radius:6px;overflow:hidden;margin-bottom:20px}
+  .log-open textarea{width:100%;border:0;padding:22px 26px;font:13.5px/2 "IBM Plex Mono",monospace;resize:none;outline:none;color:var(--ink);display:block}
+  .log-foot{border-top:1px solid var(--rule-2);padding:11px 18px;display:flex;align-items:center;gap:18px;font-size:12.5px;color:var(--ink-3);background:var(--sunk)}
+  kbd{font:11px/1 "IBM Plex Mono",monospace;background:var(--paper);border:1px solid var(--rule);border-bottom-width:2px;border-radius:3px;padding:3px 6px;color:var(--ink-2)}
+
+  .log-read{position:relative}
+  .log-read .body{padding:16px 26px 14px;font:13px/1.85 "IBM Plex Mono",monospace;color:var(--ink-2);max-height:118px;overflow:hidden}
+  .log-read .fade{position:absolute;left:1px;right:1px;bottom:44px;height:44px;background:linear-gradient(rgba(255,255,255,0),#fff)}
+  .log-read .bar{border-top:1px solid var(--rule-2);padding:10px 18px;display:flex;align-items:center;gap:14px;font-size:12.5px;color:var(--ink-3);background:var(--sunk)}
+
+  .log-min{padding:13px 20px;display:flex;align-items:center;gap:14px;font-size:13px;color:var(--ink-2)}
+  .log-min .peek{font:12.5px/1 "IBM Plex Mono",monospace;color:var(--ink-3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:420px}
+
+  .sel{border:1px solid #8c8f94;border-radius:3px;background:#fff;padding:6px 28px 6px 10px;font-size:13px;position:relative;display:inline-block;min-width:150px}
+  .sel::after{content:"▾";position:absolute;right:10px;color:var(--ink-3);font-size:10px}
+  .sel.warn{border-color:#c9a24a;background:#fffdf6}
+
+  tr.needs td{background:#fffdf6}
+  .flag{display:inline-block;width:6px;height:6px;border-radius:50%;background:#c9962a}
+
+  .note{background:var(--sunk);border:1px solid var(--rule);border-left:3px solid var(--blue);border-radius:5px;padding:16px 20px;margin-top:18px}
+  .note h4{margin:0 0 7px;font-size:13.5px;font-weight:600}
+  .note p{margin:0;font-size:13px;color:var(--ink-2);line-height:1.75}
+  .note p + p{margin-top:9px}
+
+  .rule-tbl{width:100%;border-collapse:collapse;background:var(--paper);border:1px solid var(--rule);border-radius:6px;overflow:hidden}
+  .rule-tbl td{font-size:13.5px}
+  .banner{background:#fffdf6;border:1px solid #e8d9a8;border-radius:5px;padding:12px 18px;display:flex;align-items:center;gap:12px;font-size:13px;color:#6b5518;margin-bottom:18px}
+</style>
+
+<div class="wrap">
+
+<div class="doc">
+  <h1>Today's three states, and the status column</h1>
+  <p>The log recedes as the day progresses. <b>Capturing</b> — full height, active, the only thing on screen. <b>Confirming</b> — collapsed to a peek, because you're working in the table. <b>Recorded</b> — read-only at reduced height, with editing available but deliberate.</p>
+  <p>Read-only by default isn't only about space: once processed, entries are derived from text that you can still change. Making the log inert until you ask for it prevents quietly editing the source of records you've already saved.</p>
+</div>
+
+<!-- ===== 01 STATUS ===== -->
+<div class="sec">
+  <div class="sec-head"><span class="sec-num">01</span><h2>Status — three values</h2><span class="say">Less than I proposed before.</span></div>
+  <p class="lead">Unbilled and Billed are the only real billing statuses. <b>Not charged</b> earns a third slot because it's a decision you made that's otherwise invisible — an excluded entry and a fixed-fee entry both showing a dash is the one genuinely ambiguous case. Everything else stays a dash: <i>in allocation</i> and <i>in fixed fee</i> aren't statuses, they're facts about the project, and the project name is already in the row.</p>
+
+  <table class="rule-tbl">
+    <thead><tr><th style="width:150px">Status</th><th class="c" style="width:90px">Billable</th><th class="n" style="width:110px">Amount</th><th>When</th></tr></thead>
+    <tbody>
+      <tr><td><span class="pill p-hourly">Unbilled</span></td><td class="c"><span style="color:var(--c-hourly);font-weight:600">$</span></td><td class="n"><span class="amt">$16.67</span></td><td>Chargeable, no bill record yet. The only coloured chip — money you're owed.</td></tr>
+      <tr><td><span class="pill p-draft">Billed</span></td><td class="c"><span style="color:var(--c-hourly);font-weight:600">$</span></td><td class="n"><span class="amt">$16.67</span></td><td>Covered by a bill record. Grey — nothing to do.</td></tr>
+      <tr><td><span class="pill p-over">Not charged</span></td><td class="c"><span class="dash">—</span></td><td class="n"><span class="amt" style="color:var(--ink-3);text-decoration:line-through;font-weight:400">$43.33</span></td><td>You turned billable off. Settled, not outstanding — the one state that would otherwise look identical to "not applicable".</td></tr>
+      <tr><td><span class="dash">—</span></td><td class="c"><span class="dash">—</span></td><td class="n"><span class="dash">—</span></td><td>Retainer within allocation, fixed fee, or internal. Not a billing status at all.</td></tr>
+    </tbody>
+  </table>
+
+  <div class="note">
+    <h4>Why not name the quiet ones</h4>
+    <p>I argued for <i>In allocation</i> and <i>In fixed fee</i> earlier. The case against: they repeat what the project name and the dashed Billable column already say, they add a third grey chip competing with the two that matter, and they turn a column you scan into a column you read. A dash there is accurate — there is no billing status, because nothing will ever be billed.</p>
+  </div>
+</div>
+
+<!-- ===== 02 CAPTURING ===== -->
+<div class="sec">
+  <div class="sec-head"><span class="sec-num">02</span><h2>Capturing</h2><span class="say">The log is the whole screen.</span></div>
+  <span class="step">STATE 1 — WRITING</span>
+
+  <div class="wp">
+    <div class="wp-bar">Plain Text Time Tracker</div>
+    <div class="wp-body">
+      <div class="hd">
+        <div>
+          <h1>Today</h1>
+          <div class="l2">3 timestamps · <span class="typed">2h 14m</span> so far · saved a moment ago</div>
+          <div class="l3"><span class="typed">Friday, July 3, 2026</span></div>
+        </div>
+        <div class="grow"></div>
+        <span class="stepper"><span class="arw">‹</span><span class="dt">Jul 3, 2026</span><span class="arw r">›</span></span>
+      </div>
+
+      <div class="log log-open">
+<textarea rows="13" readonly>@9:30am - Working on LinkedIn Outreach
+@10:22am - Done
+- It still feels like I don't really know what I am doing. This still
+  feels odd and uncomfortable, which I am willing to deal with.
+@10:24am - Responding to client emails
+@10:31am - Done.
+@10:31am - Working on final trip page updates for BTSA.
+@10:46am - Working on accounting.</textarea>
+        <div class="log-foot">
+          <span><kbd>@</kbd> timestamp</span><span><kbd>#</kbd> tag</span><span><kbd>done</kbd> end task</span>
+          <div class="grow"></div>
+          <span class="btn q sm">Save</span>
+          <span class="btn p sm">Process entries →</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="note">
+    <h4>Nothing below it</h4>
+    <p>No stat cards, no empty entries table. Until you process, there is nothing to show — and the principle is that capture shouldn't be crowded by anything.</p>
+  </div>
+</div>
+
+<!-- ===== 03 CONFIRMING ===== -->
+<div class="sec">
+  <div class="sec-head"><span class="sec-num">03</span><h2>Confirming</h2><span class="say">Log collapses to a line. The table is the work.</span></div>
+  <span class="step">STATE 2 — REVIEWING PARSED ENTRIES</span>
+
+  <div class="wp">
+    <div class="wp-bar">Plain Text Time Tracker</div>
+    <div class="wp-body">
+      <div class="hd">
+        <div>
+          <div class="row" style="gap:11px"><h1>Review entries</h1><span class="pill p-draft">Not saved yet</span></div>
+          <div class="l2">8 parsed from the log · <span class="typed">6h 00m</span></div>
+          <div class="l3"><span class="typed">Friday, July 3, 2026</span></div>
+        </div>
+        <div class="grow"></div>
+        <span class="btn q sm">← Back to log</span>
+      </div>
+
+      <div class="log">
+        <div class="log-min">
+          <span class="muted">Log</span>
+          <span class="peek">@9:30am - Working on LinkedIn Outreach @10:22am - Done @10:24am - Responding…</span>
+          <div class="grow"></div>
+          <span class="muted typed">14 lines</span>
+          <a class="lk" href="#">Show</a>
+        </div>
+      </div>
+
+      <div class="banner">
+        <span class="flag"></span>
+        <span><b>1 entry needs a client and project</b> · 1 has no tag</span>
+        <div class="grow"></div>
+        <a class="lk" href="#" style="color:#6b5518">Jump to it ›</a>
+      </div>
+
+      <div class="card">
+        <table>
+          <thead><tr>
+            <th style="width:180px">Date / time</th><th style="width:90px">Duration</th><th>Description</th>
+            <th style="width:180px">Client</th><th style="width:190px">Project</th><th style="width:130px">Tags</th><th class="c" style="width:75px">Billable</th>
+          </tr></thead>
+          <tbody>
+            <tr>
+              <td class="typed muted">Jul 3 · 9:30 – 10:22am</td><td class="typed">52m</td>
+              <td>Working on LinkedIn Outreach</td>
+              <td><span class="sel">Internal</span></td><td><span class="sel">Marketing</span></td>
+              <td><span class="pill p-tag">Outreach</span></td><td class="c"><span class="dash">—</span></td>
+            </tr>
+            <tr>
+              <td class="typed muted">Jul 3 · 10:31 – 10:46am</td><td class="typed">15m</td>
+              <td>Working on final trip page updates for BTSA.</td>
+              <td><span class="sel">Behind The Scenes A…</span></td><td><span class="sel">General Website Su…</span></td>
+              <td><span class="pill p-tag">Support</span></td><td class="c"><span style="color:var(--c-hourly);font-weight:600">$</span></td>
+            </tr>
+            <tr>
+              <td class="typed muted">Jul 3 · 12:37 – 2:14pm</td><td class="typed">1h 37m</td>
+              <td>Looking into Posties openai tag setup.</td>
+              <td><span class="sel">Postie</span></td><td><span class="sel">Website Care Plan T…</span></td>
+              <td><span class="pill p-tag">Development</span></td><td class="c"><span class="dash">—</span></td>
+            </tr>
+            <tr class="needs">
+              <td class="typed muted"><span class="flag" style="margin-right:8px"></span>Jul 3 · 11:35pm – 12:00am</td><td class="typed muted">—</td>
+              <td>Test</td>
+              <td><span class="sel warn">Select client…</span></td><td><span class="sel warn">Select project…</span></td>
+              <td><span class="btn q sm">Add tag</span></td><td class="c"><span class="dash">—</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="row" style="margin-top:18px">
+        <span class="btn q">← Back to log</span>
+        <div class="grow"></div>
+        <span class="muted">8 entries · <span class="typed">6h 00m</span> · <span class="typed">$25.00</span> billable</span>
+        <span class="btn p">Save all entries</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="note">
+    <h4>This is a distinct screen, not a section</h4>
+    <p>Its title says so, and the badge says the entries aren't saved yet. That boundary is real — everything here is provisional until you press Save — and collapsing the log to one line makes the table unambiguously the thing you're working in.</p>
+    <p>The warning banner names both problems and offers a jump, rather than making you find an amber row in a long table.</p>
+  </div>
+</div>
+
+<!-- ===== 04 RECORDED ===== -->
+<div class="sec">
+  <div class="sec-head"><span class="sec-num">04</span><h2>Recorded</h2><span class="say">Log read-only at reduced height. Editing is deliberate.</span></div>
+  <span class="step">STATE 3 — SAVED</span>
+
+  <div class="wp">
+    <div class="wp-bar">Plain Text Time Tracker</div>
+    <div class="wp-body">
+      <div class="hd">
+        <div>
+          <div class="row" style="gap:11px"><h1>Today</h1><span class="pill p-hourly">Processed</span></div>
+          <div class="l2">7 entries recorded · <span class="typed">6h 00m</span> logged</div>
+          <div class="l3"><span class="typed">Friday, July 3, 2026</span></div>
+        </div>
+        <div class="grow"></div>
+        <span class="btn q sm">Jump to today</span>
+        <span class="stepper"><span class="arw">‹</span><span class="dt">Jul 3, 2026</span><span class="arw r">›</span></span>
+      </div>
+
+      <div class="log log-read">
+        <div class="body">@9:30am - Working on LinkedIn Outreach
+@10:22am - Done
+- It still feels like I don't really know what I am doing. This still
+  feels odd and uncomfortable, which I am willing to deal with.
+@10:24am - Responding to client emails
+@10:31am - Done.</div>
+        <div class="fade"></div>
+        <div class="bar">
+          <span class="typed">14 lines</span>
+          <span>· last edited <span class="typed">5:12pm</span></span>
+          <div class="grow"></div>
+          <a class="lk" href="#">Expand</a>
+          <span class="btn q sm">Edit log</span>
+        </div>
+      </div>
+
+      <div class="card" style="margin-bottom:20px;display:flex">
+        <div class="stat"><div class="k">Total hours</div><div class="v">6.00</div></div>
+        <div class="stat"><div class="k">Billable hours</div><div class="v">0.25</div></div>
+        <div class="stat"><div class="k">Billable amount</div><div class="v">$25.00</div></div>
+      </div>
+
+      <div class="card">
+        <div class="card-h">Recorded entries <span class="lite">· 7</span></div>
+        <table>
+          <thead><tr>
+            <th style="width:180px">Date / time</th><th style="width:90px">Duration</th><th>Description</th>
+            <th style="width:130px">Tags</th><th class="c" style="width:75px">Billable</th><th style="width:105px">Status</th><th style="width:46px"></th>
+          </tr></thead>
+          <tbody>
+            <tr>
+              <td class="typed muted">Jul 3 · 9:30 – 10:22am</td><td class="typed">52m</td>
+              <td>Working on LinkedIn Outreach<span class="sub">Internal · Marketing</span></td>
+              <td><span class="pill p-tag">Outreach</span></td>
+              <td class="c"><span class="dash">—</span></td><td><span class="dash">—</span></td>
+              <td class="c" style="color:var(--ink-3)">⋮</td>
+            </tr>
+            <tr>
+              <td class="typed muted">Jul 3 · 10:31 – 10:46am</td><td class="typed">15m</td>
+              <td>Working on final trip page updates for BTSA.<span class="sub">Behind The Scenes Adventures · General Website Support</span></td>
+              <td><span class="pill p-tag">Support</span></td>
+              <td class="c"><span style="color:var(--c-hourly);font-weight:600">$</span></td>
+              <td><span class="pill p-hourly">Unbilled</span></td>
+              <td class="c" style="color:var(--ink-3)">⋮</td>
+            </tr>
+            <tr>
+              <td class="typed muted">Jul 3 · 12:37 – 2:14pm</td><td class="typed">1h 37m</td>
+              <td>Looking into Posties openai tag setup.<span class="sub">Postie · Website Care Plan Time</span></td>
+              <td><span class="pill p-tag">Development</span></td>
+              <td class="c"><span class="dash">—</span></td><td><span class="dash">—</span></td>
+              <td class="c" style="color:var(--ink-3)">⋮</td>
+            </tr>
+            <tr>
+              <td class="typed muted">Jul 3 · 3:40 – 5:05pm</td><td class="typed">1h 25m</td>
+              <td>Reviewing Danie's website content.<span class="sub">Daniel Herman · Website Design</span></td>
+              <td><span class="pill p-tag">Prep</span></td>
+              <td class="c"><span class="dash">—</span></td><td><span class="dash">—</span></td>
+              <td class="c" style="color:var(--ink-3)">⋮</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="note">
+    <h4>Two affordances, not one</h4>
+    <p><b>Expand</b> shows the whole log still read-only — for when you just want to reread the day, which is the common case and shouldn't risk anything. <b>Edit log</b> returns it to a live textarea with Save and Re-process, and is the deliberate act.</p>
+    <p>Reduced height also puts the entries table above the fold, which is what you're actually looking at once the day is captured.</p>
+  </div>
+</div>
+
+<!-- ===== 05 EDITING BACK ===== -->
+<div class="sec">
+  <div class="sec-head"><span class="sec-num">05</span><h2>Editing a processed log</h2><span class="say">The one place a warning belongs.</span></div>
+
+  <div class="wp">
+    <div class="wp-bar">Plain Text Time Tracker</div>
+    <div class="wp-body">
+      <div class="banner">
+        <span class="flag"></span>
+        <span>This day is already processed. Editing the log <b>will not change</b> the 7 entries already recorded — re-process only if you want to parse it again.</span>
+      </div>
+
+      <div class="log log-open" style="border-color:#c9a24a">
+<textarea rows="9">@9:30am - Working on LinkedIn Outreach
+@10:22am - Done
+- It still feels like I don't really know what I am doing. This still
+  feels odd and uncomfortable, which I am willing to deal with.
+@10:24am - Responding to client emails
+@10:31am - Done.
+@10:31am - Working on final trip page updates for BTSA.</textarea>
+        <div class="log-foot">
+          <span><kbd>@</kbd> timestamp</span><span><kbd>#</kbd> tag</span>
+          <div class="grow"></div>
+          <span class="btn q sm">Cancel</span>
+          <span class="btn q sm">Re-process…</span>
+          <span class="btn p sm">Save log</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="note">
+    <h4>Why the warning goes here and nowhere else</h4>
+    <p>It's the only moment where the relationship between log and entries can surprise you. Stating it once, at the point of action, is better than a permanent note on the screen — which would become furniture within a week.</p>
+    <p>Re-process keeps its ellipsis. It's the one action that can produce duplicates, and it should confirm what it's about to do.</p>
+  </div>
+</div>
+
+</div>

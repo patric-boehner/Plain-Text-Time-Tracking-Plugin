@@ -1,0 +1,384 @@
+<meta charset="utf-8">
+<title>PLTT — Panel controls</title>
+<style>
+  :root{
+    --paper:#fff; --canvas:#f4f3f1; --sunk:#faf9f7;
+    --rule:#e4e2de; --rule-2:#efedea;
+    --ink:#1a1c1e; --ink-2:#55595e; --ink-3:#8a8d91;
+    --blue:#2271b1;
+    --c-hourly:#146b42; --c-hourly-bg:#e0f0e7;
+    --c-monthly:#175d87;--c-monthly-bg:#e0edf7;
+    --c-fixed:#5540a5;  --c-fixed-bg:#eae5f9;
+    --c-over:#9a6a10;   --c-over-bg:#fbefd8;
+    --c-tag:#1d5f8a;    --c-tag-bg:#e4eef7;
+    --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",sans-serif;
+    --mono:Menlo,Consolas,monaco,monospace;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:#e3e1de;font:14px/1.6 var(--sans);color:var(--ink);-webkit-font-smoothing:antialiased}
+  .wrap{max-width:1140px;margin:0 auto;padding:36px 24px 90px}
+  .typed{font-family:var(--mono);font-variant-numeric:tabular-nums}
+
+  .doc{background:var(--ink);color:#fff;padding:30px 34px;border-radius:6px}
+  .doc h1{margin:0 0 11px;font-size:22px;font-weight:600;letter-spacing:-.2px}
+  .doc p{margin:0 0 9px;color:#b9bcc0;max-width:76ch;line-height:1.75}
+  .doc p:last-child{margin:0}
+  .doc b{color:#fff;font-weight:500}
+
+  .sec{margin-top:44px}
+  .sec-head{padding-bottom:12px;border-bottom:2px solid var(--ink);margin-bottom:20px;display:flex;align-items:baseline;gap:13px}
+  .sec-num{font:500 12px/1 var(--mono);color:var(--ink-3);letter-spacing:.7px}
+  .sec-head h2{margin:0;font-size:18px;font-weight:600;letter-spacing:-.15px}
+  .sec-head .say{margin-left:auto;font-size:13px;color:var(--ink-2)}
+  .lead{max-width:80ch;color:var(--ink-2);margin:0 0 20px;line-height:1.8}
+
+  .wp{background:var(--canvas);border:1px solid #cbc9c5;border-radius:6px;overflow:hidden}
+  .wp-bar{background:var(--ink);color:#8a8d91;font:11px/1 var(--mono);padding:8px 14px}
+  .wp-body{padding:24px 26px 28px}
+  .row{display:flex;align-items:center;gap:12px}
+  .grow{flex:1}
+  .muted{color:var(--ink-3)}
+  h1.page{margin:0;font-size:26px;font-weight:450;letter-spacing:-.25px;line-height:1.2}
+
+  .btn{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--blue);background:var(--paper);color:var(--blue);padding:7px 14px;border-radius:4px;font-size:13.5px;white-space:nowrap}
+  .btn.q{border-color:#c2bfba;color:var(--ink-2)}
+  .btn.sm{padding:5px 11px;font-size:12.5px}
+
+  /* page-level control — full weight */
+  .seg{display:inline-flex;border:1px solid var(--rule);border-radius:4px;overflow:hidden;background:var(--paper)}
+  .seg span{padding:6px 14px;font-size:13.5px;color:var(--ink-2);border-right:1px solid var(--rule)}
+  .seg span:last-child{border-right:0}
+  .seg span.on{background:var(--ink);color:#fff}
+  .stepper{display:inline-flex;align-items:center;border:1px solid #c2bfba;border-radius:4px;overflow:hidden;background:var(--paper)}
+  .stepper .arw{padding:7px 12px;color:var(--ink-2);border-right:1px solid var(--rule)}
+  .stepper .arw.r{border-right:0;border-left:1px solid var(--rule)}
+  .stepper .dt{padding:7px 15px;font:13px/1 var(--mono)}
+
+  /* panel-level control — quieter */
+  .pseg{display:inline-flex;border:1px solid var(--rule);border-radius:3px;overflow:hidden;background:var(--paper)}
+  .pseg span{padding:3px 10px;font-size:12.5px;color:var(--ink-3);border-right:1px solid var(--rule-2)}
+  .pseg span:last-child{border-right:0}
+  .pseg span.on{background:var(--sunk);color:var(--ink);font-weight:500;box-shadow:inset 0 -2px 0 var(--blue)}
+  .psel{display:inline-block;border:1px solid var(--rule);background:var(--paper);border-radius:3px;padding:3px 24px 3px 9px;font-size:12.5px;color:var(--ink-2);position:relative}
+  .psel::after{content:"▾";position:absolute;right:8px;color:var(--ink-3);font-size:9px}
+  .psel b{color:var(--ink);font-weight:500}
+
+  .card{background:var(--paper);border:1px solid var(--rule);border-radius:6px}
+  .card-h{padding:13px 18px;border-bottom:1px solid var(--rule-2);font-weight:600;font-size:14px;display:flex;align-items:center;gap:11px;min-height:48px}
+  .card-h .lite{font-weight:400;color:var(--ink-3);font-size:13px}
+
+  table{width:100%;border-collapse:collapse}
+  th{text-align:left;font-weight:450;color:var(--ink-3);font-size:11.5px;letter-spacing:.5px;text-transform:uppercase;padding:11px 18px;border-bottom:1px solid var(--rule);background:var(--sunk)}
+  th.n{text-align:right} th.c{text-align:center}
+  th.sortable{color:var(--ink-2)}
+  th .car{color:var(--ink-3);font-size:9px;margin-left:4px}
+  th.sorted{color:var(--ink);font-weight:600}
+  th.sorted .car{color:var(--blue)}
+  td{padding:13px 18px;border-bottom:1px solid var(--rule-2);vertical-align:middle}
+  td.n{text-align:right} td.c{text-align:center}
+  tr:last-child td{border-bottom:0}
+  .sub{display:block;color:var(--ink-3);font-size:12.5px;margin-top:3px}
+  a.lk{color:var(--blue);text-decoration:none}
+  .dash{color:#cfccc7}
+  .amt{font-family:var(--mono);font-variant-numeric:tabular-nums;font-weight:500}
+  .pill{display:inline-block;padding:2px 9px;border-radius:3px;font-size:12px;line-height:19px}
+  .p-hourly{background:var(--c-hourly-bg);color:var(--c-hourly)}
+  .p-monthly{background:var(--c-monthly-bg);color:var(--c-monthly)}
+  .p-fixed{background:var(--c-fixed-bg);color:var(--c-fixed)}
+  .groupbar{padding:10px 18px;background:var(--sunk);border-bottom:1px solid var(--rule);display:flex;align-items:baseline;gap:11px;font-size:13.5px}
+  .groupbar b{font-weight:600}
+
+  .meter{height:5px;background:#e9e7e3;border-radius:3px;overflow:hidden;max-width:190px}
+  .meter i{display:block;height:100%;background:var(--blue)}
+  .meter i.over{background:#c08f2a}
+
+  .note{background:var(--sunk);border:1px solid var(--rule);border-left:3px solid var(--blue);border-radius:5px;padding:15px 19px;margin-top:16px}
+  .note h4{margin:0 0 7px;font-size:13.5px;font-weight:600}
+  .note p{margin:0;font-size:13px;color:var(--ink-2);line-height:1.75}
+  .note p + p{margin-top:8px}
+
+  .tiers{background:var(--paper);border:1px solid var(--rule);border-radius:6px;overflow:hidden}
+  .tier{display:flex;gap:18px;padding:15px 20px;border-bottom:1px solid var(--rule-2);align-items:flex-start}
+  .tier:last-child{border-bottom:0}
+  .tier .lv{width:120px;flex:none;font:500 11px/1.5 var(--mono);letter-spacing:.5px;color:var(--ink-3);padding-top:2px}
+  .tier .bd{flex:1}
+  .tier h4{margin:0 0 4px;font-size:13.5px;font-weight:600}
+  .tier p{margin:0;font-size:13px;color:var(--ink-2);line-height:1.7}
+
+  .test{background:var(--paper);border:1px solid var(--rule);border-radius:6px;padding:18px 22px;margin-top:16px}
+  .test p{margin:0 0 10px;font-size:13.5px;line-height:1.7}
+  .test p:last-child{margin:0}
+  .test b{font-weight:600}
+</style>
+
+<div class="wrap">
+
+<div class="doc">
+  <h1>Panel-level controls</h1>
+  <p>One rule: <b>a control lives where its effect ends.</b> Changes everything below it → page level. Changes one panel → that panel's header.</p>
+  <p>This adds a third tier the spec doesn't have. Panel controls are styled quieter than page controls, so the hierarchy itself tells you how far the change reaches before you touch anything.</p>
+</div>
+
+<!-- ===== 01 TIERS ===== -->
+<div class="sec">
+  <div class="sec-head"><span class="sec-num">01</span><h2>Three tiers</h2></div>
+
+  <div class="tiers">
+    <div class="tier">
+      <span class="lv">PAGE · NAV</span>
+      <div class="bd">
+        <h4>Title row, left — view toggle</h4>
+        <p>Changes which page you're on. Full-weight segmented control against the title.</p>
+        <div style="margin-top:9px"><span class="seg"><span>Summary</span><span class="on">Entries</span></span></div>
+      </div>
+    </div>
+    <div class="tier">
+      <span class="lv">PAGE · SCOPE</span>
+      <div class="bd">
+        <h4>Title row right, and the filter bar</h4>
+        <p>Changes what data the whole page is about. Date control and filter dropdowns. Full-weight, bordered, labelled.</p>
+        <div style="margin-top:9px"><span class="stepper"><span class="arw">‹</span><span class="dt">Jun 1 – Jun 30, 2026</span><span class="arw r">›</span></span></div>
+      </div>
+    </div>
+    <div class="tier">
+      <span class="lv">PANEL</span>
+      <div class="bd">
+        <h4>Right end of a panel header</h4>
+        <p>Changes how one panel presents the data the page already selected. Reduced size, lighter borders, muted until active. Never affects anything outside its own panel.</p>
+        <div style="margin-top:9px;display:flex;gap:9px">
+          <span class="pseg"><span class="on">By day</span><span>By week</span><span>By month</span></span>
+          <span class="psel">Group by <b>Client</b></span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="test">
+    <p><b>The test, when it's unclear:</b> change the control, then look at the stat figures above. If they change too, it's page level. If only the panel redraws, it's panel level.</p>
+    <p>A chart switching between day/week/month is showing the same data at different granularity — page figures don't move, so it's panel level. A control that changes <i>which period</i> the page covers moves the figures, so it's page level even if it sits next to a chart.</p>
+  </div>
+</div>
+
+<!-- ===== 02 PROJECT ===== -->
+<div class="sec">
+  <div class="sec-head"><span class="sec-num">02</span><h2>Project detail</h2><span class="say">Two panels, two sets of controls, neither at page level.</span></div>
+
+  <div class="wp">
+    <div class="wp-bar">Plain Text Time Tracker</div>
+    <div class="wp-body">
+      <div class="row" style="margin-bottom:18px">
+        <h1 class="page">Website Care Plan Time</h1>
+        <div class="seg" style="margin-left:6px"><span class="on">Report</span><span>Settings</span></div>
+        <div class="grow"></div>
+        <span class="stepper"><span class="arw">‹</span><span class="dt">June 2026</span><span class="arw r">›</span></span>
+        <span class="btn q sm">← Projects</span>
+      </div>
+
+      <div class="card" style="margin-bottom:18px">
+        <div style="padding:18px 22px 17px;border-bottom:1px solid var(--rule-2)">
+          <span style="font-size:24px;font-weight:600;letter-spacing:-.2px">Website Care Plan Time</span>
+          <span class="pill p-monthly" style="vertical-align:4px;margin-left:8px">Monthly retainer</span>
+          <div style="color:var(--ink-2);margin-top:8px">Democrats of Rossmor · 3 hours included each month at $90/hr</div>
+          <div style="display:inline-block;margin-top:11px;background:var(--sunk);border:1px solid var(--rule-2);border-radius:4px;padding:6px 12px;font-size:13px;color:var(--ink-2)">Showing <b class="typed" style="color:var(--ink);font-weight:500">Jun 1 – Jun 30, 2026</b> · 18 entries</div>
+        </div>
+        <div style="display:flex;flex-wrap:wrap">
+          <div style="padding:16px 22px 18px;border-right:1px solid var(--rule-2);flex:1;min-width:200px">
+            <div style="font-size:13px;color:var(--ink-2)">Total hours</div>
+            <div class="typed" style="font-size:26px;font-weight:450;margin-top:4px;letter-spacing:-.5px">5h 43m</div>
+            <div style="font-size:12.5px;color:var(--ink-3);margin-top:5px">All time recorded in this period</div>
+          </div>
+          <div style="padding:16px 22px 18px;border-right:1px solid var(--rule-2);flex:1;min-width:200px">
+            <div style="font-size:13px;color:var(--ink-2)">Against the 3h included</div>
+            <div class="typed" style="font-size:26px;font-weight:450;margin-top:4px;letter-spacing:-.5px;color:var(--c-over)">2h 43m over</div>
+            <div style="font-size:12.5px;color:var(--ink-3);margin-top:5px">191% of the monthly allocation</div>
+          </div>
+          <div style="padding:16px 22px 18px;border-right:1px solid var(--rule-2);flex:1;min-width:200px">
+            <div style="font-size:13px;color:var(--ink-2)">Billable amount</div>
+            <div class="typed" style="font-size:26px;font-weight:450;margin-top:4px;letter-spacing:-.5px">$244.50</div>
+            <div style="font-size:12.5px;color:var(--ink-3);margin-top:5px">Overage only · <span class="typed">2h 43m × $90/hr</span></div>
+          </div>
+          <div style="padding:16px 22px 18px;flex:1;min-width:200px">
+            <div style="font-size:13px;color:var(--ink-2)">Ready to bill</div>
+            <div class="typed" style="font-size:26px;font-weight:450;margin-top:4px;letter-spacing:-.5px;color:var(--c-over)">$244.50</div>
+            <div style="font-size:12.5px;color:var(--ink-3);margin-top:5px">No bill recorded for June yet</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card" style="margin-bottom:18px">
+        <div class="card-h">
+          Time logged
+          <span class="lite">· <span class="typed">Jun 1 – Jun 30</span></span>
+          <div class="grow"></div>
+          <span class="pseg"><span class="on">By day</span><span>By week</span></span>
+        </div>
+        <div style="padding:22px 20px 16px">
+          <div style="display:flex;align-items:flex-end;gap:5px;height:110px;border-bottom:1px solid var(--rule)">
+            <div style="flex:1"><div style="height:68px;background:#3f9166"></div></div>
+            <div style="flex:1"><div style="height:42px;background:#3f9166"></div></div>
+            <div style="flex:1"><div style="height:6px;background:#3f9166"></div></div>
+            <div style="flex:1"></div><div style="flex:1"></div><div style="flex:1"></div><div style="flex:1"></div>
+            <div style="flex:1"><div style="height:4px;background:#3f9166"></div></div>
+            <div style="flex:1"><div style="height:52px;background:#3f9166"></div></div>
+            <div style="flex:1"></div><div style="flex:1"></div><div style="flex:1"></div><div style="flex:1"></div>
+            <div style="flex:1"><div style="height:5px;background:#3f9166"></div></div>
+            <div style="flex:1"></div><div style="flex:1"></div><div style="flex:1"></div><div style="flex:1"></div><div style="flex:1"></div>
+            <div style="flex:1"><div style="height:18px;background:#3f9166"></div></div>
+            <div style="flex:1"><div style="height:9px;background:#3f9166"></div></div>
+            <div style="flex:1"><div style="height:76px;background:#3f9166"></div></div>
+            <div style="flex:1"></div><div style="flex:1"></div><div style="flex:1"></div>
+          </div>
+          <div class="row" style="margin-top:8px;font-size:11.5px;color:var(--ink-3)">
+            <span class="typed">6/1</span><div class="grow"></div><span class="typed">6/15</span><div class="grow"></div><span class="typed">6/30</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-h">
+          Entries <span class="lite">· 18</span>
+          <div class="grow"></div>
+          <span class="psel">Group by <b>Day</b></span>
+        </div>
+        <div class="groupbar"><b class="typed">Jun 26</b> <span class="muted">Friday</span><div class="grow"></div><span class="muted typed">1h 16m</span></div>
+        <table><tbody>
+          <tr>
+            <td>Updating DOR website content.</td>
+            <td style="width:130px"><span class="pill" style="background:var(--c-tag-bg);color:var(--c-tag)">Content</span></td>
+            <td style="width:150px" class="typed muted">12:50 – 1:07pm</td>
+            <td style="width:85px" class="typed">17m</td>
+            <td style="width:105px"><span class="dash">—</span></td>
+          </tr>
+        </tbody></table>
+        <div class="groupbar" style="border-top:1px solid var(--rule)"><b class="typed">Jun 25</b> <span class="muted">Thursday</span><div class="grow"></div><span class="muted typed">9m</span></div>
+        <table><tbody>
+          <tr>
+            <td>Responding to email about videos for DOR</td>
+            <td style="width:130px"><span class="pill" style="background:var(--c-tag-bg);color:var(--c-tag)">Communication</span></td>
+            <td style="width:150px" class="typed muted">2:05 – 2:11pm</td>
+            <td style="width:85px" class="typed">6m</td>
+            <td style="width:105px"><span class="dash">—</span></td>
+          </tr>
+        </tbody></table>
+      </div>
+    </div>
+  </div>
+
+  <div class="note">
+    <h4>What moved</h4>
+    <p>The <b>Full / By month</b> toggle currently sits above the chart at full weight, reading like a page control. If it only changes the chart's granularity, it belongs in the chart's header at panel weight — as shown. If it changes the period the whole page covers, it isn't a chart control at all and should be folded into the date control's presets.</p>
+    <p><b>Worth checking in the code which it actually does</b> — that determines where it goes.</p>
+  </div>
+</div>
+
+<!-- ===== 03 TABLE ===== -->
+<div class="sec">
+  <div class="sec-head"><span class="sec-num">03</span><h2>Sorting and grouping</h2><span class="say">Different mechanisms, deliberately.</span></div>
+  <p class="lead">Sorting is a property of a column, so it lives on the column header — clickable, with a caret, WP-native. Grouping restructures the whole table, so it's a control in the panel header. Keeping them separate means the column headers stay honest: a caret means "sort by me" and nothing else.</p>
+
+  <div class="wp">
+    <div class="wp-bar">Plain Text Time Tracker</div>
+    <div class="wp-body">
+      <div class="row" style="margin-bottom:18px">
+        <h1 class="page">Projects</h1>
+        <div class="grow"></div>
+        <span class="btn sm" style="background:var(--blue);color:#fff">Add project</span>
+      </div>
+
+      <div class="card">
+        <div class="card-h">
+          Active projects <span class="lite">· 31</span>
+          <div class="grow"></div>
+          <span class="psel">Group by <b>Billing model</b></span>
+        </div>
+
+        <div class="groupbar"><b>Hourly</b> <span class="muted">18 projects</span><div class="grow"></div><span class="muted typed">42h 18m</span></div>
+        <table>
+          <thead><tr>
+            <th class="sortable">Project <span class="car">▾</span></th>
+            <th class="sortable" style="width:180px">Client <span class="car">▾</span></th>
+            <th class="sortable n sorted" style="width:110px">Hours <span class="car">▼</span></th>
+            <th class="sortable n" style="width:120px">Unbilled <span class="car">▾</span></th>
+            <th class="sortable" style="width:130px">Last logged <span class="car">▾</span></th>
+          </tr></thead>
+          <tbody>
+            <tr>
+              <td><a class="lk" href="#">General Website Support</a></td>
+              <td class="muted">Daniel Mintie</td>
+              <td class="n typed">7h 56m</td>
+              <td class="n"><span class="amt">$793.32</span></td>
+              <td class="muted typed">May 19</td>
+            </tr>
+            <tr>
+              <td><a class="lk" href="#">General Website Support</a></td>
+              <td class="muted">S3NSE</td>
+              <td class="n typed">6h 15m</td>
+              <td class="n"><span class="amt">$562.50</span></td>
+              <td class="muted typed">May 9</td>
+            </tr>
+            <tr>
+              <td><a class="lk" href="#">Steve Wilson Lecture Series</a></td>
+              <td class="muted">Paula Levine</td>
+              <td class="n typed">4h 29m</td>
+              <td class="n"><span class="amt">$156.91</span></td>
+              <td class="muted typed">Apr 8</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <div class="groupbar" style="border-top:1px solid var(--rule)"><b>Monthly retainer</b> <span class="muted">4 projects</span><div class="grow"></div><span class="muted typed">31h 41m</span></div>
+        <table>
+          <tbody>
+            <tr>
+              <td><a class="lk" href="#">Website Care Plan Time</a></td>
+              <td class="muted" style="width:180px">Democrats of Rossmor</td>
+              <td class="n typed" style="width:110px">31h 41m</td>
+              <td class="n" style="width:120px"><span class="amt">$1,501.50</span></td>
+              <td class="muted typed" style="width:130px">Jun 26</td>
+            </tr>
+            <tr>
+              <td><a class="lk" href="#">Content Plan Time</a></td>
+              <td class="muted">S3NSE</td>
+              <td class="n typed">24m</td>
+              <td class="n"><span class="dash">—</span></td>
+              <td class="muted typed">Jun 26</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="note">
+    <h4>Rules</h4>
+    <p><b>Sortable columns</b> get a muted caret. The active one darkens, its caret turns blue and points, and it's the only column showing direction. Not every column needs to be sortable — only ones you'd plausibly order by.</p>
+    <p><b>Group by</b> is a panel-header dropdown. When grouping is off, the bands disappear and the table is flat. Sorting then applies across the whole table; when grouping is on, sorting applies within each band.</p>
+    <p><b>Group bands</b> carry the group name, its count, and its total — the same shape as the day bands in Entries, so one component serves both.</p>
+  </div>
+</div>
+
+<!-- ===== 04 ===== -->
+<div class="sec">
+  <div class="sec-head"><span class="sec-num">04</span><h2>Panel control styling</h2></div>
+  <div class="card">
+    <table>
+      <thead><tr><th style="width:22%">Property</th><th style="width:32%">Page level</th><th>Panel level</th></tr></thead>
+      <tbody>
+        <tr><td><b>Size</b></td><td>13.5px, 6–7px padding</td><td>12.5px, 3px padding</td></tr>
+        <tr><td><b>Border</b></td><td><span class="typed">--rule</span> / <span class="typed">#c2bfba</span></td><td><span class="typed">--rule</span>, dividers <span class="typed">--rule-2</span></td></tr>
+        <tr><td><b>Active state</b></td><td>Solid <span class="typed">--ink</span> fill, white text</td><td><span class="typed">--sunk</span> fill, ink text, 2px blue underline</td></tr>
+        <tr><td><b>Resting colour</b></td><td><span class="typed">--ink-2</span></td><td><span class="typed">--ink-3</span></td></tr>
+        <tr><td><b>Position</b></td><td>Title row, or filter bar</td><td>Right end of the panel header</td></tr>
+        <tr><td><b>Label</b></td><td>Standalone</td><td>Prefixed — <i>Group by</i>, <i>Show</i></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="note">
+    <h4>Why the weight difference matters</h4>
+    <p>Two segmented controls that look identical but reach different distances is the kind of thing that makes an interface feel unpredictable. Making panel controls visibly lighter means you can tell, before clicking, whether something will redraw one chart or the whole page.</p>
+    <p>Panel controls never persist across navigation. Page-level scope — filters and period — should.</p>
+  </div>
+</div>
+
+</div>

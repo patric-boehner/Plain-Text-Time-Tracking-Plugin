@@ -1,0 +1,514 @@
+<meta charset="utf-8">
+<title>PLTT — Visual style</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;450;500;600&family=IBM+Plex+Mono:wght@400;450;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    /* neutrals — warmed very slightly off WP's cold grey */
+    --paper:#ffffff;
+    --canvas:#f4f3f1;
+    --sunk:#faf9f7;
+    --rule:#e4e2de;      /* hairline, lighter than WP's #dcdcde */
+    --rule-2:#efedea;
+    --ink:#1a1c1e;
+    --ink-2:#55595e;
+    --ink-3:#8a8d91;
+
+    /* one action colour, WP's blue, kept as the anchor */
+    --blue:#2271b1;
+    --blue-soft:#eaf1f7;
+
+    /* categorical, desaturated — these name things, they never judge */
+    --c-hourly:#3d6b52;   --c-hourly-bg:#eaf0ec;
+    --c-monthly:#3a5f77;  --c-monthly-bg:#e9eff3;
+    --c-fixed:#5a4f7a;    --c-fixed-bg:#eeecf3;
+    --c-own:#6b6863;      --c-own-bg:#f0efec;
+    --c-over:#8a6a2f;     --c-over-bg:#f6f1e6;
+
+    --sp:4px;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:#e3e1de;font:14px/1.6 "IBM Plex Sans",system-ui,sans-serif;color:var(--ink);-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+  .wrap{max-width:1180px;margin:0 auto;padding:36px 24px 100px}
+  .typed{font-family:"IBM Plex Mono",monospace;font-variant-numeric:tabular-nums;letter-spacing:-.12px}
+
+  .doc{background:var(--ink);color:#fff;padding:32px 36px;border-radius:6px}
+  .doc h1{margin:0 0 12px;font-size:23px;font-weight:600;letter-spacing:-.35px}
+  .doc p{margin:0 0 10px;color:#b9bcc0;max-width:76ch;line-height:1.75}
+  .doc p:last-child{margin:0}
+  .doc b{color:#fff;font-weight:500}
+
+  .sec{margin-top:48px}
+  .sec-head{padding-bottom:12px;border-bottom:2px solid var(--ink);margin-bottom:22px;display:flex;align-items:baseline;gap:13px}
+  .sec-num{font:500 12px/1 "IBM Plex Mono",monospace;color:var(--ink-3);letter-spacing:.7px}
+  .sec-head h2{margin:0;font-size:18px;font-weight:600;letter-spacing:-.25px}
+  .sec-head .say{margin-left:auto;font-size:13px;color:var(--ink-2)}
+  .lead{max-width:80ch;color:var(--ink-2);margin:0 0 22px;line-height:1.8}
+
+  /* ---------- specimen ---------- */
+  .spec{background:var(--paper);border:1px solid var(--rule);border-radius:6px;overflow:hidden}
+  .spec-h{padding:14px 20px;border-bottom:1px solid var(--rule);font-weight:600;font-size:13.5px;background:var(--sunk);letter-spacing:.15px}
+  .spec-b{padding:22px 24px}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:0}
+  .grid2 > div{padding:22px 24px}
+  .grid2 > div:first-child{border-right:1px solid var(--rule-2)}
+
+  .t-row{display:flex;align-items:baseline;gap:18px;padding:9px 0;border-bottom:1px solid var(--rule-2)}
+  .t-row:last-child{border-bottom:0}
+  .t-spec{width:150px;flex:none;font:400 11.5px/1.4 "IBM Plex Mono",monospace;color:var(--ink-3)}
+
+  .sw-set{display:flex;gap:0;border-radius:4px;overflow:hidden;border:1px solid var(--rule)}
+  .sw-set div{flex:1;height:52px}
+  .chips{display:flex;gap:8px;flex-wrap:wrap}
+
+  .pill{display:inline-block;padding:2px 10px;border-radius:3px;font-size:12px;line-height:20px;letter-spacing:.1px}
+  .p-hourly{background:var(--c-hourly-bg);color:var(--c-hourly)}
+  .p-monthly{background:var(--c-monthly-bg);color:var(--c-monthly)}
+  .p-fixed{background:var(--c-fixed-bg);color:var(--c-fixed)}
+  .p-own{background:var(--c-own-bg);color:var(--c-own)}
+  .p-over{background:var(--c-over-bg);color:var(--c-over)}
+  .p-tag{background:var(--blue-soft);color:#255e88}
+
+  /* ---------- app frame ---------- */
+  .wp{background:var(--canvas);border:1px solid #cbc9c5;border-radius:6px;overflow:hidden}
+  .wp-bar{background:var(--ink);color:#8a8d91;font:11px/1 "IBM Plex Mono",monospace;padding:9px 15px}
+  .wp-body{padding:28px 30px 34px}
+  .row{display:flex;align-items:center;gap:12px}
+  .grow{flex:1}
+  .muted{color:var(--ink-3)}
+
+  h1.page{margin:0;font-size:26px;font-weight:450;letter-spacing:-.5px;line-height:1.2}
+  .page-sub{color:var(--ink-2);margin-top:5px;font-size:13.5px}
+
+  .btn{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--blue);background:var(--paper);color:var(--blue);padding:7px 14px;border-radius:4px;font-size:13.5px;white-space:nowrap}
+  .btn.p{background:var(--blue);color:#fff}
+  .btn.q{border-color:#c2bfba;color:var(--ink-2)}
+  .btn.sm{padding:5px 11px;font-size:12.5px}
+  .seg{display:inline-flex;border:1px solid var(--rule);border-radius:4px;overflow:hidden;background:var(--paper)}
+  .seg span{padding:7px 16px;font-size:13.5px;color:var(--ink-2);border-right:1px solid var(--rule)}
+  .seg span:last-child{border-right:0}
+  .seg span.on{background:var(--ink);color:#fff}
+
+  .stepper{display:inline-flex;align-items:center;border:1px solid #c2bfba;border-radius:4px;overflow:hidden;background:var(--paper)}
+  .stepper .arw{padding:7px 13px;color:var(--ink-2);border-right:1px solid var(--rule)}
+  .stepper .arw.r{border-right:0;border-left:1px solid var(--rule)}
+  .stepper .dt{padding:7px 17px;font:13px/1 "IBM Plex Mono",monospace}
+
+  .card{background:var(--paper);border:1px solid var(--rule);border-radius:6px}
+  .card-h{padding:15px 20px;border-bottom:1px solid var(--rule-2);font-weight:600;font-size:14px;display:flex;align-items:center;gap:12px;letter-spacing:.1px}
+  .card-h .lite{font-weight:400;color:var(--ink-3);font-size:13px}
+
+  table{width:100%;border-collapse:collapse}
+  th{text-align:left;font-weight:450;color:var(--ink-3);font-size:11.5px;letter-spacing:.5px;text-transform:uppercase;padding:11px 20px;border-bottom:1px solid var(--rule);background:var(--sunk)}
+  th.c{text-align:center} th.n{text-align:right}
+  td{padding:15px 20px;border-bottom:1px solid var(--rule-2);vertical-align:middle}
+  td.c{text-align:center} td.n{text-align:right}
+  tr:last-child td{border-bottom:0}
+  .sub{display:block;color:var(--ink-3);font-size:12.5px;margin-top:3px}
+  a.lk{color:var(--blue);text-decoration:none}
+  a.lk:hover{text-decoration:underline}
+
+  .daybar{padding:12px 20px;background:var(--sunk);border-bottom:1px solid var(--rule);display:flex;align-items:baseline;gap:12px;font-size:13.5px}
+  .daybar b{font-weight:600;letter-spacing:-.1px}
+
+  /* editor */
+  .editor{background:var(--paper);border:1px solid var(--rule);border-radius:6px;overflow:hidden}
+  .editor textarea{width:100%;border:0;padding:22px 26px;font:13.5px/2 "IBM Plex Mono",monospace;resize:none;outline:none;color:var(--ink);display:block;background:var(--paper)}
+  .editor-foot{border-top:1px solid var(--rule-2);padding:11px 18px;display:flex;align-items:center;gap:18px;font-size:12.5px;color:var(--ink-3);background:var(--sunk)}
+  kbd{font:11px/1 "IBM Plex Mono",monospace;background:var(--paper);border:1px solid var(--rule);border-bottom-width:2px;border-radius:3px;padding:3px 6px;color:var(--ink-2)}
+
+  .stat{padding:16px 20px 18px;border-right:1px solid var(--rule-2);flex:1;min-width:160px}
+  .stat:last-child{border-right:0}
+  .stat .k{font-size:12.5px;color:var(--ink-2)}
+  .stat .v{font:450 26px/1.2 "IBM Plex Mono",monospace;letter-spacing:-.9px;margin-top:4px;font-variant-numeric:tabular-nums}
+  .stat .m{font-size:12.5px;color:var(--ink-3);margin-top:4px}
+
+  .meter{height:5px;background:#e9e7e3;border-radius:3px;overflow:hidden;max-width:220px}
+  .meter i{display:block;height:100%;background:var(--blue)}
+  .meter i.over{background:#b08d4a}
+
+  .amt{font-family:"IBM Plex Mono",monospace;font-variant-numeric:tabular-nums;font-weight:500}
+  .dash{color:#cfccc7}
+
+  .note{background:var(--sunk);border:1px solid var(--rule);border-left:3px solid var(--blue);border-radius:5px;padding:16px 20px;margin-top:18px}
+  .note h4{margin:0 0 7px;font-size:13.5px;font-weight:600}
+  .note p{margin:0;font-size:13px;color:var(--ink-2);line-height:1.75}
+  .note p + p{margin-top:9px}
+
+  .ba{display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start}
+  .ba h5{margin:0 0 9px;font:500 11.5px/1 "IBM Plex Mono",monospace;letter-spacing:.6px;color:var(--ink-3)}
+</style>
+
+<div class="wrap">
+
+<div class="doc">
+  <h1>Visual style</h1>
+  <p>Structure untouched — same screens, same columns, same flows. This is only about how it looks.</p>
+  <p>Three principles doing the work. <b>The tool is plain text</b>, so typography carries the design instead of chrome or colour. <b>Descriptive, not evaluative</b>, so nothing is red, nothing alarms, and colour names categories rather than passing judgment. <b>Minimal friction</b>, so the interface recedes and the content is the loudest thing on screen.</p>
+  <p>It still reads as WordPress — same blue for actions, same table and panel conventions, same admin furniture. The departures are a real type scale, warmer neutrals, lighter rules, and more room.</p>
+</div>
+
+<!-- ===== 01 TYPE ===== -->
+<div class="sec">
+  <div class="sec-head"><span class="sec-num">01</span><h2>Type</h2><span class="say">Two families, one rule about which is which.</span></div>
+  <p class="lead">WordPress admin sets nearly everything at 13px, so hierarchy has to come from weight and colour alone. A real scale does that work instead. And the split between the families isn't decorative: <b>monospace is what the clock measured or you typed; proportional is what the app inferred or you named.</b> In any row you can see at a glance which half came from your own hands.</p>
+
+  <div class="spec">
+    <div class="spec-h">Scale</div>
+    <div class="spec-b">
+      <div class="t-row"><span class="t-spec">26px / 450 / -.5</span><span style="font-size:26px;font-weight:450;letter-spacing:-.5px">Page title</span></div>
+      <div class="t-row"><span class="t-spec">26px mono / 450</span><span class="typed" style="font-size:26px;font-weight:450;letter-spacing:-.9px">95h 39m &nbsp; $4,891.00</span></div>
+      <div class="t-row"><span class="t-spec">18px / 600</span><span style="font-size:18px;font-weight:600;letter-spacing:-.25px">Section heading</span></div>
+      <div class="t-row"><span class="t-spec">14px / 600</span><span style="font-size:14px;font-weight:600">Panel heading</span></div>
+      <div class="t-row"><span class="t-spec">14px / 400</span><span>Body and table cells — the default</span></div>
+      <div class="t-row"><span class="t-spec">13.5px mono / 400</span><span class="typed">10:21am – 10:27am &nbsp; 1h 40m &nbsp; Feb 17, 2026</span></div>
+      <div class="t-row"><span class="t-spec">12.5px / 400 / ink-3</span><span style="font-size:12.5px;color:var(--ink-3)">Secondary line — client, project, qualifier</span></div>
+      <div class="t-row"><span class="t-spec">11.5px / 450 / caps</span><span style="font-size:11.5px;font-weight:450;letter-spacing:.5px;text-transform:uppercase;color:var(--ink-3)">Column header</span></div>
+    </div>
+    <div class="grid2" style="border-top:1px solid var(--rule)">
+      <div>
+        <h5 style="margin:0 0 10px;font:500 11.5px/1 'IBM Plex Mono',monospace;letter-spacing:.6px;color:var(--ink-3)">MONOSPACE — measured or typed</h5>
+        <p style="margin:0;font-size:13px;color:var(--ink-2);line-height:1.75">Times, durations, dates, money, record numbers, and the daily log itself. Tabular figures, so columns of numbers line up on the decimal without extra work.</p>
+      </div>
+      <div>
+        <h5 style="margin:0 0 10px;font:500 11.5px/1 'IBM Plex Mono',monospace;letter-spacing:.6px;color:var(--ink-3)">PROPORTIONAL — inferred or named</h5>
+        <p style="margin:0;font-size:13px;color:var(--ink-2);line-height:1.75">Descriptions, client and project names, tags, labels, interface text. The parts a prediction produced, or that you gave a name to rather than measured.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== 02 COLOUR ===== -->
+<div class="sec">
+  <div class="sec-head"><span class="sec-num">02</span><h2>Colour</h2><span class="say">Names things. Never judges them.</span></div>
+  <p class="lead">The current palette is saturated and reads as status lights — bright green, strong blue, vivid purple. That's a dashboard vocabulary, and it conflicts with a tool whose principle is to describe rather than evaluate. Desaturating them keeps every distinction while removing the implied verdict. Nothing is red anywhere in this app.</p>
+
+  <div class="spec" style="margin-bottom:16px">
+    <div class="spec-h">Billing models — categorical, equal weight</div>
+    <div class="spec-b">
+      <div class="chips" style="margin-bottom:16px">
+        <span class="pill p-hourly">Hourly</span>
+        <span class="pill p-monthly">Monthly</span>
+        <span class="pill p-fixed">Fixed budget</span>
+        <span class="pill p-own">Internal</span>
+        <span class="pill p-over">Over allocation</span>
+        <span class="pill p-tag">Development</span>
+      </div>
+      <p style="margin:0;font-size:13px;color:var(--ink-2);line-height:1.75">Four models, four hues, none louder than another — because a fixed-fee project isn't better or worse than an hourly one. The fifth, over-allocation, is the only one carrying any warmth, and it's a muted ochre rather than orange: it's a fact about hours, not a warning.</p>
+    </div>
+  </div>
+
+  <div class="spec">
+    <div class="spec-h">Neutrals</div>
+    <div class="spec-b">
+      <div class="sw-set" style="margin-bottom:14px">
+        <div style="background:var(--paper)"></div>
+        <div style="background:var(--sunk)"></div>
+        <div style="background:var(--canvas)"></div>
+        <div style="background:var(--rule-2)"></div>
+        <div style="background:var(--rule)"></div>
+        <div style="background:var(--ink-3)"></div>
+        <div style="background:var(--ink-2)"></div>
+        <div style="background:var(--ink)"></div>
+      </div>
+      <p style="margin:0;font-size:13px;color:var(--ink-2);line-height:1.75">Warmed a few degrees off WordPress's cold grey — <span class="typed">#f4f3f1</span> rather than <span class="typed">#f0f0f1</span>. Barely perceptible side by side, but it makes a screen full of text read as paper rather than as a control panel, which suits a tool that's half notebook. Rules are lighter than WP's default so tables separate by rhythm rather than by lines.</p>
+    </div>
+  </div>
+</div>
+
+<!-- ===== 03 TODAY ===== -->
+<div class="sec">
+  <div class="sec-head"><span class="sec-num">03</span><h2>Today, restyled</h2><span class="say">Same structure. The log gets treated like writing.</span></div>
+
+  <div class="wp">
+    <div class="wp-bar">Plain Text Time Tracker</div>
+    <div class="wp-body">
+      <div class="row" style="margin-bottom:22px">
+        <div>
+          <h1 class="page">Today</h1>
+          <div class="page-sub">Friday, July 3, 2026 · <span class="typed">6h 00m</span> logged · saved a moment ago</div>
+        </div>
+        <div class="grow"></div>
+        <span class="btn q sm">Jump to today</span>
+        <span class="stepper"><span class="arw">‹</span><span class="dt">Jul 3, 2026</span><span class="arw r">›</span></span>
+      </div>
+
+      <div class="editor" style="margin-bottom:22px">
+<textarea rows="10" readonly>@9:30am - Working on LinkedIn Outreach
+@10:22am - Done
+- It still feels like I don't really know what I am doing.
+@10:24am - Responding to client emails
+@10:31am - Done.
+@10:31am - Working on final trip page updates for BTSA.
+@10:46am - Working on accounting.
+@11:08am - Done.
+@11:10am - Running website care plan updates
+@12:32pm - Done.</textarea>
+        <div class="editor-foot">
+          <span><kbd>@</kbd> timestamp</span><span><kbd>#</kbd> tag</span><span><kbd>done</kbd> end task</span>
+          <div class="grow"></div>
+          <span class="btn q sm">Save</span>
+          <span class="btn p sm">Process entries</span>
+        </div>
+      </div>
+
+      <div class="card" style="margin-bottom:22px;display:flex">
+        <div class="stat"><div class="k">Total hours</div><div class="v">6.00</div></div>
+        <div class="stat"><div class="k">Billable hours</div><div class="v">0.25</div></div>
+        <div class="stat"><div class="k">Billable amount</div><div class="v">$25.00</div></div>
+      </div>
+
+      <div class="card">
+        <div class="card-h">Recorded entries <span class="lite">· 7</span></div>
+        <table>
+          <thead><tr>
+            <th style="width:190px">Date / time</th><th style="width:100px">Duration</th><th>Description</th><th style="width:150px">Tags</th><th class="c" style="width:80px">Billable</th>
+          </tr></thead>
+          <tbody>
+            <tr>
+              <td class="typed muted">Jul 3 · 9:30 – 10:22am</td>
+              <td class="typed">52m</td>
+              <td>Working on LinkedIn Outreach<span class="sub">Internal · Marketing</span></td>
+              <td><span class="pill p-tag">Outreach</span></td>
+              <td class="c"><span class="dash">—</span></td>
+            </tr>
+            <tr>
+              <td class="typed muted">Jul 3 · 10:24 – 10:31am</td>
+              <td class="typed">7m</td>
+              <td>Responding to client emails<span class="sub">Internal · Admin &amp; Operations</span></td>
+              <td><span class="pill p-tag">Communication</span></td>
+              <td class="c"><span class="dash">—</span></td>
+            </tr>
+            <tr>
+              <td class="typed muted">Jul 3 · 10:31 – 10:46am</td>
+              <td class="typed">15m</td>
+              <td>Working on final trip page updates for BTSA.<span class="sub">Behind The Scenes Adventures · General Website Support</span></td>
+              <td><span class="pill p-tag">Support</span></td>
+              <td class="c"><span style="color:var(--c-hourly);font-weight:500">$</span></td>
+            </tr>
+            <tr>
+              <td class="typed muted">Jul 3 · 11:10am – 12:32pm</td>
+              <td class="typed">1h 22m</td>
+              <td>Running website care plan updates<span class="sub">Internal · Website Care Plan Time</span></td>
+              <td><span class="pill p-tag">Support</span></td>
+              <td class="c"><span class="dash">—</span></td>
+            </tr>
+            <tr>
+              <td class="typed muted">Jul 3 · 12:37 – 2:14pm</td>
+              <td class="typed">1h 37m</td>
+              <td>Looking into Posties openai tag setup.<span class="sub">Postie · Website Care Plan Time</span></td>
+              <td><span class="pill p-tag">Development</span></td>
+              <td class="c"><span class="dash">—</span></td>
+            </tr>
+            <tr>
+              <td class="typed muted">Jul 3 · 3:40 – 5:05pm</td>
+              <td class="typed">1h 25m</td>
+              <td>Reviewing Danie's website content.<span class="sub">Daniel Herman · Website Design</span></td>
+              <td><span class="pill p-tag">Prep</span></td>
+              <td class="c"><span class="dash">—</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="note">
+    <h4>The log is set as writing, not as a form field</h4>
+    <p>Line height at 2.0, generous padding, no inner border, paper background flush with the panel. It's the only place in the app where you compose rather than review, and it should feel like a page rather than an input. Everything else on the screen is quieter than it is.</p>
+    <p>The <span class="typed">@</span> and <span class="typed">#</span> hints are set as keys because they're literally keystrokes — the same reasoning as monospace for measured things.</p>
+  </div>
+</div>
+
+<!-- ===== 04 ENTRIES ===== -->
+<div class="sec">
+  <div class="sec-head"><span class="sec-num">04</span><h2>Entries, restyled</h2><span class="say">Same columns. More air, lighter rules, aligned figures.</span></div>
+
+  <div class="wp">
+    <div class="wp-bar">Plain Text Time Tracker</div>
+    <div class="wp-body">
+      <div class="row" style="margin-bottom:22px">
+        <h1 class="page">Entries</h1>
+        <div class="grow"></div>
+        <div class="seg"><span>Summary</span><span class="on">Entries</span></div>
+      </div>
+
+      <div class="row" style="margin-bottom:18px;justify-content:flex-end">
+        <span class="stepper"><span class="arw">‹</span><span class="dt">Jun 1 – Jun 30, 2026</span><span class="arw r">›</span></span>
+      </div>
+
+      <div class="card" style="margin-bottom:20px;display:flex">
+        <div class="stat"><div class="k">Total hours</div><div class="v">95h 39m</div><div class="m">Client 45h 29m · internal 50h 10m</div></div>
+        <div class="stat"><div class="k">Billable hours</div><div class="v">6h 31m</div></div>
+        <div class="stat"><div class="k">Billable amount</div><div class="v">$618.00</div></div>
+        <div class="stat"><div class="k">Unbilled so far</div><div class="v" style="color:var(--c-over)">$4,656.31</div><div class="m"><a class="lk" href="#">Go to billing ›</a></div></div>
+      </div>
+
+      <div class="card">
+        <div class="daybar"><b>June 26, 2026</b> <span class="muted">Friday</span> <div class="grow"></div> <span class="muted typed">4h 52m · 11 entries</span></div>
+        <table>
+          <thead><tr>
+            <th>Description</th><th style="width:140px">Tags</th><th style="width:160px">Time</th><th style="width:90px">Duration</th>
+            <th class="c" style="width:75px">Billable</th><th style="width:110px">Status</th><th class="n" style="width:100px">Amount</th>
+          </tr></thead>
+          <tbody>
+            <tr>
+              <td>Starting Quiet Coworking<span class="sub">Internal · Networking &amp; Community</span></td>
+              <td><span class="pill p-tag">Community</span></td>
+              <td class="typed muted">9:30 – 10:39am</td><td class="typed">1h 9m</td>
+              <td class="c"><span class="dash">—</span></td><td><span class="dash">—</span></td><td class="n"><span class="dash">—</span></td>
+            </tr>
+            <tr>
+              <td>Sending updated flyer to NCJW<span class="sub">NCJW of Rossmoor · September 2026 Order Form</span></td>
+              <td><span class="pill p-tag">Support</span></td>
+              <td class="typed muted">11:28 – 11:32am</td><td class="typed">4m</td>
+              <td class="c"><span style="color:var(--c-hourly);font-weight:500">$</span></td>
+              <td><span class="pill p-hourly">Unbilled</span></td>
+              <td class="n"><span class="amt">$6.67</span></td>
+            </tr>
+            <tr>
+              <td>Updating testimonial in BTSA website.<span class="sub">Behind The Scenes Adventures · General Website Support</span></td>
+              <td><span class="pill p-tag">Support</span></td>
+              <td class="typed muted">12:30 – 12:40pm</td><td class="typed">10m</td>
+              <td class="c"><span style="color:var(--c-hourly);font-weight:500">$</span></td>
+              <td><span class="pill p-hourly">Unbilled</span></td>
+              <td class="n"><span class="amt">$16.67</span></td>
+            </tr>
+            <tr>
+              <td>Updating DOR website content.<span class="sub">Democrats of Rossmor · Website Care Plan Time</span></td>
+              <td><span class="pill p-tag">Content</span></td>
+              <td class="typed muted">12:50 – 1:07pm</td><td class="typed">17m</td>
+              <td class="c"><span class="dash">—</span></td><td><span class="dash">—</span></td><td class="n"><span class="dash">—</span></td>
+            </tr>
+            <tr>
+              <td>Replying to DOR questions about the registration form.<span class="sub">Democrats of Rossmor · Website Care Plan Time</span></td>
+              <td><span class="pill p-tag">Communication</span></td>
+              <td class="typed muted">2:36 – 2:48pm</td><td class="typed">12m</td>
+              <td class="c"><span class="dash">—</span></td><td><span class="dash">—</span></td><td class="n"><span class="dash">—</span></td>
+            </tr>
+          </tbody>
+        </table>
+
+        <div class="daybar" style="border-top:1px solid var(--rule)"><b>June 25, 2026</b> <span class="muted">Thursday</span> <div class="grow"></div> <span class="muted typed">6h 27m · 11 entries</span></div>
+        <table>
+          <tbody>
+            <tr>
+              <td>Working on Linkedin connections and commenting.<span class="sub">Internal · Marketing</span></td>
+              <td style="width:140px"><span class="pill p-tag">Outreach</span></td>
+              <td class="typed muted" style="width:160px">8:52 – 10:15am</td><td class="typed" style="width:90px">1h 23m</td>
+              <td class="c" style="width:75px"><span class="dash">—</span></td><td style="width:110px"><span class="dash">—</span></td><td class="n" style="width:100px"><span class="dash">—</span></td>
+            </tr>
+            <tr>
+              <td>Updating Kristals cookie consent<span class="sub">Kristal Fiorentino · General Website Support</span></td>
+              <td><span class="pill p-tag">Support</span></td>
+              <td class="typed muted">4:03 – 4:22pm</td><td class="typed">19m</td>
+              <td class="c"><span style="color:var(--c-hourly);font-weight:500">$</span></td>
+              <td><span class="pill p-hourly">Unbilled</span></td>
+              <td class="n"><span class="amt">$31.67</span></td>
+            </tr>
+            <tr>
+              <td>Working on event poster<span class="sub">NCJW of Rossmoor · September 2026 Order Form</span></td>
+              <td><span class="pill p-tag">Design</span></td>
+              <td class="typed muted">4:40 – 5:40pm</td><td class="typed">1h</td>
+              <td class="c"><span style="color:var(--c-hourly);font-weight:500">$</span></td>
+              <td><span class="pill p-hourly">Unbilled</span></td>
+              <td class="n"><span class="amt">$100.00</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="note">
+    <h4>What changed here is almost entirely spacing</h4>
+    <p>Row padding from 10px to 15px, rules lightened, column headers set small and uppercase so they stop competing with the data underneath them. Day headers become a tinted band rather than a bordered panel of their own, which removes a border and a heading level from every day on the page.</p>
+    <p>Amounts and durations are tabular monospace, so the columns align on the digit without needing right-alignment tricks — and a column of aligned figures is far quicker to scan than a ragged one.</p>
+  </div>
+</div>
+
+<!-- ===== 05 PROJECT ===== -->
+<div class="sec">
+  <div class="sec-head"><span class="sec-num">05</span><h2>A project, restyled</h2><span class="say">Over budget stated, not alarmed.</span></div>
+
+  <div class="wp">
+    <div class="wp-bar">Plain Text Time Tracker</div>
+    <div class="wp-body">
+      <div class="row" style="margin-bottom:24px">
+        <div>
+          <div class="row" style="gap:10px"><h1 class="page">Website Redesign</h1><span class="pill p-fixed">Fixed budget</span></div>
+          <div class="page-sub">Robin Mohr · <span class="typed">Feb 19 – Jun 10, 2026</span> · 91 entries</div>
+        </div>
+        <div class="grow"></div>
+        <span class="btn q sm">Settings</span>
+        <span class="btn q sm">← Back to projects</span>
+      </div>
+
+      <div class="card" style="margin-bottom:20px;display:flex">
+        <div class="stat"><div class="k">Total hours</div><div class="v">96h 25m</div><div class="m" style="color:var(--c-over)">57h 43m over budget</div></div>
+        <div class="stat"><div class="k">Effective rate</div><div class="v">$40/hr</div><div class="m">vs $100 target</div></div>
+        <div class="stat"><div class="k">Budget</div><div class="v">249%</div><div class="m">96h 25m of 38h 42m</div></div>
+        <div class="stat"><div class="k">Fixed fee</div><div class="v">$3,870</div><div class="m">$100/hr budgeted</div></div>
+      </div>
+
+      <div class="card" style="margin-bottom:20px">
+        <div class="card-h">Budget consumed</div>
+        <div style="padding:20px 22px">
+          <div class="meter" style="max-width:none;height:7px"><i class="over" style="width:100%"></i></div>
+          <div class="row" style="margin-top:11px;font-size:13px;color:var(--ink-2)">
+            <span class="typed">$9,641.67</span> <span>of</span> <span class="typed">$3,870.00</span>
+            <div class="grow"></div>
+            <span class="typed" style="color:var(--c-over)">$5,771.67 over</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-h">Hours by month <span class="lite">· avg 19h 17m</span></div>
+        <div style="padding:26px 24px 20px">
+          <div style="display:flex;align-items:flex-end;gap:28px;height:160px;border-bottom:1px solid var(--rule);position:relative">
+            <div style="position:absolute;left:0;right:0;bottom:62px;border-top:1px dashed #d6d3ce"></div>
+            <div style="flex:1"><div style="height:2px;background:#8fa89a"></div></div>
+            <div style="flex:1"><div style="height:64px;background:#8fa89a"></div></div>
+            <div style="flex:1"><div style="height:72px;background:#8fa89a"></div></div>
+            <div style="flex:1"><div style="height:140px;background:#b08d4a"></div></div>
+            <div style="flex:1"><div style="height:30px;background:#8fa89a"></div></div>
+          </div>
+          <div style="display:flex;gap:28px;margin-top:10px">
+            <div style="flex:1;text-align:center"><div style="font-size:13px">Feb</div><div class="typed muted" style="font-size:12px">23m</div></div>
+            <div style="flex:1;text-align:center"><div style="font-size:13px">Mar</div><div class="typed muted" style="font-size:12px">20h 02m</div></div>
+            <div style="flex:1;text-align:center"><div style="font-size:13px">Apr</div><div class="typed muted" style="font-size:12px">22h 35m</div></div>
+            <div style="flex:1;text-align:center"><div style="font-size:13px">May</div><div class="typed muted" style="font-size:12px">43h 57m</div></div>
+            <div style="flex:1;text-align:center"><div style="font-size:13px">Jun</div><div class="typed muted" style="font-size:12px">9h 28m</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="note">
+    <h4>Over budget, without the verdict</h4>
+    <p>The current page uses a bright orange for the overrun, which reads as an error condition. Here it's a muted ochre used consistently — the meter, the May bar, the stat qualifier — so it reads as one fact stated in one colour rather than as an alarm going off in three places.</p>
+    <p>This is the principle doing real work. The project went 249% over; that already happened and nothing on this screen can change it. Saying so plainly is descriptive. Saying so in red is a judgment about you.</p>
+  </div>
+</div>
+
+<!-- ===== 06 SUMMARY ===== -->
+<div class="sec">
+  <div class="sec-head"><span class="sec-num">06</span><h2>The whole adjustment, in short</h2></div>
+  <div class="card">
+    <table>
+      <thead><tr><th style="width:26%">Change</th><th style="width:32%">From WordPress default</th><th>Grounded in</th></tr></thead>
+      <tbody>
+        <tr><td><b>Real type scale</b></td><td class="muted">Nearly everything at 13px</td><td>Hierarchy from size rather than from weight and colour, so headings stop shouting to be noticed.</td></tr>
+        <tr><td><b>Mono for measured, sans for inferred</b></td><td class="muted">One family throughout</td><td>The tool's identity is plain text. The split makes visible which parts of a row you produced and which the alias learner guessed.</td></tr>
+        <tr><td><b>Desaturated categoricals</b></td><td class="muted">Saturated status-light greens and blues</td><td>Descriptive, not evaluative. Four billing models, four hues, equal weight, no verdict.</td></tr>
+        <tr><td><b>Nothing red, ochre for over</b></td><td class="muted">Bright orange for over-budget</td><td>If it creates pressure, it doesn't belong. An overrun is a fact about hours.</td></tr>
+        <tr><td><b>Warmer neutrals</b></td><td class="muted">#f0f0f1 cold grey</td><td>Half the tool is a notebook. Paper, not control panel.</td></tr>
+        <tr><td><b>Lighter rules, 50% more row padding</b></td><td class="muted">Dense tables, #dcdcde borders everywhere</td><td>Minimal friction. Separation by rhythm rather than by lines.</td></tr>
+        <tr><td><b>The log set as writing</b></td><td class="muted">A form textarea</td><td>Capture first. The one place you compose should feel like a page.</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+</div>

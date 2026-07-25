@@ -1,0 +1,263 @@
+<meta charset="utf-8">
+<title>PLTT — Editing and the day</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;450;500;600&family=IBM+Plex+Mono:wght@400;450;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --paper:#fff; --canvas:#f4f3f1; --sunk:#faf9f7;
+    --rule:#e4e2de; --rule-2:#efedea;
+    --ink:#1a1c1e; --ink-2:#55595e; --ink-3:#8a8d91;
+    --blue:#2271b1;
+    --c-hourly:#146b42; --c-hourly-bg:#e0f0e7;
+    --c-tag:#1d5f8a;    --c-tag-bg:#e4eef7;
+    --c-over:#9a6a10;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:#e3e1de;font:14px/1.6 "IBM Plex Sans",system-ui,sans-serif;color:var(--ink);-webkit-font-smoothing:antialiased}
+  .wrap{max-width:1120px;margin:0 auto;padding:36px 24px 90px}
+  .typed{font-family:"IBM Plex Mono",monospace;font-variant-numeric:tabular-nums;letter-spacing:-.12px}
+
+  .doc{background:var(--ink);color:#fff;padding:30px 34px;border-radius:6px}
+  .doc h1{margin:0 0 11px;font-size:22px;font-weight:600;letter-spacing:-.35px}
+  .doc p{margin:0 0 9px;color:#b9bcc0;max-width:76ch;line-height:1.75}
+  .doc p:last-child{margin:0}
+  .doc b{color:#fff;font-weight:500}
+
+  .sec{margin-top:44px}
+  .sec-head{padding-bottom:12px;border-bottom:2px solid var(--ink);margin-bottom:22px;display:flex;align-items:baseline;gap:13px}
+  .sec-num{font:500 12px/1 "IBM Plex Mono",monospace;color:var(--ink-3);letter-spacing:.7px}
+  .sec-head h2{margin:0;font-size:18px;font-weight:600;letter-spacing:-.25px}
+  .sec-head .say{margin-left:auto;font-size:13px;color:var(--ink-2)}
+  .lead{max-width:80ch;color:var(--ink-2);margin:0 0 22px;line-height:1.8}
+
+  .wp{background:var(--canvas);border:1px solid #cbc9c5;border-radius:6px;overflow:hidden}
+  .wp-bar{background:var(--ink);color:#8a8d91;font:11px/1 "IBM Plex Mono",monospace;padding:9px 15px}
+  .wp-body{padding:26px 28px 30px}
+  .row{display:flex;align-items:center;gap:12px}
+  .grow{flex:1}
+  .muted{color:var(--ink-3)}
+
+  .pill{display:inline-block;padding:2px 10px;border-radius:3px;font-size:12px;line-height:20px}
+  .p-tag{background:var(--c-tag-bg);color:var(--c-tag)}
+  .p-hourly{background:var(--c-hourly-bg);color:var(--c-hourly)}
+
+  .btn{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--blue);background:var(--paper);color:var(--blue);padding:7px 14px;border-radius:4px;font-size:13.5px}
+  .btn.p{background:var(--blue);color:#fff}
+  .btn.q{border-color:#c2bfba;color:var(--ink-2)}
+  .btn.sm{padding:5px 11px;font-size:12.5px}
+
+  .card{background:var(--paper);border:1px solid var(--rule);border-radius:6px}
+  .card-h{padding:15px 20px;border-bottom:1px solid var(--rule-2);font-weight:600;font-size:14px;display:flex;align-items:center;gap:12px}
+  .card-h .lite{font-weight:400;color:var(--ink-3);font-size:13px}
+
+  table{width:100%;border-collapse:collapse}
+  th{text-align:left;font-weight:450;color:var(--ink-3);font-size:11.5px;letter-spacing:.5px;text-transform:uppercase;padding:11px 20px;border-bottom:1px solid var(--rule);background:var(--sunk)}
+  th.c{text-align:center} th.n{text-align:right}
+  td{padding:15px 20px;border-bottom:1px solid var(--rule-2);vertical-align:middle}
+  td.c{text-align:center} td.n{text-align:right}
+  tr:last-child td{border-bottom:0}
+  .sub{display:block;color:var(--ink-3);font-size:12.5px;margin-top:3px}
+  a.lk{color:var(--blue);text-decoration:none}
+  a.lk:hover{text-decoration:underline}
+  .dash{color:#cfccc7}
+  .amt{font-family:"IBM Plex Mono",monospace;font-variant-numeric:tabular-nums;font-weight:500}
+
+  .daybar{padding:12px 20px;background:var(--sunk);border-bottom:1px solid var(--rule);display:flex;align-items:baseline;gap:12px;font-size:13.5px}
+  .daybar b{font-weight:600;letter-spacing:-.1px}
+  .daybar a{font-weight:600;color:var(--blue);text-decoration:none;letter-spacing:-.1px}
+  .daybar a:hover{text-decoration:underline}
+  .daybar .log{font-size:12.5px}
+
+  .rowact{display:inline-flex;flex-direction:column;gap:3px;padding:7px 9px;border-radius:4px;border:1px solid transparent}
+  .rowact.hover{border-color:var(--rule);background:var(--sunk)}
+  .rowact i{width:3px;height:3px;border-radius:50%;background:var(--ink-3);display:block}
+  .menu{position:absolute;right:14px;top:52px;background:#fff;border:1px solid var(--rule);border-radius:5px;box-shadow:0 6px 20px rgba(0,0,0,.13);min-width:215px;padding:5px 0;z-index:5;text-align:left}
+  .menu div{padding:9px 15px;font-size:13.5px}
+  .menu div.hl{background:#eef3f8;color:var(--blue)}
+  .menu div.sep{border-top:1px solid var(--rule-2);padding:0;margin:5px 0}
+
+  .note{background:var(--sunk);border:1px solid var(--rule);border-left:3px solid var(--blue);border-radius:5px;padding:16px 20px;margin-top:18px}
+  .note h4{margin:0 0 7px;font-size:13.5px;font-weight:600}
+  .note p{margin:0;font-size:13px;color:var(--ink-2);line-height:1.75}
+  .note p + p{margin-top:9px}
+
+  .split{display:grid;grid-template-columns:1fr 1fr;gap:0;background:var(--paper);border:1px solid var(--rule);border-radius:6px;overflow:hidden}
+  .split > div{padding:18px 22px}
+  .split > div:first-child{border-right:1px solid var(--rule-2)}
+  .split h4{margin:0 0 8px;font:500 11.5px/1 "IBM Plex Mono",monospace;letter-spacing:.6px;color:var(--ink-3)}
+  .split p{margin:0;font-size:13px;color:var(--ink-2);line-height:1.75}
+
+  .editor{background:var(--paper);border:1px solid var(--rule);border-radius:6px;overflow:hidden}
+  .editor textarea{width:100%;border:0;padding:20px 24px;font:13.5px/2 "IBM Plex Mono",monospace;resize:none;outline:none;color:var(--ink);display:block}
+</style>
+
+<div class="wrap">
+
+<div class="doc">
+  <h1>Editing, and getting back to the day</h1>
+  <p>Two jobs were sharing one button. <b>Editing an entry</b> belongs to a row. <b>Reaching the day</b> — its raw log, the journal notes between entries, re-processing — belongs to a date, and it's the thing an entries table currently can't do at all.</p>
+  <p>So the day band keeps a link, but it navigates rather than edits. The date is the link.</p>
+</div>
+
+<div class="split" style="margin-bottom:44px">
+  <div>
+    <h4>THE ROW → EDIT THE ENTRY</h4>
+    <p>Time, description, client, project, tags, billable. The same modal you have now, opened from the entry it changes rather than from the date it happens to fall on.</p>
+  </div>
+  <div>
+    <h4>THE DATE → GO TO THE DAY</h4>
+    <p>Opens Today at that date: the raw log, the journal lines that never became entries, and the option to re-process. Currently unreachable from Entries.</p>
+  </div>
+</div>
+
+<!-- ===== 01 ===== -->
+<div class="sec">
+  <div class="sec-head"><span class="sec-num">01</span><h2>In the table</h2><span class="say">Date links out. Row menu edits.</span></div>
+
+  <div class="wp">
+    <div class="wp-bar">Plain Text Time Tracker</div>
+    <div class="wp-body">
+      <div class="card" style="position:relative">
+        <table>
+          <thead><tr>
+            <th>Description</th><th style="width:140px">Tags</th><th style="width:160px">Time</th><th style="width:90px">Duration</th>
+            <th class="c" style="width:75px">Billable</th><th style="width:105px">Status</th><th class="n" style="width:100px">Amount</th><th style="width:52px"></th>
+          </tr></thead>
+        </table>
+
+        <div class="daybar">
+          <a href="#">June 26</a> <span class="muted">Friday</span>
+          <span class="log"><a class="lk" href="#">Open day log ›</a></span>
+          <div class="grow"></div>
+          <span class="muted typed">4h 52m · 11 entries</span>
+        </div>
+        <table><tbody>
+          <tr>
+            <td>Starting Quiet Coworking<span class="sub">Internal · Networking &amp; Community</span></td>
+            <td style="width:140px"><span class="pill p-tag">Community</span></td>
+            <td style="width:160px" class="typed muted">9:30 – 10:39am</td><td style="width:90px" class="typed">1h 9m</td>
+            <td class="c" style="width:75px"><span class="dash">—</span></td><td style="width:105px"><span class="dash">—</span></td>
+            <td class="n" style="width:100px"><span class="dash">—</span></td>
+            <td class="c" style="width:52px"><span class="rowact"><i></i><i></i><i></i></span></td>
+          </tr>
+          <tr style="background:var(--sunk)">
+            <td>Sending updated flyer to NCJW<span class="sub">NCJW of Rossmoor · September 2026 Order Form</span></td>
+            <td><span class="pill p-tag">Support</span></td>
+            <td class="typed muted">11:28 – 11:32am</td><td class="typed">4m</td>
+            <td class="c"><span style="color:var(--c-hourly);font-weight:600">$</span></td>
+            <td><span class="pill p-hourly">Unbilled</span></td>
+            <td class="n"><span class="amt">$6.67</span></td>
+            <td class="c"><span class="rowact hover"><i></i><i></i><i></i></span></td>
+          </tr>
+          <tr>
+            <td>Updating testimonial in BTSA website.<span class="sub">Behind The Scenes Adventures · General Website Support</span></td>
+            <td><span class="pill p-tag">Support</span></td>
+            <td class="typed muted">12:30 – 12:40pm</td><td class="typed">10m</td>
+            <td class="c"><span style="color:var(--c-hourly);font-weight:600">$</span></td>
+            <td><span class="pill p-hourly">Unbilled</span></td>
+            <td class="n"><span class="amt">$16.67</span></td>
+            <td class="c"><span class="rowact"><i></i><i></i><i></i></span></td>
+          </tr>
+        </tbody></table>
+
+        <div class="menu" style="top:150px">
+          <div class="hl">Edit entry…</div>
+          <div>Change tags…</div>
+          <div>Mark not billable</div>
+          <div class="sep"></div>
+          <div>Go to June 26 log</div>
+          <div class="sep"></div>
+          <div>Delete entry</div>
+        </div>
+
+        <div class="daybar" style="border-top:1px solid var(--rule)">
+          <a href="#">June 25</a> <span class="muted">Thursday</span>
+          <span class="log"><a class="lk" href="#">Open day log ›</a></span>
+          <div class="grow"></div>
+          <span class="muted typed">6h 27m · 11 entries</span>
+        </div>
+        <table><tbody>
+          <tr>
+            <td>Working on Linkedin connections and commenting.<span class="sub">Internal · Marketing</span></td>
+            <td style="width:140px"><span class="pill p-tag">Outreach</span></td>
+            <td style="width:160px" class="typed muted">8:52 – 10:15am</td><td style="width:90px" class="typed">1h 23m</td>
+            <td class="c" style="width:75px"><span class="dash">—</span></td><td style="width:105px"><span class="dash">—</span></td>
+            <td class="n" style="width:100px"><span class="dash">—</span></td>
+            <td class="c" style="width:52px"><span class="rowact"><i></i><i></i><i></i></span></td>
+          </tr>
+          <tr>
+            <td>Updating Kristals cookie consent<span class="sub">Kristal Fiorentino · General Website Support</span></td>
+            <td><span class="pill p-tag">Support</span></td>
+            <td class="typed muted">4:03 – 4:22pm</td><td class="typed">19m</td>
+            <td class="c"><span style="color:var(--c-hourly);font-weight:600">$</span></td>
+            <td><span class="pill p-hourly">Unbilled</span></td>
+            <td class="n"><span class="amt">$31.67</span></td>
+            <td class="c"><span class="rowact"><i></i><i></i><i></i></span></td>
+          </tr>
+        </tbody></table>
+      </div>
+    </div>
+  </div>
+
+  <div class="note">
+    <h4>Two routes to the day, deliberately</h4>
+    <p>The date in the band, and "Go to [date] log" in the row menu. The band is for when you're scanning by day; the menu is for when you're looking at one entry and want the context it came from — which is the more common case when something reads oddly and you want to see the raw line that produced it.</p>
+    <p>Tags and billable stay inline-editable as they are now. The menu is for the heavier changes.</p>
+  </div>
+</div>
+
+<!-- ===== 02 ===== -->
+<div class="sec">
+  <div class="sec-head"><span class="sec-num">02</span><h2>Where the date takes you</h2><span class="say">The day log, in read-and-revise mode.</span></div>
+  <p class="lead">Same Today screen, at that date. Which means from an entries table you can now reach the journal lines that never became entries — the notes between tasks, which are currently invisible from anywhere except History.</p>
+
+  <div class="wp">
+    <div class="wp-bar">Plain Text Time Tracker</div>
+    <div class="wp-body">
+      <div class="row" style="align-items:flex-start;margin-bottom:20px">
+        <div>
+          <div class="row" style="gap:11px"><h1 style="margin:0;font-size:26px;font-weight:450;letter-spacing:-.5px">Friday, June 26</h1><span class="pill p-hourly">Processed</span></div>
+          <div style="color:var(--ink-2);font-size:13.5px;margin-top:6px">11 entries recorded · <span class="typed">4h 52m</span> logged</div>
+        </div>
+        <div class="grow"></div>
+        <span class="btn q sm">← Back to entries</span>
+      </div>
+
+      <div class="editor" style="margin-bottom:18px">
+<textarea rows="8" readonly>@9:30am - Starting Quiet Coworking
+@10:39am - Done
+@9:36am - Working on Linkedin comments
+@11:00am - Done
+- Kept getting pulled off this. Worth blocking the morning next week.
+@11:28am - Sending updated flyer to NCJW
+@11:32am - Done
+@12:03pm - Working on S3NSE newsletter setup</textarea>
+        <div style="border-top:1px solid var(--rule-2);padding:11px 18px;display:flex;align-items:center;gap:14px;background:var(--sunk);font-size:12.5px;color:var(--ink-3)">
+          <span>Editing the log does not change entries already recorded</span>
+          <div class="grow"></div>
+          <span class="btn q sm">Save log</span>
+          <span class="btn q sm">Re-process…</span>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-h">Recorded entries <span class="lite">· 11</span></div>
+        <table>
+          <thead><tr><th style="width:170px">Time</th><th style="width:95px">Duration</th><th>Description</th><th style="width:140px">Tags</th><th style="width:52px"></th></tr></thead>
+          <tbody>
+            <tr><td class="typed muted">9:30 – 10:39am</td><td class="typed">1h 9m</td><td>Starting Quiet Coworking<span class="sub">Internal · Networking &amp; Community</span></td><td><span class="pill p-tag">Community</span></td><td class="c"><span class="rowact"><i></i><i></i><i></i></span></td></tr>
+            <tr><td class="typed muted">11:28 – 11:32am</td><td class="typed">4m</td><td>Sending updated flyer to NCJW<span class="sub">NCJW of Rossmoor · September 2026 Order Form</span></td><td><span class="pill p-tag">Support</span></td><td class="c"><span class="rowact"><i></i><i></i><i></i></span></td></tr>
+            <tr><td class="typed muted">12:03 – 12:27pm</td><td class="typed">24m</td><td>Working on S3NSE newsletter setup<span class="sub">S3NSE · Content Plan Time</span></td><td><span class="pill p-tag">Prep</span></td><td class="c"><span class="rowact"><i></i><i></i><i></i></span></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="note">
+    <h4>The line worth stating on screen</h4>
+    <p>"Editing the log does not change entries already recorded." Once processed, the log and the entries are separate — the log is the note you took, the entry is the record you keep. That's already how it works; it's just never said anywhere, which is exactly the kind of thing that makes you hesitate before touching an old log.</p>
+    <p>Re-process stays available but sits as a secondary action with an ellipsis, since it's the one operation here that can produce duplicates.</p>
+  </div>
+</div>
+
+</div>

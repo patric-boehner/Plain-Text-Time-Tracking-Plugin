@@ -1,0 +1,183 @@
+<meta charset="utf-8">
+<title>PLTT — Billing scope by type</title>
+<style>
+  :root{
+    --paper:#fff; --canvas:#f4f3f1; --sunk:#faf9f7;
+    --rule:#e4e2de; --rule-2:#efedea;
+    --ink:#1a1c1e; --ink-2:#55595e; --ink-3:#8a8d91;
+    --blue:#2271b1;
+    --c-hourly:#146b42; --c-hourly-bg:#e0f0e7;
+    --c-monthly:#175d87;--c-monthly-bg:#e0edf7;
+    --c-fixed:#5540a5;  --c-fixed-bg:#eae5f9;
+    --c-over:#9a6a10;
+    --c-tag:#1d5f8a;    --c-tag-bg:#e4eef7;
+    --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",sans-serif;
+    --mono:Menlo,Consolas,monaco,monospace;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:#e3e1de;font:14px/1.6 var(--sans);color:var(--ink);-webkit-font-smoothing:antialiased}
+  .wrap{max-width:1080px;margin:0 auto;padding:36px 24px 90px}
+  .typed{font-family:var(--mono);font-variant-numeric:tabular-nums}
+
+  .doc{background:var(--ink);color:#fff;padding:30px 34px;border-radius:6px}
+  .doc h1{margin:0 0 11px;font-size:22px;font-weight:600;letter-spacing:-.2px}
+  .doc p{margin:0 0 9px;color:#b9bcc0;max-width:76ch;line-height:1.75}
+  .doc p:last-child{margin:0}
+  .doc b{color:#fff;font-weight:500}
+
+  .sec{margin-top:42px}
+  .sec-head{padding-bottom:12px;border-bottom:2px solid var(--ink);margin-bottom:20px;display:flex;align-items:baseline;gap:13px}
+  .sec-num{font:500 12px/1 var(--mono);color:var(--ink-3);letter-spacing:.7px}
+  .sec-head h2{margin:0;font-size:18px;font-weight:600;letter-spacing:-.15px}
+  .sec-head .say{margin-left:auto;font-size:13px;color:var(--ink-2)}
+  .lead{max-width:80ch;color:var(--ink-2);margin:0 0 20px;line-height:1.8}
+
+  .scope{background:var(--paper);border:1px solid var(--rule);border-radius:6px}
+  .scope-id{padding:19px 22px 17px;border-bottom:1px solid var(--rule-2)}
+  .scope-id h1{margin:0;font-size:23px;font-weight:600;letter-spacing:-.2px;display:inline}
+  .scope-l2{color:var(--ink-2);font-size:14px;margin-top:8px}
+  .scope-when{display:inline-block;margin-top:12px;background:var(--sunk);border:1px solid var(--rule-2);border-radius:4px;padding:6px 13px;font-size:13px;color:var(--ink-2)}
+  .scope-nums{display:flex;flex-wrap:wrap}
+  .fig{padding:16px 22px 18px;border-right:1px solid var(--rule-2);flex:1;min-width:195px}
+  .fig:last-child{border-right:0}
+  .fig .lab{font-size:13px;color:var(--ink-2)}
+  .fig .val{font:450 25px/1.2 var(--mono);letter-spacing:-.5px;margin-top:4px;font-variant-numeric:tabular-nums}
+  .fig .val.over{color:var(--c-over)}
+  .fig .basis{font-size:12.5px;color:var(--ink-3);margin-top:5px;line-height:1.55}
+
+  .bbar{background:var(--paper);border:1px solid var(--rule);border-top:0;border-radius:0 0 6px 6px;padding:13px 22px;display:flex;align-items:center;gap:14px;font-size:13.5px;background:#f4faf6;border-color:#cfe4d6}
+  .dotg{width:7px;height:7px;border-radius:50%;background:var(--c-hourly);flex:none}
+  .btn{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--blue);background:var(--blue);color:#fff;padding:5px 12px;border-radius:4px;font-size:12.5px}
+  .grow{flex:1}
+  .muted{color:var(--ink-3)}
+
+  .pill{display:inline-block;padding:2px 9px;border-radius:3px;font-size:12px;line-height:19px}
+  .p-hourly{background:var(--c-hourly-bg);color:var(--c-hourly)}
+  .p-monthly{background:var(--c-monthly-bg);color:var(--c-monthly)}
+  .p-fixed{background:var(--c-fixed-bg);color:var(--c-fixed)}
+
+  .note{background:var(--sunk);border:1px solid var(--rule);border-left:3px solid var(--blue);border-radius:5px;padding:15px 19px;margin-top:16px}
+  .note h4{margin:0 0 7px;font-size:13.5px;font-weight:600}
+  .note p{margin:0;font-size:13px;color:var(--ink-2);line-height:1.75}
+  .note p + p{margin-top:8px}
+  .note.q{border-left-color:var(--c-over);background:#fdfaf3;border-color:#e8dcc0}
+
+  .cmp{width:100%;border-collapse:collapse;background:var(--paper);border:1px solid var(--rule);border-radius:6px;overflow:hidden}
+  .cmp th{text-align:left;font-weight:450;color:var(--ink-3);font-size:11.5px;letter-spacing:.5px;text-transform:uppercase;padding:11px 18px;border-bottom:1px solid var(--rule);background:var(--sunk)}
+  .cmp td{padding:12px 18px;border-bottom:1px solid var(--rule-2);font-size:13px;vertical-align:top}
+  .cmp tr:last-child td{border-bottom:0}
+</style>
+
+<div class="wrap">
+
+<div class="doc">
+  <h1>Billing scope block, by project type</h1>
+  <p>Only hourly was ever mocked. Here are the figure sets for each type that can produce a bill.</p>
+  <p><b>No meter in billing context.</b> The block's figures and basis lines already carry the arithmetic exactly; a meter restates it as proportion, which is a shape you don't act on while deciding what to charge. The meter stays on project report, where proportion <i>is</i> the question.</p>
+</div>
+
+<!-- ===== HOURLY ===== -->
+<div class="sec">
+  <div class="sec-head"><span class="sec-num">01</span><h2>Hourly</h2><span class="say">Scope is a run of unbilled entries.</span></div>
+
+  <div class="scope">
+    <div class="scope-id">
+      <h1>General Website Support</h1> <span class="pill p-hourly" style="vertical-align:3px;margin-left:8px">Hourly</span>
+      <div class="scope-l2">Daniel Mintie · $100/hr</div>
+      <div class="scope-when">Showing <b class="typed" style="color:var(--ink);font-weight:500">Feb 17 – May 19, 2026</b> · not yet billed · 15 entries</div>
+    </div>
+    <div class="scope-nums">
+      <div class="fig"><div class="lab">Total hours</div><div class="val">7h 56m</div><div class="basis">The 15 entries below</div></div>
+      <div class="fig"><div class="lab">Billable amount</div><div class="val">$793.32</div><div class="basis"><span class="typed">7h 56m × $100/hr</span></div></div>
+      <div class="fig"><div class="lab">Sitting unbilled</div><div class="val over">151 days</div><div class="basis">Since the oldest entry, <span class="typed">Feb 17</span></div></div>
+      <div class="fig"><div class="lab">Billed to date</div><div class="val">$60.00</div><div class="basis">2 bill records · <a href="#" style="color:var(--blue);text-decoration:none">View records ›</a></div></div>
+    </div>
+  </div>
+  <div class="bbar">
+    <span class="dotg"></span>
+    <span><b>Ready to bill</b> — <span class="typed">$793.32</span> across 15 unbilled entries</span>
+    <div class="grow"></div>
+    <span class="btn">Review &amp; bill →</span>
+  </div>
+</div>
+
+<!-- ===== RETAINER ===== -->
+<div class="sec">
+  <div class="sec-head"><span class="sec-num">02</span><h2>Retainer</h2><span class="say">Scope is one closed period.</span></div>
+  <p class="lead">The structural difference: an hourly scope is a run of entries with no natural end, a retainer scope is a calendar month. The period is the unit, so the third figure counts from when the period <i>closed</i>, not from the oldest entry.</p>
+
+  <div class="scope">
+    <div class="scope-id">
+      <h1>Website Care Plan Time</h1> <span class="pill p-monthly" style="vertical-align:3px;margin-left:8px">Monthly retainer</span>
+      <div class="scope-l2">Democrats of Rossmor · 3 hours included each month at $90/hr</div>
+      <div class="scope-when">Showing <b class="typed" style="color:var(--ink);font-weight:500">June 2026</b> · not yet billed · 18 entries</div>
+    </div>
+    <div class="scope-nums">
+      <div class="fig"><div class="lab">Total hours</div><div class="val">5h 43m</div><div class="basis">Against the <span class="typed">3h</span> included · 191%</div></div>
+      <div class="fig"><div class="lab">Over allocation</div><div class="val over">2h 43m</div><div class="basis">The chargeable portion</div></div>
+      <div class="fig"><div class="lab">Billable amount</div><div class="val">$244.50</div><div class="basis">Overage only · <span class="typed">2h 43m × $90/hr</span></div></div>
+      <div class="fig"><div class="lab">Sitting unbilled</div><div class="val over">19 days</div><div class="basis">Since the period closed, <span class="typed">Jun 30</span></div></div>
+    </div>
+  </div>
+  <div class="bbar">
+    <span class="dotg"></span>
+    <span><b>Ready to bill</b> — <span class="typed">$244.50</span> for June 2026</span>
+    <div class="grow"></div>
+    <span class="btn">Review &amp; bill →</span>
+  </div>
+
+  <div class="note">
+    <h4>Why two figures for one fact</h4>
+    <p><i>Total hours</i> and <i>Over allocation</i> look like duplication, but they answer different questions: how much work happened, and how much of it you can charge for. In an hourly scope those are the same number, which is why hourly needs only one.</p>
+    <p>The percentage lives on the basis line rather than as its own figure. That's where the dropped meter's information goes — <span class="typed">191%</span> stated once, in text, next to the hours it describes.</p>
+  </div>
+</div>
+
+<!-- ===== FIXED ===== -->
+<div class="sec">
+  <div class="sec-head"><span class="sec-num">03</span><h2>Fixed budget</h2><span class="say">Does this have a billing context at all?</span></div>
+
+  <div class="note q">
+    <h4>Question before designing it</h4>
+    <p>The working model has been that fixed-fee projects use time tracking for over/under awareness only — <b>no billing record machinery</b>, because the fee is agreed up front and invoiced in Zoho on its own schedule. If that's still true, a fixed-budget project never appears in Ready to bill and there is no billing scope block to design.</p>
+    <p>If it isn't true — if you record a bill against a fixed-fee project when you deliver, or for a deposit or a milestone — then it needs a figure set, and the set below is the starting point. Worth settling before building, because it also determines whether fixed-budget rows appear in the Billing index at all.</p>
+  </div>
+
+  <div class="scope" style="opacity:.72">
+    <div class="scope-id">
+      <h1>Website Redesign</h1> <span class="pill p-fixed" style="vertical-align:3px;margin-left:8px">Fixed budget</span>
+      <div class="scope-l2">Robin Mohr · $3,870 agreed, budgeted as 38h 42m at $100/hr</div>
+      <div class="scope-when">Showing <b class="typed" style="color:var(--ink);font-weight:500">Feb 19 – Jun 10, 2026</b> · the whole project · 91 entries</div>
+    </div>
+    <div class="scope-nums">
+      <div class="fig"><div class="lab">Total hours</div><div class="val">96h 25m</div><div class="basis">Against <span class="typed">38h 42m</span> budgeted · 249%</div></div>
+      <div class="fig"><div class="lab">Billable amount</div><div class="val">$3,870.00</div><div class="basis">The agreed fee · fixed regardless of hours</div></div>
+      <div class="fig"><div class="lab">Effective rate</div><div class="val">$40/hr</div><div class="basis"><span class="typed">$3,870 ÷ 96h 25m</span> · target $100/hr</div></div>
+      <div class="fig"><div class="lab">Billed to date</div><div class="val">$0.00</div><div class="basis">No bill record yet</div></div>
+    </div>
+  </div>
+
+  <div class="note">
+    <h4>If it is built</h4>
+    <p>The entry table below it would have no per-entry amounts to select — the fee doesn't derive from hours — so "Review &amp; bill" wouldn't open a selection list. It'd go straight to the record dialog with the fee pre-filled. That's a different flow from the other two, which is another reason to confirm it's needed before building it.</p>
+  </div>
+</div>
+
+<!-- ===== SUMMARY ===== -->
+<div class="sec">
+  <div class="sec-head"><span class="sec-num">04</span><h2>Figure sets side by side</h2></div>
+  <table class="cmp">
+    <thead><tr><th style="width:18%"></th><th style="width:27%">Hourly</th><th style="width:27%">Retainer</th><th>Fixed — if built</th></tr></thead>
+    <tbody>
+      <tr><td><b>Scope is</b></td><td>A run of unbilled entries</td><td>One closed period</td><td>The whole project</td></tr>
+      <tr><td><b>Figure 1</b></td><td>Total hours</td><td>Total hours <span class="muted">(with % on basis)</span></td><td>Total hours <span class="muted">(with % on basis)</span></td></tr>
+      <tr><td><b>Figure 2</b></td><td>Billable amount</td><td>Over allocation</td><td>Billable amount <span class="muted">(the fee)</span></td></tr>
+      <tr><td><b>Figure 3</b></td><td>Sitting unbilled</td><td>Billable amount</td><td>Effective rate</td></tr>
+      <tr><td><b>Figure 4</b></td><td>Billed to date</td><td>Sitting unbilled</td><td>Billed to date</td></tr>
+      <tr><td><b>Sitting counts from</b></td><td>Oldest unbilled entry</td><td>Period close</td><td>—</td></tr>
+      <tr><td><b>Meter</b></td><td colspan="3">None. Report only.</td></tr>
+    </tbody>
+  </table>
+</div>
+
+</div>

@@ -1,0 +1,520 @@
+<meta charset="utf-8">
+<title>PLTT — Billing &amp; Entries</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;450;500;600&family=IBM+Plex+Mono:wght@400;450;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --blue:#2271b1; --blue-dk:#135e96;
+    --ink:#16191d; --ink-2:#4b5158; --ink-3:#787c82;
+    --line:#dcdcde; --line-2:#ececed; --paper:#fff; --bg:#f2f2f3;
+    --ready:#00844a; --ready-bg:#e8f5ed;
+    --wait:#8a5d00; --wait-bg:#fbf3e3;
+    --done:#4b5158; --done-bg:#eeeff0;
+    --purple:#5b41c9; --purple-bg:#efecfb;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:#e6e6e8;font:14px/1.6 "IBM Plex Sans",system-ui,sans-serif;color:var(--ink);-webkit-font-smoothing:antialiased}
+  .wrap{max-width:1240px;margin:0 auto;padding:34px 24px 90px}
+
+  /* typed / measured — things you wrote or the clock recorded */
+  .typed{font-family:"IBM Plex Mono",monospace;font-variant-numeric:tabular-nums;letter-spacing:-.1px}
+
+  .doc{background:var(--ink);color:#fff;padding:32px 36px;border-radius:5px}
+  .doc h1{margin:0 0 10px;font-size:23px;font-weight:600;letter-spacing:-.3px}
+  .doc p{margin:0 0 10px;color:#c3c4c7;max-width:76ch;line-height:1.7}
+  .doc p:last-child{margin:0}
+  .doc b{color:#fff;font-weight:500}
+
+  .sec{margin-top:46px}
+  .sec-head{padding-bottom:12px;border-bottom:2px solid var(--ink);margin-bottom:20px;display:flex;align-items:baseline;gap:13px}
+  .sec-num{font:500 12px/1 "IBM Plex Mono",monospace;color:var(--ink-3);letter-spacing:.6px}
+  .sec-head h2{margin:0;font-size:18px;font-weight:600;letter-spacing:-.2px}
+  .sec-head .say{margin-left:auto;font-size:13px;color:var(--ink-2)}
+  .lead{max-width:80ch;color:var(--ink-2);margin:0 0 20px;line-height:1.75}
+
+  .wp{background:var(--bg);border:1px solid #c8c9cb;border-radius:4px;overflow:hidden}
+  .wp-bar{background:#16191d;color:#9ea3a8;font-size:11px;padding:8px 14px;font-family:"IBM Plex Mono",monospace}
+  .wp-body{padding:26px 28px 32px}
+  .row{display:flex;align-items:center;gap:11px}
+  .grow{flex:1}
+  .muted{color:var(--ink-3)}
+
+  h1.page{margin:0;font-size:25px;font-weight:450;letter-spacing:-.4px}
+
+  .btn{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--blue);background:#fff;color:var(--blue);padding:6px 13px;border-radius:3px;font-size:13.5px;white-space:nowrap}
+  .btn.p{background:var(--blue);color:#fff;border-color:var(--blue)}
+  .btn.q{border-color:#a7abaf;color:var(--ink-2)}
+  .btn.sm{padding:4px 10px;font-size:12.5px}
+  .tabs{display:inline-flex;border:1px solid var(--line);border-radius:3px;overflow:hidden;background:#fff}
+  .tabs span{padding:7px 15px;font-size:13.5px;color:var(--ink-2);border-right:1px solid var(--line)}
+  .tabs span:last-child{border-right:0}
+  .tabs span.on{background:var(--ink);color:#fff}
+
+  .pill{display:inline-block;padding:2px 9px;border-radius:3px;font-size:12px;line-height:19px;white-space:nowrap}
+  .pill.hourly{background:var(--ready-bg);color:var(--ready)}
+  .pill.monthly{background:#e4f0f7;color:#0c5a86}
+  .pill.fixed{background:var(--purple-bg);color:var(--purple)}
+  .pill.own{background:#eeeff0;color:var(--ink-2)}
+  .pill.tag{background:#eaf1f8;color:#1e5c8a}
+
+  .panel{background:var(--paper);border:1px solid var(--line);border-radius:4px}
+  .panel-head{padding:14px 18px;border-bottom:1px solid var(--line);font-weight:600;font-size:14px;display:flex;align-items:center;gap:11px}
+  .panel-head .lite{font-weight:400;color:var(--ink-3);font-size:13px}
+
+  table{width:100%;border-collapse:collapse}
+  th{text-align:left;font-weight:400;color:var(--ink-2);font-size:12.5px;padding:11px 18px;border-bottom:1px solid var(--line);background:#fafafb}
+  td{padding:14px 18px;border-bottom:1px solid var(--line-2);vertical-align:middle}
+  tr:last-child td{border-bottom:0}
+  td.n,th.n{text-align:right}
+  .sub{display:block;color:var(--ink-3);font-size:12.5px;margin-top:2px}
+  a.lk{color:var(--blue);text-decoration:none;border-bottom:1px solid #bfd6e8}
+
+  /* state marks */
+  .mark{display:inline-flex;align-items:center;gap:7px;font-size:13px}
+  .mark i{width:7px;height:7px;border-radius:50%;flex:none}
+  .mark.ready i{background:var(--ready)} .mark.ready{color:var(--ready)}
+  .mark.wait i{background:#c9962a} .mark.wait{color:var(--wait)}
+  .mark.done i{background:#a7abaf} .mark.done{color:var(--ink-3)}
+
+  .group-bar{padding:11px 18px;background:#fafafb;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:11px;font-size:13px}
+  .group-bar b{font-weight:600}
+
+  .scope{background:#fff;border:1px solid var(--line);border-radius:4px;margin-bottom:18px}
+  .scope-id{padding:18px 20px 16px;border-bottom:1px solid var(--line-2)}
+  .scope-title{font-size:18px;font-weight:600;letter-spacing:-.25px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  .scope-parent{color:var(--ink-2);margin-top:4px}
+  .scope-when{margin-top:10px;font-size:13px;color:var(--ink-2);display:inline-flex;gap:7px;background:#f6f7f8;border:1px solid var(--line-2);border-radius:3px;padding:5px 11px}
+  .scope-nums{display:flex;flex-wrap:wrap}
+  .fig{padding:16px 20px 18px;border-right:1px solid var(--line-2);min-width:200px;flex:1}
+  .fig:last-child{border-right:0}
+  .fig .lab{font-size:13px;color:var(--ink-2)}
+  .fig .val{font:500 25px/1.25 "IBM Plex Mono",monospace;letter-spacing:-.7px;margin-top:3px;font-variant-numeric:tabular-nums}
+  .fig .val.wait{color:var(--wait)}
+  .fig .basis{font-size:12.5px;color:var(--ink-3);margin-top:5px;line-height:1.55}
+
+  .selbar{position:sticky;bottom:0;background:var(--ink);color:#fff;border-radius:4px;padding:13px 18px;display:flex;align-items:center;gap:13px;margin-top:16px}
+  .selbar .btn.q{border-color:#5a6067;color:#dcdcde;background:transparent}
+
+  .note{background:#eef3f8;border:1px solid #c2d8ea;border-left:3px solid var(--blue);border-radius:4px;padding:15px 18px;margin-top:16px}
+  .note h4{margin:0 0 6px;font-size:13.5px;font-weight:600;color:#1c3category}
+  .note h4{color:#1c3a5c}
+  .note p{margin:0;font-size:13px;color:#2c3e50;line-height:1.7}
+  .note p + p{margin-top:8px}
+
+  .legend{display:flex;gap:26px;flex-wrap:wrap;background:#fff;border:1px solid var(--line);border-radius:4px;padding:16px 20px;margin-top:16px;font-size:13px}
+  .legend div{display:flex;gap:10px;align-items:flex-start}
+  .legend b{font-weight:600;display:block}
+  .legend span{color:var(--ink-2)}
+</style>
+
+<div class="wrap">
+
+<div class="doc">
+  <h1>Billing and Entries</h1>
+  <p><b>Entries is the working surface.</b> It shows individual entries, filters to any scope, and is where billing actually happens. <b>Billing is an index.</b> It shows billable scopes and bill records, never individual entries, and every row routes into Entries pre-filtered. Neither screen can do the other's job, which is why both exist.</p>
+  <p>New here: unbilled work is split into <b>ready</b> and <b>waiting</b>. A closed retainer month can be billed today; this month's is still running. Both are unbilled, only one is actionable, and right now they look identical.</p>
+  <p>Type rule throughout: <span class="typed">monospace for what you typed or the clock measured</span> — times, durations, dates, money. Proportional for what the app inferred or you named — clients, projects, descriptions. You can always see which half of a row came from your hands.</p>
+</div>
+
+<!-- ===== 01 BILLING ===== -->
+<div class="sec">
+  <div class="sec-head"><span class="sec-num">01</span><h2>Billing — the index</h2><span class="say">What can I bill, what's not ready, what did I bill.</span></div>
+  <p class="lead">Three states, one list. Ready first, because that's the question you came to ask. Nothing here is an entry — every row is a scope with a period and an amount, and the arrow takes you into Entries with that scope already filtered.</p>
+
+  <div class="wp">
+    <div class="wp-bar">Plain Text Time Tracker</div>
+    <div class="wp-body">
+      <div class="row" style="margin-bottom:20px">
+        <h1 class="page">Billing</h1>
+        <div class="grow"></div>
+        <div class="tabs"><span class="on">Ready &amp; waiting</span><span>Billed</span></div>
+      </div>
+
+      <div class="scope">
+        <div class="scope-id">
+          <div class="scope-title">Everything not yet billed</div>
+          <div class="scope-parent">Across all clients and projects</div>
+          <div class="scope-when">As of <span class="typed">Jul 19, 2026</span></div>
+        </div>
+        <div class="scope-nums">
+          <div class="fig">
+            <div class="lab">Ready to bill now</div>
+            <div class="val">$4,412.00</div>
+            <div class="basis">18 scopes · 13 clients</div>
+          </div>
+          <div class="fig">
+            <div class="lab">Waiting — not billable yet</div>
+            <div class="val">$244.31</div>
+            <div class="basis">3 scopes still running or not delivered</div>
+          </div>
+          <div class="fig">
+            <div class="lab">Oldest thing ready</div>
+            <div class="val wait">151 days</div>
+            <div class="basis">Jean Elvin, since Feb 11, 2026</div>
+          </div>
+          <div class="fig">
+            <div class="lab">Billed so far this month</div>
+            <div class="val">$779.01</div>
+            <div class="basis">6 bill records · Jul 1–19, 2026</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="group-bar">
+          <span class="mark ready"><i></i><b>Ready to bill</b></span>
+          <span class="muted">— the work is finished and the period is closed</span>
+          <div class="grow"></div>
+          <span class="muted">Sorted by how long it has been sitting</span>
+        </div>
+        <table>
+          <thead><tr>
+            <th style="width:24%">Client</th><th style="width:26%">Project</th><th>Covers</th>
+            <th class="n" style="width:110px">Sitting</th><th class="n" style="width:120px">Amount</th><th style="width:56px"></th>
+          </tr></thead>
+          <tbody>
+            <tr>
+              <td>Jean Elvin</td>
+              <td>General Website Support <span class="pill hourly">Hourly</span></td>
+              <td class="muted"><span class="typed">Feb 11, 2026</span> · 2 entries</td>
+              <td class="n typed" style="color:var(--wait)">151 days</td>
+              <td class="n typed" style="font-weight:500">$158.33</td>
+              <td class="n"><a class="lk" href="#">Bill →</a></td>
+            </tr>
+            <tr>
+              <td>Daniel Mintie</td>
+              <td>General Website Support <span class="pill hourly">Hourly</span></td>
+              <td class="muted"><span class="typed">Feb 17 – May 19, 2026</span> · 15 entries</td>
+              <td class="n typed" style="color:var(--wait)">151 days</td>
+              <td class="n typed" style="font-weight:500">$793.32</td>
+              <td class="n"><a class="lk" href="#">Bill →</a></td>
+            </tr>
+            <tr>
+              <td>Democrats of Rossmor</td>
+              <td>Website Care Plan Time <span class="pill monthly">Monthly</span></td>
+              <td class="muted"><span class="typed">February 2026</span> · <span class="typed">6h 21m</span> over the <span class="typed">3h</span> included</td>
+              <td class="n typed" style="color:var(--wait)">149 days</td>
+              <td class="n typed" style="font-weight:500">$571.50</td>
+              <td class="n"><a class="lk" href="#">Bill →</a></td>
+            </tr>
+            <tr>
+              <td>Milena Moser</td>
+              <td>General Website Support <span class="pill hourly">Hourly</span></td>
+              <td class="muted"><span class="typed">Feb 18 – Jun 15, 2026</span> · 8 entries</td>
+              <td class="n typed" style="color:var(--wait)">150 days</td>
+              <td class="n typed" style="font-weight:500">$205.16</td>
+              <td class="n"><a class="lk" href="#">Bill →</a></td>
+            </tr>
+            <tr>
+              <td>S3NSE</td>
+              <td>General Website Support <span class="pill hourly">Hourly</span></td>
+              <td class="muted"><span class="typed">Mar 2 – May 9, 2026</span> · 27 entries</td>
+              <td class="n typed">137 days</td>
+              <td class="n typed" style="font-weight:500">$562.50</td>
+              <td class="n"><a class="lk" href="#">Bill →</a></td>
+            </tr>
+            <tr>
+              <td>Postie</td>
+              <td>Website Care Plan Time <span class="pill monthly">Monthly</span></td>
+              <td class="muted"><span class="typed">June 2026</span> · <span class="typed">2h 8m</span> over the <span class="typed">1h</span> included</td>
+              <td class="n typed">19 days</td>
+              <td class="n typed" style="font-weight:500">$192.00</td>
+              <td class="n"><a class="lk" href="#">Bill →</a></td>
+            </tr>
+            <tr>
+              <td>Behind The Scenes Adventures</td>
+              <td>General Website Support <span class="pill hourly">Hourly</span></td>
+              <td class="muted"><span class="typed">Jun 26 – Jul 3, 2026</span> · 2 entries</td>
+              <td class="n typed">15 days</td>
+              <td class="n typed" style="font-weight:500">$41.67</td>
+              <td class="n"><a class="lk" href="#">Bill →</a></td>
+            </tr>
+          </tbody>
+        </table>
+
+        <div class="group-bar" style="border-top:1px solid var(--line)">
+          <span class="mark wait"><i></i><b>Waiting</b></span>
+          <span class="muted">— unbilled, but not billable yet</span>
+        </div>
+        <table>
+          <thead><tr>
+            <th style="width:24%">Client</th><th style="width:26%">Project</th><th>Covers</th>
+            <th style="width:110px">Ready when</th><th class="n" style="width:120px">Amount so far</th><th style="width:56px"></th>
+          </tr></thead>
+          <tbody>
+            <tr>
+              <td>Democrats of Rossmor</td>
+              <td>Website Care Plan Time <span class="pill monthly">Monthly</span></td>
+              <td class="muted"><span class="typed">July 2026</span> · <span class="typed">1h 12m</span> over the <span class="typed">3h</span> included</td>
+              <td class="muted">Period closes <span class="typed">Jul 31</span></td>
+              <td class="n typed" style="color:var(--ink-3)">$108.00</td>
+              <td class="n"><a class="lk" href="#">View →</a></td>
+            </tr>
+            <tr>
+              <td>Capital Advantage</td>
+              <td>Website Care Plan Time <span class="pill monthly">Monthly</span></td>
+              <td class="muted"><span class="typed">July 2026</span> · <span class="typed">24m</span> over the <span class="typed">3h</span> included</td>
+              <td class="muted">Period closes <span class="typed">Jul 31</span></td>
+              <td class="n typed" style="color:var(--ink-3)">$36.00</td>
+              <td class="n"><a class="lk" href="#">View →</a></td>
+            </tr>
+            <tr>
+              <td>Robin Mohr</td>
+              <td>Website Redesign <span class="pill fixed">Fixed fee</span></td>
+              <td class="muted">Fee of <span class="typed">$3,870</span> · <span class="typed">249%</span> of the budgeted time used</td>
+              <td class="muted">When you mark it delivered</td>
+              <td class="n typed" style="color:var(--ink-3)">$100.31</td>
+              <td class="n"><a class="lk" href="#">View →</a></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="legend">
+        <div><span class="mark ready"><i></i></span><span><b>Ready</b>Hourly work with unbilled entries, or a retainer period that has closed. Bill it today.</span></div>
+        <div><span class="mark wait"><i></i></span><span><b>Waiting</b>A retainer month still running, or a fixed fee not yet marked delivered. Shown so nothing is invisible, greyed so it isn't in your way.</span></div>
+        <div><span class="mark done"><i></i></span><span><b>Billed</b>Covered by a bill record. On the second tab, with the record that covers it.</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="note">
+    <h4>Why ready and waiting are separated rather than filtered</h4>
+    <p>Filtering them apart would mean remembering to check the other list. Showing them together, with the waiting rows quiet and stated in terms of what unblocks them — <i>period closes Jul 31</i> — means the screen answers "what can I bill" and "what's coming" in one look, and you never wonder whether something got lost.</p>
+    <p>"Amount so far" on a waiting row is deliberately grey: it's a real number, but it will change before you charge it.</p>
+  </div>
+</div>
+
+<!-- ===== 02 BILLED ===== -->
+<div class="sec">
+  <div class="sec-head"><span class="sec-num">02</span><h2>Billing — Billed</h2><span class="say">Find any billed entry through the record that covers it.</span></div>
+  <p class="lead">The second tab. Same rule — records, not entries — but each record opens the entries it covers, in Entries, which is how you find a billed entry when you need one.</p>
+
+  <div class="wp">
+    <div class="wp-bar">Plain Text Time Tracker</div>
+    <div class="wp-body">
+      <div class="row" style="margin-bottom:20px">
+        <h1 class="page">Billing</h1>
+        <div class="grow"></div>
+        <div class="tabs"><span>Ready &amp; waiting</span><span class="on">Billed</span></div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head">
+          Bill records
+          <span class="lite">· <span class="typed">Jul 1 – 19, 2026</span></span>
+          <div class="grow"></div>
+          <span class="btn q sm">All clients ▾</span>
+          <span class="btn q sm">‹ <span class="typed">July 2026</span> ›</span>
+        </div>
+        <table>
+          <thead><tr>
+            <th style="width:130px">Recorded</th><th style="width:22%">Client</th><th style="width:24%">Project</th>
+            <th>Covers</th><th class="n" style="width:110px">Billed</th><th class="n" style="width:110px">Absorbed</th><th style="width:70px"></th>
+          </tr></thead>
+          <tbody>
+            <tr>
+              <td class="typed muted">Jul 5, 2026<span class="sub typed">#23</span></td>
+              <td>Behind The Scenes Adventures</td><td>June 2026 Ad <span class="pill hourly">Hourly</span></td>
+              <td class="muted"><span class="typed">Jun 2 – Jun 8, 2026</span> · 3 entries</td>
+              <td class="n typed" style="font-weight:500">$93.33</td>
+              <td class="n typed muted">—</td>
+              <td class="n"><a class="lk" href="#">Open</a></td>
+            </tr>
+            <tr>
+              <td class="typed muted">Jul 3, 2026<span class="sub typed">#20</span></td>
+              <td>Behind The Scenes Adventures</td><td>General Website Support <span class="pill hourly">Hourly</span></td>
+              <td class="muted"><span class="typed">Feb 9 – Jun 24, 2026</span> · 17 entries</td>
+              <td class="n typed" style="font-weight:500">$593.35</td>
+              <td class="n typed muted">—</td>
+              <td class="n"><a class="lk" href="#">Open</a></td>
+            </tr>
+            <tr>
+              <td class="typed muted">Jul 3, 2026<span class="sub typed">#19</span></td>
+              <td>Behind The Scenes Adventures</td><td>April 2026 Ad Design <span class="pill hourly">Hourly</span></td>
+              <td class="muted"><span class="typed">Apr 29 – Apr 30, 2026</span> · 3 entries</td>
+              <td class="n typed" style="font-weight:500">$63.33</td>
+              <td class="n typed" style="color:var(--wait)">$20.00</td>
+              <td class="n"><a class="lk" href="#">Open</a></td>
+            </tr>
+            <tr>
+              <td class="typed muted">Jul 1, 2026<span class="sub typed">#16</span></td>
+              <td>Michele McCormick</td><td>General Support <span class="pill hourly">Hourly</span></td>
+              <td class="muted"><span class="typed">June 2026</span> · 1 entry</td>
+              <td class="n typed" style="font-weight:500">$9.00</td>
+              <td class="n typed muted">—</td>
+              <td class="n"><a class="lk" href="#">Open</a></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="note">
+    <h4>"Open" goes to Entries, filtered to that record</h4>
+    <p>Which answers the find-a-billed-entry problem without Billing ever needing to list entries itself. One working surface, reached three ways: filter it yourself, arrive from a ready scope, or arrive from a bill record.</p>
+  </div>
+</div>
+
+<!-- ===== 03 ENTRIES ===== -->
+<div class="sec">
+  <div class="sec-head"><span class="sec-num">03</span><h2>Entries — the working surface</h2><span class="say">Arrived here from a ready scope. Billing happens in place.</span></div>
+  <p class="lead">Same screen you already have, and billing still happens here. Changes: the scope block states what's filtered and what it's worth in the same format as everywhere else; day grouping stays but its headers carry day totals; the three billing columns become one; and the selection bar leads to a record dialog that has the invoice text inside it.</p>
+
+  <div class="wp">
+    <div class="wp-bar">Plain Text Time Tracker</div>
+    <div class="wp-body">
+      <div class="row" style="margin-bottom:20px">
+        <h1 class="page">Entries</h1>
+        <div class="grow"></div>
+        <div class="tabs"><span>Summary</span><span class="on">Entries</span></div>
+      </div>
+
+      <div class="panel" style="margin-bottom:18px">
+        <div class="panel-head" style="border-bottom:0;flex-wrap:wrap">
+          <span class="btn q sm">Client: <b>Daniel Mintie</b> ✕</span>
+          <span class="btn q sm">Project: <b>General Website Support</b> ✕</span>
+          <span class="btn q sm">Not yet billed ✕</span>
+          <span class="btn q sm">+ Filter</span>
+          <div class="grow"></div>
+          <span class="btn q sm">‹ <span class="typed">Feb 17 – Jul 19, 2026</span> ›</span>
+        </div>
+      </div>
+
+      <div class="scope">
+        <div class="scope-id">
+          <div class="scope-title">General Website Support <span class="pill hourly">Hourly</span></div>
+          <div class="scope-parent">Daniel Mintie · <span class="typed">$100/hr</span></div>
+          <div class="scope-when">Showing <span class="typed">Feb 17 – May 19, 2026</span> · everything not yet billed · 15 entries</div>
+        </div>
+        <div class="scope-nums">
+          <div class="fig"><div class="lab">Time logged</div><div class="val">7h 56m</div><div class="basis">The 15 entries below</div></div>
+          <div class="fig"><div class="lab">Earned</div><div class="val">$793.32</div><div class="basis"><span class="typed">7h 56m × $100/hr</span></div></div>
+          <div class="fig"><div class="lab">Sitting unbilled</div><div class="val wait">151 days</div><div class="basis">Since the oldest entry, <span class="typed">Feb 17, 2026</span></div></div>
+          <div class="fig"><div class="lab">Billed before on this project</div><div class="val">$0.00</div><div class="basis">No bill record yet</div></div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head">
+          <span style="display:inline-block;width:14px;height:14px;background:var(--blue);border-radius:3px"></span>
+          All 15 selected
+          <span class="lite">· uncheck anything you're not charging for</span>
+        </div>
+
+        <div class="group-bar"><b class="typed">May 19, 2026</b><span class="muted">Tuesday</span><div class="grow"></div><span class="muted typed">6m · $10.00</span></div>
+        <table>
+          <tbody>
+            <tr>
+              <td style="width:36px"><span style="display:inline-block;width:14px;height:14px;background:var(--blue);border-radius:3px"></span></td>
+              <td style="width:150px" class="typed muted">10:21 – 10:27am</td>
+              <td class="typed" style="width:80px">6m</td>
+              <td>Responding to Daniel's question about security.<span class="sub">Daniel Mintie · General Website Support</span></td>
+              <td style="width:140px"><span class="pill tag">Communication</span></td>
+              <td style="width:190px"><span class="typed" style="font-weight:500">$10.00</span> <span class="muted">· not yet billed</span></td>
+            </tr>
+          </tbody>
+        </table>
+
+        <div class="group-bar" style="border-top:1px solid var(--line)"><b class="typed">Mar 16, 2026</b><span class="muted">Monday</span><div class="grow"></div><span class="muted typed">2h 52m · $286.67</span></div>
+        <table>
+          <tbody>
+            <tr>
+              <td style="width:36px"><span style="display:inline-block;width:14px;height:14px;background:var(--blue);border-radius:3px"></span></td>
+              <td style="width:150px" class="typed muted">11:53am – 1:33pm</td>
+              <td class="typed" style="width:80px">1h 40m</td>
+              <td>Working on Daniels theme updates for PHP upgrade.<span class="sub">Daniel Mintie · General Website Support</span></td>
+              <td style="width:140px"><span class="pill tag">Development</span></td>
+              <td style="width:190px"><span class="typed" style="font-weight:500">$166.67</span> <span class="muted">· not yet billed</span></td>
+            </tr>
+            <tr>
+              <td><span style="display:inline-block;width:14px;height:14px;background:var(--blue);border-radius:3px"></span></td>
+              <td class="typed muted">3:09 – 4:21pm</td>
+              <td class="typed">1h 12m</td>
+              <td>Continue testing issues with Daniel's website.<span class="sub">Daniel Mintie · General Website Support</span></td>
+              <td><span class="pill tag">Development</span></td>
+              <td><span class="typed" style="font-weight:500">$120.00</span> <span class="muted">· not yet billed</span></td>
+            </tr>
+          </tbody>
+        </table>
+
+        <div class="group-bar" style="border-top:1px solid var(--line)"><b class="typed">Feb 18, 2026</b><span class="muted">Wednesday</span><div class="grow"></div><span class="muted typed">2h 51m · $284.99</span></div>
+        <table>
+          <tbody>
+            <tr>
+              <td style="width:36px"><span style="display:inline-block;width:14px;height:14px;background:var(--blue);border-radius:3px"></span></td>
+              <td style="width:150px" class="typed muted">12:52 – 1:03pm</td>
+              <td class="typed" style="width:80px">11m</td>
+              <td>Updating Livingwell Publishing for Daniel to add new book<span class="sub">Daniel Mintie · General Website Support</span></td>
+              <td style="width:140px"><span class="pill tag">Content</span></td>
+              <td style="width:190px"><span class="typed" style="font-weight:500">$18.33</span> <span class="muted">· not yet billed</span></td>
+            </tr>
+            <tr>
+              <td><span style="display:inline-block;width:14px;height:14px;background:var(--blue);border-radius:3px"></span></td>
+              <td class="typed muted">1:03 – 3:17pm</td>
+              <td class="typed">2h 14m</td>
+              <td>Working on updating logo for Livingwell Publishign for Daniel<span class="sub">Daniel Mintie · General Website Support</span></td>
+              <td><span class="pill tag">Development</span></td>
+              <td><span class="typed" style="font-weight:500">$223.33</span> <span class="muted">· not yet billed</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="selbar">
+        <span>15 entries selected · <b class="typed">7h 56m</b> · <b class="typed">$793.32</b></span>
+        <div class="grow"></div>
+        <span class="btn q sm">Clear selection</span>
+        <span class="btn p sm">Record a bill →</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="note">
+    <h4>What the type rule is doing here</h4>
+    <p>Scan one row: <span class="typed">10:21 – 10:27am</span>, <span class="typed">6m</span>, and <span class="typed">$10.00</span> are monospace — the clock recorded them or they follow arithmetically from what it recorded. "Responding to Daniel's question about security" and "Daniel Mintie · General Website Support" are proportional — you wrote the first and the alias learner matched the second.</p>
+    <p>It costs nothing, it isn't decorative, and it means the parts of a row you might want to double-check are visually grouped without a single extra label.</p>
+  </div>
+</div>
+
+<!-- ===== 04 RECORD ===== -->
+<div class="sec">
+  <div class="sec-head"><span class="sec-num">04</span><h2>Recording the bill</h2><span class="say">One dialog, invoice text included.</span></div>
+  <div style="padding:30px;background:#d9dadd;border-radius:5px">
+    <div style="max-width:660px;margin:0 auto;background:#fff;border-radius:5px;box-shadow:0 6px 30px rgba(0,0,0,.2)">
+      <div style="padding:17px 24px;border-bottom:1px solid var(--line);font-size:16px;font-weight:600">Record a bill</div>
+      <div style="padding:22px 24px">
+        <div style="font-weight:600;font-size:15px">General Website Support <span class="pill hourly">Hourly</span></div>
+        <div class="muted" style="margin-bottom:20px">Daniel Mintie · <span class="typed">Feb 17 – May 19, 2026</span> · 15 entries · <span class="typed">7h 56m</span></div>
+
+        <div style="font-size:13px;color:var(--ink-2);margin-bottom:7px">Amount to bill</div>
+        <div class="row" style="gap:13px;margin-bottom:7px">
+          <span style="display:inline-flex;align-items:center;border:1px solid #8c8f94;border-radius:3px;overflow:hidden">
+            <span style="padding:8px 11px;background:#f0f0f1;border-right:1px solid var(--line);color:var(--ink-2)">$</span>
+            <span class="typed" style="padding:8px 15px;min-width:120px;font-size:15px">793.32</span>
+          </span>
+          <span class="muted" style="font-size:13px">Calculated <span class="typed">$793.32</span> · you would absorb <span class="typed">$0.00</span></span>
+        </div>
+        <div class="muted" style="font-size:13px;margin-bottom:22px">Lower this to charge less than the calculated amount.</div>
+
+        <div style="border:1px solid var(--line);border-radius:4px">
+          <div style="padding:11px 15px;border-bottom:1px solid var(--line);background:#fafafb;display:flex;align-items:center;gap:13px">
+            <b style="font-size:13px">Invoice text</b>
+            <span class="btn q sm">Structured list ▾</span>
+            <div class="grow"></div>
+            <span class="btn sm">Copy</span>
+          </div>
+          <div class="typed" style="padding:15px;font-size:12.5px;line-height:1.85;color:var(--ink-2)">Project: Daniel Mintie — General Website Support<br>Period: Feb 17 – May 19, 2026<br>Billable: 7h 56m × $100.00 = $793.32<br><br>— Feb 17 (9m): Responding to Daniel's email about logo update<br>— Feb 18 (2h 14m): Working on updating logo for Livingwell<br>— Mar 16 (1h 40m): Working on Daniels theme updates for PHP…</div>
+        </div>
+      </div>
+      <div style="padding:15px 24px;border-top:1px solid var(--line);background:#fafafb;display:flex;align-items:center;gap:13px">
+        <span class="btn p">Record bill · <span class="typed">$793.32</span></span>
+        <span class="btn q">Cancel</span>
+        <div class="grow"></div>
+        <span class="muted" style="font-size:13px">Marks these 15 entries billed</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+</div>

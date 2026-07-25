@@ -1,0 +1,330 @@
+<meta charset="utf-8">
+<title>PLTT — Charts</title>
+<style>
+  :root{
+    --paper:#fff; --canvas:#f4f3f1; --sunk:#faf9f7;
+    --rule:#e4e2de; --rule-2:#efedea;
+    --ink:#1a1c1e; --ink-2:#55595e; --ink-3:#8a8d91;
+    --blue:#2271b1;
+    --c-over:#9a6a10;
+    --s-bill:#146b42;      /* billable client work */
+    --s-nonbill:#7fb094;   /* non-billable client work */
+    --s-own:#c5c2bd;       /* own time */
+    --s-over:#c08f2a;      /* past a limit */
+    --track:#e9e7e3;
+    --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",sans-serif;
+    --mono:Menlo,Consolas,monaco,monospace;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:#e3e1de;font:14px/1.6 var(--sans);color:var(--ink);-webkit-font-smoothing:antialiased}
+  .wrap{max-width:1120px;margin:0 auto;padding:36px 24px 90px}
+  .typed{font-family:var(--mono);font-variant-numeric:tabular-nums}
+
+  .doc{background:var(--ink);color:#fff;padding:30px 34px;border-radius:6px}
+  .doc h1{margin:0 0 11px;font-size:22px;font-weight:600;letter-spacing:-.2px}
+  .doc p{margin:0 0 9px;color:#b9bcc0;max-width:76ch;line-height:1.75}
+  .doc p:last-child{margin:0}
+  .doc b{color:#fff;font-weight:500}
+
+  .sec{margin-top:44px}
+  .sec-head{padding-bottom:12px;border-bottom:2px solid var(--ink);margin-bottom:20px;display:flex;align-items:baseline;gap:13px}
+  .sec-num{font:500 12px/1 var(--mono);color:var(--ink-3);letter-spacing:.7px}
+  .sec-head h2{margin:0;font-size:18px;font-weight:600;letter-spacing:-.15px}
+  .sec-head .say{margin-left:auto;font-size:13px;color:var(--ink-2)}
+  .lead{max-width:80ch;color:var(--ink-2);margin:0 0 20px;line-height:1.8}
+
+  .card{background:var(--paper);border:1px solid var(--rule);border-radius:6px}
+  .card-h{padding:13px 18px;border-bottom:1px solid var(--rule-2);font-weight:600;font-size:14px;display:flex;align-items:center;gap:11px}
+  .card-h .lite{font-weight:400;color:var(--ink-3);font-size:13px}
+  .card-b{padding:22px 20px 16px}
+  .row{display:flex;align-items:center;gap:12px}
+  .grow{flex:1}
+  .muted{color:var(--ink-3)}
+
+  .pseg{display:inline-flex;border:1px solid var(--rule);border-radius:3px;overflow:hidden;background:var(--paper)}
+  .pseg span{padding:3px 10px;font-size:12.5px;color:var(--ink-3);border-right:1px solid var(--rule-2)}
+  .pseg span:last-child{border-right:0}
+  .pseg span.on{background:var(--sunk);color:var(--ink);font-weight:500;box-shadow:inset 0 -2px 0 var(--blue)}
+
+  /* ---- BAR CHART ---- */
+  .chart{position:relative;padding-left:44px}
+  .yax{position:absolute;left:0;top:0;bottom:26px;width:40px}
+  .yax span{position:absolute;right:0;font:11.5px/1 var(--mono);color:var(--ink-3);transform:translateY(-50%)}
+  .plot{position:relative;height:150px;border-bottom:1px solid var(--rule);display:flex;align-items:flex-end;gap:4px}
+  .grid{position:absolute;left:0;right:0;border-top:1px solid var(--rule-2)}
+  .avg{position:absolute;left:0;right:0;border-top:1px dashed #bfbcb7}
+  .avg b{position:absolute;right:0;top:-8px;background:var(--paper);padding:0 5px;font:11.5px/1 var(--sans);color:var(--ink-3);font-weight:400}
+  .bar{flex:1;display:flex;flex-direction:column;justify-content:flex-end;min-width:0}
+  .bar i{display:block}
+  .bar .b1{background:var(--s-bill)}
+  .bar .b2{background:var(--s-nonbill)}
+  .bar .b3{background:var(--s-own)}
+  .bar.none{position:relative}
+  .bar.none::after{content:"";position:absolute;bottom:-1px;left:22%;right:22%;height:2px;background:var(--rule)}
+  .xax{display:flex;gap:4px;margin-top:8px}
+  .xax div{flex:1;text-align:center;font:11.5px/1.4 var(--mono);color:var(--ink-3);min-width:0}
+  .legend{display:flex;gap:20px;align-items:center;margin-top:16px;padding-top:13px;border-top:1px solid var(--rule-2);font-size:12.5px;color:var(--ink-2);flex-wrap:wrap}
+  .legend i{width:11px;height:11px;border-radius:2px;display:inline-block;vertical-align:-1px;margin-right:7px}
+
+  /* ---- METER ---- */
+  .meter-wrap{margin-bottom:6px}
+  .track{position:relative;height:10px;background:var(--track);border-radius:5px;overflow:visible}
+  .track .fill{position:absolute;left:0;top:0;bottom:0;background:var(--blue);border-radius:5px 0 0 5px}
+  .track .fill.full{border-radius:5px}
+  .track .fill.overpart{background:var(--s-over);border-radius:0 5px 5px 0;left:auto}
+  .track .limit{position:absolute;top:-5px;bottom:-5px;width:2px;background:var(--ink);border-radius:1px}
+  .track .limit b{position:absolute;top:-19px;left:50%;transform:translateX(-50%);font:11px/1 var(--mono);color:var(--ink-2);white-space:nowrap;font-weight:400}
+  .mlabels{display:flex;margin-top:11px;font-size:13px;color:var(--ink-2);align-items:baseline}
+
+  .note{background:var(--sunk);border:1px solid var(--rule);border-left:3px solid var(--blue);border-radius:5px;padding:15px 19px;margin-top:16px}
+  .note h4{margin:0 0 7px;font-size:13.5px;font-weight:600}
+  .note p{margin:0;font-size:13px;color:var(--ink-2);line-height:1.75}
+  .note p + p{margin-top:8px}
+
+  .rules{width:100%;border-collapse:collapse;background:var(--paper);border:1px solid var(--rule);border-radius:6px;overflow:hidden}
+  .rules th{text-align:left;font-weight:450;color:var(--ink-3);font-size:11.5px;letter-spacing:.5px;text-transform:uppercase;padding:11px 18px;border-bottom:1px solid var(--rule);background:var(--sunk)}
+  .rules td{padding:13px 18px;border-bottom:1px solid var(--rule-2);font-size:13.5px;vertical-align:top}
+  .rules tr:last-child td{border-bottom:0}
+  .was{color:var(--ink-3)}
+
+  .ba{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:6px}
+  .ba h5{margin:0 0 9px;font:500 11px/1 var(--mono);letter-spacing:.6px;color:var(--ink-3)}
+  .oldtrack{height:10px;background:#dfe7ef;border-radius:5px;overflow:hidden;display:flex}
+  .oldtrack i{display:block;height:100%}
+</style>
+
+<div class="wrap">
+
+<div class="doc">
+  <h1>Charts</h1>
+  <p>Two types, and only two. <b>Bar chart</b> — a quantity over time. <b>Meter</b> — one value against a limit. Composition ("where the time went") stays a table with inline meters; a pie or stacked bar would be worse at the one thing you do with it, which is read exact figures per project.</p>
+  <p>The meter has a real problem: an over-budget bar currently fills the track and shows the excess in a lighter tint, which reads as <i>remaining</i>. And because the track caps, 249% and 500% look nearly the same.</p>
+</div>
+
+<!-- ===== 01 METER ===== -->
+<div class="sec">
+  <div class="sec-head"><span class="sec-num">01</span><h2>The meter</h2><span class="say">The limit is a position, not the end of the track.</span></div>
+
+  <div class="ba" style="margin-bottom:20px">
+    <div>
+      <h5>NOW — 249% of budget</h5>
+      <div style="background:var(--paper);border:1px solid var(--rule);border-radius:6px;padding:18px 20px">
+        <div class="oldtrack"><i style="width:40%;background:#2271b1"></i><i style="width:60%;background:#7eb3dc"></i></div>
+        <div style="margin-top:11px;font-size:13px;color:var(--ink-2)">
+          <span class="typed">$9,641.67</span> of <span class="typed">$3,870.00</span>
+          <span style="float:right;color:#2271b1" class="typed">$5,771.67 over</span>
+        </div>
+        <p style="margin:12px 0 0;font-size:12.5px;color:var(--ink-3);line-height:1.65">The light segment is the overage, but light-on-dark is the universal idiom for <i>remaining</i>. Reads as "60% left".</p>
+      </div>
+    </div>
+    <div>
+      <h5>PROPOSED — same data</h5>
+      <div style="background:var(--paper);border:1px solid var(--rule);border-radius:6px;padding:26px 20px 18px">
+        <div class="track">
+          <div class="fill" style="width:40.1%"></div>
+          <div class="fill overpart" style="left:40.1%;width:59.9%"></div>
+          <div class="limit" style="left:40.1%"><b>budget</b></div>
+        </div>
+        <div class="mlabels">
+          <span><span class="typed">$9,641.67</span> against a <span class="typed">$3,870</span> budget</span>
+          <span class="grow"></span>
+          <span class="typed" style="color:var(--c-over)">249% · $5,771.67 over</span>
+        </div>
+        <p style="margin:14px 0 0;font-size:12.5px;color:var(--ink-3);line-height:1.65">The budget marker sits where the budget actually falls — 40% along. The amber segment past it is unambiguously extra. At 500% the marker would sit at 20%, so the proportion stays honest.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-h">All four states</div>
+    <div style="padding:26px 22px 20px">
+
+      <div style="margin-bottom:30px">
+        <div class="track">
+          <div class="fill" style="width:84%"></div>
+          <div class="limit" style="left:100%"><b>budget</b></div>
+        </div>
+        <div class="mlabels">
+          <span><span class="typed">32h 45m</span> against a <span class="typed">38h 42m</span> budget</span>
+          <span class="grow"></span>
+          <span class="muted typed">84% · 5h 57m left</span>
+        </div>
+      </div>
+
+      <div style="margin-bottom:30px">
+        <div class="track">
+          <div class="fill full" style="width:100%"></div>
+          <div class="limit" style="left:100%"><b>budget</b></div>
+        </div>
+        <div class="mlabels">
+          <span><span class="typed">38h 42m</span> against a <span class="typed">38h 42m</span> budget</span>
+          <span class="grow"></span>
+          <span class="muted typed">100% · fully used</span>
+        </div>
+      </div>
+
+      <div style="margin-bottom:30px">
+        <div class="track">
+          <div class="fill" style="width:52.4%"></div>
+          <div class="fill overpart" style="left:52.4%;width:47.6%"></div>
+          <div class="limit" style="left:52.4%"><b>3h included</b></div>
+        </div>
+        <div class="mlabels">
+          <span><span class="typed">5h 43m</span> against the <span class="typed">3h</span> included</span>
+          <span class="grow"></span>
+          <span class="typed" style="color:var(--c-over)">191% · 2h 43m over</span>
+        </div>
+      </div>
+
+      <div>
+        <div class="track">
+          <div class="fill" style="width:9%"></div>
+        </div>
+        <div class="mlabels">
+          <span><span class="typed">7h 56m</span> logged</span>
+          <span class="grow"></span>
+          <span class="muted">No budget set</span>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="note">
+    <h4>Rules</h4>
+    <p><b>Under or at the limit</b> — track scales so the limit is the full width; marker sits at the right edge. Fill is blue.</p>
+    <p><b>Over</b> — track scales so the <i>total</i> is the full width; the marker moves left to where the limit falls. Everything past it is amber. Never cap the bar; the marker's position is what communicates how far over.</p>
+    <p><b>No limit</b> — hourly projects with no budget. Show the bar with no marker and no percentage, or omit the meter entirely. Do not invent a limit.</p>
+    <p>The marker is labelled with what it is — <i>budget</i>, <i>3h included</i> — so a meter is readable without the caption underneath it.</p>
+  </div>
+</div>
+
+<!-- ===== 02 BAR ===== -->
+<div class="sec">
+  <div class="sec-head"><span class="sec-num">02</span><h2>The bar chart</h2><span class="say">Hours over time, split by kind of work.</span></div>
+
+  <div class="card">
+    <div class="card-h">
+      Time logged <span class="lite">· <span class="typed">Jun 1 – Jun 30, 2026</span></span>
+      <div class="grow"></div>
+      <span class="pseg"><span class="on">By day</span><span>By week</span></span>
+    </div>
+    <div class="card-b">
+      <div class="chart">
+        <div class="yax">
+          <span style="top:0">10h</span>
+          <span style="top:50%">5h</span>
+          <span style="top:100%">0</span>
+        </div>
+        <div class="plot">
+          <div class="grid" style="top:0"></div>
+          <div class="grid" style="top:50%"></div>
+          <div class="avg" style="top:40%"><b>avg 5h 59m</b></div>
+
+          <div class="bar"><i class="b3" style="height:52px"></i><i class="b2" style="height:8px"></i><i class="b1" style="height:26px"></i></div>
+          <div class="bar"><i class="b3" style="height:56px"></i><i class="b2" style="height:12px"></i><i class="b1" style="height:54px"></i></div>
+          <div class="bar"><i class="b3" style="height:16px"></i><i class="b2" style="height:6px"></i><i class="b1" style="height:58px"></i></div>
+          <div class="bar"><i class="b3" style="height:64px"></i><i class="b2" style="height:4px"></i><i class="b1" style="height:26px"></i></div>
+          <div class="bar"><i class="b3" style="height:48px"></i><i class="b2" style="height:10px"></i><i class="b1" style="height:60px"></i></div>
+          <div class="bar none"></div>
+          <div class="bar"><i class="b1" style="height:9px"></i></div>
+          <div class="bar"><i class="b3" style="height:34px"></i><i class="b2" style="height:6px"></i><i class="b1" style="height:72px"></i></div>
+          <div class="bar"><i class="b3" style="height:52px"></i><i class="b2" style="height:8px"></i><i class="b1" style="height:40px"></i></div>
+          <div class="bar"><i class="b3" style="height:54px"></i><i class="b1" style="height:48px"></i></div>
+          <div class="bar"><i class="b3" style="height:58px"></i><i class="b2" style="height:6px"></i><i class="b1" style="height:46px"></i></div>
+          <div class="bar"><i class="b3" style="height:28px"></i><i class="b2" style="height:4px"></i><i class="b1" style="height:48px"></i></div>
+          <div class="bar none"></div>
+          <div class="bar none"></div>
+          <div class="bar"><i class="b3" style="height:62px"></i><i class="b1" style="height:40px"></i></div>
+          <div class="bar none"></div>
+          <div class="bar none"></div>
+          <div class="bar none"></div>
+          <div class="bar none"></div>
+          <div class="bar none"></div>
+          <div class="bar none"></div>
+          <div class="bar none"></div>
+          <div class="bar"><i class="b1" style="height:32px"></i></div>
+          <div class="bar"><i class="b3" style="height:60px"></i><i class="b2" style="height:4px"></i><i class="b1" style="height:10px"></i></div>
+          <div class="bar"><i class="b3" style="height:68px"></i><i class="b1" style="height:26px"></i></div>
+          <div class="bar"><i class="b3" style="height:40px"></i><i class="b2" style="height:8px"></i><i class="b1" style="height:32px"></i></div>
+          <div class="bar none"></div>
+          <div class="bar none"></div>
+          <div class="bar none"></div>
+          <div class="bar none"></div>
+        </div>
+        <div class="xax">
+          <div>1</div><div></div><div></div><div></div><div>5</div><div></div><div></div><div></div><div></div><div>10</div>
+          <div></div><div></div><div></div><div></div><div>15</div><div></div><div></div><div></div><div></div><div>20</div>
+          <div></div><div></div><div></div><div></div><div>25</div><div></div><div></div><div></div><div></div><div>30</div>
+        </div>
+      </div>
+      <div class="legend">
+        <span><i style="background:var(--s-bill)"></i>Billable client work</span>
+        <span><i style="background:var(--s-nonbill)"></i>Non-billable client work</span>
+        <span><i style="background:var(--s-own)"></i>Internal</span>
+        <div class="grow"></div>
+        <span class="muted typed">95h 39m across 16 days</span>
+      </div>
+    </div>
+  </div>
+
+  <table class="rules" style="margin-top:18px">
+    <thead><tr><th style="width:30%">Change</th><th>Reason</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><b>Solid tints, no hatching</b></td>
+        <td>Diagonal hatching is noisy below about 20px wide and reads as a texture rather than a category. Three solid steps — dark green, light green, warm grey — separate cleanly at any size.</td>
+      </tr>
+      <tr>
+        <td><b>Days with nothing logged draw nothing</b></td>
+        <td class="was">Currently a full-height grey column, which is the visually heaviest mark on the chart and represents the absence of data. Now a 2px baseline tick — present, unmissable, weightless.</td>
+      </tr>
+      <tr>
+        <td><b>Value labels removed from bars</b></td>
+        <td class="was">Labels above every bar plus a y-axis says everything twice, and at 30 bars the labels collide. Axis plus hover for exact values.</td>
+      </tr>
+      <tr>
+        <td><b>Round-number axis, two gridlines</b></td>
+        <td class="was"><span class="typed">45h / 23h / 0</span> — 23 is an arbitrary midpoint. Use 0, a round mid, and a round top.</td>
+      </tr>
+      <tr>
+        <td><b>Sparse x labels</b></td>
+        <td>Every fifth day for a month, every month for a year. Enough to locate yourself, not enough to become a wall of text.</td>
+      </tr>
+      <tr>
+        <td><b>Average line kept</b></td>
+        <td>Descriptive and genuinely useful for spotting a heavy or light stretch. Label sits on the line at the right edge, on a paper-coloured chip so it never overlaps a bar.</td>
+      </tr>
+      <tr>
+        <td><b>Total in the legend row</b></td>
+        <td>The chart's own summary — <span class="typed">95h 39m across 16 days</span> — sits with the legend rather than needing a caption.</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- ===== 03 SHARED ===== -->
+<div class="sec">
+  <div class="sec-head"><span class="sec-num">03</span><h2>Shared rules</h2></div>
+
+  <table class="rules">
+    <thead><tr><th style="width:26%">Rule</th><th></th></tr></thead>
+    <tbody>
+      <tr><td><b>Series colours are fixed</b></td><td>Billable <span class="typed">#146b42</span> · non-billable <span class="typed">#7fb094</span> · internal <span class="typed">#c5c2bd</span> · past a limit <span class="typed">#c08f2a</span>. Never reassigned per chart; the same colour means the same thing everywhere.</td></tr>
+      <tr><td><b>Never red</b></td><td>Over a budget or allocation is amber. Nothing in a chart is an error state.</td></tr>
+      <tr><td><b>Absence is not a mark</b></td><td>A day with no work draws a baseline tick, never a filled column. Zero and no-data look the same because for this tool they mean the same thing.</td></tr>
+      <tr><td><b>Y axis always starts at zero</b></td><td>Truncating the axis exaggerates variation, which is a form of editorialising.</td></tr>
+      <tr><td><b>Every chart states its period</b></td><td>In the panel header, same wording as everywhere else — <i>· Jun 1 – Jun 30, 2026</i>.</td></tr>
+      <tr><td><b>Granularity is a panel control</b></td><td>By day / by week / by month at panel weight, right of the panel header. Never changes what the page is scoped to.</td></tr>
+      <tr><td><b>Exact values on hover</b></td><td>Date, total, and the split. The chart shows shape; the tooltip carries precision.</td></tr>
+      <tr><td><b>No chart without a decision</b></td><td>If you can't name what someone does differently after looking at it, use a table.</td></tr>
+    </tbody>
+  </table>
+
+  <div class="note">
+    <h4>Why no third chart type</h4>
+    <p>"Where the time went" is the obvious candidate for a pie or stacked bar. But what you do with that panel is read exact hours and money per project, and compare a couple of them — which a table does better, with the inline meter carrying the proportion. A second visual encoding of the same data would add a thing to learn without answering a new question.</p>
+  </div>
+</div>
+
+</div>

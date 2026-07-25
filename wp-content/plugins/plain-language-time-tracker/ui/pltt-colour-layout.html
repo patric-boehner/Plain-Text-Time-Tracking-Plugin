@@ -1,0 +1,402 @@
+<meta charset="utf-8">
+<title>PLTT — Colour &amp; layout</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;450;500;600&family=IBM+Plex+Mono:wght@400;450;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --paper:#ffffff;
+    --canvas:#f4f3f1;
+    --sunk:#faf9f7;
+    --rule:#e4e2de;
+    --rule-2:#efedea;
+    --ink:#1a1c1e;
+    --ink-2:#55595e;
+    --ink-3:#8a8d91;
+    --blue:#2271b1;
+    --blue-soft:#e4eef7;
+
+    /* categoricals — brought up from the last pass */
+    --c-hourly:#146b42;   --c-hourly-bg:#e0f0e7;
+    --c-monthly:#175d87;  --c-monthly-bg:#e0edf7;
+    --c-fixed:#5540a5;    --c-fixed-bg:#eae5f9;
+    --c-own:#666360;      --c-own-bg:#eeedea;
+    --c-over:#9a6a10;     --c-over-bg:#fbefd8;
+    --c-tag:#1d5f8a;      --c-tag-bg:#e4eef7;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:#e3e1de;font:14px/1.6 "IBM Plex Sans",system-ui,sans-serif;color:var(--ink);-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+  .wrap{max-width:1180px;margin:0 auto;padding:36px 24px 100px}
+  .typed{font-family:"IBM Plex Mono",monospace;font-variant-numeric:tabular-nums;letter-spacing:-.12px}
+
+  .doc{background:var(--ink);color:#fff;padding:32px 36px;border-radius:6px}
+  .doc h1{margin:0 0 12px;font-size:23px;font-weight:600;letter-spacing:-.35px}
+  .doc p{margin:0 0 10px;color:#b9bcc0;max-width:76ch;line-height:1.75}
+  .doc p:last-child{margin:0}
+  .doc b{color:#fff;font-weight:500}
+
+  .sec{margin-top:48px}
+  .sec-head{padding-bottom:12px;border-bottom:2px solid var(--ink);margin-bottom:22px;display:flex;align-items:baseline;gap:13px}
+  .sec-num{font:500 12px/1 "IBM Plex Mono",monospace;color:var(--ink-3);letter-spacing:.7px}
+  .sec-head h2{margin:0;font-size:18px;font-weight:600;letter-spacing:-.25px}
+  .sec-head .say{margin-left:auto;font-size:13px;color:var(--ink-2)}
+  .lead{max-width:80ch;color:var(--ink-2);margin:0 0 22px;line-height:1.8}
+
+  .pill{display:inline-block;padding:2px 10px;border-radius:3px;font-size:12px;line-height:20px;letter-spacing:.1px}
+  .p-hourly{background:var(--c-hourly-bg);color:var(--c-hourly)}
+  .p-monthly{background:var(--c-monthly-bg);color:var(--c-monthly)}
+  .p-fixed{background:var(--c-fixed-bg);color:var(--c-fixed)}
+  .p-own{background:var(--c-own-bg);color:var(--c-own)}
+  .p-over{background:var(--c-over-bg);color:var(--c-over)}
+  .p-tag{background:var(--c-tag-bg);color:var(--c-tag)}
+
+  .wp{background:var(--canvas);border:1px solid #cbc9c5;border-radius:6px;overflow:hidden}
+  .wp-bar{background:var(--ink);color:#8a8d91;font:11px/1 "IBM Plex Mono",monospace;padding:9px 15px}
+  .wp-body{padding:28px 30px 34px}
+  .row{display:flex;align-items:center;gap:12px}
+  .grow{flex:1}
+  .muted{color:var(--ink-3)}
+
+  h1.page{margin:0;font-size:26px;font-weight:450;letter-spacing:-.5px;line-height:1.2}
+  .page-sub{color:var(--ink-2);margin-top:5px;font-size:13.5px}
+
+  .btn{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--blue);background:var(--paper);color:var(--blue);padding:7px 14px;border-radius:4px;font-size:13.5px;white-space:nowrap}
+  .btn.p{background:var(--blue);color:#fff}
+  .btn.q{border-color:#c2bfba;color:var(--ink-2)}
+  .btn.sm{padding:5px 11px;font-size:12.5px}
+  .seg{display:inline-flex;border:1px solid var(--rule);border-radius:4px;overflow:hidden;background:var(--paper)}
+  .seg span{padding:7px 16px;font-size:13.5px;color:var(--ink-2);border-right:1px solid var(--rule)}
+  .seg span:last-child{border-right:0}
+  .seg span.on{background:var(--ink);color:#fff}
+  .stepper{display:inline-flex;align-items:center;border:1px solid #c2bfba;border-radius:4px;overflow:hidden;background:var(--paper)}
+  .stepper .arw{padding:7px 13px;color:var(--ink-2);border-right:1px solid var(--rule)}
+  .stepper .arw.r{border-right:0;border-left:1px solid var(--rule)}
+  .stepper .dt{padding:7px 17px;font:13px/1 "IBM Plex Mono",monospace}
+
+  .card{background:var(--paper);border:1px solid var(--rule);border-radius:6px}
+  .card-h{padding:15px 20px;border-bottom:1px solid var(--rule-2);font-weight:600;font-size:14px;display:flex;align-items:center;gap:12px}
+  .card-h .lite{font-weight:400;color:var(--ink-3);font-size:13px}
+
+  table{width:100%;border-collapse:collapse}
+  th{text-align:left;font-weight:450;color:var(--ink-3);font-size:11.5px;letter-spacing:.5px;text-transform:uppercase;padding:11px 20px;border-bottom:1px solid var(--rule);background:var(--sunk)}
+  th.c{text-align:center} th.n{text-align:right}
+  td{padding:15px 20px;border-bottom:1px solid var(--rule-2);vertical-align:middle}
+  td.c{text-align:center} td.n{text-align:right}
+  tr:last-child td{border-bottom:0}
+  .sub{display:block;color:var(--ink-3);font-size:12.5px;margin-top:3px}
+  a.lk{color:var(--blue);text-decoration:none}
+
+  .daybar{padding:12px 20px;background:var(--sunk);border-bottom:1px solid var(--rule);display:flex;align-items:baseline;gap:12px;font-size:13.5px}
+  .daybar b{font-weight:600;letter-spacing:-.1px}
+
+  .stat{padding:16px 20px 18px;border-right:1px solid var(--rule-2);flex:1;min-width:160px}
+  .stat:last-child{border-right:0}
+  .stat .k{font-size:12.5px;color:var(--ink-2)}
+  .stat .v{font:450 26px/1.2 "IBM Plex Mono",monospace;letter-spacing:-.9px;margin-top:4px;font-variant-numeric:tabular-nums}
+  .stat .m{font-size:12.5px;color:var(--ink-3);margin-top:4px}
+
+  .meter{height:5px;background:#e9e7e3;border-radius:3px;overflow:hidden}
+  .meter i{display:block;height:100%;background:var(--blue)}
+  .meter i.over{background:#c08f2a}
+
+  .amt{font-family:"IBM Plex Mono",monospace;font-variant-numeric:tabular-nums;font-weight:500}
+  .dash{color:#cfccc7}
+
+  .note{background:var(--sunk);border:1px solid var(--rule);border-left:3px solid var(--blue);border-radius:5px;padding:16px 20px;margin-top:18px}
+  .note h4{margin:0 0 7px;font-size:13.5px;font-weight:600}
+  .note p{margin:0;font-size:13px;color:var(--ink-2);line-height:1.75}
+  .note p + p{margin-top:9px}
+
+  /* before/after */
+  .ba{display:grid;grid-template-columns:1fr 1fr;gap:18px;align-items:start;margin-bottom:8px}
+  .ba h5{margin:0 0 10px;font:500 11.5px/1 "IBM Plex Mono",monospace;letter-spacing:.7px;color:var(--ink-3)}
+  .ba .old{opacity:.92}
+  .oldcard{background:#fff;border:1px solid #dcdcde;border-radius:0;box-shadow:0 1px 1px rgba(0,0,0,.04);padding:14px 16px}
+  .oldcard .k{font-size:13px;color:#50575e}
+  .oldcard .v{font:400 26px/1.2 "IBM Plex Sans";margin-top:4px}
+  .oldcard .m{font-size:12px;color:#787c82;margin-top:6px;border-top:1px solid #f0f0f1;padding-top:6px}
+
+  .swatches{display:flex;gap:0;border:1px solid var(--rule);border-radius:5px;overflow:hidden;margin-bottom:14px}
+  .swatches div{flex:1;padding:16px 14px;text-align:center;border-right:1px solid var(--rule)}
+  .swatches div:last-child{border-right:0}
+  .swatches .nm{font-size:12px;margin-top:9px;color:var(--ink-2)}
+  .dot{width:100%;height:34px;border-radius:4px}
+</style>
+
+<div class="wrap">
+
+<div class="doc">
+  <h1>Colour brought up, layout changes shown</h1>
+  <p>Palette lifted — still no status-light saturation, but enough presence that a pill reads as a deliberate mark rather than a smudge. Roughly halfway between your current colours and the last pass.</p>
+  <p>And the layout moves stated plainly this time, with what they replace beside them. These are layout only: no numbers added, no numbers removed, no labels rewritten.</p>
+</div>
+
+<!-- ===== 01 COLOUR ===== -->
+<div class="sec">
+  <div class="sec-head"><span class="sec-num">01</span><h2>Palette, lifted</h2><span class="say">Present, not loud.</span></div>
+
+  <div class="swatches">
+    <div><div class="dot" style="background:var(--c-hourly)"></div><div class="nm">Hourly</div></div>
+    <div><div class="dot" style="background:var(--c-monthly)"></div><div class="nm">Monthly</div></div>
+    <div><div class="dot" style="background:var(--c-fixed)"></div><div class="nm">Fixed budget</div></div>
+    <div><div class="dot" style="background:var(--c-own)"></div><div class="nm">Internal</div></div>
+    <div><div class="dot" style="background:var(--c-over)"></div><div class="nm">Over</div></div>
+    <div><div class="dot" style="background:var(--blue)"></div><div class="nm">Action</div></div>
+  </div>
+
+  <div class="card">
+    <div class="card-h">In use</div>
+    <div style="padding:20px 22px">
+      <div class="row" style="gap:9px;flex-wrap:wrap;margin-bottom:18px">
+        <span class="pill p-hourly">Hourly</span>
+        <span class="pill p-monthly">Monthly</span>
+        <span class="pill p-fixed">Fixed budget</span>
+        <span class="pill p-own">Internal</span>
+        <span class="pill p-over">2h 43m over</span>
+        <span class="pill p-tag">Development</span>
+        <span class="pill p-tag">Communication</span>
+      </div>
+      <p style="margin:0;font-size:13px;color:var(--ink-2);line-height:1.75">Text darkened and backgrounds given more tint than the last pass. The four models still sit at equal weight — none is styled as better or worse — and over-allocation is the only warm one, now a proper amber rather than a beige.</p>
+    </div>
+  </div>
+</div>
+
+<!-- ===== 02 STAT STRIP ===== -->
+<div class="sec">
+  <div class="sec-head"><span class="sec-num">02</span><h2>Layout change · joined stat strip</h2><span class="say">Four cards become one.</span></div>
+  <p class="lead">This is the change I made without declaring it. Same four figures, same labels, same qualifiers — but joined into a single object with hairline dividers instead of four floating cards with four borders and four shadows.</p>
+
+  <div class="ba">
+    <div class="old">
+      <h5>NOW</h5>
+      <div style="background:#f0f0f1;padding:16px;border-radius:4px;display:grid;grid-template-columns:repeat(2,1fr);gap:14px">
+        <div class="oldcard"><div class="k">Total Hours</div><div class="v">95h 39m</div><div class="m">Client 45h 29m (48%)<br>Internal 50h 10m (52%)</div></div>
+        <div class="oldcard"><div class="k">Billable Hours</div><div class="v">6h 31m</div><div class="m">vs. 9h 24m last period ↓31%</div></div>
+        <div class="oldcard"><div class="k">Billable Amount</div><div class="v">$618.00</div><div class="m">vs. $888.50 last period ↓30%</div></div>
+        <div class="oldcard"><div class="k">Unbilled so far</div><div class="v" style="color:#d63638">$4,656.31</div><div class="m">Go to Billing ›</div></div>
+      </div>
+    </div>
+    <div>
+      <h5>PROPOSED</h5>
+      <div style="background:var(--canvas);padding:16px;border-radius:4px">
+        <div class="card" style="display:flex;flex-wrap:wrap">
+          <div class="stat" style="min-width:48%"><div class="k">Total hours</div><div class="v">95h 39m</div><div class="m">Client 45h 29m · internal 50h 10m</div></div>
+          <div class="stat" style="min-width:48%"><div class="k">Billable hours</div><div class="v">6h 31m</div><div class="m">vs 9h 24m last period</div></div>
+          <div class="stat" style="min-width:48%;border-top:1px solid var(--rule-2)"><div class="k">Billable amount</div><div class="v">$618.00</div><div class="m">vs $888.50 last period</div></div>
+          <div class="stat" style="min-width:48%;border-top:1px solid var(--rule-2)"><div class="k">Unbilled so far</div><div class="v" style="color:var(--c-over)">$4,656.31</div><div class="m"><a class="lk" href="#">Go to billing ›</a></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="note">
+    <h4>Why joined</h4>
+    <p>Four separate cards read as four unrelated objects. They're not — they're four views of one filtered scope, and joining them says so without a word of explanation. It also removes three borders and four shadows from the top of every screen.</p>
+    <p>The qualifier lines are kept exactly as they are, including the period comparisons. The only colour change is the unbilled figure moving off red — nothing about money you haven't invoiced yet is an error.</p>
+  </div>
+</div>
+
+<!-- ===== 03 DAY GROUPING ===== -->
+<div class="sec">
+  <div class="sec-head"><span class="sec-num">03</span><h2>Layout change · day grouping</h2><span class="say">One table, banded. Not nine tables.</span></div>
+  <p class="lead">Currently each day is its own bordered panel with its own repeated column header. On a month of entries that's twenty panels and twenty header rows saying Description / Tags / Time / Duration. Here the header appears once and days become tinted bands inside a single table.</p>
+
+  <div class="ba">
+    <div class="old">
+      <h5>NOW</h5>
+      <div style="background:#f0f0f1;padding:14px;border-radius:4px">
+        <div style="background:#fff;border:1px solid #dcdcde;margin-bottom:12px">
+          <div style="padding:12px 14px;border-bottom:1px solid #dcdcde;display:flex"><b style="font-size:13px">June 26, 2026 · Friday</b><div class="grow"></div><span style="border:1px solid #2271b1;color:#2271b1;padding:3px 9px;font-size:12px;border-radius:3px">Edit</span></div>
+          <div style="padding:9px 14px;border-bottom:1px solid #f0f0f1;font-size:12px;color:#50575e;display:flex;gap:20px"><span style="flex:1">Description</span><span style="width:70px">Tags</span><span style="width:80px">Time</span></div>
+          <div style="padding:11px 14px;font-size:13px">Starting Quiet Coworking</div>
+        </div>
+        <div style="background:#fff;border:1px solid #dcdcde;margin-bottom:12px">
+          <div style="padding:12px 14px;border-bottom:1px solid #dcdcde;display:flex"><b style="font-size:13px">June 25, 2026 · Thursday</b><div class="grow"></div><span style="border:1px solid #2271b1;color:#2271b1;padding:3px 9px;font-size:12px;border-radius:3px">Edit</span></div>
+          <div style="padding:9px 14px;border-bottom:1px solid #f0f0f1;font-size:12px;color:#50575e;display:flex;gap:20px"><span style="flex:1">Description</span><span style="width:70px">Tags</span><span style="width:80px">Time</span></div>
+          <div style="padding:11px 14px;font-size:13px">Working on Linkedin connections.</div>
+        </div>
+        <div style="background:#fff;border:1px solid #dcdcde">
+          <div style="padding:12px 14px;border-bottom:1px solid #dcdcde;display:flex"><b style="font-size:13px">June 24, 2026 · Wednesday</b><div class="grow"></div><span style="border:1px solid #2271b1;color:#2271b1;padding:3px 9px;font-size:12px;border-radius:3px">Edit</span></div>
+          <div style="padding:9px 14px;border-bottom:1px solid #f0f0f1;font-size:12px;color:#50575e;display:flex;gap:20px"><span style="flex:1">Description</span><span style="width:70px">Tags</span><span style="width:80px">Time</span></div>
+          <div style="padding:11px 14px;font-size:13px">Working on Linkedin commenting.</div>
+        </div>
+      </div>
+    </div>
+    <div>
+      <h5>PROPOSED</h5>
+      <div style="background:var(--canvas);padding:14px;border-radius:4px">
+        <div class="card">
+          <table>
+            <thead><tr><th>Description</th><th style="width:90px">Tags</th><th style="width:80px">Time</th></tr></thead>
+          </table>
+          <div class="daybar"><b>June 26</b> <span class="muted">Friday</span><div class="grow"></div><span class="muted typed">4h 52m</span></div>
+          <table><tbody><tr><td>Starting Quiet Coworking<span class="sub">Internal · Networking</span></td><td style="width:90px"><span class="pill p-tag">Community</span></td><td style="width:80px" class="typed muted">9:30am</td></tr></tbody></table>
+          <div class="daybar" style="border-top:1px solid var(--rule)"><b>June 25</b> <span class="muted">Thursday</span><div class="grow"></div><span class="muted typed">6h 27m</span></div>
+          <table><tbody><tr><td>Working on Linkedin connections.<span class="sub">Internal · Marketing</span></td><td style="width:90px"><span class="pill p-tag">Outreach</span></td><td style="width:80px" class="typed muted">8:52am</td></tr></tbody></table>
+          <div class="daybar" style="border-top:1px solid var(--rule)"><b>June 24</b> <span class="muted">Wednesday</span><div class="grow"></div><span class="muted typed">4h 39m</span></div>
+          <table><tbody><tr><td>Working on Linkedin commenting.<span class="sub">Internal · Marketing</span></td><td style="width:90px"><span class="pill p-tag">Outreach</span></td><td style="width:80px" class="typed muted">8:33am</td></tr></tbody></table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="note">
+    <h4>What moved</h4>
+    <p>The Edit button leaves the day header. It was the only reason the header needed to be a full panel bar, and editing belongs to a row rather than to a date. Day totals take its place on the right, which is information you already compute.</p>
+    <p>Columns now align down the entire page instead of restarting every day, which is most of why a long month currently feels choppy.</p>
+  </div>
+</div>
+
+<!-- ===== 04 PAGE HEADER ===== -->
+<div class="sec">
+  <div class="sec-head"><span class="sec-num">04</span><h2>Layout change · page header</h2><span class="say">Context sits with the title.</span></div>
+
+  <div class="ba">
+    <div class="old">
+      <h5>NOW</h5>
+      <div style="background:#f0f0f1;padding:16px;border-radius:4px">
+        <div style="display:flex;align-items:center;margin-bottom:10px">
+          <span style="font:400 23px/1.3 'IBM Plex Sans'">Website Redesign</span>
+          <span style="margin-left:10px;background:#efecfb;color:#5b41c9;padding:3px 10px;border-radius:3px;font-size:12px">Fixed Budget</span>
+          <div class="grow"></div>
+          <span style="border:1px solid #2271b1;color:#2271b1;padding:6px 12px;font-size:13px;border-radius:3px">← Back to Projects</span>
+        </div>
+        <div style="color:#50575e;font-size:13px">Robin Mohr · Feb 19, 2026 – Jun 10, 2026 · 91 entries</div>
+      </div>
+    </div>
+    <div>
+      <h5>PROPOSED</h5>
+      <div style="background:var(--canvas);padding:16px;border-radius:4px">
+        <div class="row" style="align-items:flex-start">
+          <div>
+            <div class="row" style="gap:10px"><h1 class="page">Website Redesign</h1><span class="pill p-fixed">Fixed budget</span></div>
+            <div class="page-sub">Robin Mohr · <span class="typed">Feb 19 – Jun 10, 2026</span> · 91 entries</div>
+          </div>
+          <div class="grow"></div>
+          <span class="btn q sm">Settings</span>
+          <span class="btn q sm">← Projects</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="note">
+    <h4>Small but it applies everywhere</h4>
+    <p>Title larger and tighter, subline tied directly beneath it, buttons dropped to small so they stop competing with the page name. Dates in the subline become monospace, which is where the type rule starts paying off — a date reads as a measured thing at a glance rather than as more prose.</p>
+  </div>
+</div>
+
+<!-- ===== 05 FULL SCREEN ===== -->
+<div class="sec">
+  <div class="sec-head"><span class="sec-num">05</span><h2>All of it together</h2><span class="say">Entries, with the lifted palette and the layout moves.</span></div>
+
+  <div class="wp">
+    <div class="wp-bar">Plain Text Time Tracker</div>
+    <div class="wp-body">
+      <div class="row" style="align-items:flex-start;margin-bottom:22px">
+        <div>
+          <h1 class="page">Entries</h1>
+          <div class="page-sub">All clients · <span class="typed">Jun 1 – Jun 30, 2026</span> · 117 entries</div>
+        </div>
+        <div class="grow"></div>
+        <div class="seg"><span>Summary</span><span class="on">Entries</span></div>
+        <span class="stepper"><span class="arw">‹</span><span class="dt">Jun 2026</span><span class="arw r">›</span></span>
+      </div>
+
+      <div class="card" style="margin-bottom:20px;display:flex">
+        <div class="stat"><div class="k">Total hours</div><div class="v">95h 39m</div><div class="m">Client 45h 29m · internal 50h 10m</div></div>
+        <div class="stat"><div class="k">Billable hours</div><div class="v">6h 31m</div><div class="m">vs 9h 24m last period</div></div>
+        <div class="stat"><div class="k">Billable amount</div><div class="v">$618.00</div><div class="m">vs $888.50 last period</div></div>
+        <div class="stat"><div class="k">Unbilled so far</div><div class="v" style="color:var(--c-over)">$4,656.31</div><div class="m"><a class="lk" href="#">Go to billing ›</a></div></div>
+      </div>
+
+      <div class="card">
+        <table>
+          <thead><tr>
+            <th>Description</th><th style="width:150px">Tags</th><th style="width:165px">Time</th><th style="width:95px">Duration</th>
+            <th class="c" style="width:80px">Billable</th><th style="width:110px">Status</th><th class="n" style="width:105px">Amount</th>
+          </tr></thead>
+        </table>
+
+        <div class="daybar"><b>June 26</b> <span class="muted">Friday</span><div class="grow"></div><span class="muted typed">4h 52m · 11 entries</span></div>
+        <table><tbody>
+          <tr>
+            <td>Starting Quiet Coworking<span class="sub">Internal · Networking &amp; Community</span></td>
+            <td style="width:150px"><span class="pill p-tag">Community</span></td>
+            <td style="width:165px" class="typed muted">9:30 – 10:39am</td><td style="width:95px" class="typed">1h 9m</td>
+            <td class="c" style="width:80px"><span class="dash">—</span></td><td style="width:110px"><span class="dash">—</span></td><td class="n" style="width:105px"><span class="dash">—</span></td>
+          </tr>
+          <tr>
+            <td>Sending updated flyer to NCJW<span class="sub">NCJW of Rossmoor · September 2026 Order Form</span></td>
+            <td><span class="pill p-tag">Support</span></td>
+            <td class="typed muted">11:28 – 11:32am</td><td class="typed">4m</td>
+            <td class="c"><span style="color:var(--c-hourly);font-weight:600">$</span></td>
+            <td><span class="pill p-hourly">Unbilled</span></td>
+            <td class="n"><span class="amt">$6.67</span></td>
+          </tr>
+          <tr>
+            <td>Updating testimonial in BTSA website.<span class="sub">Behind The Scenes Adventures · General Website Support</span></td>
+            <td><span class="pill p-tag">Support</span></td>
+            <td class="typed muted">12:30 – 12:40pm</td><td class="typed">10m</td>
+            <td class="c"><span style="color:var(--c-hourly);font-weight:600">$</span></td>
+            <td><span class="pill p-hourly">Unbilled</span></td>
+            <td class="n"><span class="amt">$16.67</span></td>
+          </tr>
+          <tr>
+            <td>Updating DOR website content.<span class="sub">Democrats of Rossmor · Website Care Plan Time</span></td>
+            <td><span class="pill p-tag">Content</span></td>
+            <td class="typed muted">12:50 – 1:07pm</td><td class="typed">17m</td>
+            <td class="c"><span class="dash">—</span></td><td><span class="dash">—</span></td><td class="n"><span class="dash">—</span></td>
+          </tr>
+        </tbody></table>
+
+        <div class="daybar" style="border-top:1px solid var(--rule)"><b>June 25</b> <span class="muted">Thursday</span><div class="grow"></div><span class="muted typed">6h 27m · 11 entries</span></div>
+        <table><tbody>
+          <tr>
+            <td>Working on Linkedin connections and commenting.<span class="sub">Internal · Marketing</span></td>
+            <td style="width:150px"><span class="pill p-tag">Outreach</span></td>
+            <td style="width:165px" class="typed muted">8:52 – 10:15am</td><td style="width:95px" class="typed">1h 23m</td>
+            <td class="c" style="width:80px"><span class="dash">—</span></td><td style="width:110px"><span class="dash">—</span></td><td class="n" style="width:105px"><span class="dash">—</span></td>
+          </tr>
+          <tr>
+            <td>Updating Kristals cookie consent<span class="sub">Kristal Fiorentino · General Website Support</span></td>
+            <td><span class="pill p-tag">Support</span></td>
+            <td class="typed muted">4:03 – 4:22pm</td><td class="typed">19m</td>
+            <td class="c"><span style="color:var(--c-hourly);font-weight:600">$</span></td>
+            <td><span class="pill p-hourly">Unbilled</span></td>
+            <td class="n"><span class="amt">$31.67</span></td>
+          </tr>
+          <tr>
+            <td>Working on event poster<span class="sub">NCJW of Rossmoor · September 2026 Order Form</span></td>
+            <td><span class="pill p-tag">Design</span></td>
+            <td class="typed muted">4:40 – 5:40pm</td><td class="typed">1h</td>
+            <td class="c"><span style="color:var(--c-hourly);font-weight:600">$</span></td>
+            <td><span class="pill p-hourly">Unbilled</span></td>
+            <td class="n"><span class="amt">$100.00</span></td>
+          </tr>
+        </tbody></table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== 06 ===== -->
+<div class="sec">
+  <div class="sec-head"><span class="sec-num">06</span><h2>Layout changes, listed</h2></div>
+  <div class="card">
+    <table>
+      <thead><tr><th style="width:30%">Change</th><th style="width:30%">Replaces</th><th>Effect</th></tr></thead>
+      <tbody>
+        <tr><td><b>Joined stat strip</b></td><td class="muted">Four separate cards</td><td>Says the figures belong to one scope; removes three borders and four shadows.</td></tr>
+        <tr><td><b>One table, day bands</b></td><td class="muted">A bordered panel per day, each with its own column header</td><td>Columns align down the whole page. Twenty header rows become one.</td></tr>
+        <tr><td><b>Day totals in the band</b></td><td class="muted">Edit button in the day header</td><td>Editing belongs to a row, not a date. The band gets a number instead.</td></tr>
+        <tr><td><b>Title, badge, subline as one block</b></td><td class="muted">Title with the subline detached below the button row</td><td>Applies to every screen; the page says what it is in one place.</td></tr>
+        <tr><td><b>Controls grouped at the right of the title row</b></td><td class="muted">View toggle and date control on separate rows</td><td>One row of chrome instead of two, in the same position on every screen.</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="note">
+    <h4>Not included</h4>
+    <p>No figures added or removed, no labels rewritten, no columns merged. The period comparisons and the dashes are all still there. Those are information decisions and they're yours to make separately.</p>
+  </div>
+</div>
+
+</div>

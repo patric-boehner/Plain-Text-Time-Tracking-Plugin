@@ -1,0 +1,240 @@
+<meta charset="utf-8">
+<title>PLTT — Scope by type on reports</title>
+<style>
+  :root{
+    --paper:#fff; --sunk:#faf9f7;
+    --rule:#e4e2de; --rule-2:#efedea;
+    --ink:#1a1c1e; --ink-2:#55595e; --ink-3:#8a8d91;
+    --blue:#2271b1; --c-over:#9a6a10;
+    --c-hourly:#146b42; --c-hourly-bg:#e0f0e7;
+    --c-monthly:#175d87;--c-monthly-bg:#e0edf7;
+    --c-fixed:#5540a5;  --c-fixed-bg:#eae5f9;
+    --c-own:#666360;    --c-own-bg:#eeedea;
+    --track:#e9e7e3; --s-over:#c08f2a;
+    --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",sans-serif;
+    --mono:Menlo,Consolas,monaco,monospace;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:#e3e1de;font:14px/1.6 var(--sans);color:var(--ink);-webkit-font-smoothing:antialiased}
+  .wrap{max-width:1040px;margin:0 auto;padding:36px 24px 90px}
+  .typed{font-family:var(--mono);font-variant-numeric:tabular-nums}
+
+  .doc{background:var(--ink);color:#fff;padding:28px 32px;border-radius:6px}
+  .doc h1{margin:0 0 10px;font-size:21px;font-weight:600;letter-spacing:-.2px}
+  .doc p{margin:0 0 9px;color:#b9bcc0;max-width:76ch;line-height:1.75}
+  .doc p:last-child{margin:0}
+  .doc b{color:#fff;font-weight:500}
+
+  .sec{margin-top:40px}
+  .sec-head{padding-bottom:11px;border-bottom:2px solid var(--ink);margin-bottom:18px;display:flex;align-items:baseline;gap:13px}
+  .sec-num{font:500 12px/1 var(--mono);color:var(--ink-3);letter-spacing:.7px}
+  .sec-head h2{margin:0;font-size:17px;font-weight:600;letter-spacing:-.15px}
+  .sec-head .say{margin-left:auto;font-size:13px;color:var(--ink-2)}
+  .lead{max-width:80ch;color:var(--ink-2);margin:0 0 16px;line-height:1.8}
+
+  .scope{background:var(--paper);border:1px solid var(--rule);border-radius:6px}
+  .scope-id{padding:17px 22px 15px;border-bottom:1px solid var(--rule-2)}
+  .scope-id h1{margin:0;font-size:21px;font-weight:600;letter-spacing:-.2px;display:inline}
+  .scope-l2{color:var(--ink-2);font-size:13.5px;margin-top:7px}
+  .scope-when{display:inline-block;margin-top:10px;background:var(--sunk);border:1px solid var(--rule-2);border-radius:4px;padding:5px 12px;font-size:13px;color:var(--ink-2)}
+  .scope-nums{display:flex;flex-wrap:wrap}
+  .fig{padding:15px 22px 17px;border-right:1px solid var(--rule-2);flex:1;min-width:190px}
+  .fig:last-child{border-right:0}
+  .fig .lab{font-size:13px;color:var(--ink-2)}
+  .fig .val{font:450 24px/1.2 var(--mono);letter-spacing:-.5px;margin-top:4px;font-variant-numeric:tabular-nums}
+  .fig .val.over{color:var(--c-over)}
+  .fig .val.set{color:var(--ink-3)}
+  .fig .basis{font-size:12.5px;color:var(--ink-3);margin-top:5px;line-height:1.5}
+
+  .pill{display:inline-block;padding:2px 9px;border-radius:3px;font-size:12px;line-height:19px}
+  .p-hourly{background:var(--c-hourly-bg);color:var(--c-hourly)}
+  .p-monthly{background:var(--c-monthly-bg);color:var(--c-monthly)}
+  .p-fixed{background:var(--c-fixed-bg);color:var(--c-fixed)}
+  .p-own{background:var(--c-own-bg);color:var(--c-own)}
+  .p-arch{background:#e7e5e1;color:#6a6862}
+
+  .tagrow{display:flex;gap:8px;margin-bottom:9px;align-items:center}
+  .lbl{display:inline-block;font:500 10.5px/1 var(--mono);letter-spacing:.6px;padding:4px 8px;border-radius:3px}
+  .lbl.active{background:#e0f0e7;color:#146b42}
+  .lbl.arch{background:#e7e5e1;color:#6a6862}
+
+  .card{background:var(--paper);border:1px solid var(--rule);border-radius:6px;margin-top:14px}
+  .card-h{padding:12px 18px;border-bottom:1px solid var(--rule-2);font-weight:600;font-size:13.5px;display:flex;gap:10px}
+  .card-h .lite{font-weight:400;color:var(--ink-3);font-size:13px}
+  .track{position:relative;height:9px;background:var(--track);border-radius:5px}
+  .track .fill{position:absolute;left:0;top:0;bottom:0;background:var(--blue);border-radius:5px 0 0 5px}
+  .track .fill.overpart{background:var(--s-over);border-radius:0 5px 5px 0;left:auto}
+  .track .limit{position:absolute;top:-4px;bottom:-4px;width:2px;background:var(--ink)}
+  .grow{grow:1;flex:1}
+  .muted{color:var(--ink-3)}
+
+  .note{background:var(--sunk);border:1px solid var(--rule);border-left:3px solid var(--blue);border-radius:5px;padding:14px 18px;margin-top:14px}
+  .note h4{margin:0 0 6px;font-size:13.5px;font-weight:600}
+  .note p{margin:0;font-size:13px;color:var(--ink-2);line-height:1.75}
+  .note p + p{margin-top:8px}
+
+  .rules{width:100%;border-collapse:collapse;background:var(--paper);border:1px solid var(--rule);border-radius:6px;overflow:hidden;margin-top:6px}
+  .rules th{text-align:left;font-weight:450;color:var(--ink-3);font-size:11px;letter-spacing:.4px;text-transform:uppercase;padding:10px 15px;border-bottom:1px solid var(--rule);background:var(--sunk)}
+  .rules td{padding:11px 15px;border-bottom:1px solid var(--rule-2);font-size:12.5px;vertical-align:top}
+  .rules tr:last-child td{border-bottom:0}
+  .rules b{font-weight:600}
+</style>
+
+<div class="wrap">
+
+<div class="doc">
+  <h1>Scope block per project type — report surface</h1>
+  <p>The Report tab is archived-only (locked in PROJECT.md), but the scope block also heads the <b>active</b> project's lifetime view and filtered Entries. So each type needs a figure set that holds up both while running and once closed.</p>
+  <p>Testing each figure against one question: <b>what decision does it inform?</b> Anything that only creates pressure or restates another figure comes out.</p>
+</div>
+
+<!-- ===== HOURLY ===== -->
+<div class="sec">
+  <div class="sec-head"><span class="sec-num">01</span><h2>Hourly</h2><span class="say">No budget, no allocation — just work and its worth.</span></div>
+
+  <div class="scope">
+    <div class="scope-id">
+      <h1>General Website Support</h1> <span class="pill p-hourly" style="vertical-align:3px;margin-left:8px">Hourly</span>
+      <div class="scope-l2">Daniel Mintie · $100/hr</div>
+      <div class="scope-when">Showing <b class="typed" style="color:var(--ink);font-weight:500">the whole project</b> · Feb 17 – Jul 19 · 108 entries</div>
+    </div>
+    <div class="scope-nums">
+      <div class="fig"><div class="lab">Total hours</div><div class="val">61h 20m</div><div class="basis">108 entries</div></div>
+      <div class="fig"><div class="lab">Billable amount</div><div class="val">$5,916.67</div><div class="basis"><span class="typed">59h 10m</span> billable · 96%</div></div>
+      <div class="fig"><div class="lab">Not yet billed</div><div class="val over">$793.32</div><div class="basis"><a href="#" style="color:var(--blue);text-decoration:none">15 entries ›</a></div></div>
+      <div class="fig"><div class="lab">Billed to date</div><div class="val">$5,123.35</div><div class="basis">12 records · <a href="#" style="color:var(--blue);text-decoration:none">View ›</a></div></div>
+    </div>
+  </div>
+
+  <div class="note">
+    <h4>No budget figure, and that's correct</h4>
+    <p>An hourly project has no ceiling to measure against — that's what makes it hourly. The four figures are all it can say: how much work, what it's worth, what's owed, what's settled. Adding an effective-rate figure would be noise; the rate is fixed and already on line 2.</p>
+    <p>Same set active or archived. Nothing here needs the project to be finished to make sense.</p>
+  </div>
+</div>
+
+<!-- ===== RETAINER ===== -->
+<div class="sec">
+  <div class="sec-head"><span class="sec-num">02</span><h2>Retainer — lifetime view</h2><span class="say">Different from the per-period billing block.</span></div>
+  <p class="lead">The per-period figures (§3 of the spec) are for when you're filtered to one month. The project's <i>lifetime</i> view answers a different question: is this retainer healthy across its whole run?</p>
+
+  <div class="scope">
+    <div class="scope-id">
+      <h1>Website Care Plan Time</h1> <span class="pill p-monthly" style="vertical-align:3px;margin-left:8px">Monthly retainer</span>
+      <div class="scope-l2">Democrats of Rossmor · 3 hours included each month at $90/hr</div>
+      <div class="scope-when">Showing <b class="typed" style="color:var(--ink);font-weight:500">the whole project</b> · 5 months · 71 entries</div>
+    </div>
+    <div class="scope-nums">
+      <div class="fig"><div class="lab">Total hours</div><div class="val">31h 41m</div><div class="basis">Across 5 monthly periods</div></div>
+      <div class="fig"><div class="lab">Average per month</div><div class="val over">6h 20m</div><div class="basis">211% of the <span class="typed">3h</span> included · 5 of 5 over</div></div>
+      <div class="fig"><div class="lab">Overage billable</div><div class="val">$1,501.50</div><div class="basis">Sum of 5 monthly overages</div></div>
+      <div class="fig"><div class="lab">Not yet billed</div><div class="val over">$1,501.50</div><div class="basis"><a href="#" style="color:var(--blue);text-decoration:none">5 periods ›</a></div></div>
+    </div>
+  </div>
+
+  <div class="note">
+    <h4>Average per month is the load-bearing figure</h4>
+    <p>It's the one that tells you something you'd act on: this plan is running at more than double its allocation every single month, which is a conversation with the client about resizing the retainer. That's the decision this view exists to inform.</p>
+    <p><i>5 of 5 over</i> matters alongside the average — an average of 211% could be one wild month, but "5 of 5" says it's the shape of the engagement, not an outlier.</p>
+  </div>
+</div>
+
+<!-- ===== FIXED ACTIVE ===== -->
+<div class="sec">
+  <div class="sec-head"><span class="sec-num">03</span><h2>Fixed budget — active</h2><span class="say">Three figures. No effective rate yet.</span></div>
+
+  <div class="tagrow"><span class="lbl active">ACTIVE</span></div>
+  <div class="scope">
+    <div class="scope-id">
+      <h1>Website Redesign</h1> <span class="pill p-fixed" style="vertical-align:3px;margin-left:8px">Fixed budget</span>
+      <div class="scope-l2">Robin Mohr · $3,870 agreed, budgeted as 38h 42m at $100/hr</div>
+      <div class="scope-when">Showing <b class="typed" style="color:var(--ink);font-weight:500">the whole project</b> · Feb 19 – ongoing · 47 entries</div>
+    </div>
+    <div class="scope-nums">
+      <div class="fig"><div class="lab">Total hours</div><div class="val">28h 26m</div><div class="basis">47 entries</div></div>
+      <div class="fig"><div class="lab">Budget left</div><div class="val">10h 16m</div><div class="basis"><span class="typed">28h 26m</span> of <span class="typed">38h 42m</span> used · 73%</div></div>
+      <div class="fig"><div class="lab">Fixed fee</div><div class="val">$3,870</div><div class="basis">Agreed regardless of hours</div></div>
+    </div>
+  </div>
+
+  <div class="note">
+    <h4>Why not a fourth figure</h4>
+    <p>Effective rate is the obvious candidate and it's exactly wrong while active — <span class="typed">$3,870 ÷ 28h 26m</span> reads $136/hr today and drops every hour you work, so mid-project it's a number that only ever looks worse. PROJECT.md already rejects live EHR for this reason.</p>
+    <p>Three honest figures beat four with one that misleads. The empty slot is fine.</p>
+  </div>
+</div>
+
+<!-- ===== FIXED ARCHIVED ===== -->
+<div class="sec">
+  <div class="sec-head"><span class="sec-num">04</span><h2>Fixed budget — archived</h2><span class="say">Now effective rate earns its place.</span></div>
+
+  <div class="tagrow"><span class="lbl arch">ARCHIVED</span></div>
+  <div class="scope">
+    <div class="scope-id">
+      <h1>Website Redesign</h1>
+      <span class="pill p-fixed" style="vertical-align:3px;margin-left:8px">Fixed budget</span>
+      <span class="pill p-arch" style="vertical-align:3px;margin-left:4px">Archived</span>
+      <div class="scope-l2">Robin Mohr · $3,870 agreed, budgeted as 38h 42m at $100/hr</div>
+      <div class="scope-when">Showing <b class="typed" style="color:var(--ink);font-weight:500">the whole project</b> · Feb 19 – Jun 10 · 91 entries</div>
+    </div>
+    <div class="scope-nums">
+      <div class="fig"><div class="lab">Total hours</div><div class="val">96h 25m</div><div class="basis">91 entries</div></div>
+      <div class="fig"><div class="lab">Budget overrun</div><div class="val over">57h 43m</div><div class="basis"><span class="typed">96h 25m</span> of <span class="typed">38h 42m</span> used · 249%</div></div>
+      <div class="fig"><div class="lab">Fixed fee</div><div class="val">$3,870</div><div class="basis">Agreed regardless of hours</div></div>
+      <div class="fig"><div class="lab">Effective rate</div><div class="val">$40/hr</div><div class="basis"><span class="typed">$3,870 ÷ 96h 25m</span> · target $100</div></div>
+    </div>
+  </div>
+
+  <div class="note">
+    <h4>The archived-only figure</h4>
+    <p>Once the hours stop, effective rate is a true number and the single most useful thing the project can tell you: this job paid $40/hr against a $100 target. That's what shapes whether you quote the next one like it. Retrospective, no pressure — exactly the case PROJECT.md carves out.</p>
+    <p>It's also the only figure that appears conditionally on lifecycle. Everything else is present throughout; this one waits for archive.</p>
+  </div>
+</div>
+
+<!-- ===== INTERNAL ===== -->
+<div class="sec">
+  <div class="sec-head"><span class="sec-num">05</span><h2>Internal / own time</h2><span class="say">No client, no money.</span></div>
+
+  <div class="scope">
+    <div class="scope-id">
+      <h1>Marketing</h1> <span class="pill p-own" style="vertical-align:3px;margin-left:8px">Internal</span>
+      <div class="scope-l2">Own time · not billable</div>
+      <div class="scope-when">Showing <b class="typed" style="color:var(--ink);font-weight:500">the whole project</b> · 63 entries</div>
+    </div>
+    <div class="scope-nums">
+      <div class="fig"><div class="lab">Total hours</div><div class="val">44h 09m</div><div class="basis">63 entries</div></div>
+      <div class="fig"><div class="lab">Share of tracked time</div><div class="val">12%</div><div class="basis">of <span class="typed">371h</span> logged this year</div></div>
+      <div class="fig"><div class="lab">Most recent</div><div class="val" style="font-size:20px">Jul 3</div><div class="basis">LinkedIn outreach</div></div>
+    </div>
+  </div>
+
+  <div class="note">
+    <h4>No money figures at all</h4>
+    <p>Internal work has no rate, no bill, no budget — so three of the standard figures have nothing to show. Rather than four dashes, the block carries only what's true: how much time, what share of the whole, when you last touched it.</p>
+    <p><i>Share of tracked time</i> is the one worth debating. It informs a real decision — am I spending too much unbilled — but it edges toward the self-scoring PROJECT.md warns against. Descriptive framing ("12% of tracked time") keeps it on the right side; "only 12% billable" would not. Include it cautiously, or drop to two figures if it ever reads as judgment.</p>
+  </div>
+</div>
+
+<!-- ===== SUMMARY ===== -->
+<div class="sec">
+  <div class="sec-head"><span class="sec-num">06</span><h2>All types, all slots</h2></div>
+  <table class="rules">
+    <thead><tr><th style="width:14%"></th><th style="width:21%">Hourly</th><th style="width:21%">Retainer</th><th style="width:22%">Fixed</th><th>Internal</th></tr></thead>
+    <tbody>
+      <tr><td><b>Fig 1</b></td><td>Total hours</td><td>Total hours</td><td>Total hours</td><td>Total hours</td></tr>
+      <tr><td><b>Fig 2</b></td><td>Billable amount</td><td>Average per month</td><td>Budget left / overrun</td><td>Share of tracked time</td></tr>
+      <tr><td><b>Fig 3</b></td><td>Not yet billed</td><td>Overage billable</td><td>Fixed fee</td><td>Most recent</td></tr>
+      <tr><td><b>Fig 4</b></td><td>Billed to date</td><td>Not yet billed</td><td>Effective rate <span class="muted">(archived only)</span></td><td>—</td></tr>
+      <tr><td><b>Meter</b></td><td class="muted">none</td><td>allocation, lifetime</td><td>budget, lifetime</td><td class="muted">none</td></tr>
+      <tr><td><b>Count</b></td><td>4</td><td>4</td><td>3 active / 4 archived</td><td>3</td></tr>
+    </tbody>
+  </table>
+
+  <div class="note">
+    <h4>The through-line</h4>
+    <p>Figure 1 is always total hours — the one thing every project has. After that each type diverges by what it actually has to measure: hourly against nothing, retainer against a monthly allocation, fixed against a budget, internal against nothing but itself. No type is padded to four for symmetry, and no figure appears that the type can't honestly fill.</p>
+  </div>
+</div>
+
+</div>

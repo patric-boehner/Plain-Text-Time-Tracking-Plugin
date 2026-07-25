@@ -1,0 +1,340 @@
+<meta charset="utf-8">
+<title>PLTT — Row actions</title>
+<style>
+  :root{
+    --paper:#fff; --canvas:#f4f3f1; --sunk:#faf9f7;
+    --rule:#e4e2de; --rule-2:#efedea;
+    --ink:#1a1c1e; --ink-2:#55595e; --ink-3:#8a8d91;
+    --blue:#2271b1;
+    --c-hourly:#146b42; --c-hourly-bg:#e0f0e7;
+    --c-monthly:#175d87;--c-monthly-bg:#e0edf7;
+    --c-fixed:#5540a5;  --c-fixed-bg:#eae5f9;
+    --c-over:#9a6a10;   --c-over-bg:#fbefd8;
+    --c-tag:#1d5f8a;    --c-tag-bg:#e4eef7;
+    --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",sans-serif;
+    --mono:Menlo,Consolas,monaco,monospace;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:#e3e1de;font:14px/1.6 var(--sans);color:var(--ink);-webkit-font-smoothing:antialiased}
+  .wrap{max-width:1140px;margin:0 auto;padding:36px 24px 90px}
+  .typed{font-family:var(--mono);font-variant-numeric:tabular-nums}
+
+  .doc{background:var(--ink);color:#fff;padding:30px 34px;border-radius:6px}
+  .doc h1{margin:0 0 11px;font-size:22px;font-weight:600;letter-spacing:-.2px}
+  .doc p{margin:0 0 9px;color:#b9bcc0;max-width:76ch;line-height:1.75}
+  .doc p:last-child{margin:0}
+  .doc b{color:#fff;font-weight:500}
+
+  .sec{margin-top:44px}
+  .sec-head{padding-bottom:12px;border-bottom:2px solid var(--ink);margin-bottom:20px;display:flex;align-items:baseline;gap:13px}
+  .sec-num{font:500 12px/1 var(--mono);color:var(--ink-3);letter-spacing:.7px}
+  .sec-head h2{margin:0;font-size:18px;font-weight:600;letter-spacing:-.15px}
+  .sec-head .say{margin-left:auto;font-size:13px;color:var(--ink-2)}
+  .lead{max-width:80ch;color:var(--ink-2);margin:0 0 20px;line-height:1.8}
+
+  .wp{background:var(--canvas);border:1px solid #cbc9c5;border-radius:6px;overflow:hidden}
+  .wp-bar{background:var(--ink);color:#8a8d91;font:11px/1 var(--mono);padding:8px 14px}
+  .wp-body{padding:24px 26px 26px}
+  .row{display:flex;align-items:center;gap:12px}
+  .grow{flex:1}
+  .muted{color:var(--ink-3)}
+  h1.page{margin:0;font-size:26px;font-weight:450;letter-spacing:-.25px;line-height:1.2}
+
+  .btn{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--blue);background:var(--paper);color:var(--blue);padding:6px 13px;border-radius:4px;font-size:13.5px;white-space:nowrap}
+  .btn.p{background:var(--blue);color:#fff}
+  .btn.q{border-color:#c2bfba;color:var(--ink-2)}
+  .btn.sm{padding:4px 10px;font-size:12.5px}
+
+  .card{background:var(--paper);border:1px solid var(--rule);border-radius:6px}
+  .card-h{padding:13px 18px;border-bottom:1px solid var(--rule-2);font-weight:600;font-size:14px;display:flex;align-items:center;gap:11px}
+  .card-h .lite{font-weight:400;color:var(--ink-3);font-size:13px}
+  table{width:100%;border-collapse:collapse}
+  th{text-align:left;font-weight:450;color:var(--ink-3);font-size:11.5px;letter-spacing:.5px;text-transform:uppercase;padding:11px 18px;border-bottom:1px solid var(--rule);background:var(--sunk)}
+  th.n{text-align:right} th.c{text-align:center}
+  td{padding:13px 18px;border-bottom:1px solid var(--rule-2);vertical-align:middle}
+  td.n{text-align:right} td.c{text-align:center}
+  tr:last-child td{border-bottom:0}
+  .sub{display:block;color:var(--ink-3);font-size:12.5px;margin-top:3px}
+  a.lk{color:var(--blue);text-decoration:none}
+  a.lk:hover{text-decoration:underline}
+  .dash{color:#cfccc7}
+  .amt{font-family:var(--mono);font-variant-numeric:tabular-nums;font-weight:500}
+  .pill{display:inline-block;padding:2px 9px;border-radius:3px;font-size:12px;line-height:19px}
+  .p-hourly{background:var(--c-hourly-bg);color:var(--c-hourly)}
+  .p-monthly{background:var(--c-monthly-bg);color:var(--c-monthly)}
+  .p-fixed{background:var(--c-fixed-bg);color:var(--c-fixed)}
+  .p-tag{background:var(--c-tag-bg);color:var(--c-tag)}
+
+  /* kebab */
+  .kb{display:inline-flex;flex-direction:column;gap:3px;padding:7px 8px;border-radius:4px;border:1px solid transparent;vertical-align:middle}
+  .kb i{width:3px;height:3px;border-radius:50%;background:var(--ink-3);display:block}
+  .kb.hov{border-color:var(--rule);background:var(--sunk)}
+  .menu{position:absolute;right:12px;background:#fff;border:1px solid var(--rule);border-radius:5px;box-shadow:0 6px 22px rgba(0,0,0,.14);min-width:200px;padding:5px 0;z-index:9;text-align:left}
+  .menu div{padding:8px 15px;font-size:13.5px}
+  .menu div.hl{background:#eef3f8;color:var(--blue)}
+  .menu div.sep{border-top:1px solid var(--rule-2);padding:0;margin:5px 0}
+  .menu div.dz{color:#a02c2c}
+
+  .inv{background:var(--paper);border:1px solid var(--rule);border-radius:6px;overflow:hidden}
+  .inv .ir{display:flex;gap:16px;padding:14px 20px;border-bottom:1px solid var(--rule-2);align-items:flex-start}
+  .inv .ir:last-child{border-bottom:0}
+  .inv .wh{width:190px;flex:none;font-weight:600;font-size:13.5px}
+  .inv .pt{width:210px;flex:none;font-size:13px;color:var(--ink-2)}
+  .inv .vd{flex:1;font-size:13px;color:var(--ink-2);line-height:1.7}
+  .inv .vd b{color:var(--ink)}
+
+  .rules{background:var(--paper);border:1px solid var(--rule);border-radius:6px;overflow:hidden}
+  .rl{display:flex;gap:18px;padding:16px 20px;border-bottom:1px solid var(--rule-2);align-items:flex-start}
+  .rl:last-child{border-bottom:0}
+  .rl .n{width:26px;height:26px;border-radius:50%;background:var(--sunk);border:1px solid var(--rule);flex:none;display:flex;align-items:center;justify-content:center;font:500 12px/1 var(--mono);color:var(--ink-2)}
+  .rl h4{margin:0 0 5px;font-size:14px;font-weight:600}
+  .rl p{margin:0;font-size:13px;color:var(--ink-2);line-height:1.7}
+
+  .note{background:var(--sunk);border:1px solid var(--rule);border-left:3px solid var(--blue);border-radius:5px;padding:15px 19px;margin-top:16px}
+  .note h4{margin:0 0 7px;font-size:13.5px;font-weight:600}
+  .note p{margin:0;font-size:13px;color:var(--ink-2);line-height:1.75}
+  .note p + p{margin-top:8px}
+  .test{background:var(--paper);border:1px solid var(--rule);border-radius:6px;padding:17px 21px;margin-top:16px}
+  .test p{margin:0 0 9px;font-size:13.5px;line-height:1.7}
+  .test p:last-child{margin:0}
+</style>
+
+<div class="wrap">
+
+<div class="doc">
+  <h1>Row actions, unified</h1>
+  <p>Four patterns are currently doing overlapping work: WP hover row actions, trailing links, buttons in cells, and the kebab menu I introduced. Three rules replace all of them — and the first removes most trailing links on its own.</p>
+</div>
+
+<!-- ===== 01 INVENTORY ===== -->
+<div class="sec">
+  <div class="sec-head"><span class="sec-num">01</span><h2>What's there now</h2></div>
+  <div class="inv">
+    <div class="ir"><span class="wh">Clients</span><span class="pt">Hover row actions</span><span class="vd">Edit / delete appear under the name on hover. Invisible until you find them; shifts the row.</span></div>
+    <div class="ir"><span class="wh">Projects</span><span class="pt">Name is a link</span><span class="vd"><b>Correct.</b> The row's identifier navigates to the row's page.</span></div>
+    <div class="ir"><span class="wh">Billing history</span><span class="pt">"View record" trailing link</span><span class="vd">A whole column to navigate to the thing the row already names.</span></div>
+    <div class="ir"><span class="wh">Billing ready</span><span class="pt">Button in a card</span><span class="vd"><b>Correct.</b> The row exists to be acted on; hiding that in a menu would hide the point.</span></div>
+    <div class="ir"><span class="wh">Entries</span><span class="pt">Edit button on day header</span><span class="vd">Row-level action attached to a date. Already being changed.</span></div>
+    <div class="ir"><span class="wh">Project detail</span><span class="pt">"View record" trailing link</span><span class="vd">Same as billing history.</span></div>
+  </div>
+</div>
+
+<!-- ===== 02 RULES ===== -->
+<div class="sec">
+  <div class="sec-head"><span class="sec-num">02</span><h2>Three rules</h2></div>
+  <div class="rules">
+    <div class="rl">
+      <span class="n">1</span>
+      <div>
+        <h4>The row's name is the link</h4>
+        <p>Navigation to the thing a row represents happens by clicking what identifies it — client name, project name, bill record number, date. Never a trailing "View" or "Open" column. If a row has no obvious identifier to link, that's a sign the columns are ordered wrong.</p>
+      </div>
+    </div>
+    <div class="rl">
+      <span class="n">2</span>
+      <div>
+        <h4>Actions live in one always-visible menu</h4>
+        <p>A kebab in the last column, present on every row, opening edit / delete / contextual actions. Always visible rather than hover-revealed: no layout shift, works on touch, and you can see that actions exist without discovering them.</p>
+      </div>
+    </div>
+    <div class="rl">
+      <span class="n">3</span>
+      <div>
+        <h4>A button only when the action is the row's purpose</h4>
+        <p>If you came to this screen <i>in order to</i> act on its rows, the action is a button. Billing's ready list qualifies — every row is there to be billed. The clients list doesn't; you go there to find a client.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="test">
+    <p><b>The test for rule 3:</b> "Would I open this screen in order to do this to a row?" Yes → button. No → menu.</p>
+    <p>It's deliberately narrow. A screen gets at most one button-per-row action, and everything else on that row still goes in the menu.</p>
+  </div>
+</div>
+
+<!-- ===== 03 CLIENTS ===== -->
+<div class="sec">
+  <div class="sec-head"><span class="sec-num">03</span><h2>Clients — name links, menu acts</h2><span class="say">Replaces hover row actions.</span></div>
+
+  <div class="wp">
+    <div class="wp-bar">Plain Text Time Tracker</div>
+    <div class="wp-body">
+      <div class="row" style="margin-bottom:18px">
+        <h1 class="page">Clients</h1>
+        <div class="grow"></div>
+        <span class="btn p sm">Add client</span>
+      </div>
+      <div class="card" style="position:relative">
+        <table>
+          <thead><tr>
+            <th>Client</th><th class="n" style="width:110px">Rate</th><th style="width:130px">Projects</th>
+            <th class="n" style="width:130px">Unbilled</th><th class="n" style="width:140px">Value this year</th><th style="width:52px"></th>
+          </tr></thead>
+          <tbody>
+            <tr>
+              <td><a class="lk" href="#" style="font-weight:500">Behind The Scenes Adventures</a></td>
+              <td class="n typed muted">$100</td><td class="muted">3 active</td>
+              <td class="n"><span class="amt">$41.67</span></td><td class="n"><span class="amt">$791.68</span></td>
+              <td class="c"><span class="kb"><i></i><i></i><i></i></span></td>
+            </tr>
+            <tr style="background:var(--sunk)">
+              <td><a class="lk" href="#" style="font-weight:500">Daniel Mintie</a></td>
+              <td class="n typed muted">$100</td><td class="muted">1 active</td>
+              <td class="n"><span class="amt">$793.32</span></td><td class="n"><span class="amt">$793.32</span></td>
+              <td class="c" style="position:relative"><span class="kb hov"><i></i><i></i><i></i></span></td>
+            </tr>
+            <tr>
+              <td><a class="lk" href="#" style="font-weight:500">Democrats of Rossmor</a></td>
+              <td class="n typed">$90</td><td class="muted">1 active</td>
+              <td class="n"><span class="amt">$1,501.50</span></td><td class="n"><span class="amt">$1,501.50</span></td>
+              <td class="c"><span class="kb"><i></i><i></i><i></i></span></td>
+            </tr>
+            <tr>
+              <td><a class="lk" href="#" style="font-weight:500">Postie</a></td>
+              <td class="n typed">$90</td><td class="muted">3 active</td>
+              <td class="n"><span class="amt">$348.00</span></td><td class="n"><span class="amt">$3,848.00</span></td>
+              <td class="c"><span class="kb"><i></i><i></i><i></i></span></td>
+            </tr>
+          </tbody>
+        </table>
+        <div class="menu" style="top:106px">
+          <div class="hl">Edit client…</div>
+          <div>View entries</div>
+          <div>Add a project</div>
+          <div class="sep"></div>
+          <div class="dz">Delete client</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="note">
+    <h4>Why not keep WP hover actions</h4>
+    <p>They're native, and that's the argument for them. Against: they're invisible until hover, so nothing tells you actions exist; they shift the row when they appear; and they don't work on touch at all. The kebab costs one narrow column and solves all three.</p>
+    <p>Delete stays inside the menu, below a divider, in red — the one place red is permitted, because deleting a client with history is genuinely destructive.</p>
+  </div>
+</div>
+
+<!-- ===== 04 BILLING ===== -->
+<div class="sec">
+  <div class="sec-head"><span class="sec-num">04</span><h2>Billing — where a button is right</h2><span class="say">Rule 3 in both directions.</span></div>
+
+  <div class="wp" style="margin-bottom:16px">
+    <div class="wp-bar">Billing — Ready to bill</div>
+    <div class="wp-body">
+      <div class="row" style="margin-bottom:18px">
+        <h1 class="page">Billing</h1>
+        <div style="margin-left:6px;display:inline-flex;border:1px solid var(--rule);border-radius:4px;overflow:hidden;background:#fff">
+          <span style="padding:6px 14px;font-size:13.5px;background:var(--ink);color:#fff">Ready to bill</span>
+          <span style="padding:6px 14px;font-size:13.5px;color:var(--ink-2);border-left:1px solid var(--rule)">Billed</span>
+        </div>
+        <div class="grow"></div>
+      </div>
+      <div class="card">
+        <div class="card-h">Ready to bill <span class="lite">· 18 scopes · <span class="typed">$4,412.00</span></span>
+          <div class="grow"></div>
+          <span style="display:inline-block;border:1px solid var(--rule);background:#fff;border-radius:3px;padding:3px 24px 3px 9px;font-size:12.5px;color:var(--ink-2);position:relative">Sort by <b style="color:var(--ink)">Longest sitting</b></span>
+        </div>
+        <table>
+          <thead><tr>
+            <th style="width:22%">Client</th><th style="width:26%">Project</th><th>Covers</th>
+            <th class="n" style="width:105px">Sitting</th><th class="n" style="width:115px">Amount</th><th style="width:150px"></th>
+          </tr></thead>
+          <tbody>
+            <tr>
+              <td><a class="lk" href="#">Jean Elvin</a></td>
+              <td><a class="lk" href="#">General Website Support</a> <span class="pill p-hourly">Hourly</span></td>
+              <td class="muted"><span class="typed">Feb 11, 2026</span> · 2 entries</td>
+              <td class="n typed" style="color:var(--c-over)">151 days</td>
+              <td class="n"><span class="amt">$158.33</span></td>
+              <td class="n"><span class="btn sm">Review &amp; bill →</span></td>
+            </tr>
+            <tr>
+              <td><a class="lk" href="#">Daniel Mintie</a></td>
+              <td><a class="lk" href="#">General Website Support</a> <span class="pill p-hourly">Hourly</span></td>
+              <td class="muted"><span class="typed">Feb 17 – May 19</span> · 15 entries</td>
+              <td class="n typed" style="color:var(--c-over)">151 days</td>
+              <td class="n"><span class="amt">$793.32</span></td>
+              <td class="n"><span class="btn sm">Review &amp; bill →</span></td>
+            </tr>
+            <tr>
+              <td><a class="lk" href="#">Postie</a></td>
+              <td><a class="lk" href="#">Website Care Plan Time</a> <span class="pill p-monthly">Monthly</span></td>
+              <td class="muted"><span class="typed">June 2026</span> · <span class="typed">2h 8m</span> over</td>
+              <td class="n typed">19 days</td>
+              <td class="n"><span class="amt">$192.00</span></td>
+              <td class="n"><span class="btn sm">Review &amp; bill →</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="wp">
+    <div class="wp-bar">Billing — Billed</div>
+    <div class="wp-body">
+      <div class="card">
+        <div class="card-h">Bill records <span class="lite">· <span class="typed">Jul 1 – 19, 2026</span></span></div>
+        <table>
+          <thead><tr>
+            <th style="width:120px">Record</th><th style="width:120px">Recorded</th><th style="width:22%">Client</th>
+            <th>Project</th><th class="n" style="width:110px">Billed</th><th class="n" style="width:110px">Absorbed</th><th style="width:52px"></th>
+          </tr></thead>
+          <tbody>
+            <tr>
+              <td><a class="lk typed" href="#" style="font-weight:500">#23</a></td>
+              <td class="typed muted">Jul 5, 2026</td>
+              <td class="muted">Behind The Scenes Adventures</td>
+              <td class="muted">June 2026 Ad</td>
+              <td class="n"><span class="amt">$93.33</span></td><td class="n"><span class="dash">—</span></td>
+              <td class="c"><span class="kb"><i></i><i></i><i></i></span></td>
+            </tr>
+            <tr>
+              <td><a class="lk typed" href="#" style="font-weight:500">#19</a></td>
+              <td class="typed muted">Jul 3, 2026</td>
+              <td class="muted">Behind The Scenes Adventures</td>
+              <td class="muted">April 2026 Ad Design</td>
+              <td class="n"><span class="amt">$63.33</span></td>
+              <td class="n typed" style="color:var(--c-over)">$20.00</td>
+              <td class="c"><span class="kb"><i></i><i></i><i></i></span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="note">
+    <h4>Two lists, two treatments, one rule</h4>
+    <p><b>Ready to bill</b> — you open this screen in order to bill things. Button. It's also the only per-row button in the app, which is what keeps it meaningful.</p>
+    <p><b>Billed</b> — you open this to look something up. The record number is the link; <span class="typed">View record</span> disappears as a column. The menu holds copy invoice text, view entries, delete record.</p>
+  </div>
+</div>
+
+<!-- ===== 05 MENU ===== -->
+<div class="sec">
+  <div class="sec-head"><span class="sec-num">05</span><h2>Menu contents</h2><span class="say">Same order everywhere.</span></div>
+  <p class="lead">Primary edit first and highlighted, then navigation, then contextual actions, then destructive below a divider. Consistent ordering means the first item is always the one you want most.</p>
+
+  <div class="card">
+    <table>
+      <thead><tr><th style="width:22%">Row type</th><th>Menu</th></tr></thead>
+      <tbody>
+        <tr><td><b>Time entry</b></td><td><span class="muted">Edit entry… · Change tags… · Mark not billable · Go to [date] log · — · Delete entry</span></td></tr>
+        <tr><td><b>Client</b></td><td><span class="muted">Edit client… · View entries · Add a project · — · Delete client</span></td></tr>
+        <tr><td><b>Project</b></td><td><span class="muted">Edit project… · View entries · Archive project · — · Delete project</span></td></tr>
+        <tr><td><b>Bill record</b></td><td><span class="muted">Copy invoice text · View entries covered · — · Delete record</span></td></tr>
+        <tr><td><b>Daily log</b></td><td><span class="muted">Open log · View entries · Re-process…</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="note">
+    <h4>Conventions</h4>
+    <p>Ellipsis means a dialog follows — <i>Edit client…</i> opens a modal, <i>Archive project</i> acts immediately. Destructive items sit below a divider in red and always confirm. Red appears nowhere else in the app.</p>
+    <p>If a menu would hold one item, don't build a menu — that item becomes a link in the row. If it would hold more than six, the row probably needs a detail page.</p>
+  </div>
+</div>
+
+</div>

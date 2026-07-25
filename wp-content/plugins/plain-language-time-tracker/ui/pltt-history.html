@@ -1,0 +1,280 @@
+<meta charset="utf-8">
+<title>PLTT — History</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;450;500;600&family=IBM+Plex+Mono:wght@400;450;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --paper:#fff; --canvas:#f4f3f1; --sunk:#faf9f7;
+    --rule:#e4e2de; --rule-2:#efedea;
+    --ink:#1a1c1e; --ink-2:#55595e; --ink-3:#8a8d91;
+    --blue:#2271b1;
+    --c-hourly:#146b42; --c-hourly-bg:#e0f0e7;
+    --c-over:#9a6a10;   --c-over-bg:#fbefd8;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:#e3e1de;font:14px/1.6 "IBM Plex Sans",system-ui,sans-serif;color:var(--ink);-webkit-font-smoothing:antialiased}
+  .wrap{max-width:1100px;margin:0 auto;padding:36px 24px 90px}
+  .typed{font-family:"IBM Plex Mono",monospace;font-variant-numeric:tabular-nums;letter-spacing:-.12px}
+
+  .doc{background:var(--ink);color:#fff;padding:30px 34px;border-radius:6px}
+  .doc h1{margin:0 0 11px;font-size:22px;font-weight:600;letter-spacing:-.35px}
+  .doc p{margin:0;color:#b9bcc0;max-width:76ch;line-height:1.75}
+  .doc b{color:#fff;font-weight:500}
+
+  .sec{margin-top:44px}
+  .sec-head{padding-bottom:12px;border-bottom:2px solid var(--ink);margin-bottom:22px;display:flex;align-items:baseline;gap:13px}
+  .sec-num{font:500 12px/1 "IBM Plex Mono",monospace;color:var(--ink-3);letter-spacing:.7px}
+  .sec-head h2{margin:0;font-size:18px;font-weight:600;letter-spacing:-.25px}
+  .sec-head .say{margin-left:auto;font-size:13px;color:var(--ink-2)}
+  .lead{max-width:80ch;color:var(--ink-2);margin:0 0 22px;line-height:1.8}
+
+  .wp{background:var(--canvas);border:1px solid #cbc9c5;border-radius:6px;overflow:hidden}
+  .wp-bar{background:var(--ink);color:#8a8d91;font:11px/1 "IBM Plex Mono",monospace;padding:9px 15px}
+  .wp-body{padding:26px 28px 32px}
+  .row{display:flex;align-items:center;gap:12px}
+  .grow{flex:1}
+  .muted{color:var(--ink-3)}
+
+  .hd{display:flex;align-items:flex-start;gap:16px;margin-bottom:20px}
+  .hd h1{margin:0;font-size:26px;font-weight:450;letter-spacing:-.5px;line-height:1.2}
+  .hd .l2{color:var(--ink-2);font-size:13.5px;margin-top:6px}
+  .hd .l3{color:var(--ink-3);font-size:13px;margin-top:3px}
+
+  .btn{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--blue);background:var(--paper);color:var(--blue);padding:7px 14px;border-radius:4px;font-size:13.5px}
+  .btn.q{border-color:#c2bfba;color:var(--ink-2)}
+  .btn.sm{padding:5px 11px;font-size:12.5px}
+  .stepper{display:inline-flex;align-items:center;border:1px solid #c2bfba;border-radius:4px;overflow:hidden;background:var(--paper)}
+  .stepper .arw{padding:7px 13px;color:var(--ink-2);border-right:1px solid var(--rule)}
+  .stepper .arw.r{border-right:0;border-left:1px solid var(--rule)}
+  .stepper .dt{padding:7px 17px;font:13px/1 "IBM Plex Mono",monospace}
+  .seg{display:inline-flex;border:1px solid var(--rule);border-radius:4px;overflow:hidden;background:var(--paper)}
+  .seg span{padding:7px 15px;font-size:13.5px;color:var(--ink-2);border-right:1px solid var(--rule)}
+  .seg span:last-child{border-right:0}
+  .seg span.on{background:var(--ink);color:#fff}
+
+  .card{background:var(--paper);border:1px solid var(--rule);border-radius:6px}
+  table{width:100%;border-collapse:collapse}
+  th{text-align:left;font-weight:450;color:var(--ink-3);font-size:11.5px;letter-spacing:.5px;text-transform:uppercase;padding:11px 20px;border-bottom:1px solid var(--rule);background:var(--sunk)}
+  th.n{text-align:right}
+  td{padding:14px 20px;border-bottom:1px solid var(--rule-2);vertical-align:middle}
+  td.n{text-align:right}
+  tr:last-child td{border-bottom:0}
+  a.lk{color:var(--blue);text-decoration:none}
+  a.lk:hover{text-decoration:underline}
+  .pill{display:inline-block;padding:2px 10px;border-radius:3px;font-size:12px;line-height:20px}
+  .p-over{background:var(--c-over-bg);color:var(--c-over)}
+
+  .weekbar{padding:12px 20px;background:var(--sunk);border-bottom:1px solid var(--rule);display:flex;align-items:baseline;gap:12px;font-size:13.5px}
+  .weekbar b{font-weight:600;letter-spacing:-.1px}
+
+  .prev{color:var(--ink-2);font:12.5px/1.55 "IBM Plex Mono",monospace;display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+  /* calendar */
+  .cal{display:grid;grid-template-columns:repeat(7,1fr);gap:5px}
+  .cal .dow{font-size:11.5px;color:var(--ink-3);text-align:center;padding-bottom:5px;letter-spacing:.4px}
+  .cell{aspect-ratio:1;border-radius:4px;border:1px solid var(--rule-2);background:var(--paper);padding:6px 7px;position:relative}
+  .cell .d{font:11.5px/1 "IBM Plex Mono",monospace;color:var(--ink-3)}
+  .cell .h{position:absolute;left:7px;bottom:6px;font:12px/1 "IBM Plex Mono",monospace;color:var(--ink-2)}
+  .cell.l1{background:#eef4f0} .cell.l2{background:#dceae2} .cell.l3{background:#c4dcd0} .cell.l4{background:#a6cbba}
+  .cell.gap{background:repeating-linear-gradient(135deg,#faf9f7,#faf9f7 4px,#f2f0ed 4px,#f2f0ed 8px);border-style:dashed}
+  .cell.off{background:transparent;border-color:transparent}
+  .legend{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--ink-3);margin-top:14px}
+  .legend i{width:15px;height:15px;border-radius:3px;border:1px solid var(--rule-2);display:inline-block}
+
+  .note{background:var(--sunk);border:1px solid var(--rule);border-left:3px solid var(--blue);border-radius:5px;padding:16px 20px;margin-top:18px}
+  .note h4{margin:0 0 7px;font-size:13.5px;font-weight:600}
+  .note p{margin:0;font-size:13px;color:var(--ink-2);line-height:1.75}
+  .note p + p{margin-top:9px}
+
+  .cut{width:100%;border-collapse:collapse;background:var(--paper);border:1px solid var(--rule);border-radius:6px;overflow:hidden}
+  .cut td{font-size:13.5px}
+  .was{color:var(--ink-3)}
+</style>
+
+<div class="wrap">
+
+<div class="doc">
+  <h1>History</h1>
+  <p>Its job is finding a past day's log, and it already does that. This is subtraction plus one free addition — nothing here is a new feature.</p>
+</div>
+
+<!-- ===== 01 ===== -->
+<div class="sec">
+  <div class="sec-head"><span class="sec-num">01</span><h2>Cleaned up</h2><span class="say">Four removals, one addition.</span></div>
+
+  <div class="wp">
+    <div class="wp-bar">Plain Text Time Tracker</div>
+    <div class="wp-body">
+      <div class="hd">
+        <div>
+          <h1>History</h1>
+          <div class="l2">16 days logged · <span class="typed">96h 12m</span> across the month</div>
+          <div class="l3"><span class="typed">June 2026</span></div>
+        </div>
+        <div class="grow"></div>
+        <div class="seg"><span class="on">List</span><span>Calendar</span></div>
+        <span class="btn q sm">This month</span>
+        <span class="stepper"><span class="arw">‹</span><span class="dt">June 2026</span><span class="arw r">›</span></span>
+      </div>
+
+      <div class="card">
+        <table>
+          <thead><tr><th style="width:170px">Day</th><th>Preview</th><th class="n" style="width:100px">Entries</th><th class="n" style="width:110px">Hours</th></tr></thead>
+        </table>
+
+        <div class="weekbar"><b>Jun 22 – 28</b><div class="grow"></div><span class="muted typed">3 days · 15h 58m</span></div>
+        <table><tbody>
+          <tr>
+            <td style="width:170px"><a class="lk" href="#">Fri, Jun 26</a></td>
+            <td><span class="prev">@9:30am - Starting Quiet Coworking @10:39am - Done @9:36am - Working on Linke…</span></td>
+            <td class="n" style="width:100px"><a class="lk typed" href="#">11</a></td>
+            <td class="n typed" style="width:110px">4h 52m</td>
+          </tr>
+          <tr>
+            <td><a class="lk" href="#">Thu, Jun 25</a></td>
+            <td><span class="prev">@8:52am - Working on Linkedin connections and commenting. @10:15am - Working …</span></td>
+            <td class="n"><a class="lk typed" href="#">11</a></td>
+            <td class="n typed">6h 27m</td>
+          </tr>
+          <tr>
+            <td><a class="lk" href="#">Wed, Jun 24</a></td>
+            <td><span class="prev">@8:33am - Working on Linkedin commenting and connections. @10:43am - Done. @1…</span></td>
+            <td class="n"><a class="lk typed" href="#">7</a></td>
+            <td class="n typed">4h 39m</td>
+          </tr>
+        </tbody></table>
+
+        <div class="weekbar" style="border-top:1px solid var(--rule)"><b>Jun 15 – 21</b><div class="grow"></div><span class="muted typed">1 day · 7h 01m</span></div>
+        <table><tbody>
+          <tr>
+            <td style="width:170px"><a class="lk" href="#">Mon, Jun 15</a></td>
+            <td><span class="prev">@8:50am - Working on LinkedIn Outreach @10:34am - Done. @10:43am - Following …</span></td>
+            <td class="n" style="width:100px"><a class="lk typed" href="#">9</a></td>
+            <td class="n typed" style="width:110px">7h 01m</td>
+          </tr>
+        </tbody></table>
+
+        <div class="weekbar" style="border-top:1px solid var(--rule)"><b>Jun 8 – 14</b><div class="grow"></div><span class="muted typed">6 days · 36h 32m</span></div>
+        <table><tbody>
+          <tr>
+            <td style="width:170px"><a class="lk" href="#">Sun, Jun 14</a></td>
+            <td><span class="prev">@12:20pm - Working on CA's analytics report. @2:36pm - Done</span></td>
+            <td class="n" style="width:100px"><a class="lk typed" href="#">1</a></td>
+            <td class="n typed" style="width:110px">2h 16m</td>
+          </tr>
+          <tr>
+            <td><a class="lk" href="#">Fri, Jun 12</a></td>
+            <td><span class="prev">@9:02am - Responding to client emails @9:44am - Working on Linkedin Connectio…</span></td>
+            <td class="n"><a class="lk typed" href="#">3</a></td>
+            <td class="n typed">5h 12m</td>
+          </tr>
+          <tr>
+            <td><a class="lk" href="#">Thu, Jun 11</a></td>
+            <td><span class="prev">@8:38am - Working on content writing @10:08am - Pause @10:31am - Back to work…</span></td>
+            <td class="n"><a class="lk typed" href="#">8</a></td>
+            <td class="n typed">7h 51m</td>
+          </tr>
+          <tr>
+            <td><a class="lk" href="#">Tue, Jun 9</a> <span class="pill p-over">Not processed</span></td>
+            <td><span class="prev">##Today -[x] Meeting with Amanda -[x] Robins website lanuch @9:17am - Posting…</span></td>
+            <td class="n muted">—</td>
+            <td class="n muted">—</td>
+          </tr>
+        </tbody></table>
+      </div>
+    </div>
+  </div>
+
+  <table class="cut" style="margin-top:18px">
+    <thead><tr><th style="width:36%">Change</th><th>Reason</th></tr></thead>
+    <tbody>
+      <tr><td><b class="was" style="text-decoration:line-through">Daily Logs 16</b> card removed</td><td>Moved into the header subline, where it costs a phrase instead of a card.</td></tr>
+      <tr><td><b class="was" style="text-decoration:line-through">Status</b> column removed</td><td>Every row said "Processed". Now the exception is a chip on the day itself — which makes an unprocessed day findable instead of invisible in a column of identical chips.</td></tr>
+      <tr><td><b>Hours in h/m</b></td><td><span class="typed">4.87</span> was the only place in the app using decimals.</td></tr>
+      <tr><td><b>Week totals in the band</b></td><td>You already group by week; days and hours per week cost nothing to add.</td></tr>
+      <tr><td><b>Preview gets the width</b></td><td>It's the column you actually read to recognise a day. Set in mono, since it's your raw text.</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- ===== 02 ===== -->
+<div class="sec">
+  <div class="sec-head"><span class="sec-num">02</span><h2>The calendar, if you want it</h2><span class="say">The only thing a list structurally can't show.</span></div>
+  <p class="lead">A list can only show days that exist. Days you didn't log aren't rows — they're absent, and absence is invisible in a table. A month grid is the only view where a gap has a shape.</p>
+
+  <div class="wp">
+    <div class="wp-bar">Plain Text Time Tracker</div>
+    <div class="wp-body">
+      <div class="hd">
+        <div>
+          <h1>History</h1>
+          <div class="l2">16 days logged · 8 weekdays with nothing recorded</div>
+          <div class="l3"><span class="typed">June 2026</span></div>
+        </div>
+        <div class="grow"></div>
+        <div class="seg"><span>List</span><span class="on">Calendar</span></div>
+        <span class="stepper"><span class="arw">‹</span><span class="dt">June 2026</span><span class="arw r">›</span></span>
+      </div>
+
+      <div class="card">
+        <div style="padding:20px 22px 22px">
+          <div class="cal">
+            <div class="dow">MON</div><div class="dow">TUE</div><div class="dow">WED</div><div class="dow">THU</div><div class="dow">FRI</div><div class="dow">SAT</div><div class="dow">SUN</div>
+
+            <div class="cell l4"><span class="d">1</span><span class="h">7h 08m</span></div>
+            <div class="cell l4"><span class="d">2</span><span class="h">8h 07m</span></div>
+            <div class="cell l3"><span class="d">3</span><span class="h">5h 19m</span></div>
+            <div class="cell l3"><span class="d">4</span><span class="h">6h 25m</span></div>
+            <div class="cell l4"><span class="d">5</span><span class="h">7h 56m</span></div>
+            <div class="cell off"><span class="d">6</span></div>
+            <div class="cell l1"><span class="d">7</span><span class="h">1h 09m</span></div>
+
+            <div class="cell l4"><span class="d">8</span><span class="h">7h 42m</span></div>
+            <div class="cell l3"><span class="d">9</span><span class="h">6h 41m</span></div>
+            <div class="cell l3"><span class="d">10</span><span class="h">6h 54m</span></div>
+            <div class="cell l4"><span class="d">11</span><span class="h">7h 51m</span></div>
+            <div class="cell l2"><span class="d">12</span><span class="h">5h 12m</span></div>
+            <div class="cell off"><span class="d">13</span></div>
+            <div class="cell l1"><span class="d">14</span><span class="h">2h 16m</span></div>
+
+            <div class="cell l4"><span class="d">15</span><span class="h">7h 01m</span></div>
+            <div class="cell gap"><span class="d">16</span></div>
+            <div class="cell gap"><span class="d">17</span></div>
+            <div class="cell gap"><span class="d">18</span></div>
+            <div class="cell gap"><span class="d">19</span></div>
+            <div class="cell off"><span class="d">20</span></div>
+            <div class="cell off"><span class="d">21</span></div>
+
+            <div class="cell gap"><span class="d">22</span></div>
+            <div class="cell gap"><span class="d">23</span></div>
+            <div class="cell l2"><span class="d">24</span><span class="h">4h 39m</span></div>
+            <div class="cell l3"><span class="d">25</span><span class="h">6h 27m</span></div>
+            <div class="cell l2"><span class="d">26</span><span class="h">4h 52m</span></div>
+            <div class="cell off"><span class="d">27</span></div>
+            <div class="cell off"><span class="d">28</span></div>
+
+            <div class="cell gap"><span class="d">29</span></div>
+            <div class="cell gap"><span class="d">30</span></div>
+            <div class="cell off"></div><div class="cell off"></div><div class="cell off"></div><div class="cell off"></div><div class="cell off"></div>
+          </div>
+
+          <div class="legend">
+            <span>Less</span>
+            <i style="background:#eef4f0"></i><i style="background:#dceae2"></i><i style="background:#c4dcd0"></i><i style="background:#a6cbba"></i>
+            <span>More</span>
+            <span style="margin-left:16px">·</span>
+            <i style="background:repeating-linear-gradient(135deg,#faf9f7,#faf9f7 4px,#f2f0ed 4px,#f2f0ed 8px);border-style:dashed"></i>
+            <span>Weekday with nothing logged</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="note">
+    <h4>Two things to be careful of</h4>
+    <p>The hatched cells are the whole point, and they're also the risk. A grid of blanks staring back at you is close to a productivity scorecard, which is the thing your principles rule out. Marking only <i>weekdays</i> and never counting a total of missed days keeps it descriptive — it's telling you a log is missing, not that you underperformed.</p>
+    <p>Second: the shading is hours, so a light cell reads as a weak day. If that grates, the alternative is a single flat tone for "logged" and hatching for "not" — showing presence and absence only, with no intensity at all. That's the safer version and probably the one to build first.</p>
+  </div>
+</div>
+
+</div>
