@@ -319,8 +319,28 @@ class PLTT_Project_Report {
 			array( 'sub' => $billable_minutes > 0 ? $billable_basis : '' )
 		);
 
-		// 3 — Not yet billed. Ochre while something is owed; the basis line is the
-		// route to those entries, nothing else (see spec §3, figure 4).
+		// 3 — Billed to date. No "View records" link: the ledger those records live
+		// in is already further down this same page.
+		$billed_opts = array( 'muted' => $billed <= 0.0 );
+		if ( $record_count > 0 ) {
+			$billed_opts['sub'] = sprintf(
+				/* translators: %s: number of billing records. */
+				_n( '%s record', '%s records', $record_count, 'plain-language-time-tracker' ),
+				number_format_i18n( $record_count )
+			);
+		} else {
+			$billed_opts['sub'] = __( 'no bill records yet', 'plain-language-time-tracker' );
+		}
+		$cards[] = self::card(
+			__( 'Billed to date', 'plain-language-time-tracker' ),
+			pltt_format_currency( $billed ),
+			$billed_opts
+		);
+
+		// 4 — Not yet billed. Slot 4 on every type that bills: the spec's rules for
+		// this figure are positional (period states, links-only basis, the backlog
+		// append), so it has to sit where they say. Ochre while something is owed;
+		// the basis line is the route to those entries, nothing else.
 		$unbilled_opts = array(
 			'over'  => $unbilled_amount > 0,
 			'muted' => 0.0 === $unbilled_amount,
@@ -341,24 +361,6 @@ class PLTT_Project_Report {
 			__( 'Not yet billed', 'plain-language-time-tracker' ),
 			pltt_format_currency( $unbilled_amount ),
 			$unbilled_opts
-		);
-
-		// 4 — Billed to date. No "View records" link: the ledger those records live
-		// in is already further down this same page.
-		$billed_opts = array( 'muted' => $billed <= 0.0 );
-		if ( $record_count > 0 ) {
-			$billed_opts['sub'] = sprintf(
-				/* translators: %s: number of billing records. */
-				_n( '%s record', '%s records', $record_count, 'plain-language-time-tracker' ),
-				number_format_i18n( $record_count )
-			);
-		} else {
-			$billed_opts['sub'] = __( 'no bill records yet', 'plain-language-time-tracker' );
-		}
-		$cards[] = self::card(
-			__( 'Billed to date', 'plain-language-time-tracker' ),
-			pltt_format_currency( $billed ),
-			$billed_opts
 		);
 
 		return $cards;

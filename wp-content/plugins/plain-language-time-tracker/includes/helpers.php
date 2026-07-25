@@ -2313,6 +2313,14 @@ function pltt_build_single_project_scope_figures( $project, $stats, $billing_typ
 			) . ' &rsaquo;</a>';
 		}
 
+		// Settled before owed, so "Not yet billed" lands in slot 4 on every type
+		// that bills. The spec's rules for this figure are positional — the
+		// period-states table, "figure 4's basis holds only links", the
+		// dash-not-zero rule, the backlog append, the tint — so the figure they
+		// describe has to actually be figure 4. Retainer already put it there;
+		// hourly had it third with "Billed to date" last.
+		$figures[] = $billed_figure;
+
 		// One name for this slot on every type and every range (amendment §7):
 		// "Not yet billed" names the STATE. "Ready to bill" / "Sitting unbilled"
 		// named the readiness or the age — and the age is already on the basis
@@ -2326,8 +2334,6 @@ function pltt_build_single_project_scope_figures( $project, $stats, $billing_typ
 			// filter — the only other signal that the figure isn't the whole story.
 			'tint'  => ( $backlog_count > 0 ),
 		);
-
-		$figures[] = $billed_figure;
 
 		// Action bar — only when something is ready to bill. The button jumps to
 		// the select-row flow (bill=1) over the span of unbilled entries.
