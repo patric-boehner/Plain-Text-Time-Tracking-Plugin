@@ -459,7 +459,7 @@
 
 	/**
 	 * Helper: update billable checkbox and $ symbol visually without side-effects.
-	 * Does NOT dispatch 'change' (which would trigger AJAX to clear billed status).
+	 * Does NOT dispatch 'change' (which would fire the inline-save AJAX).
 	 *
 	 * @param {HTMLElement} row         The .pltt-entry-row element.
 	 * @param {boolean}     isBillable  True to mark billable, false for non-billable.

@@ -375,7 +375,6 @@ class PLTT_Review {
 				'verified'             => $entry->verified,
 				'billable'             => $entry->billable,
 				'billable_amount'      => $billable_amount,
-				'billed'               => $entry->billed ?? 0,
 			);
 		}
 

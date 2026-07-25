@@ -776,17 +776,6 @@ a.pltt-pcc-project:focus {
 	text-align: center;
 }
 
-/* Billed (invoiced) entry row highlight */
-.widefat tr.pltt-billed td {
-	background-color: var(--pltt-billed-bg);
-	border-left-color: var(--pltt-primary);
-	border-bottom-color: var(--pltt-billed-border);
-}
-
-.widefat tr.pltt-billed td:first-child {
-	border-left: 3px solid var(--pltt-primary);
-}
-
 /* Archived row highlight (reports summary, projects list when not grouped by status). */
 .widefat tr.pltt-row-archived td {
 	background-color: var(--pltt-overlay-faint);
