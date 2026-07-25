@@ -69,7 +69,6 @@ $return_to     = $return_to_raw ? wp_validate_redirect( $return_to_raw, '' ) : '
 			</div>
 			<div class="pltt-lh-l2"><?php echo $today_l2; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?></div>
 			<?php if ( $is_today_view ) : ?>
-				<div class="pltt-lh-l3"><span class="pltt-mono"><?php echo esc_html( $date_full ); ?></span></div>
 			<?php endif; ?>
 		</div>
 		<?php

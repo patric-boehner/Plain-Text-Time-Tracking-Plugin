@@ -139,24 +139,17 @@ $tab_base_url = add_query_arg( $filter_params, admin_url( 'admin.php' ) );
 		// Light header — this screen is not a single scope with terms, so it gets
 		// the three-line identity (no figures inside; those sit in the number bar
 		// below). Line 2 states what's true about the view; line 3 the literal dates.
-		$range_label_hdr = pltt_format_date_range( $date_from, $date_to );
-		if ( $stats && (int) $stats->total_minutes > 0 ) {
-			$scope_line_hdr = sprintf(
-				/* translators: 1: entry count; 2: total time logged (e.g. "95h 39m"). */
-				esc_html__( '%1$s · %2$s logged', 'plain-language-time-tracker' ),
-				esc_html( sprintf( _n( '%s entry', '%s entries', $total_entries, 'plain-language-time-tracker' ), number_format_i18n( $total_entries ) ) ),
-				esc_html( pltt_format_duration( (int) $stats->total_minutes ) )
-			);
-		} else {
-			$scope_line_hdr = esc_html( sprintf( _n( '%s entry', '%s entries', $total_entries, 'plain-language-time-tracker' ), number_format_i18n( $total_entries ) ) );
-		}
+		// Line 2 states only what the page can't get from the elements beside it.
+		// The hours used to sit here too, but "Total Hours" is the first figure in
+		// the number bar directly below — the same number twice, inches apart. The
+		// entry count appears nowhere else, so that's what's left.
+		$scope_line_hdr = esc_html( sprintf( _n( '%s entry', '%s entries', $total_entries, 'plain-language-time-tracker' ), number_format_i18n( $total_entries ) ) );
 		?>
 		<div class="pltt-light-header">
 			<div class="pltt-lh-titlerow">
 				<h1><?php echo esc_html( 'summary' === $view ? __( 'Summary', 'plain-language-time-tracker' ) : __( 'Entries', 'plain-language-time-tracker' ) ); ?></h1>
 			</div>
 			<div class="pltt-lh-l2"><?php echo $scope_line_hdr; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?></div>
-			<div class="pltt-lh-l3"><span class="pltt-mono"><?php echo esc_html( $range_label_hdr ); ?></span></div>
 		</div>
 		<div class="pltt-view-toggle">
 			<a href="<?php echo esc_url( add_query_arg( 'view', 'summary', $tab_base_url ) ); ?>"
