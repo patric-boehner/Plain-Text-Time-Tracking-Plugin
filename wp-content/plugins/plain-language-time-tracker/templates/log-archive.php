@@ -50,7 +50,6 @@ if ( ! defined( 'ABSPATH' ) ) {
 					?>
 				</div>
 			<?php endif; ?>
-			<div class="pltt-lh-l3"><span class="pltt-mono"><?php echo esc_html( $nav_label ); ?></span></div>
 		</div>
 
 	<?php // Date nav sits in the header (top-right), where the Today · History toggle used to be. ?>
