@@ -295,7 +295,10 @@ class PLTT_Ajax {
 			return;
 		}
 
-		$allowed_fields = array( 'billable', 'billed', 'tags' );
+		// 'billed' is gone: billed state comes from bill-record coverage, so there
+		// is nothing on the entry to set. Leaving the write path open would have
+		// let a stray request re-populate the fossil flag.
+		$allowed_fields = array( 'billable', 'tags' );
 		if ( ! in_array( $field, $allowed_fields, true ) ) {
 			wp_send_json_error( __( 'Invalid field.', 'plain-language-time-tracker' ) );
 			return;
@@ -314,6 +317,17 @@ class PLTT_Ajax {
 			// SEC-H3: Ensure value is strictly 0 or 1.
 			if ( ! in_array( $int_value, array( 0, 1 ), true ) ) {
 				wp_send_json_error( __( 'Invalid value.', 'plain-language-time-tracker' ) );
+				return;
+			}
+
+			// Locked once a bill record covers the entry (spec §4). A record froze
+			// this entry's amount into a committed total, so flipping the flag
+			// afterwards would either contradict money already billed or produce
+			// "not billable, yet billed" — the one Status combination that must not
+			// exist. Undoing means deleting the record. Enforced here rather than
+			// only in the markup: a UI-only lock isn't a lock.
+			if ( in_array( $entry_id, PLTT_Billing_Record_Entries::get_all_covered_entry_ids(), true ) ) {
+				wp_send_json_error( __( 'This entry is on a bill record. Delete the record to change whether it is billable.', 'plain-language-time-tracker' ) );
 				return;
 			}
 
@@ -356,19 +370,6 @@ class PLTT_Ajax {
 				'billable_amount' => $update_data['billable_amount'] ?? 0.0,
 			) );
 			return;
-		} else {
-			// 'billed' field — SEC-H3: Ensure value is strictly 0 or 1.
-			$int_value = (int) $value;
-			if ( ! in_array( $int_value, array( 0, 1 ), true ) ) {
-				wp_send_json_error( __( 'Invalid value.', 'plain-language-time-tracker' ) );
-				return;
-			}
-
-			$result = PLTT_Entries::update( $entry_id, array( 'billed' => $int_value ) );
-			if ( ! $result ) {
-				wp_send_json_error( __( 'Failed to update entry.', 'plain-language-time-tracker' ) );
-				return;
-			}
 		}
 
 		wp_send_json_success( array( 'message' => __( 'Saved.', 'plain-language-time-tracker' ) ) );

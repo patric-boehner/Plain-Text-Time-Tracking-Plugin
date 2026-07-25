@@ -1,0 +1,360 @@
+/**
+ * PLTT design language — the reusable layer.
+ *
+ * Tokens + type + the header/number-bar primitives that give every screen one
+ * way of stating "what you're looking at" and "what it's worth". Loaded on every
+ * PLTT admin page (before the per-screen sheets), so anything here is available
+ * everywhere and meant to be built against rather than re-authored per screen.
+ *
+ * Two ideas do the work:
+ *   - Type carries the design. Two families, split by MEANING, not decoration:
+ *     mono = what the clock measured or you typed (times, durations, dates,
+ *     money, record numbers, the raw log); sans = what the app inferred or you
+ *     named (descriptions, client/project names, tags, labels).
+ *   - Colour names, never judges. Categoricals sit at equal weight; nothing
+ *     about hours or money is ever red — over-budget / overage / unbilled all
+ *     use one muted ochre (--pltt-c-over). Red stays for destructive actions and
+ *     form errors only.
+ *
+ * No webfonts: "mono" and "sans" resolve to the system stacks below.
+ *
+ * @package PlainLanguageTimeTracker
+ */
+
+:root {
+	/* ---- Neutrals: warmed a few degrees off WP's cold grey, so a screen of
+	   text reads as paper rather than a control panel. ---- */
+	--pltt-paper:  #ffffff;
+	--pltt-canvas: #f4f3f1;
+	--pltt-sunk:   #faf9f7;
+	--pltt-rule:   #e4e2de; /* structural hairline (lighter than WP #dcdcde) */
+	--pltt-rule-2: #efedea; /* in-table / intra-object hairline */
+	--pltt-ink:    #1a1c1e;
+	--pltt-ink-2:  #55595e;
+	--pltt-ink-3:  #8a8d91;
+
+	/* One action colour — WP's blue, kept as the anchor. */
+	--pltt-blue: #2271b1;
+
+	/* ---- Categoricals: desaturated, equal weight. These name things; none is
+	   styled as better or worse. --pltt-c-over is the only warm one, a muted
+	   ochre — over is a fact about hours, not a warning. ---- */
+	--pltt-c-hourly:   #146b42;  --pltt-c-hourly-bg:  #e0f0e7;
+	--pltt-c-monthly:  #175d87;  --pltt-c-monthly-bg: #e0edf7;
+	--pltt-c-fixed:    #5540a5;  --pltt-c-fixed-bg:   #eae5f9;
+	--pltt-c-own:      #666360;  --pltt-c-own-bg:     #eeedea;
+	--pltt-c-over:     #9a6a10;  --pltt-c-over-bg:    #fbefd8;
+	--pltt-c-tag:      #1d5f8a;  --pltt-c-tag-bg:     #e4eef7;
+
+	/* ---- Type: two families, one rule about which is which. ---- */
+	--pltt-font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+	                  "Helvetica Neue", sans-serif;
+	--pltt-font-mono: Menlo, Consolas, monaco, monospace;
+}
+
+/* ============================================================
+   MODEL BADGES — the billing-model pill (Hourly / Monthly / Fixed / Internal)
+   in the desaturated categoricals, equal weight, none louder than another.
+   Base .pltt-badge sizing/shape comes from admin.css; these set colour only.
+   Two-class specificity (0,2,0) beats admin.css's generic .pltt-badge-success
+   etc., so only model badges recolour — status badges elsewhere are untouched.
+   ============================================================ */
+.pltt-badge.pltt-badge-model-hourly   { background: var(--pltt-c-hourly-bg);  color: var(--pltt-c-hourly); }
+.pltt-badge.pltt-badge-model-monthly  { background: var(--pltt-c-monthly-bg); color: var(--pltt-c-monthly); }
+.pltt-badge.pltt-badge-model-fixed    { background: var(--pltt-c-fixed-bg);   color: var(--pltt-c-fixed); }
+.pltt-badge.pltt-badge-model-internal { background: var(--pltt-c-own-bg);     color: var(--pltt-c-own); }
+
+/* ============================================================
+   TYPE — a real scale, plus the mono utility.
+   System sans is set looser than the mockups' IBM Plex, so negative
+   letter-spacing on large text is roughly half what the specimen shows.
+   ============================================================ */
+
+/* Measured or typed. Use on any clock value, duration, date, money, record #,
+   or the raw log. Tabular figures so columns of numbers align for free. */
+.pltt-mono,
+.pltt-measured {
+	font-family: var(--pltt-font-mono);
+	font-variant-numeric: tabular-nums;
+	letter-spacing: -0.12px;
+}
+
+/* ============================================================
+   LIGHT HEADER — for screens that are not a scope (Today, unfiltered
+   Overview, lists). Three lines, no panel, no figures inside: what it is,
+   what's true about it, which dates. Figures live in the number bar below.
+   ============================================================ */
+.pltt-light-header {
+	margin: 0 0 20px;
+}
+/* When it sits in the existing .pltt-header grid it's just the first cell — the
+   grid already owns the bottom spacing, so drop the block's own margin. */
+.pltt-header > .pltt-light-header {
+	margin-bottom: 0;
+}
+.pltt-light-header .pltt-lh-titlerow {
+	display: flex;
+	align-items: center;
+	gap: 11px;
+	flex-wrap: wrap;
+}
+.pltt-light-header h1,
+.pltt-light-header .pltt-lh-title {
+	margin: 0;
+	padding: 0;
+	font-family: var(--pltt-font-sans);
+	font-size: 26px;
+	font-weight: 450;
+	letter-spacing: -0.25px;
+	line-height: 1.2;
+	color: var(--pltt-ink);
+}
+.pltt-light-header .pltt-lh-l2 {
+	color: var(--pltt-ink-2);
+	font-size: 13.5px;
+	margin-top: 6px;
+}
+.pltt-light-header .pltt-lh-l3 {
+	color: var(--pltt-ink-3);
+	font-size: 13px;
+	margin-top: 3px;
+}
+
+/* ============================================================
+   SCOPE BLOCK — for screens that ARE a scope with agreed terms (project
+   report, Entries filtered to one client+project, bill flow). A bordered
+   object: three-line identity, then the number bar as its figure row.
+   ============================================================ */
+.pltt-scope-block {
+	background: var(--pltt-paper);
+	border: 1px solid var(--pltt-rule);
+	border-radius: 6px;
+	margin: 0 0 20px;
+	overflow: hidden;
+}
+.pltt-scope-block .pltt-scope-id {
+	padding: 20px 24px 18px;
+	border-bottom: 1px solid var(--pltt-rule-2);
+}
+.pltt-scope-block .pltt-scope-titlerow {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	flex-wrap: wrap;
+}
+.pltt-scope-block .pltt-scope-title,
+.pltt-scope-block .pltt-scope-id h1 {
+	margin: 0;
+	padding: 0;
+	font-family: var(--pltt-font-sans);
+	font-size: 24px;
+	font-weight: 600;
+	letter-spacing: -0.25px;
+	line-height: 1.2;
+	color: var(--pltt-ink);
+}
+/* Line 2 — client · terms in plain language. */
+.pltt-scope-block .pltt-scope-terms {
+	color: var(--pltt-ink-2);
+	font-size: 14px;
+	margin-top: 8px;
+}
+/* Line 3 — "Showing <dates> · <count> entries", a tinted inset. */
+.pltt-scope-block .pltt-scope-when {
+	display: inline-flex;
+	align-items: baseline;
+	gap: 8px;
+	margin-top: 12px;
+	background: var(--pltt-sunk);
+	border: 1px solid var(--pltt-rule-2);
+	border-radius: 4px;
+	padding: 5px 12px;
+	font-size: 13px;
+	color: var(--pltt-ink-2);
+}
+
+/* When the number bar sits inside a scope block it is the block's figure row,
+   so it loses its own border/radius/margin and just carries the top hairline
+   already drawn by .pltt-scope-id. */
+.pltt-scope-block .pltt-summary-cards.pltt-numbar {
+	border: 0;
+	border-radius: 0;
+	margin: 0;
+}
+
+/* ============================================================
+   BILLING BAR — the action bar attached to the bottom of a scope block. The
+   block holds information; the bar holds the one action (Review & bill).
+   Attached with no gap (the block squares its bottom corners via .pltt-has-bar)
+   so the two read as one object. Present only when there's something to do.
+   ============================================================ */
+.pltt-scope-block.pltt-has-bar {
+	border-bottom-left-radius: 0;
+	border-bottom-right-radius: 0;
+	margin-bottom: 0;
+}
+.pltt-bbar {
+	display: flex;
+	align-items: center;
+	gap: 14px;
+	background: var(--pltt-paper);
+	border: 1px solid var(--pltt-rule);
+	border-top: 0;
+	border-radius: 0 0 6px 6px;
+	padding: 13px 22px;
+	margin: 0 0 20px;
+	font-size: 13.5px;
+	color: var(--pltt-ink-2);
+}
+.pltt-bbar-ready {
+	background: #f4faf6;
+	border-color: #cfe4d6;
+}
+.pltt-bbar-dot {
+	width: 7px;
+	height: 7px;
+	border-radius: 50%;
+	background: var(--pltt-c-hourly);
+	flex: none;
+}
+.pltt-bbar-spacer {
+	flex: 1;
+}
+.pltt-bbar strong {
+	font-weight: 600;
+	color: var(--pltt-ink);
+}
+
+/* ============================================================
+   STATUS CHIPS (spec §4) — the entry table's three billing states.
+   Green = chargeable and waiting. Tag blue = on a bill record; grey was the
+   spec's suggestion but reads as "disabled" on a status rather than "done", and
+   reusing the tag colour keeps a new combination out of the system. Ochre = a
+   decision you made, and it's the app's one amber.
+   ============================================================ */
+.pltt-badge.pltt-badge-billed {
+	background: var(--pltt-c-tag-bg);
+	color: var(--pltt-c-tag);
+}
+.pltt-badge.pltt-badge-notcharged {
+	background: var(--pltt-c-over-bg);
+	color: var(--pltt-c-over);
+}
+
+/* Warm wash on a figure whose work extends past the filter — the backlog line
+   says how much, this says "this figure isn't the whole story" before you read
+   it. Faint on purpose: it marks, it doesn't warn. */
+.pltt-summary-cards.pltt-numbar > .card.pltt-numbar-tint {
+	background: #fdfaf3;
+}
+
+/* The backlog link itself — ochre, matching the "owed" signal. */
+.pltt-lk.pltt-lk-over {
+	color: var(--pltt-c-over);
+}
+
+/* Inline link used on figure basis lines (e.g. "View records ›"). */
+.pltt-lk {
+	color: var(--pltt-blue);
+	text-decoration: none;
+}
+.pltt-lk:hover {
+	text-decoration: underline;
+}
+
+/* ============================================================
+   NUMBER BAR — the joined stat strip. Opt in with .pltt-numbar on an existing
+   .pltt-summary-cards container: the four (or N) figures become one bordered
+   object with hairline dividers instead of separate floating cards. Shared by
+   both the light header (as a standalone strip) and the scope block (as its
+   figure row). Higher specificity than admin.css's .pltt-summary-cards .card,
+   so it wins regardless of load order.
+   ============================================================ */
+.pltt-summary-cards.pltt-numbar {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0;
+	background: var(--pltt-paper);
+	border: 1px solid var(--pltt-rule);
+	border-radius: 6px;
+	overflow: hidden;
+	margin-bottom: 22px;
+}
+.pltt-summary-cards.pltt-numbar > .card {
+	flex: 1 1 0;
+	min-width: 180px;
+	margin: 0;
+	padding: 17px 24px 19px;
+	border: 0;
+	border-right: 1px solid var(--pltt-rule-2);
+	border-radius: 0;
+	box-shadow: none;
+	background: transparent;
+}
+.pltt-summary-cards.pltt-numbar > .card:last-child {
+	border-right: 0;
+}
+
+/* Figure: label / value / basis. Value is mono + tabular — it's a measured
+   thing, and mono lets the row of figures align. */
+.pltt-summary-cards.pltt-numbar > .card > .card-label {
+	font-size: 13px;
+	color: var(--pltt-ink-2);
+	margin-bottom: 4px;
+}
+.pltt-summary-cards.pltt-numbar > .card > .card-value {
+	font-family: var(--pltt-font-mono);
+	font-variant-numeric: tabular-nums;
+	font-size: 26px;
+	font-weight: 500;
+	letter-spacing: -0.5px;
+	line-height: 1.2;
+	color: var(--pltt-ink);
+	margin-bottom: 0;
+}
+/* Basis line — no top rule inside the bar; it reads as a caption, not a divider. */
+.pltt-summary-cards.pltt-numbar > .card > .card-secondary {
+	margin-top: 5px;
+	padding-top: 0;
+	border-top: 0;
+	font-size: 12.5px;
+	color: var(--pltt-ink-3);
+	line-height: 1.5;
+}
+
+/* Over is ochre, never red — the one figure (or basis) that breaks the "fact,
+   not a warning" default states it in the same colour everywhere. */
+.pltt-summary-cards.pltt-numbar > .card.pltt-unbilled-card > .card-value,
+.pltt-summary-cards.pltt-numbar > .card > .card-value.pltt-numbar-over,
+.pltt-summary-cards.pltt-numbar > .card > .card-secondary.pltt-alloc-over {
+	color: var(--pltt-c-over);
+}
+
+/* Figure 4 settled/not-owed states (Billed, $0, a still-open dash) read grey —
+   the colour separates settled from owed. */
+.pltt-summary-cards.pltt-numbar > .card > .card-value.pltt-numbar-muted {
+	color: var(--pltt-ink-3);
+}
+
+/* The backlog link on a basis line — amber, matching the "owed" signal. */
+.pltt-lk-over {
+	color: var(--pltt-c-over);
+}
+
+/* Stack on narrow viewports: dividers turn horizontal, two-up then one-up. */
+@media screen and (max-width: 782px) {
+	.pltt-summary-cards.pltt-numbar > .card {
+		flex-basis: 50%;
+		border-right: 1px solid var(--pltt-rule-2);
+		border-bottom: 1px solid var(--pltt-rule-2);
+	}
+	.pltt-summary-cards.pltt-numbar > .card:nth-child(2n) {
+		border-right: 0;
+	}
+}
+@media screen and (max-width: 480px) {
+	.pltt-summary-cards.pltt-numbar > .card {
+		flex-basis: 100%;
+		border-right: 0;
+	}
+}

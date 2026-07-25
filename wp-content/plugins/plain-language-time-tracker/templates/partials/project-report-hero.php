@@ -23,8 +23,11 @@ if ( empty( $hero ) ) {
 }
 
 $is_gauge = ( 'gauge' === $hero['mode'] );
+// Mini-rows are optional: with the scope block carrying the figures, a hero is
+// often just its meter, and then it goes full width.
+$has_rows = ! empty( $hero['minirows'] );
 ?>
-<div class="pltt-report-hero pltt-hero-<?php echo esc_attr( $hero['type'] ); ?>">
+<div class="pltt-report-hero pltt-hero-<?php echo esc_attr( $hero['type'] ); ?><?php echo $has_rows ? '' : ' pltt-hero-solo'; ?>">
 	<div class="pltt-hero-left">
 		<div class="pltt-hero-tag">
 			<?php echo esc_html( $hero['tag'] ); ?>
@@ -75,12 +78,15 @@ $is_gauge = ( 'gauge' === $hero['mode'] );
 		<?php endif; ?>
 	</div>
 
-	<div class="pltt-hero-right">
-		<?php foreach ( $hero['minirows'] as $row ) : ?>
-			<div class="pltt-hero-row">
-				<span class="pltt-hero-row-lbl"><?php echo esc_html( $row['label'] ); ?></span>
-				<b class="<?php echo ! empty( $row['accent'] ) ? 'pltt-hero-row-accent' : ''; ?>"><?php echo esc_html( $row['value'] ); ?></b>
-			</div>
-		<?php endforeach; ?>
-	</div>
+	<?php // Right column only when there are mini-rows; the meter stands alone otherwise. ?>
+	<?php if ( $has_rows ) : ?>
+		<div class="pltt-hero-right">
+			<?php foreach ( $hero['minirows'] as $row ) : ?>
+				<div class="pltt-hero-row">
+					<span class="pltt-hero-row-lbl"><?php echo esc_html( $row['label'] ); ?></span>
+					<b class="<?php echo ! empty( $row['accent'] ) ? 'pltt-hero-row-accent' : ''; ?>"><?php echo esc_html( $row['value'] ); ?></b>
+				</div>
+			<?php endforeach; ?>
+		</div>
+	<?php endif; ?>
 </div>

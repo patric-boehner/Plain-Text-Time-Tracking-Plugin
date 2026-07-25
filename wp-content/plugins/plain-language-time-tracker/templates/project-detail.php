@@ -25,17 +25,13 @@ $is_archived = ( 'archived' === $project->status );
 
 <div class="wrap pltt-wrap pltt-project-detail<?php echo $is_archived ? ' pltt-detail-archived' : ''; ?>">
 
-	<div class="pltt-header pltt-detail-header">
-		<div class="pltt-detail-titlewrap">
-			<div class="pltt-detail-title">
-				<h1><?php echo esc_html( $project->name ); ?></h1>
-				<?php pltt_render_billing_type_badge( $billing_type ); ?>
-				<?php if ( $is_archived ) : ?>
-					<span class="pltt-badge pltt-badge-archived"><?php esc_html_e( 'Archived', 'plain-language-time-tracker' ); ?></span>
-				<?php endif; ?>
-			</div>
-			<p class="pltt-detail-subhead"><?php echo esc_html( $subhead ); ?></p>
-		</div>
+	<div class="pltt-header pltt-detail-header pltt-detail-actionsbar">
+		<?php
+		// Identity (name, badge, terms, span) now lives in the scope block below.
+		// This screen-reader-only H1 keeps the page named for assistive tech and
+		// gives WordPress an anchor so admin notices stay put near the top.
+		?>
+		<h1 class="screen-reader-text"><?php echo esc_html( $project->name ); ?></h1>
 
 		<div class="pltt-header-actions">
 			<a href="<?php echo esc_url( $list_url ); ?>" class="button">

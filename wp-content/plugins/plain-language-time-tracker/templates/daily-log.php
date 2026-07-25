@@ -41,7 +41,37 @@ $return_to     = $return_to_raw ? wp_validate_redirect( $return_to_raw, '' ) : '
 
 <div class="wrap pltt-wrap">
 	<div class="pltt-header">
-		<h1><?php esc_html_e( 'Today', 'plain-language-time-tracker' ); ?></h1>
+		<?php
+		// Light header — Today is a day, not a scope with terms: three lines, no
+		// figures inside (those sit in the number bar below). The H1 reads "Today"
+		// on the current day and the weekday date when navigated back; the badge
+		// and date fold up here from the old .pltt-date-display block.
+		$is_today_view = ( $date === $today );
+		$date_full     = date_i18n( 'l, F j, Y', strtotime( $date ) );
+		$entry_count   = count( $entries );
+		if ( $has_entries ) {
+			$today_l2 = sprintf(
+				/* translators: 1: entry-count phrase (e.g. "7 entries"); 2: total time logged (e.g. "6h 00m"). */
+				esc_html__( '%1$s recorded · %2$s logged', 'plain-language-time-tracker' ),
+				esc_html( sprintf( _n( '%s entry', '%s entries', $entry_count, 'plain-language-time-tracker' ), number_format_i18n( $entry_count ) ) ),
+				esc_html( pltt_format_duration( (int) $total_minutes ) )
+			);
+		} else {
+			$today_l2 = esc_html__( 'Nothing recorded yet', 'plain-language-time-tracker' );
+		}
+		?>
+		<div class="pltt-light-header">
+			<div class="pltt-lh-titlerow">
+				<h1><?php echo esc_html( $is_today_view ? __( 'Today', 'plain-language-time-tracker' ) : $date_full ); ?></h1>
+				<?php if ( $is_processed ) : ?>
+					<span class="pltt-badge pltt-badge-success"><?php esc_html_e( 'Processed', 'plain-language-time-tracker' ); ?></span>
+				<?php endif; ?>
+			</div>
+			<div class="pltt-lh-l2"><?php echo $today_l2; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?></div>
+			<?php if ( $is_today_view ) : ?>
+				<div class="pltt-lh-l3"><span class="pltt-mono"><?php echo esc_html( $date_full ); ?></span></div>
+			<?php endif; ?>
+		</div>
 		<?php
 		// OPT-DUP1: display success/error notices via shared helper. Inside the
 		// header div on purpose — see memory: WordPress JS relocates notices
@@ -101,13 +131,6 @@ $return_to     = $return_to_raw ? wp_validate_redirect( $return_to_raw, '' ) : '
 		</p>
 	<?php endif; ?>
 
-	<div class="pltt-date-display">
-		<h2><?php echo esc_html( pltt_format_date( $date ) ); ?></h2>
-		<?php if ( $is_processed ) : ?>
-			<span class="pltt-badge pltt-badge-success"><?php esc_html_e( 'Processed', 'plain-language-time-tracker' ); ?></span>
-		<?php endif; ?>
-	</div>
-
 	<div class="pltt-log-container <?php echo $is_processed ? 'pltt-log-processed' : ''; ?>">
 		<textarea
 			id="pltt-log-textarea"
@@ -160,7 +183,7 @@ $return_to     = $return_to_raw ? wp_validate_redirect( $return_to_raw, '' ) : '
 			<h3><?php esc_html_e( 'Recorded Entries', 'plain-language-time-tracker' ); ?></h3>
 
 			<?php // Pared day summary (matches Reports): hours, billable hours, amount. ?>
-			<div class="pltt-summary-cards">
+			<div class="pltt-summary-cards pltt-numbar">
 				<div class="card">
 					<div class="card-label"><?php esc_html_e( 'Total Hours', 'plain-language-time-tracker' ); ?></div>
 					<div class="card-value"><?php echo esc_html( pltt_format_hours( $total_minutes ) ); ?></div>

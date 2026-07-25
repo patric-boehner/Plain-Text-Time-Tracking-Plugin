@@ -36,13 +36,32 @@ class PLTT_Reports {
 		$client_id  = isset( $_GET['client_id'] ) ? absint( $_GET['client_id'] ) : 0;
 		$project_id = isset( $_GET['project_id'] ) ? absint( $_GET['project_id'] ) : 0;
 		$tag        = isset( $_GET['tag'] ) ? sanitize_text_field( wp_unslash( $_GET['tag'] ) ) : '';
-		$billable   = isset( $_GET['billable'] ) && '' !== $_GET['billable'] ? absint( $_GET['billable'] ) : null;
-		$billed     = isset( $_GET['billed'] ) && '' !== $_GET['billed'] ? absint( $_GET['billed'] ) : null;
+		// One Billing filter replaces the old Billable + Invoiced pair: its options
+		// ARE the Status column's values, so a query that has no answer can't be
+		// constructed (spec §4 — you filter by outcome, and Billable stays a column
+		// because it's the input).
+		$billing_status = isset( $_GET['billing'] ) ? sanitize_key( wp_unslash( $_GET['billing'] ) ) : '';
+		if ( ! in_array( $billing_status, array( 'unbilled', 'billed', 'not_charged' ), true ) ) {
+			$billing_status = '';
+		}
 
 		// Negate flags for exclusion filters.
 		$client_negate  = ! empty( $_GET['client_negate'] ) ? 1 : 0;
 		$project_negate = ! empty( $_GET['project_negate'] ) ? 1 : 0;
 		$tag_negate     = ! empty( $_GET['tag_negate'] ) ? 1 : 0;
+
+		// Picking a project without its client (e.g. straight from the grouped
+		// Project dropdown on an unfiltered view) leaves client_id = 0, so the
+		// single-project scope + billing indicator never resolve. Derive the
+		// client from the project so the filter behaves as one selection. The
+		// Client dropdown then renders it selected on load; skip when either the
+		// project or client filter is negated.
+		if ( $project_id > 0 && $client_id <= 0 && ! $project_negate && ! $client_negate ) {
+			$derived_project = PLTT_Projects::get( $project_id );
+			if ( $derived_project && ! empty( $derived_project->client_id ) ) {
+				$client_id = (int) $derived_project->client_id;
+			}
+		}
 
 		// Whitelist valid views.
 		if ( ! in_array( $view, self::VIEWS, true ) ) {
@@ -56,8 +75,7 @@ class PLTT_Reports {
 			'client_id'      => $client_id,
 			'project_id'     => $project_id,
 			'tag'            => $tag,
-			'billable'       => $billable,
-			'billed'         => $billed,
+			'billing_status' => $billing_status,
 			'client_negate'  => $client_negate,
 			'project_negate' => $project_negate,
 			'tag_negate'     => $tag_negate,

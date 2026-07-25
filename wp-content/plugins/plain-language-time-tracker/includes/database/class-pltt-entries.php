@@ -458,7 +458,16 @@ class PLTT_Entries {
 	 * @return string
 	 */
 	private static function billable_amount_expr() {
-		return 'COALESCE(e.billable_amount, ROUND(e.duration_minutes / 60.0 * COALESCE(p.hourly_rate, c.hourly_rate, 0), 2))';
+		// Mirrors pltt_resolve_billable_rate()'s cascade exactly, including the
+		// final fall-through to PLTT_DEFAULT_HOURLY_RATE. Without that last step
+		// the SQL stopped at the client and returned $0 for any project without a
+		// rate of its own, while every PHP path resolved the same entry at the
+		// default — so a figure computed in SQL disagreed with the money shown
+		// beside it. NULLIF treats a stored 0 as "unset", which is what the PHP
+		// `> 0` checks do.
+		$default = defined( 'PLTT_DEFAULT_HOURLY_RATE' ) ? (float) PLTT_DEFAULT_HOURLY_RATE : 0.0;
+
+		return 'COALESCE(e.billable_amount, ROUND(e.duration_minutes / 60.0 * COALESCE(NULLIF(p.hourly_rate, 0), NULLIF(c.hourly_rate, 0), ' . $default . '), 2))';
 	}
 
 	/**
@@ -543,12 +552,17 @@ class PLTT_Entries {
 			: "LOWER(c.name) != 'internal'";
 
 		$amount = self::billable_amount_expr();
+		// "Unbilled" means no committed bill record covers the entry — the legacy
+		// per-entry `billed` flag was a manual tick nothing verified.
+		$record_entries = PLTT_Database::get_table_name( 'billing_record_entries' );
 
 		$sql = "SELECT
 			COUNT(*) AS total_count,
 			COALESCE(SUM(e.duration_minutes), 0) AS total_minutes,
 			COALESCE(SUM(CASE WHEN e.billable = 1 THEN e.duration_minutes ELSE 0 END), 0) AS billable_minutes,
-			COALESCE(SUM(CASE WHEN e.billable = 1 AND COALESCE(e.billed, 0) = 0 THEN e.duration_minutes ELSE 0 END), 0) AS unbilled_billable_minutes,
+			COALESCE(SUM(CASE WHEN e.billable = 1 AND NOT EXISTS (
+				SELECT 1 FROM {$record_entries} bre WHERE bre.entry_id = e.id
+			) THEN e.duration_minutes ELSE 0 END), 0) AS unbilled_billable_minutes,
 			COALESCE(SUM(CASE WHEN ({$exclude_clause}) THEN e.duration_minutes ELSE 0 END), 0) AS client_total_minutes,
 			COALESCE(SUM(CASE WHEN ({$exclude_clause}) AND e.billable = 1 THEN e.duration_minutes ELSE 0 END), 0) AS client_billable_minutes,
 			SUM(CASE WHEN e.verified = 1 THEN 1 ELSE 0 END) AS verified_count,
@@ -630,13 +644,18 @@ class PLTT_Entries {
 		$prepare = array_merge( $prepare, $common['prepare'] );
 
 		$amount = self::billable_amount_expr();
+		// "Unbilled" means no committed bill record covers the entry — the legacy
+		// per-entry `billed` flag was a manual tick nothing verified.
+		$record_entries = PLTT_Database::get_table_name( 'billing_record_entries' );
 
 		$sql = "SELECT
 			e.{$group_by} AS group_key,
 			COUNT(*) AS total_count,
 			COALESCE(SUM(e.duration_minutes), 0) AS total_minutes,
 			COALESCE(SUM(CASE WHEN e.billable = 1 THEN e.duration_minutes ELSE 0 END), 0) AS billable_minutes,
-			COALESCE(SUM(CASE WHEN e.billable = 1 AND COALESCE(e.billed, 0) = 0 THEN e.duration_minutes ELSE 0 END), 0) AS unbilled_billable_minutes,
+			COALESCE(SUM(CASE WHEN e.billable = 1 AND NOT EXISTS (
+				SELECT 1 FROM {$record_entries} bre WHERE bre.entry_id = e.id
+			) THEN e.duration_minutes ELSE 0 END), 0) AS unbilled_billable_minutes,
 			COALESCE(SUM(CASE WHEN e.billable = 1 THEN {$amount} ELSE 0 END), 0) AS billable_amount,
 			MIN(e.entry_date) AS first_entry_date,
 			MAX(e.entry_date) AS last_entry_date
@@ -891,10 +910,38 @@ class PLTT_Entries {
 			$prepare[] = $args['billable'] ? 1 : 0;
 		}
 
-		// Billed filter (invoiced status).
-		if ( isset( $args['billed'] ) && null !== $args['billed'] ) {
-			$where[]   = $col_prefix . 'billed = %d';
-			$prepare[] = $args['billed'] ? 1 : 0;
+		// Billing status — the Status column's own three values, so the filter and
+		// the column can never disagree (spec §4). Deliberately NOT the legacy
+		// `billed` column: billed state comes from bill-record coverage.
+		//
+		// "Flag applies" mirrors pltt_billable_flag_applies() in SQL — retainer,
+		// fixed fee and internal bill at the project level, so their entries carry
+		// no per-entry decision and are excluded from all three states. An entry
+		// with no project counts as applying, matching the PHP.
+		if ( ! empty( $args['billing_status'] ) && $entry_ref ) {
+			$record_entries = PLTT_Database::get_table_name( 'billing_record_entries' );
+			$covered_sql    = "EXISTS (SELECT 1 FROM {$record_entries} bre WHERE bre.entry_id = {$entry_id_col})";
+			$projects_tbl   = PLTT_Database::get_table_name( 'projects' );
+			$flag_applies   = "({$p_col} IS NULL OR EXISTS (
+				SELECT 1 FROM {$projects_tbl} fp
+				WHERE fp.id = {$p_col}
+					AND ( fp.recurring_period IS NULL OR fp.recurring_period = '' )
+					AND COALESCE( fp.budget_hours, 0 ) = 0
+					AND COALESCE( fp.budget_fee, 0 ) = 0
+					AND COALESCE( fp.billability_default, 0 ) = 1
+			))";
+
+			switch ( $args['billing_status'] ) {
+				case 'billed':
+					$where[] = $covered_sql;
+					break;
+				case 'unbilled':
+					$where[] = "NOT {$covered_sql} AND {$col_prefix}billable = 1 AND {$flag_applies}";
+					break;
+				case 'not_charged':
+					$where[] = "NOT {$covered_sql} AND {$col_prefix}billable = 0 AND {$flag_applies}";
+					break;
+			}
 		}
 
 		// Exclude specific entry IDs (e.g. entries already covered by a committed

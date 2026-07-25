@@ -73,6 +73,7 @@
 	margin-left: auto;
 }
 
+
 .pltt-pcc-bill-scope + .pltt-pcc-bill-scope {
 	margin-top: 12px;
 	padding-top: 12px;
@@ -877,37 +878,7 @@
    the record of past bills. No entries live here — cards are doorways into
    the detailed view where selection + commit happen.
    ========================================================================== */
-/* --- client group --- */
-.pltt-bill-clientgroup {
-	margin-bottom: 24px;
-}
-.pltt-bill-clienthead {
-	display: flex;
-	align-items: baseline;
-	justify-content: space-between;
-	gap: 12px;
-	padding-bottom: 8px;
-	margin-bottom: 12px;
-	border-bottom: 1px solid var(--pltt-border-light);
-}
-.pltt-bill-clientname {
-	font-size: 15px;
-	font-weight: 600;
-	margin: 0;
-}
-.pltt-bill-clienttotal {
-	font-size: 13px;
-	color: var(--pltt-text-muted, #646970);
-	font-variant-numeric: tabular-nums;
-	white-space: nowrap;
-}
-
-/* --- project cards --- */
-.pltt-bill-cards {
-	display: grid;
-	grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
-	gap: 14px;
-}
+/* --- single scope card (Project Detail "Ready to bill" panel) --- */
 .pltt-bill-card {
 	display: flex;
 	flex-direction: column;
@@ -916,13 +887,6 @@
 	border: 1px solid var(--pltt-border-light);
 	border-radius: 4px;
 	padding: 16px 18px;
-	/* Anchor jump from the Insights backlog notice clears the admin bar. */
-	scroll-margin-top: 50px;
-}
-/* Brief highlight so the jumped-to project card is easy to spot. */
-.pltt-bill-card:target {
-	border-color: var(--pltt-accent, #2271b1);
-	box-shadow: 0 0 0 2px rgba(34, 113, 177, 0.18);
 }
 .pltt-bill-card-head {
 	display: flex;
@@ -953,6 +917,45 @@
 	align-self: flex-start;
 }
 
+/* --- ready-to-bill table --- */
+.pltt-bill-ready-table .pltt-bill-ready-proj {
+	font-weight: 600;
+}
+.pltt-bill-ready-table .pltt-bill-ready-covered {
+	color: var(--pltt-text-muted, #646970);
+	font-variant-numeric: tabular-nums;
+}
+.pltt-bill-ready-table .pltt-bill-ready-count {
+	white-space: nowrap;
+	opacity: 0.75;
+}
+.pltt-bill-ready-table th.pltt-amount-col,
+.pltt-bill-ready-table td.pltt-amount-col {
+	text-align: right;
+	font-variant-numeric: tabular-nums;
+	white-space: nowrap;
+}
+.pltt-bill-ready-table .pltt-bill-ready-action {
+	text-align: right;
+	white-space: nowrap;
+	width: 1%;
+}
+.pltt-bill-ready-link {
+	white-space: nowrap;
+	text-decoration: none;
+}
+/* Anchor jump from the Insights backlog notice clears the admin bar. */
+.pltt-bill-ready-row {
+	scroll-margin-top: 50px;
+}
+/* Brief highlight so the jumped-to project row is easy to spot. */
+.pltt-bill-ready-row:target > td {
+	box-shadow: inset 0 0 0 9999px rgba(34, 113, 177, 0.1);
+}
+.pltt-bill-ready-row:target > td:first-child {
+	box-shadow: inset 3px 0 0 0 var(--pltt-accent, #2271b1), inset 0 0 0 9999px rgba(34, 113, 177, 0.1);
+}
+
 /* --- records table --- */
 .pltt-bill-records-table .pltt-bill-records-action {
 	text-align: right;
@@ -972,11 +975,13 @@
 .pltt-bill-cards-summary {
 	margin-bottom: 24px;
 }
+/* Outstanding is money owed — ochre, matching the "owed/over" signal used across
+   the number bars. Absorbed is settled/written-down, so it reads muted. */
 .pltt-bill-outstanding-value {
-	color: var(--pltt-warning-text, #b45309);
+	color: var(--pltt-c-over);
 }
 .pltt-bill-absorbed-value {
-	color: var(--pltt-text-muted, #646970);
+	color: var(--pltt-ink-3);
 }
 
 /* --- history table cells --- */

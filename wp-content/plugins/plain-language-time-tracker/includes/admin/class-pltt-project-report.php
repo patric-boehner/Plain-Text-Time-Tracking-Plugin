@@ -1,13 +1,14 @@
 <?php
 /**
- * Project Report — read-only lifetime aggregations for the Report tab.
+ * Project Report — read-only aggregations for the Report tab.
  *
- * Pure data layer: one pass over a project's entries + their tags produces the
- * stat-card figures and the per-tag-group bar buckets. No output, no per-entry
- * queries in loops. Consumed by templates/partials/project-detail-report.php.
+ * Pure data layer: turns a project's stats into the type-aware hero, the stat
+ * cards, and the volume ("Hours by …") chart. No output, no per-entry queries in
+ * loops. Consumed by templates/partials/project-detail-report.php.
  *
- * Phase 2: stat cards (fixed-budget lineup) + "Where the time went" bars.
- * The swimlane timeline (per-day ticks, gaps) is Phase 3.
+ * The per-tag "Where the time went" bars and the "Activity over time" swimlane
+ * (and all their entry/tag grouping + timeline-axis machinery) were removed
+ * 2026-07-18 — see docs/removed-project-report-sections.md to rebuild them.
  *
  * @package PlainLanguageTimeTracker
  */
@@ -23,23 +24,6 @@ if ( ! defined( 'ABSPATH' ) ) {
 class PLTT_Project_Report {
 
 	/**
-	 * Synthetic key for the "tags with no group" grouping.
-	 */
-	const UNGROUPED = '__ungrouped__';
-
-	/**
-	 * Synthetic key for the "no tag in this group" bucket.
-	 */
-	const UNTAGGED = '__untagged__';
-
-	/**
-	 * Idle-gap threshold (days). A run of >= this many days with nothing logged
-	 * breaks a timeline lane into separate segments. The single tunable for the
-	 * "Activity over time" timeline — raise if lanes break too often.
-	 */
-	const GAP_THRESHOLD_DAYS = 7;
-
-	/**
 	 * Build the full Report-tab dataset for a project.
 	 *
 	 * @param int         $project_id    Project ID.
@@ -50,48 +34,28 @@ class PLTT_Project_Report {
 	 * @param object|null $windowed_stats Pre-loaded windowed stats for $window, to reuse instead of
 	 *                                   re-querying (OPT-N-A: render() already computes these for the subhead).
 	 * @return array {
-	 *     @type array  $cards         Stat-card figures.
-	 *     @type array  $groupings     Map of grouping key => grouping data (buckets, etc.).
-	 *     @type string $default_group The grouping key to show first.
+	 *     @type bool   $has_entries Whether any time is logged.
+	 *     @type array  $hero        Type-aware hero view-model (or null).
+	 *     @type array  $cards       Stat-card figures.
+	 *     @type array  $chart       Volume ("Hours by …") chart data (or null).
+	 *     @type array  $window      Active period-lens window (or null).
 	 * }
+	 *
+	 * Note: this used to also return `groupings` / `timeline_groupings` /
+	 * `default_group` / `axis` / `budget_line` for the "Where the time went" bars
+	 * and "Activity over time" swimlane. Both sections were removed 2026-07-18 —
+	 * see docs/removed-project-report-sections.md to rebuild them.
 	 */
 	public static function build( $project_id, $project, $client = null, $stats = null, $window = null, $windowed_stats = null ) {
 		if ( null === $stats ) {
 			$stats = PLTT_Entries::get_stats( array( 'project_id' => $project_id ) );
 		}
 
-		// Lifetime entries — drive the swimlane (always the full arc) and the
-		// group-by toggle's dimension set. Only id/date/duration are read here, so
-		// request just those instead of every column (OPT-N-C); tags are loaded
-		// separately by id below.
-		$entries = PLTT_Entries::get_all(
-			array(
-				'project_id' => $project_id,
-				'orderby'    => 'entry_date',
-				'order'      => 'ASC',
-				'fields'     => array( 'id', 'entry_date', 'duration_minutes' ),
-			)
-		);
-
-		$entry_ids     = array();
-		foreach ( $entries as $e ) {
-			$entry_ids[] = (int) $e->id;
-		}
-		$tags_by_entry = PLTT_Tags::get_for_entries( $entry_ids );
-		$name_to_group = PLTT_Tags::get_name_to_group_map();
-		// Load the group list once and feed both build_groupings() calls (OPT-N-B).
-		$group_names   = PLTT_Tags::get_all_groups();
-
 		$rate = (float) pltt_resolve_billable_rate( (int) $project->client_id, (int) $project_id );
 
-		// Lifetime groupings: the swimlane (always the full arc) and the toggle's
-		// dimension set/default both read from these.
-		$timeline_groupings = self::build_groupings( $entries, $tags_by_entry, $name_to_group, $group_names );
-
-		// Windowed slice → stat cards + "Where the time went" bars + volume chart.
-		// For the full/lifetime view (every non-recurring project, and recurring
-		// projects in "Full" scope) the window is the whole span, so these collapse
-		// back to the all-time figures and nothing about today's behavior changes.
+		// Windowed slice → stat cards + volume chart. For the full/lifetime view
+		// (every non-recurring project, and recurring projects in "Full" scope) the
+		// window is the whole span, so these collapse back to the all-time figures.
 		$is_windowed = is_array( $window ) && ! empty( $window['is_period'] );
 
 		if ( $is_windowed ) {
@@ -106,17 +70,8 @@ class PLTT_Project_Report {
 						'date_to'    => $window['to'],
 					)
 				);
-
-			$win_entries = array();
-			foreach ( $entries as $e ) {
-				if ( $e->entry_date >= $window['from'] && $e->entry_date <= $window['to'] ) {
-					$win_entries[] = $e;
-				}
-			}
-			$bar_groupings = self::build_groupings( $win_entries, $tags_by_entry, $name_to_group, $group_names );
 		} else {
-			$card_stats    = $stats;
-			$bar_groupings = $timeline_groupings;
+			$card_stats = $stats;
 		}
 
 		// Volume chart spans the active window (== lifetime span when not windowed).
@@ -127,32 +82,12 @@ class PLTT_Project_Report {
 			: null;
 
 		return array(
-			'has_entries'        => ( isset( $stats->total_minutes ) ? (int) $stats->total_minutes : 0 ) > 0,
-			'hero'               => self::build_hero( $project, $stats, $rate, $project_id, $window ),
-			'cards'              => self::build_cards( $project, $card_stats, $rate, $window, $stats ),
-			'groupings'          => $bar_groupings,        // windowed — "Where the time went".
-			'timeline_groupings' => $timeline_groupings,   // lifetime — swimlane.
-			'default_group'      => self::pick_default_group( $timeline_groupings ),
-			'axis'               => self::build_axis( $stats ),
-			'budget_line'        => self::build_budget_line( $project, $stats, $entries, $rate ),
-			'chart'              => $chart,
-			'window'             => is_array( $window ) ? $window : null,
+			'has_entries' => ( isset( $stats->total_minutes ) ? (int) $stats->total_minutes : 0 ) > 0,
+			'hero'        => self::build_hero( $project, $stats, $rate, $window ),
+			'cards'       => self::build_cards( $project, $card_stats, $rate, $window, $stats ),
+			'chart'       => $chart,
+			'window'      => is_array( $window ) ? $window : null,
 		);
-	}
-
-	/**
-	 * Choose which grouping shows first: prefer a phase-like one, else the first.
-	 *
-	 * @param array $groupings Exposed groupings (key => data).
-	 * @return string Grouping key (empty string if none).
-	 */
-	private static function pick_default_group( $groupings ) {
-		foreach ( $groupings as $key => $data ) {
-			if ( ! empty( $data['is_phase'] ) ) {
-				return $key;
-			}
-		}
-		return (string) array_key_first( $groupings );
 	}
 
 	/**
@@ -192,7 +127,8 @@ class PLTT_Project_Report {
 	 *
 	 * @param string $label Card label.
 	 * @param string $value Pre-formatted value ('' renders as an em-dash).
-	 * @param array  $opts  Optional: suffix, sub, attention (bool).
+	 * @param array  $opts  Optional: suffix, sub, attention (bool), over (bool),
+	 *                      sub_link ([ 'url' => string, 'label' => string ]).
 	 * @return array
 	 */
 	private static function card( $label, $value, $opts = array() ) {
@@ -203,6 +139,15 @@ class PLTT_Project_Report {
 			'value_suffix' => isset( $opts['suffix'] ) ? $opts['suffix'] : '',
 			'sub'          => isset( $opts['sub'] ) ? $opts['sub'] : '',
 			'attention'    => ! empty( $opts['attention'] ),
+			// Ochre value — money that's owed, or hours past a limit. Never red.
+			'over'         => ! empty( $opts['over'] ),
+			// Grey value — a settled or not-owed figure ($0.00 billed, nothing out).
+			'muted'        => ! empty( $opts['muted'] ),
+			// A link on the basis line ("15 entries ›"), joined to $sub with " · ".
+			'sub_link'     => isset( $opts['sub_link'] ) ? $opts['sub_link'] : null,
+			// Pre-built basis HTML (already escaped by its builder) — used where a
+			// shared figure helper assembles the line, links and all.
+			'sub_html'     => isset( $opts['sub_html'] ) ? $opts['sub_html'] : '',
 		);
 	}
 
@@ -216,66 +161,105 @@ class PLTT_Project_Report {
 	 */
 	private static function cards_fixed( $project, $stats, $rate ) {
 		$total_minutes = isset( $stats->total_minutes ) ? (int) $stats->total_minutes : 0;
+		$entry_count   = isset( $stats->total_count ) ? (int) $stats->total_count : 0;
 		$fee           = self::num( $project->budget_fee );
 
 		$budgeted_minutes = pltt_budgeted_minutes( $project, $rate );
-		$ehr              = pltt_effective_rate( $fee, $total_minutes );
 
-		// Total hours + over/under budget.
-		$total = self::card( __( 'Total hours', 'plain-language-time-tracker' ), pltt_format_duration( $total_minutes ) );
-		if ( $budgeted_minutes > 0 ) {
-			$ou = $total_minutes - $budgeted_minutes;
-			if ( $ou > 0 ) {
-				/* translators: %s: duration over budget. */
-				$total['sub']       = sprintf( __( '+%s over budget', 'plain-language-time-tracker' ), pltt_format_duration( $ou ) );
-				$total['attention'] = true;
-			} elseif ( $ou < 0 ) {
-				/* translators: %s: duration under budget. */
-				$total['sub'] = sprintf( __( '%s under budget', 'plain-language-time-tracker' ), pltt_format_duration( abs( $ou ) ) );
-			} else {
-				$total['sub'] = __( 'on budget', 'plain-language-time-tracker' );
-			}
-		}
-
-		// Budget card.
-		if ( $budgeted_minutes > 0 ) {
-			$pct    = (int) round( $total_minutes / $budgeted_minutes * 100 );
-			$budget = self::card(
-				__( 'Budget', 'plain-language-time-tracker' ),
+		// 1 — Total hours.
+		$cards = array(
+			self::card(
+				__( 'Total hours', 'plain-language-time-tracker' ),
 				pltt_format_duration( $total_minutes ),
 				array(
-					/* translators: %s: budgeted hours. */
-					'suffix'    => sprintf( __( 'of %s', 'plain-language-time-tracker' ), pltt_format_duration( $budgeted_minutes ) ),
-					/* translators: %d: percent of budget used. */
-					'sub'       => sprintf( __( '%d%% used', 'plain-language-time-tracker' ), $pct ),
-					'attention' => $pct > 100,
-				)
-			);
-		} else {
-			$budget = self::card( __( 'Budget', 'plain-language-time-tracker' ), '', array( 'sub' => __( 'no budget set', 'plain-language-time-tracker' ) ) );
-		}
-
-		return array(
-			$total,
-			self::card(
-				__( 'Effective rate', 'plain-language-time-tracker' ),
-				$ehr > 0 ? self::rate_str( $ehr ) : '',
-				array( 'sub' => $rate > 0 ? self::vs_target( $rate ) : '' )
-			),
-			$budget,
-			self::card(
-				__( 'Fixed fee', 'plain-language-time-tracker' ),
-				$fee > 0 ? pltt_format_currency_compact( $fee ) : '',
-				array(
-					/* translators: %s: hourly rate used for budgeting. */
-					'sub' => ( $fee > 0 && $rate > 0 ) ? sprintf( __( '%s/hr budgeted', 'plain-language-time-tracker' ), pltt_format_currency_compact( round( $rate ) ) ) : '',
+					'sub' => $entry_count > 0
+						? sprintf(
+							/* translators: %s: entry count. */
+							_n( '%s entry', '%s entries', $entry_count, 'plain-language-time-tracker' ),
+							number_format_i18n( $entry_count )
+						)
+						: '',
 				)
 			),
 		);
+
+		// 2 — Budget left / Budget overrun. The value is the actionable number —
+		// hours remaining or hours past the budget — with the ratio and percentage
+		// on the basis line (ui/pltt-budget-figure.html).
+		if ( $budgeted_minutes > 0 ) {
+			$diff  = $total_minutes - $budgeted_minutes;
+			$over  = $diff > 0;
+			$basis = sprintf(
+				/* translators: 1: hours used; 2: hours budgeted; 3: percent used. */
+				__( '%1$s of %2$s used · %3$d%%', 'plain-language-time-tracker' ),
+				pltt_format_duration( $total_minutes ),
+				pltt_format_duration( $budgeted_minutes ),
+				(int) round( $total_minutes / $budgeted_minutes * 100 )
+			);
+			$cards[] = self::card(
+				$over
+					? __( 'Budget overrun', 'plain-language-time-tracker' )
+					: __( 'Budget left', 'plain-language-time-tracker' ),
+				pltt_format_duration( abs( $diff ) ),
+				array(
+					'sub'  => $basis,
+					'over' => $over,
+				)
+			);
+		} else {
+			$cards[] = self::card( __( 'Budget left', 'plain-language-time-tracker' ), '', array( 'sub' => __( 'no budget set', 'plain-language-time-tracker' ) ) );
+		}
+
+		// 3 — The fee itself, which the hours never change. No basis line: the model
+		// badge and the terms line above already say the fee is fixed.
+		$cards[] = self::card(
+			__( 'Project fee', 'plain-language-time-tracker' ),
+			$fee > 0 ? pltt_format_currency( $fee ) : ''
+		);
+
+		// 4 — Effective rate, ARCHIVED ONLY. Mid-project it falls monotonically
+		// from an absurd high (two hours into a $3,870 job it reads $1,935/hr), so
+		// it flatters early and accuses late; it is only true once work stops.
+		// Matches the "live EHR tracking — archived projects only" call in PROJECT.md.
+		if ( 'archived' === $project->status ) {
+			$ehr = pltt_effective_rate( $fee, $total_minutes );
+			if ( $ehr > 0 ) {
+				$ehr_basis = sprintf(
+					/* translators: 1: the fixed fee; 2: hours logged. */
+					__( '%1$s ÷ %2$s', 'plain-language-time-tracker' ),
+					pltt_format_currency( $fee ),
+					pltt_format_duration( $total_minutes )
+				);
+				if ( $rate > 0 ) {
+					$ehr_basis .= ' · ' . sprintf(
+						/* translators: %s: the project's nominal hourly rate. */
+						__( 'target %s', 'plain-language-time-tracker' ),
+						pltt_format_currency_compact( round( $rate ) )
+					);
+				}
+				$cards[] = self::card(
+					__( 'Effective rate', 'plain-language-time-tracker' ),
+					self::rate_str( $ehr ),
+					array( 'sub' => $ehr_basis )
+				);
+			}
+		}
+
+		return $cards;
 	}
 
 	/**
-	 * Hourly lineup: total hours, billable amount, effective rate, unbilled.
+	 * Hourly lineup: total hours, billable amount, not yet billed, billed to date.
+	 *
+	 * The four figures an hourly project can honestly fill — how much work, what
+	 * it's worth, what's owed, what's settled (ui/pltt-scope-by-type.html §01).
+	 * No budget figure: an hourly project has no ceiling to measure against, which
+	 * is what makes it hourly. No effective-rate figure either — the rate is fixed
+	 * and already stated on the block's terms line, so it would only restate it.
+	 *
+	 * "Not yet billed" and "Billed to date" come from billing records, not from the
+	 * legacy per-entry billed flag: outstanding is the uncovered set the billing
+	 * surface would actually bill.
 	 *
 	 * @param object      $project Project row.
 	 * @param object|null $stats   Aggregate stats.
@@ -286,37 +270,129 @@ class PLTT_Project_Report {
 		$total_minutes    = isset( $stats->total_minutes ) ? (int) $stats->total_minutes : 0;
 		$billable_minutes = isset( $stats->billable_minutes ) ? (int) $stats->billable_minutes : 0;
 		$billable_amount  = isset( $stats->billable_amount ) ? (float) $stats->billable_amount : 0.0;
-		$unbilled         = isset( $stats->unbilled_billable_minutes ) ? (int) $stats->unbilled_billable_minutes : 0;
-		$ehr              = pltt_effective_rate( $billable_amount, $total_minutes );
+		$entry_count      = isset( $stats->total_count ) ? (int) $stats->total_count : 0;
 
-		return array(
-			self::card( __( 'Total hours', 'plain-language-time-tracker' ), pltt_format_duration( $total_minutes ) ),
+		// Outstanding = verified, billable, uncovered entries, all time. Same scope
+		// the Review & bill flow commits, so the figure can't disagree with it.
+		$scope             = PLTT_Billing::get_scope( $project, 'hourly' );
+		$unbilled_amount   = $scope ? (float) $scope['unbilled'] : 0.0;
+		$unbilled_entries  = $scope ? (array) $scope['entries'] : array();
+		$unbilled_count    = count( $unbilled_entries );
+
+		$rec           = PLTT_Billing_Records::query( array( 'project_ids' => array( (int) $project->id ), 'limit' => 0 ) );
+		$billed        = (float) $rec['billed'];
+		$record_count  = (int) $rec['total'];
+
+		// 1 — Total hours.
+		$cards = array(
 			self::card(
-				__( 'Billable', 'plain-language-time-tracker' ),
-				$billable_amount > 0 ? pltt_format_currency_compact( $billable_amount ) : '',
+				__( 'Total hours', 'plain-language-time-tracker' ),
+				pltt_format_duration( $total_minutes ),
 				array(
-					/* translators: %s: billable hours. */
-					'sub' => sprintf( __( '%s billable', 'plain-language-time-tracker' ), pltt_format_duration( $billable_minutes ) ),
+					'sub' => $entry_count > 0
+						? sprintf(
+							/* translators: %s: entry count. */
+							_n( '%s entry', '%s entries', $entry_count, 'plain-language-time-tracker' ),
+							number_format_i18n( $entry_count )
+						)
+						: '',
 				)
 			),
-			self::card(
-				__( 'Effective rate', 'plain-language-time-tracker' ),
-				$ehr > 0 ? self::rate_str( $ehr ) : '',
-				array(
-					/* translators: %s: hourly rate. */
-					'sub' => $rate > 0 ? sprintf( __( 'vs %s rate', 'plain-language-time-tracker' ), pltt_format_currency_compact( round( $rate ) ) ) : '',
-				)
+		);
+
+		// 2 — Billable amount, with the billable share of logged time as its basis.
+		$billable_basis = sprintf(
+			/* translators: %s: billable hours, e.g. "59h 10m". */
+			__( '%s billable', 'plain-language-time-tracker' ),
+			pltt_format_duration( $billable_minutes )
+		);
+		if ( $total_minutes > 0 ) {
+			$billable_basis .= ' · ' . sprintf(
+				/* translators: %d: percent of logged time that is billable. */
+				__( '%d%%', 'plain-language-time-tracker' ),
+				(int) round( $billable_minutes / $total_minutes * 100 )
+			);
+		}
+		$cards[] = self::card(
+			__( 'Billable amount', 'plain-language-time-tracker' ),
+			$billable_amount > 0 ? pltt_format_currency( $billable_amount ) : '',
+			array( 'sub' => $billable_minutes > 0 ? $billable_basis : '' )
+		);
+
+		// 3 — Not yet billed. Ochre while something is owed; the basis line is the
+		// route to those entries, nothing else (see spec §3, figure 4).
+		$unbilled_opts = array(
+			'over'  => $unbilled_amount > 0,
+			'muted' => 0.0 === $unbilled_amount,
+		);
+		if ( $unbilled_count > 0 ) {
+			$unbilled_opts['sub_link'] = array(
+				'url'   => self::unbilled_entries_url( $project, $unbilled_entries ),
+				'label' => sprintf(
+					/* translators: %s: number of unbilled entries. */
+					_n( '%s entry', '%s entries', $unbilled_count, 'plain-language-time-tracker' ),
+					number_format_i18n( $unbilled_count )
+				),
+			);
+		} else {
+			$unbilled_opts['sub'] = __( 'nothing outstanding', 'plain-language-time-tracker' );
+		}
+		$cards[] = self::card(
+			__( 'Not yet billed', 'plain-language-time-tracker' ),
+			pltt_format_currency( $unbilled_amount ),
+			$unbilled_opts
+		);
+
+		// 4 — Billed to date. No "View records" link: the ledger those records live
+		// in is already further down this same page.
+		$billed_opts = array( 'muted' => $billed <= 0.0 );
+		if ( $record_count > 0 ) {
+			$billed_opts['sub'] = sprintf(
+				/* translators: %s: number of billing records. */
+				_n( '%s record', '%s records', $record_count, 'plain-language-time-tracker' ),
+				number_format_i18n( $record_count )
+			);
+		} else {
+			$billed_opts['sub'] = __( 'no bill records yet', 'plain-language-time-tracker' );
+		}
+		$cards[] = self::card(
+			__( 'Billed to date', 'plain-language-time-tracker' ),
+			pltt_format_currency( $billed ),
+			$billed_opts
+		);
+
+		return $cards;
+	}
+
+	/**
+	 * Link to the Entries view showing this project's outstanding work.
+	 *
+	 * Spans the oldest unbilled entry through today — the same range the billing
+	 * surface uses for its own "Review & bill" link, minus the bill=1 flag: the
+	 * basis line points at information, never at an action (spec §3c).
+	 *
+	 * @param object   $project Project row.
+	 * @param object[] $entries Unbilled entries, oldest first.
+	 * @return string
+	 */
+	private static function unbilled_entries_url( $project, $entries ) {
+		$from = pltt_get_current_date();
+		foreach ( $entries as $entry ) {
+			if ( ! empty( $entry->entry_date ) && $entry->entry_date < $from ) {
+				$from = $entry->entry_date;
+			}
+		}
+
+		return add_query_arg(
+			array(
+				'page'       => 'pltt-reports',
+				'view'       => 'detailed',
+				'client_id'  => (int) $project->client_id,
+				'project_id' => (int) $project->id,
+				'from'       => $from,
+				'to'         => pltt_get_current_date(),
 			),
-			self::card(
-				__( 'Unbilled', 'plain-language-time-tracker' ),
-				$unbilled > 0 ? pltt_format_duration( $unbilled ) : '',
-				$unbilled > 0
-					? array(
-						'sub'       => __( 'to invoice', 'plain-language-time-tracker' ),
-						'attention' => true,
-					)
-					: array( 'sub' => __( 'all invoiced', 'plain-language-time-tracker' ) )
-			),
+			admin_url( 'admin.php' )
 		);
 	}
 
@@ -342,15 +418,20 @@ class PLTT_Project_Report {
 		$months        = self::months_between( $life->first_entry_date ?? '', $life->last_entry_date ?? '' );
 		$avg_minutes   = $months > 0 ? (int) round( $life_minutes / $months ) : $life_minutes;
 
-		// Avg / month vs allocation (shared by both views).
-		$avg = self::card( __( 'Avg / month', 'plain-language-time-tracker' ), pltt_format_duration( $avg_minutes ) );
+		// Average per period vs allocation. The basis names the allocation itself
+		// ("29% of the 2h included") rather than the word "allocation" — the number
+		// it's a percentage OF should be readable without looking it up. That also
+		// makes the "of 2h" value suffix redundant, so the value stands alone.
+		$avg = self::card( self::average_label( $project ), pltt_format_duration( $avg_minutes ) );
 		if ( $alloc_minutes > 0 ) {
-			$avg_pct             = (int) round( $avg_minutes / $alloc_minutes * 100 );
-			/* translators: %s: hour allocation per period. */
-			$avg['value_suffix'] = sprintf( __( 'of %s', 'plain-language-time-tracker' ), pltt_format_duration( $alloc_minutes ) );
-			/* translators: %d: percent of allocation used. */
-			$avg['sub']          = sprintf( __( '%d%% of allocation', 'plain-language-time-tracker' ), $avg_pct );
-			$avg['attention']    = $avg_pct > 100;
+			$avg_pct          = (int) round( $avg_minutes / $alloc_minutes * 100 );
+			$avg['sub']       = sprintf(
+				/* translators: 1: percent of allocation; 2: the included hours, e.g. "3h". */
+				__( '%1$d%% of the %2$s included', 'plain-language-time-tracker' ),
+				$avg_pct,
+				pltt_format_duration( $alloc_minutes )
+			);
+			$avg['attention'] = $avg_pct > 100;
 		}
 
 		// ── Period view: the selected/most-recent period against its allocation ──
@@ -381,47 +462,170 @@ class PLTT_Project_Report {
 				)
 			);
 
-			$lifetime_card = self::card(
-				__( 'Lifetime', 'plain-language-time-tracker' ),
-				pltt_format_duration( $life_minutes ),
+			// 4 — the period's billing status, from the same state machine the
+			// filtered-Entries scope block uses, so the two can't disagree about
+			// the same month. Replaces the old "Lifetime" card: the lifetime total
+			// is what the Full view is for, and what this period is worth and
+			// whether it's been billed is the question you're actually here with.
+			$today     = pltt_get_current_date();
+			$p_start   = (string) $window['from'];
+			$p_end     = (string) $window['to'];
+			$is_closed = ( $p_end && $p_end < $today );
+			$status    = pltt_retainer_period_status_figure(
+				$project,
+				$p_start,
+				$p_end,
+				$overage,
+				$over_minutes > 0,
+				$is_closed
+			);
+			$status_card = self::card(
+				$status['figure']['label'],
+				$status['figure']['value'],
 				array(
-					'sub' => $months > 0
-						/* translators: %d: number of months active. */
-						? sprintf( _n( 'over %d month', 'over %d months', $months, 'plain-language-time-tracker' ), $months )
-						: '',
+					'sub_html' => $status['figure']['basis'],
+					'over'     => ! empty( $status['figure']['over'] ),
+					'muted'    => ! empty( $status['figure']['muted'] ),
 				)
 			);
 
-			return array( $used, $overage_card, $avg, $lifetime_card );
+			return array( $used, $overage_card, $avg, $status_card );
 		}
 
 		// ── Full (lifetime) view ──
-		$months_card = self::card(
-			__( 'Months active', 'plain-language-time-tracker' ),
-			$months > 0
-				/* translators: %d: number of months. */
-				? sprintf( _n( '%d month', '%d months', $months, 'plain-language-time-tracker' ), $months )
-				: ''
+		//
+		// A different question from the period view: not "what do I bill for this
+		// month" but "is this retainer healthy across its whole run"
+		// (ui/pltt-scope-by-type.html §02). Average per month is the load-bearing
+		// figure — it's the one that starts a conversation about resizing the plan.
+		$summary  = PLTT_Billing::get_retainer_summary( $project );
+		$periods  = (int) $summary['periods'];
+		$adj      = self::period_adjective( $project );
+		$avg_life = $periods > 0 ? (int) round( $life_minutes / $periods ) : $life_minutes;
+
+		// 1 — Total hours across the run.
+		$total = self::card(
+			__( 'Total hours', 'plain-language-time-tracker' ),
+			pltt_format_duration( $life_minutes ),
+			array(
+				'sub' => $periods > 0
+					? sprintf(
+						/* translators: 1: number of periods; 2: cadence adjective, e.g. "monthly". */
+						_n( 'Across %1$d %2$s period', 'Across %1$d %2$s periods', $periods, 'plain-language-time-tracker' ),
+						$periods,
+						$adj
+					)
+					: '',
+			)
 		);
 
-		$period_word = array(
-			'weekly'    => __( 'per week', 'plain-language-time-tracker' ),
-			'monthly'   => __( 'per month', 'plain-language-time-tracker' ),
-			'quarterly' => __( 'per quarter', 'plain-language-time-tracker' ),
-			'yearly'    => __( 'per year', 'plain-language-time-tracker' ),
-		);
-		$alloc_card = self::card(
-			__( 'Allocation', 'plain-language-time-tracker' ),
-			$alloc_minutes > 0 ? pltt_format_duration( $alloc_minutes ) : '',
-			array( 'sub' => isset( $period_word[ $project->recurring_period ] ) ? $period_word[ $project->recurring_period ] : '' )
+		// 2 — Average per period against the allocation, plus how many ran over.
+		$avg_basis = '';
+		if ( $alloc_minutes > 0 ) {
+			$avg_basis = sprintf(
+				/* translators: 1: percent of allocation; 2: the included hours, e.g. "3h". */
+				__( '%1$d%% of the %2$s included', 'plain-language-time-tracker' ),
+				(int) round( $avg_life / $alloc_minutes * 100 ),
+				pltt_format_duration( $alloc_minutes )
+			);
+			if ( $periods > 0 ) {
+				$avg_basis .= ' · ' . sprintf(
+					/* translators: 1: periods over allocation; 2: total periods. */
+					__( '%1$d of %2$d over', 'plain-language-time-tracker' ),
+					(int) $summary['over_periods'],
+					$periods
+				);
+			}
+		}
+		$avg_life_card = self::card(
+			self::average_label( $project ),
+			pltt_format_duration( $avg_life ),
+			array(
+				'sub'  => $avg_basis,
+				'over' => ( $alloc_minutes > 0 && $avg_life > $alloc_minutes ),
+			)
 		);
 
-		return array(
-			self::card( __( 'Total hours', 'plain-language-time-tracker' ), pltt_format_duration( $life_minutes ) ),
-			$avg,
-			$months_card,
-			$alloc_card,
+		// 3 — What all that overage is worth.
+		$overage_life = (float) $summary['overage_amount'];
+		$overage_card = self::card(
+			__( 'Overage billable', 'plain-language-time-tracker' ),
+			pltt_format_currency( $overage_life ),
+			array(
+				'sub'   => $summary['over_periods'] > 0
+					? sprintf(
+						/* translators: 1: number of periods over; 2: cadence adjective, e.g. "monthly". */
+						_n( 'Sum of %1$d %2$s overage', 'Sum of %1$d %2$s overages', (int) $summary['over_periods'], 'plain-language-time-tracker' ),
+						(int) $summary['over_periods'],
+						$adj
+					)
+					: __( 'never over allocation', 'plain-language-time-tracker' ),
+				'muted' => $overage_life <= 0.0,
+			)
 		);
+
+		// 4 — What of it is still owed. The basis line is the route to those
+		// periods on the Billing surface, nothing else.
+		$unbilled_life = (float) $summary['unbilled_amount'];
+		$unbilled_opts = array(
+			'over'  => $unbilled_life > 0,
+			'muted' => $unbilled_life <= 0.0,
+		);
+		if ( $summary['unbilled_periods'] > 0 ) {
+			$unbilled_opts['sub_link'] = array(
+				'url'   => add_query_arg(
+					array( 'page' => 'pltt-invoicing', 'view' => 'ready' ),
+					admin_url( 'admin.php' )
+				) . '#pltt-bill-proj-' . (int) $project->id,
+				'label' => sprintf(
+					/* translators: %d: number of periods with unbilled overage. */
+					_n( '%d period', '%d periods', (int) $summary['unbilled_periods'], 'plain-language-time-tracker' ),
+					(int) $summary['unbilled_periods']
+				),
+			);
+		} else {
+			$unbilled_opts['sub'] = __( 'nothing outstanding', 'plain-language-time-tracker' );
+		}
+		$unbilled_card = self::card(
+			__( 'Not yet billed', 'plain-language-time-tracker' ),
+			pltt_format_currency( $unbilled_life ),
+			$unbilled_opts
+		);
+
+		return array( $total, $avg_life_card, $overage_card, $unbilled_card );
+	}
+
+	/**
+	 * The retainer's cadence as an adjective — "monthly", "weekly", …
+	 *
+	 * @param object $project Project row.
+	 * @return string
+	 */
+	private static function period_adjective( $project ) {
+		$words = array(
+			'weekly'    => __( 'weekly', 'plain-language-time-tracker' ),
+			'monthly'   => __( 'monthly', 'plain-language-time-tracker' ),
+			'quarterly' => __( 'quarterly', 'plain-language-time-tracker' ),
+			'yearly'    => __( 'yearly', 'plain-language-time-tracker' ),
+		);
+		return isset( $words[ $project->recurring_period ] ) ? $words[ $project->recurring_period ] : $words['monthly'];
+	}
+
+	/**
+	 * "Average per month" and friends — the label names the allocation period, so
+	 * the figure can't be mistaken for a filtered span.
+	 *
+	 * @param object $project Project row.
+	 * @return string
+	 */
+	private static function average_label( $project ) {
+		$labels = array(
+			'weekly'    => __( 'Average per week', 'plain-language-time-tracker' ),
+			'monthly'   => __( 'Average per month', 'plain-language-time-tracker' ),
+			'quarterly' => __( 'Average per quarter', 'plain-language-time-tracker' ),
+			'yearly'    => __( 'Average per year', 'plain-language-time-tracker' ),
+		);
+		return isset( $labels[ $project->recurring_period ] ) ? $labels[ $project->recurring_period ] : $labels['monthly'];
 	}
 
 	/**
@@ -434,99 +638,105 @@ class PLTT_Project_Report {
 	private static function cards_internal( $project, $stats ) {
 		$total_minutes = isset( $stats->total_minutes ) ? (int) $stats->total_minutes : 0;
 		$count         = isset( $stats->total_count ) ? (int) $stats->total_count : 0;
-		$months        = self::months_between( $stats->first_entry_date ?? '', $stats->last_entry_date ?? '' );
 
-		return array(
-			self::card( __( 'Total hours', 'plain-language-time-tracker' ), pltt_format_duration( $total_minutes ) ),
+		// Internal work has no rate, no bill and no budget, so three of the standard
+		// figures have nothing to show. Rather than four dashes, carry only what's
+		// true: how much time, what share of the whole, when it was last touched
+		// (ui/pltt-scope-by-type.html §05).
+		$cards = array(
 			self::card(
-				__( 'Entries', 'plain-language-time-tracker' ),
-				$count > 0 ? number_format_i18n( $count ) : '0'
-			),
-			self::card(
-				__( 'Active span', 'plain-language-time-tracker' ),
-				$months > 0
-					/* translators: %d: number of months. */
-					? sprintf( _n( '%d month', '%d months', $months, 'plain-language-time-tracker' ), $months )
-					: ''
+				__( 'Total hours', 'plain-language-time-tracker' ),
+				pltt_format_duration( $total_minutes ),
+				array(
+					'sub' => $count > 0
+						? sprintf(
+							/* translators: %s: entry count. */
+							_n( '%s entry', '%s entries', $count, 'plain-language-time-tracker' ),
+							number_format_i18n( $count )
+						)
+						: '',
+				)
 			),
 		);
+
+		// Share of everything tracked, lifetime against lifetime — never a project's
+		// whole run divided by a single year. Descriptive framing only: "12% of
+		// tracked time", never "only 12% billable".
+		$all          = PLTT_Entries::get_stats( array() );
+		$all_minutes  = isset( $all->total_minutes ) ? (int) $all->total_minutes : 0;
+		$cards[]      = self::card(
+			__( 'Share of tracked time', 'plain-language-time-tracker' ),
+			( $all_minutes > 0 && $total_minutes > 0 )
+				? sprintf( '%d%%', (int) round( $total_minutes / $all_minutes * 100 ) )
+				: '',
+			array(
+				'sub' => $all_minutes > 0
+					? sprintf(
+						/* translators: %s: all time logged across every project. */
+						__( 'of %s logged', 'plain-language-time-tracker' ),
+						pltt_format_duration( $all_minutes )
+					)
+					: '',
+			)
+		);
+
+		// Most recent touch — the date, with what it was on the basis line.
+		$last_date = ! empty( $stats->last_entry_date ) ? $stats->last_entry_date : '';
+		$last_desc = '';
+		if ( $last_date ) {
+			$recent = PLTT_Entries::get_all(
+				array(
+					'project_id' => (int) $project->id,
+					'date_from'  => $last_date,
+					'date_to'    => $last_date,
+					'orderby'    => 'duration_minutes',
+					'order'      => 'DESC',
+					'limit'      => 1,
+				)
+			);
+			if ( ! empty( $recent[0]->description ) ) {
+				$last_desc = (string) $recent[0]->description;
+			}
+		}
+		$cards[] = self::card(
+			__( 'Most recent', 'plain-language-time-tracker' ),
+			$last_date ? date_i18n( 'M j', strtotime( $last_date ) ) : '',
+			array( 'sub' => $last_desc )
+		);
+
+		return $cards;
 	}
 
 	/**
-	 * Type-aware hero: the headline block above the cards.
+	 * Type-aware hero: the gauge block beneath the scope block.
 	 *
-	 * Hourly  → "Earned to date" figure + Billed / Unbilled / Effective-rate rows.
+	 * Only the two types with a limit get one — the gauge is the meter, and a meter
+	 * needs something to measure against:
+	 *
 	 * Fixed   → "Budget consumed" gauge + Remaining / Hours / Effective-rate rows.
 	 * Retainer→ current-period "This period" allocation gauge + Overage / Avg / Fee rows.
-	 * Internal→ no hero (nothing billable to headline); returns null.
+	 * Hourly / Internal → none.
 	 *
 	 * Kept strictly factual — no pace projections or "went over N of M" framing.
 	 *
-	 * @param object      $project    Project row.
-	 * @param object|null $stats      Lifetime aggregate stats.
-	 * @param float       $rate       Resolved hourly rate.
-	 * @param int         $project_id Project ID (for the billed/absorbed lookup).
+	 * @param object      $project Project row.
+	 * @param object|null $stats   Lifetime aggregate stats.
+	 * @param float       $rate    Resolved hourly rate.
+	 * @param array|null  $window  Active period window (recurring period lens).
 	 * @return array|null Hero view-model, or null when the type has no hero.
 	 */
-	private static function build_hero( $project, $stats, $rate, $project_id, $window = null ) {
+	private static function build_hero( $project, $stats, $rate, $window = null ) {
 		switch ( pltt_get_billing_type( $project ) ) {
 			case 'fixed':
 				return self::hero_fixed( $project, $stats, $rate );
 			case 'recurring':
 				return self::hero_recurring( $project, $stats, $rate, $window );
-			case 'none':
-				return null;
 			default:
-				return self::hero_hourly( $project, $stats, $rate, $project_id );
+				// Hourly and internal have no limit to gauge against, so there is
+				// nothing for a hero to show that the scope block's figures don't
+				// already say (ui/pltt-scope-by-type.html §01, §05).
+				return null;
 		}
-	}
-
-	/**
-	 * Hourly hero: lifetime earned value, split into billed / unbilled.
-	 *
-	 * Every billable entry's value is either frozen onto a record (billed or
-	 * absorbed) or still uncovered (unbilled), so unbilled = earned − billed −
-	 * absorbed. That avoids a second coverage query.
-	 *
-	 * @param object      $project    Project row.
-	 * @param object|null $stats      Lifetime stats.
-	 * @param float       $rate       Resolved hourly rate.
-	 * @param int         $project_id Project ID.
-	 * @return array
-	 */
-	private static function hero_hourly( $project, $stats, $rate, $project_id ) {
-		$earned        = isset( $stats->billable_amount ) ? (float) $stats->billable_amount : 0.0;
-		$total_minutes = isset( $stats->total_minutes ) ? (int) $stats->total_minutes : 0;
-
-		$rec      = PLTT_Billing_Records::query( array( 'project_ids' => array( (int) $project_id ), 'limit' => 0 ) );
-		$billed   = (float) $rec['billed'];
-		$absorbed = (float) $rec['absorbed'];
-		$unbilled = max( 0.0, round( $earned - $billed - $absorbed, 2 ) );
-		$ehr      = pltt_effective_rate( $earned, $total_minutes );
-
-		$rows = array(
-			array( 'label' => __( 'Billed', 'plain-language-time-tracker' ), 'value' => pltt_format_currency( $billed ) ),
-			array( 'label' => __( 'Unbilled', 'plain-language-time-tracker' ), 'value' => pltt_format_currency( $unbilled ), 'accent' => $unbilled > 0 ),
-			array( 'label' => __( 'Effective rate', 'plain-language-time-tracker' ), 'value' => $ehr > 0 ? self::rate_str( $ehr ) : '—' ),
-		);
-		if ( $absorbed > 0 ) {
-			$rows[] = array( 'label' => __( 'Absorbed', 'plain-language-time-tracker' ), 'value' => pltt_format_currency( $absorbed ) );
-		}
-
-		return array(
-			'type'          => 'hourly',
-			'mode'          => 'figure',
-			'tag'           => __( 'Earned to date', 'plain-language-time-tracker' ),
-			'period'        => '',
-			'figure'        => pltt_format_currency( $earned ),
-			'figure_suffix' => '· ' . pltt_format_duration( $total_minutes ),
-			'note'          => $rate > 0
-				/* translators: %s: hourly rate, e.g. "$100/hr". */
-				? sprintf( __( 'All-time billable value at %s.', 'plain-language-time-tracker' ), self::rate_str( $rate ) )
-				: __( 'All-time billable value.', 'plain-language-time-tracker' ),
-			'gauge'         => null,
-			'minirows'      => $rows,
-		);
 	}
 
 	/**
@@ -545,7 +755,6 @@ class PLTT_Project_Report {
 		$consumed  = round( ( $total_minutes / 60.0 ) * $rate, 2 );
 		$remaining = round( $budget - $consumed, 2 );
 		$pct       = $budget > 0 ? ( $consumed / $budget ) : 0.0;
-		$ehr       = pltt_effective_rate( $budget, $total_minutes );
 		$seg       = self::gauge_segments( $consumed, $budget );
 
 		return array(
@@ -570,11 +779,10 @@ class PLTT_Project_Report {
 					? sprintf( __( '%1$d%% used · %2$s logged', 'plain-language-time-tracker' ), (int) round( $pct * 100 ), pltt_format_duration( $total_minutes ) )
 					: __( 'no budget set', 'plain-language-time-tracker' ),
 			),
-			'minirows' => array(
-				array( 'label' => __( 'Remaining', 'plain-language-time-tracker' ), 'value' => pltt_format_currency( $remaining ), 'accent' => $remaining < 0 ),
-				array( 'label' => __( 'Hours logged', 'plain-language-time-tracker' ), 'value' => pltt_format_duration( $total_minutes ) ),
-				array( 'label' => __( 'Effective rate', 'plain-language-time-tracker' ), 'value' => $ehr > 0 ? self::rate_str( $ehr ) : '—' ),
-			),
+			// No mini-rows: remaining, hours and effective rate are all figures in
+			// the scope block above. What's left is the meter, which is the one
+			// thing the block can't say — proportion.
+			'minirows' => array(),
 		);
 	}
 
@@ -594,7 +802,6 @@ class PLTT_Project_Report {
 	 */
 	private static function hero_recurring( $project, $stats, $rate, $window = null ) {
 		$alloc_minutes = (int) round( self::num( $project->budget_hours ) * 60 );
-		$fee           = self::num( $project->budget_fee );
 		$today         = pltt_get_current_date();
 
 		$follows_lens = is_array( $window ) && ! empty( $window['is_period'] );
@@ -624,11 +831,6 @@ class PLTT_Project_Report {
 		$rem_min   = $has_alloc ? max( 0, $alloc_minutes - $used_minutes ) : 0;
 		$overage   = round( ( $over_min / 60.0 ) * $rate, 2 );
 
-		// Lifetime average per month, for context.
-		$life_minutes = isset( $stats->total_minutes ) ? (int) $stats->total_minutes : 0;
-		$months       = self::months_between( $stats->first_entry_date ?? '', $stats->last_entry_date ?? '' );
-		$avg_minutes  = $months > 0 ? (int) round( $life_minutes / $months ) : $life_minutes;
-
 		// Caption: overage / remaining when there's an allocation; plain usage when not.
 		if ( ! $has_alloc ) {
 			/* translators: %s: hours logged this period. */
@@ -651,14 +853,6 @@ class PLTT_Project_Report {
 			$tag = __( 'Latest period', 'plain-language-time-tracker' );
 		}
 
-		// Third mini-row: the monthly fee when one is set, else the allocation
-		// (always meaningful for a real retainer — avoids a blank "Monthly fee").
-		if ( $fee > 0 ) {
-			$fee_row = array( 'label' => __( 'Monthly fee', 'plain-language-time-tracker' ), 'value' => pltt_format_currency( $fee ) );
-		} else {
-			$fee_row = array( 'label' => __( 'Allocation', 'plain-language-time-tracker' ), 'value' => $has_alloc ? pltt_format_duration( $alloc_minutes ) : '—' );
-		}
-
 		$seg = self::gauge_segments( $used_minutes, $alloc_minutes );
 
 		return array(
@@ -679,11 +873,10 @@ class PLTT_Project_Report {
 					? sprintf( __( '%d%% of allocation', 'plain-language-time-tracker' ), (int) round( $pct * 100 ) )
 					: __( 'no allocation set', 'plain-language-time-tracker' ),
 			),
-			'minirows' => array(
-				array( 'label' => __( 'Overage this period', 'plain-language-time-tracker' ), 'value' => $overage > 0 ? pltt_format_currency( $overage ) : '—', 'accent' => $overage > 0 ),
-				array( 'label' => __( 'Avg / month', 'plain-language-time-tracker' ), 'value' => pltt_format_duration( $avg_minutes ) ),
-				$fee_row,
-			),
+			// No mini-rows: overage, average and the allocation are all figures in
+			// the scope block above. What's left is the meter — proportion, which
+			// is the one thing the block can't state in words.
+			'minirows' => array(),
 		);
 	}
 
@@ -790,412 +983,4 @@ class PLTT_Project_Report {
 			+ ( (int) gmdate( 'n', $b ) - (int) gmdate( 'n', $a ) ) + 1;
 	}
 
-	/**
-	 * Build every candidate grouping and decide which to expose.
-	 *
-	 * @param array $entries       Entry rows (ASC by date).
-	 * @param array $tags_by_entry entry_id => [tag names].
-	 * @param array $name_to_group tag name => group name (grouped tags only).
-	 * @param array $group_names   All tag group names (loaded once by the caller; OPT-N-B).
-	 * @return array Map of grouping key => grouping data. Only exposed groupings are returned.
-	 */
-	private static function build_groupings( $entries, $tags_by_entry, $name_to_group, $group_names ) {
-		$candidate_keys = $group_names;
-		$candidate_keys[] = self::UNGROUPED;
-
-		$built = array();
-		foreach ( $candidate_keys as $key ) {
-			$built[ $key ] = self::build_one_grouping( $key, $entries, $tags_by_entry, $name_to_group );
-		}
-
-		// Expose only groupings that have at least one real (non-untagged) bucket
-		// with logged time. If none qualify (e.g. all entries untagged), fall back
-		// to Ungrouped so the section still renders honestly.
-		$exposed = array();
-		foreach ( $built as $key => $data ) {
-			if ( $data['has_tagged'] ) {
-				$exposed[ $key ] = $data;
-			}
-		}
-		if ( empty( $exposed ) ) {
-			$exposed[ self::UNGROUPED ] = $built[ self::UNGROUPED ];
-		}
-
-		return $exposed;
-	}
-
-	/**
-	 * Build one grouping's buckets.
-	 *
-	 * @param string $key           Grouping key (group name or UNGROUPED).
-	 * @param array  $entries       Entry rows.
-	 * @param array  $tags_by_entry entry_id => [tag names].
-	 * @param array  $name_to_group tag name => group name.
-	 * @return array Grouping data: label, buckets, total_minutes, max_minutes, has_tagged, is_phase.
-	 */
-	private static function build_one_grouping( $key, $entries, $tags_by_entry, $name_to_group ) {
-		$is_ungrouped = ( self::UNGROUPED === $key );
-		$is_phase     = ! $is_ungrouped && self::looks_like_phase( $key );
-
-		$buckets        = array(); // tag name => ['minutes'=>int, 'dates'=>set, 'first'=>, 'last'=>]
-		$untagged       = array( 'minutes' => 0, 'dates' => array(), 'first' => null, 'last' => null );
-		$grouping_total = 0;
-
-		foreach ( $entries as $entry ) {
-			$mins = (int) $entry->duration_minutes;
-			if ( $mins <= 0 ) {
-				continue;
-			}
-			$date     = $entry->entry_date;
-			$all_tags = isset( $tags_by_entry[ (int) $entry->id ] ) ? $tags_by_entry[ (int) $entry->id ] : array();
-
-			// Tags belonging to this grouping.
-			$in_group = array();
-			foreach ( $all_tags as $t ) {
-				$has_group = isset( $name_to_group[ $t ] ) && '' !== $name_to_group[ $t ];
-				if ( $is_ungrouped ) {
-					if ( ! $has_group ) {
-						$in_group[] = $t;
-					}
-				} elseif ( $has_group && $name_to_group[ $t ] === $key ) {
-					$in_group[] = $t;
-				}
-			}
-
-			$grouping_total += $mins;
-
-			if ( empty( $in_group ) ) {
-				self::accumulate( $untagged, $mins, $date );
-				continue;
-			}
-
-			// Multi-tag: attribute full duration to each matching tag (pct may exceed 100%).
-			foreach ( $in_group as $t ) {
-				if ( ! isset( $buckets[ $t ] ) ) {
-					$buckets[ $t ] = array( 'minutes' => 0, 'dates' => array(), 'first' => null, 'last' => null );
-				}
-				self::accumulate( $buckets[ $t ], $mins, $date );
-			}
-		}
-
-		// Finalize tagged buckets.
-		$out         = array();
-		$max_minutes = 0;
-		$has_tagged  = false;
-		foreach ( $buckets as $name => $b ) {
-			$out[]       = self::finalize_bucket( $name, $name, false, $b, $grouping_total );
-			$max_minutes = max( $max_minutes, $b['minutes'] );
-			$has_tagged  = true;
-		}
-
-		// Order: phase groupings chronologically (build order); others by hours desc.
-		if ( $is_phase ) {
-			usort(
-				$out,
-				static function ( $a, $b ) {
-					return strcmp( (string) $a['first_date'], (string) $b['first_date'] );
-				}
-			);
-		} else {
-			usort(
-				$out,
-				static function ( $a, $b ) {
-					return $b['minutes'] <=> $a['minutes'];
-				}
-			);
-		}
-
-		// Untagged bucket sorts last, if any.
-		if ( $untagged['minutes'] > 0 ) {
-			$out[]       = self::finalize_bucket( self::UNTAGGED, self::untagged_label( $key, $is_phase, $is_ungrouped ), true, $untagged, $grouping_total );
-			$max_minutes = max( $max_minutes, $untagged['minutes'] );
-		}
-
-		$label = $is_ungrouped ? __( 'Ungrouped', 'plain-language-time-tracker' ) : $key;
-
-		return array(
-			'key'             => $key,
-			'label'           => $label,
-			'description'     => self::grouping_description( $label, $is_phase, $is_ungrouped ),
-			'buckets'         => $out,
-			'total_minutes'   => $grouping_total,
-			'max_minutes'     => $max_minutes,
-			'has_tagged'      => $has_tagged,
-			'is_phase'        => $is_phase,
-		);
-	}
-
-	/**
-	 * One-line helper sentence shown under the "Where the time went" header.
-	 *
-	 * @param string $label        Grouping label.
-	 * @param bool   $is_phase     Phase-like grouping.
-	 * @param bool   $is_ungrouped Ungrouped grouping.
-	 * @return string
-	 */
-	private static function grouping_description( $label, $is_phase, $is_ungrouped ) {
-		if ( $is_phase ) {
-			return __( 'Hours per phase, in build order. The longest bar consumed the most time.', 'plain-language-time-tracker' );
-		}
-		if ( $is_ungrouped ) {
-			return __( 'Hours by tag, largest first.', 'plain-language-time-tracker' );
-		}
-		/* translators: %s: tag group name. */
-		return sprintf( __( 'Hours by %s tag, largest first.', 'plain-language-time-tracker' ), $label );
-	}
-
-	/**
-	 * Add minutes + date to a bucket accumulator.
-	 *
-	 * @param array  $bucket Accumulator (by reference).
-	 * @param int    $mins   Minutes to add.
-	 * @param string $date   Entry date (Y-m-d).
-	 */
-	private static function accumulate( &$bucket, $mins, $date ) {
-		$bucket['minutes'] += $mins;
-		if ( ! isset( $bucket['dates'][ $date ] ) ) {
-			$bucket['dates'][ $date ] = 0;
-		}
-		$bucket['dates'][ $date ] += $mins;
-		if ( null === $bucket['first'] || $date < $bucket['first'] ) {
-			$bucket['first'] = $date;
-		}
-		if ( null === $bucket['last'] || $date > $bucket['last'] ) {
-			$bucket['last'] = $date;
-		}
-	}
-
-	/**
-	 * Turn a bucket accumulator into the final bar shape.
-	 *
-	 * @param string $key            Bucket key.
-	 * @param string $label          Display label.
-	 * @param bool   $is_untagged    Whether this is the untagged bucket.
-	 * @param array  $b              Accumulator.
-	 * @param int    $grouping_total Denominator for pct (entries counted once).
-	 * @return array
-	 */
-	private static function finalize_bucket( $key, $label, $is_untagged, $b, $grouping_total ) {
-		$span_days = 0;
-		if ( $b['first'] && $b['last'] ) {
-			$first     = strtotime( $b['first'] );
-			$last      = strtotime( $b['last'] );
-			$span_days = (int) floor( ( $last - $first ) / DAY_IN_SECONDS ) + 1;
-		}
-
-		$per_day = $b['dates'];
-		ksort( $per_day );
-
-		return array(
-			'key'         => $key,
-			'label'       => $label,
-			'is_untagged' => (bool) $is_untagged,
-			'minutes'     => (int) $b['minutes'],
-			'pct'         => $grouping_total > 0 ? ( $b['minutes'] / $grouping_total ) : 0.0,
-			'first_date'  => $b['first'],
-			'last_date'   => $b['last'],
-			'span_days'   => $span_days,
-			'worked_days' => count( $b['dates'] ),
-			'segments'    => self::compute_segments( $per_day ),
-		);
-	}
-
-	/**
-	 * Split a bucket's worked days into solid segments for the timeline.
-	 *
-	 * A new segment starts whenever the gap to the next worked day is >= the
-	 * threshold; the space between segments is rendered as a dashed connector.
-	 *
-	 * @param array $per_day Sorted map of date (Y-m-d) => minutes.
-	 * @return array List of { start, end, minutes, worked_days }.
-	 */
-	private static function compute_segments( $per_day ) {
-		$dates = array_keys( $per_day );
-		if ( empty( $dates ) ) {
-			return array();
-		}
-
-		$segments = array();
-		$start    = $dates[0];
-		$prev     = $dates[0];
-		$minutes  = $per_day[ $dates[0] ];
-		$worked   = 1;
-		$count    = count( $dates );
-
-		for ( $i = 1; $i < $count; $i++ ) {
-			$d   = $dates[ $i ];
-			$gap = (int) floor( ( strtotime( $d ) - strtotime( $prev ) ) / DAY_IN_SECONDS );
-			if ( $gap >= self::GAP_THRESHOLD_DAYS ) {
-				$segments[] = array(
-					'start'       => $start,
-					'end'         => $prev,
-					'minutes'     => $minutes,
-					'worked_days' => $worked,
-				);
-				$start   = $d;
-				$minutes = 0;
-				$worked  = 0;
-			}
-			$minutes += $per_day[ $d ];
-			$worked++;
-			$prev = $d;
-		}
-
-		$segments[] = array(
-			'start'       => $start,
-			'end'         => $prev,
-			'minutes'     => $minutes,
-			'worked_days' => $worked,
-		);
-
-		return $segments;
-	}
-
-	/**
-	 * Build the shared calendar axis (project first -> last entry) for the timeline.
-	 *
-	 * @param object|null $stats Aggregate stats (first_entry_date / last_entry_date).
-	 * @return array|null { start, end, start_ts, end_ts, span_days, months[] } or null if no entries.
-	 */
-	private static function build_axis( $stats ) {
-		$start = $stats->first_entry_date ?? '';
-		$end   = $stats->last_entry_date ?? '';
-		if ( ! $start || ! $end ) {
-			return null;
-		}
-
-		$start_ts = strtotime( $start );
-		$end_ts   = strtotime( $end );
-		$span_secs = max( 1, $end_ts - $start_ts );
-
-		// Month gridlines/labels from the start month through the end month.
-		$months = array();
-		$cursor = strtotime( gmdate( 'Y-m-01', $start_ts ) );
-		$guard  = 0;
-		while ( $cursor <= $end_ts && $guard < 240 ) {
-			$pct      = ( $cursor - $start_ts ) / $span_secs * 100;
-			$months[] = array(
-				'label'    => date_i18n( 'M', $cursor ),
-				'year'     => (int) gmdate( 'Y', $cursor ),
-				'is_jan'   => '01' === gmdate( 'm', $cursor ),
-				'pct'      => max( 0.0, min( 100.0, $pct ) ),
-				'gridline' => ( $pct > 0.5 && $pct < 99.5 ),
-			);
-			$cursor = strtotime( '+1 month', $cursor );
-			$guard++;
-		}
-
-		return array(
-			'start'     => $start,
-			'end'       => $end,
-			'start_ts'  => $start_ts,
-			'end_ts'    => $end_ts,
-			'span_days' => (int) floor( ( $end_ts - $start_ts ) / DAY_IN_SECONDS ) + 1,
-			'months'    => $months,
-		);
-	}
-
-	/**
-	 * Position (0-100%) of a date along the axis.
-	 *
-	 * @param array  $axis Axis from build_axis().
-	 * @param string $date Date (Y-m-d).
-	 * @return float Percent 0-100.
-	 */
-	public static function axis_pct( $axis, $date ) {
-		if ( empty( $axis ) || empty( $axis['end_ts'] ) ) {
-			return 0.0;
-		}
-		$span = max( 1, $axis['end_ts'] - $axis['start_ts'] );
-		$pct  = ( strtotime( $date ) - $axis['start_ts'] ) / $span * 100;
-		return max( 0.0, min( 100.0, $pct ) );
-	}
-
-	/**
-	 * Budget-crossing line for the timeline overlay.
-	 *
-	 * The date where cumulative hours first reached the project's budget. This
-	 * is a fact about the project, not the active group-by — position is summed
-	 * across all entries in date order regardless of grouping, so the template
-	 * lands it once via axis_pct() and the line holds still as lanes regroup.
-	 *
-	 * Gated to fixed-budget projects that actually went over: hourly/internal
-	 * have no budget concept, and a project finishing under budget never crosses.
-	 * Retainers use the monthly, in-period threshold marker in the Reports entry
-	 * stream instead (pltt_compute_overage_threshold) — different surface, resets
-	 * each period — so they're excluded here.
-	 *
-	 * @param object      $project Project row.
-	 * @param object|null $stats   Aggregate stats.
-	 * @param array       $entries Project entries, oldest-first.
-	 * @param float       $rate    Resolved hourly rate.
-	 * @return array|null { date, overage_minutes } or null when no line applies.
-	 */
-	private static function build_budget_line( $project, $stats, $entries, $rate ) {
-		if ( 'fixed' !== pltt_get_billing_type( $project ) ) {
-			return null;
-		}
-
-		// Budgeted minutes: explicit hours, else fee ÷ rate (canonical cascade).
-		$budgeted_minutes = pltt_budgeted_minutes( $project, $rate );
-		if ( $budgeted_minutes <= 0 ) {
-			return null;
-		}
-
-		$total_minutes = isset( $stats->total_minutes ) ? (int) $stats->total_minutes : 0;
-		if ( $total_minutes <= $budgeted_minutes ) {
-			return null; // Came in at or under budget — no crossing.
-		}
-
-		// First date where the running cumulative reaches the budget.
-		$cumulative = 0;
-		$cross_date = null;
-		foreach ( $entries as $e ) {
-			$cumulative += (int) $e->duration_minutes;
-			if ( $cumulative >= $budgeted_minutes ) {
-				$cross_date = $e->entry_date;
-				break;
-			}
-		}
-		if ( null === $cross_date ) {
-			return null;
-		}
-
-		return array(
-			'date'            => $cross_date,
-			'overage_minutes' => $total_minutes - $budgeted_minutes,
-		);
-	}
-
-	/**
-	 * Whether a group name reads like a project-phase group.
-	 *
-	 * @param string $group_name Group name.
-	 * @return bool
-	 */
-	private static function looks_like_phase( $group_name ) {
-		return (bool) preg_match( '/phase/i', $group_name );
-	}
-
-	/**
-	 * Label for the "no tag in this group" bucket.
-	 *
-	 * @param string $key          Grouping key.
-	 * @param bool   $is_phase     Phase-like grouping.
-	 * @param bool   $is_ungrouped Ungrouped grouping.
-	 * @return string
-	 */
-	private static function untagged_label( $key, $is_phase, $is_ungrouped ) {
-		if ( $is_phase ) {
-			return __( 'Unphased', 'plain-language-time-tracker' );
-		}
-		if ( preg_match( '/flag/i', (string) $key ) ) {
-			return __( 'No flag', 'plain-language-time-tracker' );
-		}
-		if ( $is_ungrouped ) {
-			return __( 'Untagged', 'plain-language-time-tracker' );
-		}
-		/* translators: %s: tag group name. */
-		return sprintf( __( 'No %s tag', 'plain-language-time-tracker' ), strtolower( $key ) );
-	}
 }

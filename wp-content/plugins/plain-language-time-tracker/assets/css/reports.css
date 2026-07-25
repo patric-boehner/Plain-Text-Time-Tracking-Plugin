@@ -51,7 +51,10 @@
 	display: flex;
 	justify-content: space-between;
 	align-items: center;
-	padding: 10px 14px;
+	/* Vertical padding carries the height the Edit button used to give this row —
+	   without it the header collapses to a text line and stops reading as the
+	   card's head. Horizontal padding stays aligned with the table below. */
+	padding: 16px 14px;
 	background: var(--pltt-bg-white);
 	border: 1px solid var(--pltt-border);
 	border-bottom: none;
@@ -64,7 +67,32 @@
 	color: var(--pltt-text-dark);
 }
 
+/* The date is the day's identifier AND its navigation (spec §7) — it opens
+   Today at that date. No trailing "Open day log" link, no day-level kebab: one
+   action is a link. Underline on hover so it reads as clickable. */
+.pltt-day-link {
+	color: var(--pltt-primary);
+	text-decoration: none;
+}
+
+.pltt-day-link:hover,
+.pltt-day-link:focus {
+	text-decoration: underline;
+}
+
+.pltt-day-dow {
+	margin-left: 8px;
+	font-weight: 400;
+	color: var(--pltt-text-muted);
+}
+
+/* Day totals sit where the Edit button used to (spec §2.3). Inline-flex so the
+   gap opens up both sides of the "·" — the two figures need room to read as two
+   figures, not one run-on string. */
 .pltt-date-group-meta {
+	display: inline-flex;
+	align-items: baseline;
+	gap: 8px;
 	font-size: 12px;
 	color: var(--pltt-text-muted);
 }
@@ -276,72 +304,6 @@
 		display: block;
 		overflow-x: auto;
 	}
-}
-
-/* ===== Overage decision support (single-project retainer/fixed-fee view) ===== */
-
-/* Threshold marker — chrome inside the day table, not a data row. */
-.pltt-date-group .widefat tr.pltt-threshold-marker-row,
-.pltt-date-group .widefat tr.pltt-threshold-marker-row:hover {
-	background: transparent;
-	box-shadow: none;
-}
-
-.pltt-date-group .widefat tr.pltt-threshold-marker-row > td {
-	padding: 0;
-	border-top: 1px dashed var(--pltt-warning);
-	border-bottom: 1px dashed var(--pltt-warning);
-	background: linear-gradient(
-		to bottom,
-		color-mix(in srgb, var(--pltt-warning) 4%, transparent),
-		color-mix(in srgb, var(--pltt-warning) 10%, transparent) 45%,
-		color-mix(in srgb, var(--pltt-warning) 4%, transparent)
-	);
-}
-
-.pltt-threshold-marker {
-	display: flex;
-	align-items: center;
-	gap: 10px;
-	padding: 10px 14px;
-}
-
-.pltt-threshold-icon {
-	font-size: 16px;
-	line-height: 1;
-	color: var(--pltt-warning-text);
-}
-
-.pltt-threshold-labels {
-	display: flex;
-	flex-direction: row;
-	align-items: baseline;
-	gap: 10px;
-	min-width: 0;
-}
-
-.pltt-threshold-primary {
-	font-weight: 600;
-	color: var(--pltt-text-dark);
-	font-size: 13px;
-}
-
-.pltt-threshold-secondary {
-	color: var(--pltt-text-muted);
-	font-size: 12px;
-}
-
-/* Overage row tint — warm cream bg + amber left edge. */
-.pltt-date-group .widefat tr.pltt-row-overage {
-	background: var(--pltt-bg-overage);
-}
-
-.pltt-date-group .widefat tr.pltt-row-overage > td:first-child {
-	box-shadow: inset 3px 0 0 var(--pltt-warning);
-}
-
-.pltt-date-group .widefat tr.pltt-row-overage:hover {
-	background: var(--pltt-bg-overage-hover);
 }
 
 /* Covered row tint — blue bg + blue left edge: entry sits inside a committed

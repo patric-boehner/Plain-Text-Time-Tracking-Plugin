@@ -28,7 +28,30 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 <div class="wrap pltt-wrap">
 	<div class="pltt-header">
-		<h1><?php esc_html_e( 'History', 'plain-language-time-tracker' ); ?></h1>
+		<?php
+		// Light header, same as Today and the Overview: the count that used to sit
+		// in a one-figure card is a subline instead (spec §10). A single card is a
+		// lot of chrome around one number.
+		?>
+		<div class="pltt-light-header">
+			<div class="pltt-lh-titlerow">
+				<h1><?php esc_html_e( 'History', 'plain-language-time-tracker' ); ?></h1>
+			</div>
+			<?php if ( $total_logs > 0 ) : ?>
+				<div class="pltt-lh-l2">
+					<?php
+					echo esc_html(
+						sprintf(
+							/* translators: %s: number of daily logs in the month. */
+							_n( '%s daily log', '%s daily logs', $total_logs, 'plain-language-time-tracker' ),
+							number_format_i18n( $total_logs )
+						)
+					);
+					?>
+				</div>
+			<?php endif; ?>
+			<div class="pltt-lh-l3"><span class="pltt-mono"><?php echo esc_html( $nav_label ); ?></span></div>
+		</div>
 
 	<?php // Date nav sits in the header (top-right), where the Today · History toggle used to be. ?>
 	<form method="get" action="" class="pltt-report-filters-form">
@@ -112,15 +135,6 @@ if ( ! defined( 'ABSPATH' ) ) {
 		</form>
 	</div>
 
-	<?php if ( $total_logs > 0 ) : ?>
-		<div class="pltt-summary-cards">
-			<div class="card">
-				<div class="card-label"><?php esc_html_e( 'Daily Logs', 'plain-language-time-tracker' ); ?></div>
-				<div class="card-value"><?php echo esc_html( $total_logs ); ?></div>
-			</div>
-		</div>
-	<?php endif; ?>
-
 	<div class="pltt-report-content">
 		<?php if ( ! empty( $logs ) ) : ?>
 			<?php
@@ -140,10 +154,33 @@ if ( ! defined( 'ABSPATH' ) ) {
 				$week_start_obj = new DateTimeImmutable( $week_start_date, wp_timezone() );
 				$week_end_obj   = $week_start_obj->modify( '+6 days' );
 				$week_label     = $week_start_obj->format( 'M j' ) . '–' . $week_end_obj->format( 'M j, Y' );
+
+				// Week totals in the band (spec §10) — days and hours, matching the
+				// day-card headers on Entries. Hours in h/m, not decimals.
+				$week_minutes = 0;
+				foreach ( $week_logs as $week_log ) {
+					$week_minutes += (int) $week_log->total_minutes;
+				}
+				$week_days = count( $week_logs );
 				?>
 				<div class="pltt-week-group">
 					<div class="pltt-week-group-header">
 						<span class="pltt-week-group-title"><?php echo esc_html( sprintf( __( 'Week of %s', 'plain-language-time-tracker' ), $week_label ) ); ?></span>
+						<span class="pltt-week-group-meta">
+							<?php
+							echo esc_html(
+								sprintf(
+									/* translators: %s: number of days logged that week. */
+									_n( '%s day', '%s days', $week_days, 'plain-language-time-tracker' ),
+									number_format_i18n( $week_days )
+								)
+							);
+							?>
+							<?php if ( $week_minutes > 0 ) : ?>
+								&middot;
+								<span class="pltt-mono"><?php echo esc_html( pltt_format_duration( $week_minutes ) ); ?></span>
+							<?php endif; ?>
+						</span>
 					</div>
 					<table class="widefat">
 						<thead>
