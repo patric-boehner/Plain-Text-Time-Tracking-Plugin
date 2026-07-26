@@ -4,7 +4,7 @@
  *
  * Reopens a committed record so you can see what went into the bill: the frozen
  * entry manifest, the period range, the date billed, and the copyable line-items
- * text (the saved description, or a structured list + AI prompt rebuilt from the
+ * text (the saved description, or an AI prompt rebuilt from the
  * entries). Read-only — a record never changes. Shared by the Billing ledger and
  * the project-report billing history.
  *
@@ -78,7 +78,9 @@ if ( ! defined( 'ABSPATH' ) ) {
 		<div class="pltt-billcopy-head">
 			<select class="pltt-billcopy-mode" aria-label="<?php esc_attr_e( 'Description source', 'plain-language-time-tracker' ); ?>">
 				<option value="default" data-text="<?php echo esc_attr( $rv['default_desc'] ); ?>"><?php esc_html_e( 'Saved description', 'plain-language-time-tracker' ); ?></option>
-				<option value="ai_prompt" data-text="<?php echo esc_attr( $rv['ai_prompt'] ); ?>"><?php esc_html_e( 'Structured list + AI prompt', 'plain-language-time-tracker' ); ?></option>
+				<?php foreach ( $rv['prompts'] as $prompt_key => $prompt ) : ?>
+					<option value="<?php echo esc_attr( $prompt_key ); ?>" data-text="<?php echo esc_attr( $prompt['text'] ); ?>"><?php echo esc_html( $prompt['label'] ); ?></option>
+				<?php endforeach; ?>
 			</select>
 			<button type="button" class="button pltt-billcopy-copy">
 				<span class="pltt-billcopy-copy-label"><?php esc_html_e( 'Copy', 'plain-language-time-tracker' ); ?></span>

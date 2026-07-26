@@ -2443,6 +2443,285 @@ function pltt_build_single_project_scope_figures( $project, $stats, $billing_typ
 }
 
 /**
+ * Format the invoice figures for a billing scope or record as bare decimals.
+ *
+ * These are the three numbers that get typed into the invoice: quantity (hours),
+ * rate, and amount. Deliberately unformatted — no currency symbol, no thousands
+ * separator — so they paste straight into a numeric invoice field. We compute
+ * them; the AI prompts below only pass them through.
+ *
+ * @param int|null   $minutes Billable minutes, or null if not applicable.
+ * @param float|null $rate    Fallback hourly rate, used only when there are no
+ *                            hours to divide by. Null/0 when there isn't one.
+ * @param float|null $amount  Line amount in dollars.
+ * @return array{hours:?string,rate:?string,amount:?string,note:?string} Null for
+ *               any figure that doesn't apply.
+ */
+function pltt_invoice_figures( $minutes, $rate, $amount ) {
+	$amount_f = null === $amount ? null : (float) $amount;
+	$hours    = null === $minutes ? null : (int) $minutes / 60;
+
+	// The rate that actually reconciles. An entry can carry a billable_amount
+	// frozen at the rate in force when it was logged, so the project's current
+	// rate needn't multiply back to the amount — amount ÷ hours does. Fall back
+	// to the passed rate only when there are no hours to divide by.
+	$has_basis = ( null !== $hours && $hours > 0 && null !== $amount_f && $amount_f > 0 );
+	$eff       = $has_basis ? pltt_effective_rate( $amount_f, (int) $minutes ) : $rate;
+
+	$figures = array(
+		'hours'  => null === $hours ? null : number_format( $hours, 2, '.', '' ),
+		'rate'   => ( null === $eff || 0.0 === round( (float) $eff, 2 ) ) ? null : number_format( (float) $eff, 2, '.', '' ),
+		'amount' => null === $amount_f ? null : number_format( $amount_f, 2, '.', '' ),
+		'note'   => null,
+	);
+
+	// Quantity is rounded to two decimal places, so hours × rate can land a cent
+	// or two off the true amount. Say so on the line rather than let whichever
+	// number the invoice recomputes silently win.
+	if ( null !== $figures['hours'] && null !== $figures['rate'] && null !== $figures['amount'] ) {
+		$product = round( (float) $figures['hours'] * (float) $figures['rate'], 2 );
+		if ( abs( $product - round( $amount_f, 2 ) ) >= 0.005 ) {
+			$figures['note'] = sprintf(
+				/* translators: %s: the rounded product of hours × rate, e.g. "81.00". */
+				__( 'Hours × Rate rounds to %s — bill the Amount above, which is exact.', 'plain-language-time-tracker' ),
+				number_format( $product, 2, '.', '' )
+			);
+		}
+	}
+
+	return $figures;
+}
+
+/**
+ * Build the type-specific framing sentence for the invoice prompts.
+ *
+ * What the line *is* differs by billing type, and the description should say so:
+ * a retainer line is continued care-plan work beyond the plan's included time,
+ * while an hourly line is work on a named project for a named client.
+ *
+ * @param string   $type         From pltt_get_billing_type(): hourly|recurring|fixed|none.
+ * @param string   $client_name  Owning client.
+ * @param string   $project_name Project name.
+ * @param string   $period_label Human period ("June 2026", "Apr 18 – Apr 28, 2026").
+ * @param int|null $allocation   Per-period included minutes, for retainers.
+ * @return array{context:string,one_line:string} `context` prefixes every variant;
+ *               `one_line` replaces the one-line-item task when non-empty.
+ */
+function pltt_invoice_prompt_framing( $type, $client_name, $project_name, $period_label = '', $allocation = null ) {
+	$who = '' !== $client_name ? $client_name : __( 'the client', 'plain-language-time-tracker' );
+
+	if ( 'recurring' === $type ) {
+		// The overage line only makes sense against the plan it exceeds, so the
+		// allocation is the one number the description is allowed to name.
+		$included = ( $allocation > 0 )
+			? pltt_format_duration( (int) $allocation )
+			: 'the time';
+
+		return array(
+			'context'  => 'CONTEXT: ' . $who . ' is on an ongoing care plan (a retainer), "' . $project_name . '". '
+				. 'This invoice line is NOT a new or separate project — it bills only the work that went beyond the '
+				. $included . ' included in their plan for ' . $period_label . '. '
+				. 'Keep the tone continuous: ongoing care, not a one-off engagement. '
+				. 'The single exception to the no-numbers rule above: you may state the plan\'s included time, '
+				. 'because that is what this overage is measured against. Write it in words — "the hour", '
+				. '"the two hours" — not as a figure. Never state the time billed here, the rate, or any dollar amount.',
+			// The OPENING sentence of a care-plan overage line is the same every
+			// month, so it is a fill-in-the-blanks template. Only that sentence —
+			// the description of the work still follows it, because the client's
+			// first question about an overage is what the extra time went to.
+			'one_line' => 'Write a short invoice line in two parts.' . "\n\n"
+				. 'FIRST, open with this shape, filled from the plan name, period, and included time given above: '
+				. '"<plan name> for <period> over the <included time> included in your plan."' . "\n"
+				. 'Both of these openings are exactly the right length and tone:' . "\n"
+				. '- "Website care plan time for April 2026 over the hour included in your plan."' . "\n"
+				. '- "Website Care Plan Time — April 2026. Over and above the one hour included in the plan."' . "\n\n"
+				. 'THEN, in one further sentence, say what that extra time went to, rolled into a single coherent '
+				. 'statement of the work — no bullets, no task list, no adjectives selling it. Keep the tone '
+				. 'continuous: ongoing care, not a one-off engagement.',
+		);
+	}
+
+	if ( 'fixed' === $type ) {
+		return array(
+			'context'  => 'CONTEXT: this is fixed-scope project work — "' . $project_name . '" for ' . $who . '. '
+				. 'Name the project in the description so the line reads as progress on that specific engagement.',
+			'one_line' => '',
+		);
+	}
+
+	return array(
+		'context'  => 'CONTEXT: this is hourly project work — "' . $project_name . '" for ' . $who . ', covering '
+			. $period_label . '. Name the project and lead with what it is, so the line reads as work on that '
+			. 'specific engagement rather than as loose unattached tasks.',
+		'one_line' => '',
+	);
+}
+
+/**
+ * Build the copy-to-clipboard AI prompt variants for an invoice line.
+ *
+ * Every variant shares the same body — scope context, the entry notes, and the
+ * pre-calculated invoice figures — and differs in the shape of output it asks
+ * for: one line, several separate line items, or one itemized description.
+ * Shared by the outstanding-scope dialog and the committed-record dialog so
+ * both offer the same menu.
+ *
+ * The figures are quoted back rather than derived: the arithmetic happens here
+ * and the prompt forbids recomputing it. The one variant that must produce
+ * numbers we can't know in advance — "separate line items", where the model
+ * chooses the grouping — is given each entry's own pre-computed hours and
+ * amount, so its only arithmetic is adding up figures we supplied, and it is
+ * told to reconcile those sums against our totals.
+ *
+ * @param array $context_lines Leading "Label: value" lines (project, period, …).
+ * @param array $entries       Entry row objects (entry_date, duration_minutes, description).
+ * @param array $figures       From pltt_invoice_figures().
+ * @param array $framing       Type-specific framing from pltt_invoice_prompt_framing().
+ * @return array Ordered map of key => array{label:string,text:string}.
+ */
+function pltt_build_invoice_prompts( array $context_lines, array $entries, array $figures, array $framing = array() ) {
+	// Per-entry figures, so the grouping variant adds up numbers we calculated
+	// instead of deriving its own from durations and a rate.
+	$plain    = array();
+	$numeric  = array();
+	$sum      = 0.0;
+	foreach ( $entries as $e ) {
+		$date = date_i18n( 'M j', strtotime( $e->entry_date ) );
+		$desc = trim( (string) $e->description );
+		$mins = (int) $e->duration_minutes;
+		$amt  = pltt_resolve_entry_amount( $e );
+		$sum += $amt;
+
+		$plain[]   = '- ' . $date . ' (' . pltt_format_duration( $mins ) . '): ' . $desc;
+		$numeric[] = '- ' . $date . ' | ' . number_format( $mins / 60, 2, '.', '' )
+			. ' h | ' . number_format( $amt, 2, '.', '' ) . ' | ' . $desc;
+	}
+
+	// The per-entry amounts only add up to the line total when the total *is*
+	// their sum. A retainer bills overage minutes, and a record can have part of
+	// its work absorbed — in those cases the per-entry numbers are not the line's
+	// numbers, so the grouping variant must not be handed them.
+	$splittable = ( null !== $figures['amount'] && ! empty( $entries )
+		&& abs( $sum - (float) $figures['amount'] ) < 0.02 );
+
+	$totals   = array();
+	$totals[] = 'INVOICE FIGURES (already calculated — reproduce exactly, do not recompute):';
+	if ( null !== $figures['hours'] ) {
+		$totals[] = 'Hours: ' . $figures['hours'];
+	}
+	if ( null !== $figures['rate'] ) {
+		$totals[] = 'Rate: ' . $figures['rate'];
+	}
+	if ( null !== $figures['amount'] ) {
+		$totals[] = 'Amount: ' . $figures['amount'];
+	}
+	if ( ! empty( $figures['note'] ) ) {
+		$totals[] = 'Note: ' . $figures['note'];
+	}
+	$totals = implode( "\n", $totals );
+
+	$build_body = function ( $lines, $header ) use ( $context_lines, $totals ) {
+		$body   = $context_lines;
+		$body[] = '';
+		$body[] = $header;
+		$body   = array_merge( $body, $lines );
+		$body[] = '';
+		$body[] = $totals;
+
+		return implode( "\n", $body );
+	};
+
+	$plain_body = $build_body( $plain, 'Time entries (internal shorthand, oldest first):' );
+
+	$preamble = 'You are writing the description for an invoice a client will read. '
+		. 'Use plain, professional language: no internal shorthand, no jargon, no marketing tone, no filler. '
+		. 'Describe what was done and what the client got — never mention hours, rates, or dollar amounts in the description text.';
+	if ( ! empty( $framing['context'] ) ) {
+		$preamble .= "\n\n" . $framing['context'];
+	}
+
+	// The pass-through rule for the single-line variants. The figures are the one
+	// thing the model must not touch: no arithmetic, no rounding, no reformatting.
+	$figures_rule = 'Then, underneath the description, reproduce the INVOICE FIGURES block given below, '
+		. 'line for line, under the heading "Invoice figures". Those numbers are already calculated and correct: '
+		. 'copy them character for character, including any Note line. Do not add, multiply, round, reformat, '
+		. 'or check them, and do not derive any new number from them. If a figure looks wrong to you, copy it anyway.';
+
+	$out = array();
+
+	$one_line_task = ! empty( $framing['one_line'] )
+		? $framing['one_line']
+		: 'Write a single invoice line-item description covering all of the work below. '
+			. 'One sentence, two at most. Roll everything into one coherent statement of the work — '
+			. 'do not list tasks or use bullets.';
+
+	$out['ai_one_line'] = array(
+		'label' => __( 'AI prompt — one line item', 'plain-language-time-tracker' ),
+		'text'  => $preamble . "\n\n" . $one_line_task . "\n\n"
+			. $figures_rule . "\n\n---\n\n" . $plain_body,
+	);
+
+	// Several billable lines, each carrying its own total. The model picks the
+	// split, so it has to do the adding — but only of per-entry figures we
+	// supplied, and only against totals it must reconcile back to.
+	if ( $splittable ) {
+		$check = 'Your Amount column must add up to ' . $figures['amount'];
+		if ( null !== $figures['hours'] ) {
+			$check .= ' and your Hours column to about ' . $figures['hours'];
+		}
+		$check .= '. Allow a cent or two of rounding drift, no more. If your columns do not land there, '
+			. 'you have dropped, duplicated, or misfiled an entry — fix the assignment and recheck before you answer. '
+			. 'Never adjust a supplied figure to force the total to match.';
+
+		$grouped_text = $preamble . "\n\n"
+			. 'Split the work below into 2–5 SEPARATE invoice line items — each one a coherent piece of work '
+			. 'that stands on its own on the invoice, with its own total. Assign every entry to exactly one line item; '
+			. 'no entry may be left out or counted twice. Avoid a line item built from a single trivial entry — '
+			. 'fold those into the closest related one.' . "\n\n"
+			. 'Each entry below is listed as: date | hours | amount | note. Those per-entry hours and amounts are '
+			. 'already calculated. To get a line item\'s total, add up the hours and the amounts of the entries you '
+			. 'assigned to it — that addition is the ONLY arithmetic you may perform, and only on the numbers given. '
+			. 'Never recalculate an entry from its duration and a rate, and never change a supplied number.' . "\n\n"
+			. 'Output a table with the columns: Line item | Description | Hours | Amount. Give each line a short '
+			. '2–5 word label and one client-facing sentence. After the table, add a Totals row, then list the entry '
+			. 'dates you assigned to each line item so the split can be checked.' . "\n\n"
+			. $check . "\n\n---\n\n"
+			. $build_body( $numeric, 'Time entries (date | hours | amount | internal note, oldest first):' );
+	} else {
+		// No per-entry figures that reconcile, so this variant groups in prose and
+		// carries the single line total through untouched, like the others.
+		$grouped_text = $preamble . "\n\n"
+			. 'Write an invoice line-item description that groups the work below into 2–5 themes. '
+			. 'Output one line per theme: a 2–5 word label, an em dash, then one sentence describing that group. '
+			. 'Order the themes by how much of the work each represents, largest first. Every entry must land in '
+			. 'exactly one theme, and no theme may be a single trivial task (fold those into the closest group). '
+			. 'Do NOT put hours or an amount on the individual themes — this bills as one line, and the per-theme '
+			. 'figures are not ours to state.' . "\n\n"
+			. $figures_rule . "\n\n---\n\n" . $plain_body;
+	}
+
+	$out['ai_grouped'] = array(
+		'label' => $splittable
+			? __( 'AI prompt — separate line items', 'plain-language-time-tracker' )
+			: __( 'AI prompt — grouped by theme', 'plain-language-time-tracker' ),
+		'text'  => $grouped_text,
+	);
+
+	$out['ai_detailed'] = array(
+		'label' => __( 'AI prompt — itemized breakdown', 'plain-language-time-tracker' ),
+		'text'  => $preamble . "\n\n"
+			. 'Write a detailed invoice line-item description: one short lead sentence summarizing the '
+			. 'period, then a bulleted list of the discrete pieces of work. One bullet per deliverable or task, '
+			. 'each under about twelve words, phrased as what the client received. '
+			. 'Merge near-duplicate entries into a single bullet rather than repeating them, and translate '
+			. 'internal notes into client-facing terms instead of restating them verbatim.' . "\n\n"
+			. $figures_rule . "\n\n---\n\n" . $plain_body,
+	);
+
+	return $out;
+}
+
+/**
  * Build the display view-model for a single outstanding billing scope.
  *
  * Turns an engine scope (from PLTT_Billing::get_ready_to_invoice() /
@@ -2455,7 +2734,7 @@ function pltt_build_single_project_scope_figures( $project, $stats, $billing_typ
  *                            unbilled, project, and (optionally) entries.
  * @param string $client_name Owning client name, for the AI-prompt header.
  * @return array View-model: scope, proj, entries, uid, derivation,
- *               default_desc, ai_prompt, type_label, date_range, hours_label,
+ *               default_desc, prompts, type_label, date_range, hours_label,
  *               count.
  */
 function pltt_build_billing_scope_view( $scope, $client_name ) {
@@ -2525,24 +2804,24 @@ function pltt_build_billing_scope_view( $scope, $client_name ) {
 			: date_i18n( 'M j', strtotime( $first ) ) . ' – ' . date_i18n( 'M j, Y', strtotime( $last ) );
 	}
 
-	// "Structured list + AI prompt" description option: a raw dump of the scope
-	// (project details + every entry) with an appended instruction, to paste
-	// into an AI for a polished line.
-	$ai_lines   = array();
-	$ai_lines[] = 'Project: ' . $client_name . ' — ' . $proj->name;
-	$ai_lines[] = 'Type: ' . $type_label;
-	$ai_lines[] = 'Period: ' . $date_range;
-	$ai_lines[] = 'Billable: ' . pltt_format_duration( $basis ) . ' × ' . pltt_format_currency( $rate ) . ' = ' . pltt_format_currency( $scope['unbilled'] );
-	$ai_lines[] = '';
-	$ai_lines[] = 'Time entries:';
-	foreach ( $entries as $e ) {
-		$ai_lines[] = '- ' . date_i18n( 'M j', strtotime( $e->entry_date ) )
-			. ' (' . pltt_format_duration( (int) $e->duration_minutes ) . '): '
-			. trim( (string) $e->description );
-	}
-	$ai_lines[] = '';
-	$ai_lines[] = 'Write a concise, professional, client-facing invoice line-item description for this work. One or two sentences, plain language with no internal shorthand or jargon, grouping related tasks into themes.';
-	$ai_prompt  = implode( "\n", $ai_lines );
+	// AI prompt options: the scope context + every entry, wrapped in an
+	// instruction to paste into an AI for a polished line. One per output shape.
+	$prompts = pltt_build_invoice_prompts(
+		array(
+			'Project: ' . $client_name . ' — ' . $proj->name,
+			'Type: ' . $type_label,
+			'Period: ' . $date_range,
+		),
+		$entries,
+		pltt_invoice_figures( $basis, $rate, $scope['unbilled'] ),
+		pltt_invoice_prompt_framing(
+			pltt_get_billing_type( $proj ),
+			$client_name,
+			$proj->name,
+			$is_retainer ? $scope['period_label'] : $date_range,
+			isset( $scope['allocation_minutes'] ) ? $scope['allocation_minutes'] : null
+		)
+	);
 
 	return array(
 		'scope'        => $scope,
@@ -2551,7 +2830,7 @@ function pltt_build_billing_scope_view( $scope, $client_name ) {
 		'uid'          => $uid,
 		'derivation'   => $derivation,
 		'default_desc' => $default_desc,
-		'ai_prompt'    => $ai_prompt,
+		'prompts'      => $prompts,
 		'type_label'   => $type_label,
 		'date_range'   => $date_range,
 		'hours_label'  => pltt_format_duration( $basis ),
@@ -2613,14 +2892,14 @@ function pltt_billing_record_view_url( $record, array $entries = array() ) {
  * the "View record" dialog on the Billing ledger and the project-report
  * history table: the entry manifest that went into the bill, a real period
  * range, the date billed, and the copyable line-items text (the stored
- * description, plus a structured "list + AI prompt" rebuilt from the entries).
+ * description, plus the AI prompt variants rebuilt from the entries).
  *
  * Self-contained: loads its own client/project names and entries so any caller
  * can hand it just the record row.
  *
  * @param object $record Billing record row.
  * @return array View-model: uid, label, entries, period, billed_on, amount,
- *               absorbed, minutes_label, default_desc, ai_prompt.
+ *               absorbed, minutes_label, default_desc, prompts.
  */
 function pltt_build_billing_record_view( $record ) {
 	$entries = PLTT_Billing_Record_Entries::get_entries_for_record( (int) $record->id );
@@ -2660,21 +2939,29 @@ function pltt_build_billing_record_view( $record ) {
 		$default_desc = implode( '; ', array_slice( array_values( $descs ), 0, 12 ) );
 	}
 
-	// Structured list + AI prompt: rebuilt from the frozen entries, same shape as
-	// the outstanding-scope copy option.
-	$ai_lines   = array();
-	$ai_lines[] = 'Project: ' . $label;
-	$ai_lines[] = 'Period: ' . $period;
-	$ai_lines[] = 'Billed: ' . $billed_on . ' — ' . pltt_format_currency( (float) $record->billed_amount );
-	$ai_lines[] = '';
-	$ai_lines[] = 'Time entries:';
-	foreach ( $entries as $e ) {
-		$ai_lines[] = '- ' . date_i18n( 'M j', strtotime( $e->entry_date ) )
-			. ' (' . pltt_format_duration( (int) $e->duration_minutes ) . '): '
-			. trim( (string) $e->description );
-	}
-	$ai_lines[] = '';
-	$ai_lines[] = 'Write a concise, professional, client-facing invoice line-item description for this work. One or two sentences, plain language with no internal shorthand or jargon, grouping related tasks into themes.';
+	// AI prompt options: rebuilt from the frozen entries, same variants as the
+	// outstanding-scope copy dialog. Figures come off the record as committed —
+	// older records may carry no rate or minutes, in which case those lines drop.
+	$prompts = pltt_build_invoice_prompts(
+		array(
+			'Project: ' . $label,
+			'Period: ' . $period,
+			'Billed on: ' . $billed_on,
+		),
+		$entries,
+		pltt_invoice_figures(
+			null !== $record->billed_minutes ? (int) $record->billed_minutes : null,
+			null !== $record->rate ? (float) $record->rate : null,
+			(float) $record->billed_amount
+		),
+		$proj ? pltt_invoice_prompt_framing(
+			pltt_get_billing_type( $proj ),
+			$client_name,
+			$proj->name,
+			$period,
+			isset( $record->allocation_minutes ) ? $record->allocation_minutes : null
+		) : array()
+	);
 
 	return array(
 		'uid'           => (int) $record->id,
@@ -2686,7 +2973,7 @@ function pltt_build_billing_record_view( $record ) {
 		'absorbed'      => (float) $record->absorbed_amount,
 		'minutes_label' => null !== $record->billed_minutes ? pltt_format_duration( (int) $record->billed_minutes ) : '',
 		'default_desc'  => $default_desc,
-		'ai_prompt'     => implode( "\n", $ai_lines ),
+		'prompts'       => $prompts,
 	);
 }
 

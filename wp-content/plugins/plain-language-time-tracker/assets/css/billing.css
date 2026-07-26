@@ -530,31 +530,44 @@
 }
 
 /* Header band: title + divider, matching the shared modal chrome. */
-.pltt-bill-dialog-title {
+/* Full-bleed header strip. The chrome moved off .pltt-bill-dialog-title onto this
+   row so the billing-type pill can sit beside the project name — same titlerow +
+   badge shape the scope block uses. */
+.pltt-bill-dialog-titlerow {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	flex-wrap: wrap;
 	margin: -25px -25px 16px;
 	padding: 15px 48px 15px 25px;
 	border-bottom: 1px solid var(--pltt-border-light);
+}
+
+.pltt-bill-dialog-title {
+	margin: 0;
+	padding: 0;
 	font-size: 16px;
 	color: var(--pltt-text-dark);
 }
 
-.pltt-bill-dialog-proj {
-	margin: 0 0 3px;
-	font-size: 14px;
-	font-weight: 600;
-	color: var(--pltt-text-dark);
-}
+/* .pltt-bill-dialog-proj is gone — the client moved onto the .pltt-scope-terms
+   line, where the scope block also carries it. */
 
-.pltt-bill-dialog-range {
-	margin: 0 0 14px;
-	color: var(--pltt-text-subtle);
-	font-size: 13px;
-}
+/* The date range moved into the shared .pltt-scope-when inset (pltt-system.css),
+   so .pltt-bill-dialog-range is gone — both billing modals now state their span
+   the same way the scope block does. */
 
 .pltt-bill-dialog-sub {
 	margin: 0 0 20px;
 	color: var(--pltt-text-subtle);
 	font-size: 13px;
+}
+
+/* The scope inset sits between the project name and the calculation line, so it
+   needs the breathing room the range paragraph used to carry. */
+.pltt-bill-dialog .pltt-scope-when {
+	margin-top: 8px;
+	margin-bottom: 14px;
 }
 
 /* Cancel: quiet text action pushed to the right of the action row. */
