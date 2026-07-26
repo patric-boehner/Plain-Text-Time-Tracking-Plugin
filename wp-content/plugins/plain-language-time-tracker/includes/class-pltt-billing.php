@@ -3,15 +3,30 @@
  * Billing engine — the read model that turns a project into its
  * ready-to-invoice scope(s).
  *
- * Reuses the existing overage engine wholesale (no new overage math). The one
- * load-bearing rule: retainer `calculated` is derived from the CLEAN
- * `overage_minutes` field of pltt_compute_overage_threshold() (used − allocation,
- * pure period arithmetic) × rate — never from its `overage_amount` field, which
- * has a documented straddle-boundary defect (helpers.php). See the "Gating item"
- * note in the plan and billing-record-spec.md.
+ * TWO reconciliation mechanics, not one. They answer the same question
+ * differently, and the difference is deliberate on the hourly side and historical
+ * on the retainer side:
  *
- * One remainder rule for every type:
- *     unbilled(scope) = calculated(scope) − Σ billed − Σ absorbed
+ *   hourly  — set difference against the frozen coverage snapshot. Outstanding =
+ *             billable + verified entries in range whose IDs aren't in
+ *             billing_record_entries. No dollar arithmetic, so a committed record
+ *             is immutable: a late-logged entry inside an already-billed window
+ *             stays Unbilled rather than being swept in, and a later rate change
+ *             can't re-value it (entries carry their own rate snapshot).
+ *
+ *   retainer — dollar remainder, recomputed live:
+ *                  unbilled(period) = calculated_now − Σ billed − Σ absorbed
+ *             Because absorbed = calculated − billed at write time, this reduces
+ *             to (calculated_now − calculated_when_billed). KNOWN CONSEQUENCE: a
+ *             rate change or a back-filled entry re-values a closed period and
+ *             reopens it as though it were never invoiced. The record already
+ *             stores calculated_amount; this path just doesn't read it. See
+ *             billing-state-review-2026-07-25.md §3.1 before changing this.
+ *
+ * Retainer `calculated` is derived from the CLEAN `overage_minutes` field of
+ * pltt_compute_overage_threshold() (used − allocation, pure period arithmetic)
+ * × rate — never from its `overage_amount` field, which has a documented
+ * straddle-boundary defect (helpers.php) and no consumers.
  *
  * @package PlainLanguageTimeTracker
  */
@@ -162,10 +177,15 @@ class PLTT_Billing {
 	 * surface form handler and the invoicing-page AJAX handler.
 	 *
 	 * The scope is ALWAYS recomputed server-side; the posted amount only ever
-	 * lowers the bill (absorption), never raises it. This record covers the
-	 * outstanding remainder (gross − what prior records already billed/absorbed),
-	 * which is what makes the remainder rule converge and supplementals correct.
-	 * Trimming the posted amount to zero fully absorbs the scope.
+	 * lowers the bill (absorption), never raises it — so an invoice larger than
+	 * the calculation cannot be recorded here. Trimming the posted amount to zero
+	 * fully absorbs the scope.
+	 *
+	 * What "the scope" means depends on the type (see the class header): hourly is
+	 * the uncovered entries in range, so a record simply claims them. Retainer is
+	 * the period's outstanding dollar remainder — gross minus what prior records
+	 * already billed/absorbed — which is what lets a second, supplemental record
+	 * on the same period settle the rest.
 	 *
 	 * @param array $args {
 	 *     @type int    $project_id    Required.
@@ -174,6 +194,9 @@ class PLTT_Billing {
 	 *     @type float  $billed_amount Posted amount; only ever trims the bill down (absorption).
 	 *     @type int[]  $excluded_entry_ids Hourly only — entries to drop from the record (stay open).
 	 *     @type string $description   Invoice line text.
+	 *     @type string $marked_at     Optional 'Y-m-d' — the date the invoice went out.
+	 *                                 Defaults to today. Set it when back-filling so
+	 *                                 the record lands in the month it was billed.
 	 * }
 	 * @return int|WP_Error Record id, or WP_Error (codes: invalid_project, nothing_to_bill, db_insert_failed).
 	 */
@@ -271,6 +294,7 @@ class PLTT_Billing {
 				'billed_minutes'     => $scope['minutes'],
 				'allocation_minutes' => $scope['allocation_minutes'],
 				'description'        => isset( $args['description'] ) ? (string) $args['description'] : '',
+				'marked_at'          => isset( $args['marked_at'] ) ? (string) $args['marked_at'] : '',
 			)
 		);
 

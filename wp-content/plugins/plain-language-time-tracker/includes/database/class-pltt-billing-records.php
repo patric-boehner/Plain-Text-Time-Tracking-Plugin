@@ -3,14 +3,18 @@
  * Billing record CRUD operations.
  *
  * A billing record is one durable per-scope summary written at commit time
- * (verify -> adjust -> commit). It is the single source of truth for what has
- * been billed — entries carry no link back. One remainder rule for every type:
- *
- *     unbilled(scope) = calculated − SUM(billed) − SUM(absorbed)
+ * (verify -> adjust -> commit). Entries carry no link back to it; what a record
+ * covered lives in billing_record_entries (the frozen coverage snapshot).
  *
  * A fully-absorbed record is just billed_amount = 0 (absorbed = calculated),
- * reached by trimming the amount to zero; there is no status column. See
- * billing-record-spec.md and PLTT_Billing (the engine).
+ * reached by trimming the amount to zero; there is no status column. The posted
+ * amount can only ever LOWER the bill — billed is clamped to calculated here and
+ * in PLTT_Billing::commit(), so absorbed is never negative and an invoice larger
+ * than the calculation cannot be recorded.
+ *
+ * How these rows are read back differs by type — hourly reconciles on coverage,
+ * retainer on a live-recomputed dollar remainder. See the PLTT_Billing header for
+ * both mechanics and the drift consequence of the retainer one.
  *
  * @package PlainLanguageTimeTracker
  */
@@ -62,6 +66,8 @@ class PLTT_Billing_Records {
 	 *     @type int    $billed_minutes     Optional.
 	 *     @type int    $allocation_minutes Optional (retainer only).
 	 *     @type string $description        Optional.
+	 *     @type string $marked_at          Optional 'Y-m-d' — the date the invoice
+	 *                                      actually went out. Defaults to now.
 	 * }
 	 * @return int|WP_Error Inserted ID, or WP_Error on validation/DB failure.
 	 */
@@ -86,6 +92,20 @@ class PLTT_Billing_Records {
 		$billed     = min( max( 0.0, $billed ), $calculated );
 		$absorbed   = round( $calculated - $billed, 2 );
 
+		// When the invoice actually went out. Defaults to now; a supplied date lets
+		// a back-filled record land in the month it was really billed, so the
+		// marked_at-windowed figures (Billed/Absorbed this month, the ledger's date
+		// column and its ordering) report the truth instead of the data-entry day.
+		// Today's date keeps the full timestamp so same-day records still order by
+		// time; a past date gets midnight, with the id DESC tiebreak covering it.
+		$marked_at = current_time( 'mysql' );
+		if ( ! empty( $data['marked_at'] ) ) {
+			$marked_date = pltt_sanitize_date_strict( $data['marked_at'] );
+			if ( '' !== $marked_date && $marked_date !== current_time( 'Y-m-d' ) ) {
+				$marked_at = $marked_date . ' 00:00:00';
+			}
+		}
+
 		$insert = array(
 			'project_id'        => $project_id,
 			'billing_type'      => $billing_type,
@@ -94,7 +114,7 @@ class PLTT_Billing_Records {
 			'billed_amount'     => $billed,
 			'absorbed_amount'   => $absorbed,
 			'description'       => isset( $data['description'] ) ? (string) $data['description'] : '',
-			'marked_at'         => current_time( 'mysql' ),
+			'marked_at'         => $marked_at,
 		);
 		$formats = array( '%d', '%s', '%f', '%f', '%f', '%f', '%s', '%s' );
 

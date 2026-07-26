@@ -107,6 +107,19 @@ $remainder           = number_format( (float) $scope['unbilled'], 2, '.', '' );
 			</p>
 		</div>
 
+		<?php // When the invoice went out — back-date it so the record lands in the month it was billed. ?>
+		<div class="pltt-billing-amount-row">
+			<label class="pltt-billing-amount-label" for="pltt-billsel-date">
+				<?php esc_html_e( 'Invoice date', 'plain-language-time-tracker' ); ?>
+			</label>
+			<div class="pltt-billing-amount-field">
+				<input type="date" id="pltt-billsel-date" name="marked_at" value="<?php echo esc_attr( pltt_get_current_date() ); ?>" class="pltt-billing-date-input">
+			</div>
+			<p class="pltt-billing-hint">
+				<?php esc_html_e( 'Defaults to today. Back-date it when recording an invoice you already sent.', 'plain-language-time-tracker' ); ?>
+			</p>
+		</div>
+
 		<?php
 		// The invoice text / line items live in the separate "Line items" modal.
 		// This modal just commits the record; it stores a deterministic default
