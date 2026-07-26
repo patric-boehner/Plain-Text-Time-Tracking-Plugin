@@ -33,26 +33,56 @@ $remainder = number_format( (float) $scope['unbilled'], 2, '.', '' );
 		<input type="hidden" name="date_from" value="<?php echo esc_attr( (string) $scope['period_start'] ); ?>">
 		<input type="hidden" name="date_to" value="<?php echo esc_attr( (string) $scope['period_end'] ); ?>">
 
-		<h2 id="<?php echo esc_attr( $dialog_id ); ?>-title" class="pltt-bill-dialog-title">
+		<?php // Title row + terms + when: the scope block's identity shape, so the modal reads as the same object you clicked from. ?>
+		<div class="pltt-bill-dialog-titlerow">
+			<h2 id="<?php echo esc_attr( $dialog_id ); ?>-title" class="pltt-bill-dialog-title">
+				<?php echo esc_html( $proj->name ); ?>
+			</h2>
+			<?php pltt_render_billing_type_badge( pltt_get_billing_type( $proj ) ); ?>
+		</div>
+		<div class="pltt-scope-terms">
 			<?php
-			printf(
-				/* translators: 1: client name, 2: project name. */
-				esc_html__( '%1$s · %2$s', 'plain-language-time-tracker' ),
-				esc_html( $client_name ),
-				esc_html( $proj->name )
+			$bd_terms = array();
+			if ( '' !== $client_name ) {
+				$bd_terms[] = $client_name;
+			}
+			$bd_terms[] = sprintf(
+				/* translators: %s: calculated amount for this bill. */
+				__( 'Calculated %s', 'plain-language-time-tracker' ),
+				pltt_format_currency( $scope['unbilled'] )
 			);
+			echo esc_html( implode( ' · ', $bd_terms ) );
 			?>
-		</h2>
-		<p class="pltt-bill-dialog-sub">
-			<?php
-			printf(
-				/* translators: 1: calculated amount, 2: derivation e.g. "12h billable × $120". */
-				esc_html__( 'Calculated %1$s — %2$s', 'plain-language-time-tracker' ),
-				esc_html( pltt_format_currency( $scope['unbilled'] ) ),
-				esc_html( $v['derivation'] )
-			);
-			?>
-		</p>
+		</div>
+		<?php
+		// Scope line — the same tinted inset the scope block uses for its line 3,
+		// and the same one the inline select bar's dialog carries, so both routes
+		// to a bill state the span the same way. This modal previously jumped from
+		// the project name straight to the amount, leaving the date range unsaid.
+		// Date range is formatted per project type by pltt_build_billing_scope_view():
+		// retainer = its period label, hourly = the span of the covered entries.
+		?>
+		<?php if ( ! empty( $v['date_range'] ) ) : ?>
+			<div class="pltt-scope-when">
+				<span><?php esc_html_e( 'Billing', 'plain-language-time-tracker' ); ?></span>
+				<span class="pltt-mono"><?php echo esc_html( $v['date_range'] ); ?></span>
+				<?php if ( (int) $v['count'] > 0 ) : ?>
+					<span>&middot;
+						<?php
+						echo esc_html(
+							sprintf(
+								/* translators: %s: number of entries on the bill. */
+								_n( '%s entry', '%s entries', (int) $v['count'], 'plain-language-time-tracker' ),
+								number_format_i18n( (int) $v['count'] )
+							)
+						);
+						?>
+					</span>
+				<?php endif; ?>
+			</div>
+		<?php endif; ?>
+		<?php // Just the derivation now — the amount it explains moved up to the terms line. ?>
+		<p class="pltt-bill-dialog-sub"><?php echo esc_html( $v['derivation'] ); ?></p>
 
 		<?php // Entry selection now happens inline in the queue row; this modal just records the bill. ?>
 		<div class="pltt-billing-amount-row">

@@ -154,13 +154,21 @@
 	color: var(--pltt-ink);
 }
 /* Line 2 — client · terms in plain language. */
-.pltt-scope-block .pltt-scope-terms {
+/* Terms line — the standing facts about the thing named above it (client, rate,
+   allocation). Standalone alongside .pltt-scope-when: the billing modals use the
+   same pair of lines under their own title row, so both surfaces state identity
+   the same way. */
+.pltt-scope-terms {
 	color: var(--pltt-ink-2);
 	font-size: 14px;
 	margin-top: 8px;
 }
-/* Line 3 — "Showing <dates> · <count> entries", a tinted inset. */
-.pltt-scope-block .pltt-scope-when {
+/* "<verb> <dates> · <count> entries" — a tinted inset stating the span and size
+   of whatever the surface is about. Standalone rather than a scope-block child:
+   it is line 3 of the scope block AND the scope line in the billing modals, so
+   the same two facts get the same treatment wherever they appear. The verb
+   changes with the surface — "Showing" for a view, "Billing" for a commit. */
+.pltt-scope-when {
 	display: inline-flex;
 	align-items: baseline;
 	gap: 8px;

@@ -41,7 +41,7 @@ if ( empty( $scope ) ) {
 
 $client_name = ! empty( $context_client ) ? $context_client->name : '';
 
-// Scope view-model: the default description plus the structured list / AI prompt,
+// Scope view-model: the default description plus the AI prompt variants,
 // shared with the "Line items" copy dialog (billing-copy-dialog.php) below.
 $v                   = pltt_build_billing_scope_view( $scope, $client_name );
 $default_description = $v['default_desc'];
@@ -77,22 +77,43 @@ $remainder           = number_format( (float) $scope['unbilled'], 2, '.', '' );
 		<input type="hidden" name="date_from" value="">
 		<input type="hidden" name="date_to" value="">
 
-		<h2 id="pltt-billsel-title" class="pltt-bill-dialog-title"><?php esc_html_e( 'Record Bill', 'plain-language-time-tracker' ); ?></h2>
-		<p class="pltt-bill-dialog-proj"><?php echo esc_html( '' !== $client_name ? $client_name . ' · ' . $project->name : $project->name ); ?></p>
-		<?php if ( ! empty( $v['date_range'] ) ) : ?>
-			<?php // Date range, formatted per project type by pltt_build_billing_scope_view(): retainer = its period label; hourly = the span of the entries. ?>
-			<p class="pltt-bill-dialog-range">
-				<?php echo esc_html( $v['date_range'] ); ?>
-			</p>
-		<?php endif; ?>
-		<p class="pltt-bill-dialog-sub">
-			<?php if ( $pltt_bill_confirm ) : ?>
-				<?php echo esc_html( $v['derivation'] ); ?>
-			<?php else : ?>
-				<strong class="pltt-billsel-count">0</strong> <?php esc_html_e( 'entries selected', 'plain-language-time-tracker' ); ?>
-				· <span class="pltt-billsel-calc">$0.00</span>
+		<?php // Title row + terms + when: the scope block's identity shape, matching billing-dialog.php so both routes to a bill look alike. The submit button already says "Record bill", so the heading names the project instead. ?>
+		<div class="pltt-bill-dialog-titlerow">
+			<h2 id="pltt-billsel-title" class="pltt-bill-dialog-title"><?php echo esc_html( $project->name ); ?></h2>
+			<?php pltt_render_billing_type_badge( pltt_get_billing_type( $project ) ); ?>
+		</div>
+		<div class="pltt-scope-terms">
+			<?php if ( '' !== $client_name ) : ?>
+				<?php echo esc_html( $client_name ); ?> &middot;
 			<?php endif; ?>
-		</p>
+			<?php esc_html_e( 'Calculated', 'plain-language-time-tracker' ); ?>
+			<?php // Live for hourly (billing-select.js retallies .pltt-billsel-calc on every tick); fixed for a retainer period, which bills as a whole. ?>
+			<span class="pltt-billsel-calc"><?php echo esc_html( pltt_format_currency( $pltt_bill_confirm ? (float) $scope['unbilled'] : 0 ) ); ?></span>
+		</div>
+		<?php
+		// Scope line — the same tinted inset the scope block uses for its line 3,
+		// stating the same two facts (span + size). "Billing", not "Showing": the
+		// count is what's about to be charged for, which diverges from what's on
+		// screen as soon as a row is unticked. Date range is formatted per project
+		// type by pltt_build_billing_scope_view(): retainer = its period label,
+		// hourly = the span of the entries.
+		?>
+		<?php if ( ! empty( $v['date_range'] ) || ! $pltt_bill_confirm ) : ?>
+			<div class="pltt-scope-when">
+				<span><?php esc_html_e( 'Billing', 'plain-language-time-tracker' ); ?></span>
+				<?php if ( ! empty( $v['date_range'] ) ) : ?>
+					<span class="pltt-mono"><?php echo esc_html( $v['date_range'] ); ?></span>
+				<?php endif; ?>
+				<?php if ( ! $pltt_bill_confirm ) : ?>
+					<?php // Live count — billing-select.js keeps every .pltt-billsel-count in the dialog in sync. ?>
+					<span>&middot; <strong class="pltt-billsel-count">0</strong> <?php esc_html_e( 'entries', 'plain-language-time-tracker' ); ?></span>
+				<?php endif; ?>
+			</div>
+		<?php endif; ?>
+		<?php // Retainer explains its fixed figure; hourly's amount is the live one on the terms line above, and its derivation changes with every tick, so there is nothing static to state here. ?>
+		<?php if ( $pltt_bill_confirm ) : ?>
+			<p class="pltt-bill-dialog-sub"><?php echo esc_html( $v['derivation'] ); ?></p>
+		<?php endif; ?>
 
 		<div class="pltt-billing-amount-row">
 			<label class="pltt-billing-amount-label" for="pltt-billsel-amount">
@@ -142,5 +163,5 @@ $remainder           = number_format( (float) $scope['unbilled'], 2, '.', '' );
 	</form>
 </dialog>
 
-<?php // "Line items" copy modal (Default / Structured + AI prompt) — peer to Record bill. ?>
+<?php // "Line items" copy modal (default description / AI prompts) — peer to Record bill. ?>
 <?php include PLTT_PLUGIN_DIR . 'templates/partials/billing-copy-dialog.php'; ?>
