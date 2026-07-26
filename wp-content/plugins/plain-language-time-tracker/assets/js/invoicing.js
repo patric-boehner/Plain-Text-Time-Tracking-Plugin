@@ -322,6 +322,9 @@
 				.join( ',' )
 			: '';
 
+		// Invoice date: blank falls back to today server-side.
+		const markedAt = form.querySelector( 'input[name="marked_at"]' );
+
 		PLTT.ajax(
 			'pltt_commit_billing',
 			{
@@ -331,6 +334,7 @@
 				date_from: form.querySelector( 'input[name="date_from"]' ).value,
 				date_to: form.querySelector( 'input[name="date_to"]' ).value,
 				billed_amount: form.querySelector( 'input[name="billed_amount"]' ).value,
+				marked_at: markedAt ? markedAt.value : '',
 				excluded_entry_ids: excluded,
 				description: form.querySelector( 'textarea[name="description"]' ).value,
 			},

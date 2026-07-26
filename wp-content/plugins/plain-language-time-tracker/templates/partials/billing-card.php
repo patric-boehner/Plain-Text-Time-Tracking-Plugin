@@ -120,6 +120,19 @@ if ( $is_retainer ) {
 			</p>
 		</div>
 
+		<?php // When the invoice went out — back-date it so the record lands in the month it was billed. ?>
+		<div class="pltt-billing-amount-row">
+			<label class="pltt-billing-amount-label" for="pltt-billed-date">
+				<?php esc_html_e( 'Invoice date', 'plain-language-time-tracker' ); ?>
+			</label>
+			<div class="pltt-billing-amount-field">
+				<input type="date" id="pltt-billed-date" name="marked_at" value="<?php echo esc_attr( pltt_get_current_date() ); ?>" class="pltt-billing-date-input">
+			</div>
+			<p class="pltt-billing-hint">
+				<?php esc_html_e( 'Defaults to today. Back-date it when recording an invoice you already sent.', 'plain-language-time-tracker' ); ?>
+			</p>
+		</div>
+
 		<div class="pltt-billing-description-row">
 			<label class="pltt-billing-label" for="pltt-billing-description">
 				<?php esc_html_e( 'Invoice description', 'plain-language-time-tracker' ); ?>

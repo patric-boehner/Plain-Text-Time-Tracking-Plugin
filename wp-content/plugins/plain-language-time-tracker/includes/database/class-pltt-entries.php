@@ -472,12 +472,15 @@ class PLTT_Entries {
 
 	/**
 	 * Sum the billable dollar amount of a project's verified, billable entries
-	 * on/after a cutoff date — the hourly billing engine's "calculated(scope)".
+	 * on/after a given date.
 	 *
-	 * Deliberately does NOT filter on the legacy per-entry `billed` flag: under
-	 * the billing-record model, records (not the flag) define what's been billed.
-	 * The unbilled remainder is computed by the engine as calculated − billed −
-	 * absorbed across the project's records.
+	 * UNUSED as of 1.9.49 — kept only because nothing has needed removing it yet.
+	 * It served the abandoned cutoff-based hourly engine, where "what's still
+	 * owed" was a dollar figure summed forward from the last record's cutoff date.
+	 * Hourly now reconciles on entry coverage instead (PLTT_Billing::
+	 * build_hourly_scope), so there is no cutoff and no dollar remainder on that
+	 * path. Do not reintroduce this as a billing figure without reading the
+	 * PLTT_Billing header first.
 	 *
 	 * @param int    $project_id  Project to sum.
 	 * @param string $since_date  Inclusive lower bound, 'Y-m-d'. Empty = no bound.

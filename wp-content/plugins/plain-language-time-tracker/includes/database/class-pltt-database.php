@@ -264,12 +264,14 @@ class PLTT_Database {
 		dbDelta( $sql_tag_aliases );
 
 		// Billing records: one durable per-scope summary written at commit time
-		// (verify -> adjust -> commit). The single source of truth for what's been
-		// billed — entries carry no billing_record link. One remainder rule for
-		// every type: unbilled = calculated - SUM(billed) - SUM(absorbed). A
-		// fully-absorbed record is just billed_amount = 0 (absorbed = calculated);
-		// there is no status column. Hours stored as minutes to match the rest of
-		// the schema (duration_minutes, etc.). See billing-record-spec.md.
+		// (verify -> adjust -> commit). Entries carry no billing_record link — what
+		// a record covered lives in billing_record_entries below. A fully-absorbed
+		// record is just billed_amount = 0 (absorbed = calculated); there is no
+		// status column. Hours stored as minutes to match the rest of the schema
+		// (duration_minutes, etc.). marked_at is the date the invoice went out and
+		// is settable, so a back-filled record lands in the month it was really
+		// billed. How these rows are read back differs by billing type — see the
+		// PLTT_Billing header.
 		$table_billing = self::get_table_name( 'billing_records' );
 		$sql_billing   = "CREATE TABLE {$table_billing} (
 			id bigint(20) unsigned NOT NULL AUTO_INCREMENT,

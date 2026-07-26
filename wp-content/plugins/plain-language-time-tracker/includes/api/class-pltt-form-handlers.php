@@ -484,6 +484,10 @@ class PLTT_Form_Handlers {
 		$date_from = isset( $_POST['date_from'] ) && '' !== $_POST['date_from'] ? pltt_sanitize_date_strict( wp_unslash( $_POST['date_from'] ) ) : null;
 		$date_to   = isset( $_POST['date_to'] ) && '' !== $_POST['date_to'] ? pltt_sanitize_date_strict( wp_unslash( $_POST['date_to'] ) ) : null;
 
+		// The date the invoice actually went out; blank/invalid falls back to today
+		// in the data layer.
+		$marked_at = isset( $_POST['marked_at'] ) ? pltt_sanitize_date_strict( wp_unslash( $_POST['marked_at'] ) ) : '';
+
 		// Single shared write path (recomputes the scope server-side).
 		$result = PLTT_Billing::commit(
 			array(
@@ -495,6 +499,7 @@ class PLTT_Form_Handlers {
 				'billed_amount' => $posted_amount,
 				'excluded_entry_ids' => $excluded_ids,
 				'description'   => $description,
+				'marked_at'     => $marked_at,
 			)
 		);
 

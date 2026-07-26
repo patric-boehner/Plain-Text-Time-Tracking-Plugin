@@ -804,6 +804,10 @@ class PLTT_Ajax {
 		$date_from = isset( $_POST['date_from'] ) && '' !== $_POST['date_from'] ? pltt_sanitize_date_strict( wp_unslash( $_POST['date_from'] ) ) : null;
 		$date_to   = isset( $_POST['date_to'] ) && '' !== $_POST['date_to'] ? pltt_sanitize_date_strict( wp_unslash( $_POST['date_to'] ) ) : null;
 
+		// The date the invoice actually went out; blank/invalid falls back to today
+		// in the data layer.
+		$marked_at = isset( $_POST['marked_at'] ) ? pltt_sanitize_date_strict( wp_unslash( $_POST['marked_at'] ) ) : '';
+
 		$result = PLTT_Billing::commit(
 			array(
 				'project_id'    => $project_id,
@@ -815,6 +819,7 @@ class PLTT_Ajax {
 				'excluded_entry_ids' => $excluded_ids,
 				'included_entry_ids' => $included_ids,
 				'description'   => $description,
+				'marked_at'     => $marked_at,
 			)
 		);
 
