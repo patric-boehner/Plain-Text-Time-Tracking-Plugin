@@ -96,7 +96,7 @@ if ( $is_retainer ) {
 					name="billed_amount"
 					step="0.01"
 					min="0"
-					max="<?php echo esc_attr( number_format( $remainder, 2, '.', '' ) ); ?>"
+					<?php // No max: bill above the calculation to record a rounded-up invoice. ?>
 					value="<?php echo esc_attr( number_format( $remainder, 2, '.', '' ) ); ?>"
 					class="pltt-billing-amount-input"
 				>
@@ -116,7 +116,7 @@ if ( $is_retainer ) {
 				<?php endif; ?>
 			</p>
 			<p class="pltt-billing-hint">
-				<?php esc_html_e( 'Lower the amount to absorb part of the charge; the difference is recorded as absorbed.', 'plain-language-time-tracker' ); ?>
+				<?php esc_html_e( 'Lower the amount to absorb part of the charge, or raise it to record an invoice you rounded up.', 'plain-language-time-tracker' ); ?>
 			</p>
 		</div>
 

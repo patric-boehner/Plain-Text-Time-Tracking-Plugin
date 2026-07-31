@@ -288,12 +288,6 @@
 	margin-top: 4px;
 }
 
-.pltt-billing-history-action {
-	width: 1%;
-	white-space: nowrap;
-	text-align: right;
-}
-
 /* ---- Invoicing page ---- */
 
 /* .pltt-view-toggle now lives in admin.css (shared across all plugin pages). */
@@ -974,9 +968,12 @@
 }
 
 /* --- records table --- */
-.pltt-bill-records-table .pltt-bill-records-action {
-	text-align: right;
-	white-space: nowrap;
+/* View record / Delete are standard .row-actions in both record tables — reveal
+   on hover and the .submitdelete red both come from admin.css. Only the in-flight
+   state is specific to this one, since it deletes over AJAX rather than navigating. */
+.pltt-bill-record-delete[aria-disabled="true"] {
+	pointer-events: none;
+	opacity: 0.5;
 }
 .pltt-bill-absorbed {
 	color: var(--pltt-text-muted, #646970);

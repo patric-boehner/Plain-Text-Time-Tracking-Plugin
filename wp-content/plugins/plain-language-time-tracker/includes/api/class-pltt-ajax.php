@@ -42,6 +42,7 @@ class PLTT_Ajax {
 
 		// Billing.
 		add_action( 'wp_ajax_pltt_commit_billing', array( __CLASS__, 'commit_billing' ) );
+		add_action( 'wp_ajax_pltt_delete_billing_record', array( __CLASS__, 'delete_billing_record' ) );
 
 	}
 
@@ -831,6 +832,38 @@ class PLTT_Ajax {
 		wp_send_json_success(
 			array(
 				'message' => __( 'Billing recorded.', 'plain-language-time-tracker' ),
+			)
+		);
+	}
+
+	/**
+	 * Delete a committed billing record — the one way to undo a bill.
+	 *
+	 * Removes the record and its coverage snapshot together, which returns the
+	 * entries it covered to Unbilled. There is no edit path by design.
+	 */
+	public static function delete_billing_record() {
+		if ( ! self::verify_request() ) {
+			return;
+		}
+
+		$record_id = isset( $_POST['record_id'] ) ? absint( $_POST['record_id'] ) : 0;
+
+		if ( empty( $record_id ) ) {
+			wp_send_json_error( array( 'message' => __( 'Invalid billing record ID.', 'plain-language-time-tracker' ) ) );
+			return;
+		}
+
+		$result = PLTT_Billing_Records::delete( $record_id );
+
+		if ( is_wp_error( $result ) ) {
+			wp_send_json_error( array( 'message' => $result->get_error_message() ) );
+			return;
+		}
+
+		wp_send_json_success(
+			array(
+				'message' => __( 'Billing record deleted. The time it covered is unbilled again.', 'plain-language-time-tracker' ),
 			)
 		);
 	}

@@ -124,7 +124,7 @@ $remainder           = number_format( (float) $scope['unbilled'], 2, '.', '' );
 				<input type="number" id="pltt-billsel-amount" name="billed_amount" step="0.01" min="0" value="<?php echo esc_attr( $remainder ); ?>" class="pltt-billing-amount-input pltt-billsel-amount">
 			</div>
 			<p class="pltt-billing-hint">
-				<?php esc_html_e( 'Lower the amount to absorb part of the charge; the difference is recorded as absorbed.', 'plain-language-time-tracker' ); ?>
+				<?php esc_html_e( 'Lower the amount to absorb part of the charge, or raise it to record an invoice you rounded up.', 'plain-language-time-tracker' ); ?>
 			</p>
 		</div>
 

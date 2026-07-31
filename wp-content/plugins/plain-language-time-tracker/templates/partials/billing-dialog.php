@@ -91,7 +91,8 @@ $remainder = number_format( (float) $scope['unbilled'], 2, '.', '' );
 			</label>
 			<div class="pltt-billing-amount-field">
 				<span class="pltt-billing-currency">$</span>
-				<input type="number" id="<?php echo esc_attr( $dialog_id ); ?>-amount" name="billed_amount" step="0.01" min="0" max="<?php echo esc_attr( $remainder ); ?>" value="<?php echo esc_attr( $remainder ); ?>" class="pltt-billing-amount-input">
+				<?php // No max: bill above the calculation to record a rounded-up invoice. ?>
+				<input type="number" id="<?php echo esc_attr( $dialog_id ); ?>-amount" name="billed_amount" step="0.01" min="0" value="<?php echo esc_attr( $remainder ); ?>" class="pltt-billing-amount-input">
 			</div>
 		</div>
 

@@ -176,10 +176,11 @@ class PLTT_Billing {
 	 * Commit one billing record — the single write path shared by the billing
 	 * surface form handler and the invoicing-page AJAX handler.
 	 *
-	 * The scope is ALWAYS recomputed server-side; the posted amount only ever
-	 * lowers the bill (absorption), never raises it — so an invoice larger than
-	 * the calculation cannot be recorded here. Trimming the posted amount to zero
-	 * fully absorbs the scope.
+	 * The scope is ALWAYS recomputed server-side, but the posted amount is taken as
+	 * given (floored at zero): it may be lower than the calculation (absorption —
+	 * trimming to zero fully absorbs the scope) or higher (a rounded-up invoice,
+	 * which records a negative absorbed). The calculation informs the default; it
+	 * does not constrain what you're allowed to say you invoiced.
 	 *
 	 * What "the scope" means depends on the type (see the class header): hourly is
 	 * the uncovered entries in range, so a record simply claims them. Retainer is
@@ -273,9 +274,10 @@ class PLTT_Billing {
 		// honest when entries are dropped.
 		$record_calculated = ( null === $included && empty( $excluded ) ) ? (float) $scope['unbilled'] : round( $included_total, 2 );
 
-		// The posted amount only ever lowers the bill (absorption); trimming it to
-		// zero fully absorbs the scope.
-		$billed = min( max( 0.0, (float) ( $args['billed_amount'] ?? 0 ) ), $record_calculated );
+		// The posted amount is what was actually invoiced. It may sit below the
+		// calculation (absorption — trimming to zero fully absorbs the scope) or
+		// above it (a rounded-up invoice). Floor at zero, no ceiling.
+		$billed = max( 0.0, (float) ( $args['billed_amount'] ?? 0 ) );
 
 		// Record + coverage snapshot are one atomic unit: a record that failed to
 		// freeze its covered entries would leave them looking Unbilled and open to

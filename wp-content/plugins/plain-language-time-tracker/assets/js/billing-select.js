@@ -62,9 +62,9 @@
 		const total = selectionTotal( boxes );
 		dialog.querySelectorAll( '.pltt-billsel-count' ).forEach( function ( el ) { el.textContent = String( boxes.length ); } );
 		dialog.querySelectorAll( '.pltt-billsel-calc' ).forEach( function ( el ) { el.textContent = formatCurrency( total ); } );
+		// No ceiling — trim down to absorb, or raise for a rounded-up invoice.
 		const amount = form.querySelector( '.pltt-billsel-amount' );
 		if ( amount ) {
-			amount.max = total.toFixed( 2 );
 			amount.value = total.toFixed( 2 );
 		}
 		refreshSubmitLabel();
