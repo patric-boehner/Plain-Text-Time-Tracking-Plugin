@@ -458,9 +458,10 @@ class PLTT_Form_Handlers {
 	 * Commit one billing record from the billing surface.
 	 *
 	 * The verify-and-commit step: nothing writes a record except this handler.
-	 * `calculated` is ALWAYS recomputed server-side via PLTT_Billing — the posted
-	 * amount only ever lowers the bill (absorption), never raises it. Trimming the
-	 * amount to zero fully absorbs the scope.
+	 * `calculated` is ALWAYS recomputed server-side via PLTT_Billing, but the
+	 * posted amount is taken as given — it may fall below the calculation
+	 * (absorption; zero fully absorbs the scope) or rise above it (a rounded-up
+	 * invoice). The calculation seeds the default, it doesn't cap the figure.
 	 */
 	public static function handle_commit_billing() {
 		self::guard( 'pltt_commit_billing' );

@@ -8,9 +8,9 @@
  *
  * A fully-absorbed record is just billed_amount = 0 (absorbed = calculated),
  * reached by trimming the amount to zero; there is no status column. The posted
- * amount can only ever LOWER the bill — billed is clamped to calculated here and
- * in PLTT_Billing::commit(), so absorbed is never negative and an invoice larger
- * than the calculation cannot be recorded.
+ * amount is what was actually invoiced and may sit EITHER side of the
+ * calculation: below it (absorbed — work written off) or above it (a rounded-up
+ * invoice), so absorbed_amount is signed. Only the floor at zero is enforced.
  *
  * How these rows are read back differs by type — hourly reconciles on coverage,
  * retainer on a live-recomputed dollar remainder. See the PLTT_Billing header for
@@ -52,8 +52,9 @@ class PLTT_Billing_Records {
 	 * Insert a billing record.
 	 *
 	 * Caller is responsible for computing calculated/billed/absorbed correctly;
-	 * this layer validates the type allowlist and clamps the money fields so a
-	 * bad post can never write absorbed < 0 or billed > calculated.
+	 * this layer validates the type allowlist and floors the money fields at zero.
+	 * Billed above calculated is legitimate (a rounded-up invoice) and stores a
+	 * negative absorbed — see the note at the clamp.
 	 *
 	 * @param array $data {
 	 *     @type int    $project_id         Required.
@@ -62,7 +63,8 @@ class PLTT_Billing_Records {
 	 *     @type string $period_end         Optional 'Y-m-d' or null.
 	 *     @type float  $rate               Optional snapshot rate.
 	 *     @type float  $calculated_amount  Required.
-	 *     @type float  $billed_amount      Required (0 = fully absorbed).
+	 *     @type float  $billed_amount      Required (0 = fully absorbed). May exceed
+	 *                                      calculated_amount; absorbed then goes negative.
 	 *     @type int    $billed_minutes     Optional.
 	 *     @type int    $allocation_minutes Optional (retainer only).
 	 *     @type string $description        Optional.
@@ -87,9 +89,18 @@ class PLTT_Billing_Records {
 		$calculated = isset( $data['calculated_amount'] ) ? round( (float) $data['calculated_amount'], 2 ) : 0.0;
 		$billed     = isset( $data['billed_amount'] ) ? round( (float) $data['billed_amount'], 2 ) : 0.0;
 
-		// Clamp: never negative, never bill more than the honest figure.
+		// Floor at zero, and nothing else. Billed may exceed calculated (a rounded-up
+		// invoice), which makes absorbed negative on purpose.
+		//
+		// NEVER floor absorbed at zero. Retainer closes a period with
+		// calculated_now − Σbilled − Σabsorbed; because absorbed = calculated − billed
+		// the pair cancels to the calculation as it stood when billed. Clamping the
+		// negative would claim more overage was settled than ever existed, so the
+		// round-up would be silently deducted from the next real overage in that
+		// period (2h over at $95 = $190 invoiced at $200: a later back-filled hour
+		// should bill $95, but a floored absorbed bills $85).
 		$calculated = max( 0.0, $calculated );
-		$billed     = min( max( 0.0, $billed ), $calculated );
+		$billed     = max( 0.0, $billed );
 		$absorbed   = round( $calculated - $billed, 2 );
 
 		// When the invoice actually went out. Defaults to now; a supplied date lets
@@ -147,6 +158,55 @@ class PLTT_Billing_Records {
 		}
 
 		return (int) $wpdb->insert_id;
+	}
+
+	/**
+	 * Delete a record and its coverage snapshot.
+	 *
+	 * The one way to undo a bill. Records are otherwise insert-only, and that is
+	 * what keeps billed work from drifting back to unbilled — so this is a
+	 * deliberate, confirmed action, not an edit path.
+	 *
+	 * Dropping the coverage rows is what actually reverses the bill: an entry
+	 * counts as invoiced because its id sits in billing_record_entries, so once
+	 * those rows go the entries read as Unbilled again and return to the queue.
+	 * Retainer needs no separate undo either — that record's billed/absorbed
+	 * simply stop counting toward the period's sum, restoring the full remainder.
+	 *
+	 * Both deletes are one transaction: coverage rows left behind without their
+	 * record would mark entries invoiced with nothing to point at.
+	 *
+	 * @param int $id Record ID.
+	 * @return true|WP_Error True on success.
+	 */
+	public static function delete( $id ) {
+		global $wpdb;
+
+		$id = (int) $id;
+		if ( $id <= 0 ) {
+			return new WP_Error( 'invalid_record', __( 'That billing record could not be found.', 'plain-language-time-tracker' ) );
+		}
+
+		if ( ! self::get( $id ) ) {
+			return new WP_Error( 'invalid_record', __( 'That billing record could not be found.', 'plain-language-time-tracker' ) );
+		}
+
+		$table = PLTT_Database::get_table_name( 'billing_records' );
+
+		PLTT_Database::begin_transaction();
+
+		PLTT_Billing_Record_Entries::delete_for_record( $id );
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+		$deleted = $wpdb->delete( $table, array( 'id' => $id ), array( '%d' ) );
+
+		if ( false === $deleted ) {
+			PLTT_Database::rollback_transaction();
+			return new WP_Error( 'db_delete_failed', __( 'Could not delete the billing record.', 'plain-language-time-tracker' ) );
+		}
+
+		PLTT_Database::commit_transaction();
+		return true;
 	}
 
 	/**

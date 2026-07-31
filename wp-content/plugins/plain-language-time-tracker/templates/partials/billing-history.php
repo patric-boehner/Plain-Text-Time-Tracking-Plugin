@@ -161,7 +161,6 @@ $card_label = static function ( $base, $phrase ) {
 				<th><?php esc_html_e( 'Covers', 'plain-language-time-tracker' ); ?></th>
 				<th class="pltt-amount-col"><?php esc_html_e( 'Amount', 'plain-language-time-tracker' ); ?></th>
 				<th class="pltt-amount-col"><?php esc_html_e( 'Absorbed', 'plain-language-time-tracker' ); ?></th>
-				<th class="pltt-bill-records-action"></th>
 			</tr>
 		</thead>
 		<tbody>
@@ -191,10 +190,24 @@ $card_label = static function ( $base, $phrase ) {
 					);
 				}
 				?>
+				<?php $view_url = pltt_billing_record_view_url( $rec, $rv['entries'] ); ?>
 				<tr>
 					<td class="pltt-time-cell">
 						<?php echo esc_html( $rv['billed_on'] ); ?>
 						<span class="pltt-bill-record-id">#<?php echo (int) $rec->id; ?></span>
+						<div class="row-actions">
+							<?php // View is dropped when the project is gone — the link has nowhere to land. ?>
+							<?php if ( '' !== $view_url ) : ?>
+								<span class="view"><a href="<?php echo esc_url( $view_url ); ?>"><?php esc_html_e( 'View record', 'plain-language-time-tracker' ); ?></a> | </span>
+							<?php endif; ?>
+							<?php // Undo a bill: drops the record + its coverage, un-billing the time. ?>
+							<span class="trash">
+								<a href="#delete" role="button"
+									class="pltt-bill-record-delete submitdelete"
+									data-record-id="<?php echo (int) $rec->id; ?>"
+									data-confirm="<?php echo esc_attr( pltt_billing_record_delete_confirm( $rec, $rv ) ); ?>"><?php esc_html_e( 'Delete', 'plain-language-time-tracker' ); ?></a>
+							</span>
+						</div>
 					</td>
 					<td>
 						<?php
@@ -223,11 +236,6 @@ $card_label = static function ( $base, $phrase ) {
 					<td class="pltt-bill-record-covers"><?php echo esc_html( $covers ); ?></td>
 					<td class="pltt-amount-col"><?php echo esc_html( pltt_format_currency( $rv['amount'] ) ); ?></td>
 					<td class="pltt-amount-col"><?php echo $rv['absorbed'] > 0.0 ? esc_html( pltt_format_currency( $rv['absorbed'] ) ) : '<span class="pltt-empty">&mdash;</span>'; ?></td>
-					<td class="pltt-bill-records-action">
-						<a class="button-link" href="<?php echo esc_url( pltt_billing_record_view_url( $rec, $rv['entries'] ) ); ?>">
-							<?php esc_html_e( 'View record', 'plain-language-time-tracker' ); ?>
-						</a>
-					</td>
 				</tr>
 			<?php endforeach; ?>
 		</tbody>

@@ -8,6 +8,10 @@
  * threshold math, so a late-logged entry inside an already-billed window
  * correctly stays Unbilled instead of being retroactively swept in.
  *
+ * Deleting the record is the single exception, and the only way to un-bill
+ * time: it drops these rows too (one transaction), so the entries read as
+ * Unbilled again. See PLTT_Billing_Records::delete().
+ *
  * What a record captures, by type (computed once, in PLTT_Billing::commit()):
  *   - hourly: the billable+verified entries in the billed window, minus any
  *     the user excluded.
@@ -140,7 +144,12 @@ class PLTT_Billing_Record_Entries {
 	}
 
 	/**
-	 * Remove a record's coverage rows (for the rare case a record is deleted).
+	 * Release a record's coverage rows.
+	 *
+	 * This is what actually reverses a bill: an entry counts as invoiced because
+	 * its id sits here, so dropping these rows hands the time back to Unbilled.
+	 * Always called inside PLTT_Billing_Records::delete()'s transaction — never on
+	 * its own, or the record would survive claiming coverage it no longer has.
 	 *
 	 * @param int $record_id Billing record id.
 	 * @return void

@@ -14,9 +14,13 @@
 	'use strict';
 
 	// Activate where there's something to drive: a commit form (the detailed-view
-	// scope panel) or a copy dialog (the Billing ledger's "View line items"). The
-	// handlers are all delegated and target-checked, so binding is otherwise inert.
-	if ( ! document.querySelector( '.pltt-billing-form' ) && ! document.querySelector( '[data-lineitems-dialog]' ) ) {
+	// scope panel), a copy dialog (the Billing ledger's "View line items"), or a
+	// record Delete button (either history table — those carry neither of the
+	// other two). The handlers are all delegated and target-checked, so binding is
+	// otherwise inert.
+	if ( ! document.querySelector( '.pltt-billing-form' )
+		&& ! document.querySelector( '[data-lineitems-dialog]' )
+		&& ! document.querySelector( '.pltt-bill-record-delete' ) ) {
 		return;
 	}
 
@@ -127,13 +131,12 @@
 			allBox.checked = Array.prototype.every.call( checks, function ( c ) { return c.checked; } );
 		}
 
-		// Sync the Record-bill modal: the amount ceiling + value follow the
-		// selected total (trim further inside the modal to absorb).
+		// Sync the Record-bill modal: the amount follows the selected total. No
+		// ceiling — trim it down to absorb, or raise it for a rounded-up invoice.
 		const dialog = document.getElementById( 'pltt-bill-' + item.dataset.scope );
 		if ( dialog ) {
 			const input = dialog.querySelector( '.pltt-billing-amount-input' );
 			if ( input ) {
-				input.max = total.toFixed( 2 );
 				input.value = total.toFixed( 2 );
 			}
 			const amountEl = dialog.querySelector( '.pltt-bill-amount' );
@@ -358,5 +361,46 @@
 				}
 			}
 		);
+	} );
+
+	// --- Delete a committed record (row-actions in both history tables) ---
+	// The one way to undo a bill. Confirms first, because it hands the covered
+	// time back to Unbilled. On success the page reloads so the summary cards and
+	// the outstanding queue re-reflect the returned time.
+	//
+	// The trigger is an <a href="#delete"> to match the plugin's row-actions markup,
+	// so preventDefault is required and `disabled` is unavailable — aria-disabled
+	// plus a re-entry guard stands in for it.
+	document.addEventListener( 'click', function ( e ) {
+		const link = e.target.closest( '.pltt-bill-record-delete' );
+		if ( ! link ) {
+			return;
+		}
+
+		e.preventDefault();
+
+		if ( 'true' === link.getAttribute( 'aria-disabled' ) ) {
+			return;
+		}
+
+		const recordId = link.dataset.recordId;
+		if ( ! recordId || ! window.confirm( link.dataset.confirm || '' ) ) {
+			return;
+		}
+
+		link.setAttribute( 'aria-disabled', 'true' );
+
+		PLTT.ajax( 'pltt_delete_billing_record', { record_id: recordId }, function ( response ) {
+			if ( response && response.success ) {
+				window.location.reload();
+				return;
+			}
+
+			link.removeAttribute( 'aria-disabled' );
+			const msg = response && response.data && response.data.message
+				? response.data.message
+				: ( response && typeof response.data === 'string' ? response.data : plttData.i18n.error );
+			window.alert( msg );
+		} );
 	} );
 }() );

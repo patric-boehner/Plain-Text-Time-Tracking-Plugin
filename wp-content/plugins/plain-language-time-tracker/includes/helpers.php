@@ -2839,6 +2839,46 @@ function pltt_build_billing_scope_view( $scope, $client_name ) {
 }
 
 /**
+ * The confirmation sentence shown before deleting a billing record.
+ *
+ * Deleting is the one way to undo a bill, and the consequence worth stating is
+ * what happens to the time: the entries the record covered stop counting as
+ * invoiced and come back as unbilled. Shared by both record tables so the two
+ * routes to a delete warn identically.
+ *
+ * @param object $record Billing record row.
+ * @param array  $rv     View-model from pltt_build_billing_record_view().
+ * @return string Plain-text confirm message.
+ */
+function pltt_billing_record_delete_confirm( $record, array $rv ) {
+	$count = isset( $rv['entries'] ) ? count( $rv['entries'] ) : 0;
+
+	// A retainer record can legitimately cover no entries (period had overage but
+	// the entries are gone), so don't promise a count that isn't there.
+	if ( $count > 0 ) {
+		return sprintf(
+			/* translators: 1: record id, 2: billed amount, 3: number of entries. */
+			_n(
+				'Delete billing record #%1$d for %2$s? The %3$d entry it covered will show as unbilled again.',
+				'Delete billing record #%1$d for %2$s? The %3$d entries it covered will show as unbilled again.',
+				$count,
+				'plain-language-time-tracker'
+			),
+			(int) $record->id,
+			pltt_format_currency( isset( $rv['amount'] ) ? (float) $rv['amount'] : 0.0 ),
+			$count
+		);
+	}
+
+	return sprintf(
+		/* translators: 1: record id, 2: billed amount. */
+		__( 'Delete billing record #%1$d for %2$s? The time it covered will show as unbilled again.', 'plain-language-time-tracker' ),
+		(int) $record->id,
+		pltt_format_currency( isset( $rv['amount'] ) ? (float) $rv['amount'] : 0.0 )
+	);
+}
+
+/**
  * Build the Overview detailed-view URL that "reviews" a committed billing record.
  *
  * Lands on the single-project detailed entries view scoped to the record's
