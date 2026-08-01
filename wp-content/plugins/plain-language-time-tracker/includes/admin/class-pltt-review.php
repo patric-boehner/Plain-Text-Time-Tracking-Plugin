@@ -471,7 +471,13 @@ class PLTT_Review {
 				'client_id'   => ! empty( $entry_data['client_id'] ) ? absint( $entry_data['client_id'] ) : null,
 				'project_id'  => ! empty( $entry_data['project_id'] ) ? absint( $entry_data['project_id'] ) : null,
 				'tags'        => sanitize_text_field( $entry_data['tags'] ?? '' ),
-				'billable'    => ! empty( $entry_data['billable'] ) ? 1 : 0,
+				// Clamped to the project type: a hidden checkbox on a retainer/fixed row
+				// still submits, and this path used to take it verbatim.
+				'billable'    => pltt_clamp_billable(
+					! empty( $entry_data['billable'] ),
+					! empty( $entry_data['project_id'] ) ? absint( $entry_data['project_id'] ) : 0,
+					$projects_cache
+				),
 				'verified'    => 1,
 			);
 
