@@ -120,6 +120,32 @@ These are backburnered. Only build if a genuine need emerges from actual use.
 
 ### Committed — needs building
 
+- **Finalize-screen consumption indicator** — see
+  `finalize-consumption-indicator-spec.md`. Show "Democrats of Rossmoor — 2.1 of
+  3h, 5 days in" beside the project picker while assigning entries, climbing live
+  as they are assigned. **Build this first**: no dependencies, no migration,
+  reuses the `data-billable-flag` pipe, and it surfaces every day at the end of
+  work rather than once a month at invoicing.
+
+- **Cross-project profitability overview** — effective rate per project, ranked,
+  banded against two thresholds: **ideal $100/hr** and **minimum $90/hr**. At or
+  above ideal = good; between = ok; below minimum = bad.
+
+  Right now profitability is per-project, so it is only seen on a project already
+  being worried about. Ranked across everything, the pattern is visible: of 27
+  computable projects, **15 fall below the $90 minimum**, and the split is not
+  random — the worst are large fixed projects (Robin Mohr $39.34/hr, Postie
+  Accessibility Remediation $75.54/hr), the best are small bounded pieces (NCJW's
+  event forms $100–115/hr, BTSA's June ad $117/hr).
+
+  Two known data problems to solve first, or the numbers mislead:
+  1. **Retainers cannot be computed at all** — the monthly plan fee is recorded
+     nowhere. Four retainers, 76 hours, no answer. Needs first-class budgets.
+  2. **Fixed-project revenue reads `budget_fee`, which is sometimes stale** —
+     Sparq's says $1,500 against $6,550 actually invoiced, which is why its
+     $21.13/hr is almost certainly wrong. Hourly figures are sound (revenue =
+     what was actually billed).
+
 - **Overage threshold notifications** — tell me when a retainer crosses its
   allocation, at the time it happens, not when I sit down to invoice.
 
