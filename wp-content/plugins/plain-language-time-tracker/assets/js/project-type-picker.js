@@ -130,9 +130,13 @@
 			var budgetMode = ( feeInput.value !== '' ) ? 'fee' : 'hours';
 			el( 'pltt-project-budget-mode' ).value = budgetMode;
 			applyBudgetModeUI( budgetMode );
-			// Fixed-fee dollars come from the flat fee, not time × rate — default entries to
+			// Fixed-fee dollars come from the flat fee, not time × rate — force entries
 			// non-billable and hide the per-entry billable setting (it does nothing here).
-			if ( setDefaults ) { nonBillable.checked = true; }
+			// Forced unconditionally, not just on setDefaults: the control is hidden, so
+			// an edit-modal open that seeded it from a stale billability_default = 1
+			// would silently re-submit that 1 on every save, and new entries would
+			// inherit the flag. Same reasoning as the 'none' branch below.
+			nonBillable.checked = true;
 			nonBillableGroup.classList.add( 'pltt-hidden' );
 
 		} else if ( type === 'recurring' ) {
@@ -151,12 +155,11 @@
 			feeInput.required        = false;
 			var hoursOptional2 = budgetLabel.querySelector( '.pltt-optional' );
 			if ( hoursOptional2 ) { hoursOptional2.classList.remove( 'pltt-hidden' ); }
-			if ( setDefaults ) {
-				nonBillable.checked = true;
-				if ( recurringSelect.value === '' ) { recurringSelect.value = 'monthly'; }
-			}
+			if ( setDefaults && recurringSelect.value === '' ) { recurringSelect.value = 'monthly'; }
 			// Within-allocation time is covered by the flat fee and overage is billed at
-			// the period level — the per-entry billable setting does nothing here. Hide it.
+			// the period level — the per-entry billable setting does nothing here. Force
+			// it off (unconditionally, see the 'fixed' branch above for why) and hide it.
+			nonBillable.checked = true;
 			nonBillableGroup.classList.add( 'pltt-hidden' );
 
 		} else if ( type === 'none' ) {

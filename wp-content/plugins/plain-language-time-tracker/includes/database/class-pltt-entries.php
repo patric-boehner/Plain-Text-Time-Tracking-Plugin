@@ -179,16 +179,23 @@ class PLTT_Entries {
 		$project_id = ! empty( $data['project_id'] ) ? absint( $data['project_id'] ) : null;
 
 		// Determine billable default: explicit value wins; otherwise inherit from project; fall back to 1.
+		// The project row is loaded once and reused for the type clamp below, so
+		// inheriting the default costs no extra query.
+		$billable_project = ( null !== $project_id ) ? PLTT_Projects::get( $project_id ) : null;
+
 		if ( array_key_exists( 'billable', $data ) ) {
 			$billable = ! empty( $data['billable'] ) ? 1 : 0;
-		} elseif ( null !== $project_id ) {
-			$projects_table = PLTT_Database::get_table_name( 'projects' );
-			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
-			$project_default = $wpdb->get_var( $wpdb->prepare( "SELECT billability_default FROM {$projects_table} WHERE id = %d", $project_id ) );
-			$billable        = null !== $project_default ? (int) $project_default : 1;
+		} elseif ( $billable_project && null !== $billable_project->billability_default ) {
+			$billable = (int) $billable_project->billability_default;
 		} else {
 			$billable = 1;
 		}
+
+		// Enforce the invariant regardless of how billable was resolved: retainer,
+		// fixed-fee and internal projects never carry a per-entry billable flag.
+		// A project whose billability_default is stale (1 on a retainer) would
+		// otherwise seed every new entry with a flag the UI can't show or edit.
+		$billable = pltt_clamp_billable( $billable, $project_id, $billable_project ? array( (int) $project_id => $billable_project ) : array() );
 
 		$insert_data = array(
 			'entry_date'       => pltt_sanitize_date( $data['entry_date'] ?? '' ),

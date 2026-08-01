@@ -20,7 +20,7 @@ class PLTT_Database {
 	 *
 	 * @var string
 	 */
-	const DB_VERSION = '1.9.8';
+	const DB_VERSION = '1.9.9';
 
 	/**
 	 * Get the full table name with WordPress prefix.
@@ -540,7 +540,83 @@ class PLTT_Database {
 			}
 		}
 
+		// 1.9.9: repair entries that carry billable = 1 on a project type that has
+		// no per-entry billable flag. 1.9.5 already flipped these once; they came
+		// back through a finalize-screen precedence bug (the per-row "don't clobber
+		// a manual choice" guard outranked the project-type gate, and the hidden
+		// checkbox submitted the stale 1). That hole is closed in the same release
+		// — see pltt_clamp_billable() — so this repair should not be needed twice.
+		if ( version_compare( $from_version, '1.9.9', '<' ) ) {
+			if ( false === self::migrate_to_1_9_9() ) {
+				return false;
+			}
+		}
+
 		return true;
+	}
+
+	/**
+	 * 1.9.9 migration: re-assert the billable invariant on existing entries.
+	 *
+	 * `time_entries.billable` may be 1 only on a plain hourly project. Retainer,
+	 * fixed-fee and internal projects bill at the period/project level, so a flag
+	 * there decides nothing and only puts imputed dollars in the Amount column for
+	 * money that was never invoiced from time.
+	 *
+	 * Project types are resolved through pltt_get_billing_type() rather than
+	 * re-expressed in SQL. The 1.9.5 migration hand-rolled the type test in its
+	 * WHERE clause and consequently missed internal projects and the
+	 * NULL-vs-empty-string distinction; routing through the helper means this can
+	 * never disagree with pltt_billable_flag_applies(), which is what the runtime
+	 * guards use.
+	 *
+	 * Rate and amount are zeroed alongside the flag, matching what
+	 * PLTT_Review::save() already does for a non-billable entry — leaving a live
+	 * billable_amount behind a billable = 0 flag is the inconsistency that made the
+	 * Amount column and the Status column disagree in the first place.
+	 *
+	 * NO review log is written. The 1.9.5 equivalent wrote one to wp-content/uploads
+	 * and it was removed as a data-disclosure issue (SEC-M1, see
+	 * purge_migration_1_9_5_log()); reintroducing it would undo that fix. Retainer
+	 * billing reads overage_minutes × rate and ignores this flag entirely, so no
+	 * committed billing record changes value as a result of this repair.
+	 *
+	 * @return bool False on DB failure (caller aborts the version bump).
+	 */
+	private static function migrate_to_1_9_9() {
+		global $wpdb;
+
+		$projects_table = self::get_table_name( 'projects' );
+		$entries_table  = self::get_table_name( 'time_entries' );
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+		$projects = $wpdb->get_results( "SELECT id, recurring_period, budget_hours, budget_fee, billability_default FROM {$projects_table}" );
+		if ( empty( $projects ) ) {
+			return true;
+		}
+
+		$flagless_ids = array();
+		foreach ( $projects as $project ) {
+			if ( ! pltt_billable_flag_applies( $project ) ) {
+				$flagless_ids[] = (int) $project->id;
+			}
+		}
+
+		if ( empty( $flagless_ids ) ) {
+			return true;
+		}
+
+		$placeholders = implode( ',', array_fill( 0, count( $flagless_ids ), '%d' ) );
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.NotPrepared
+		$updated = $wpdb->query( $wpdb->prepare(
+			"UPDATE {$entries_table}
+			 SET billable = 0, billable_rate = 0.00, billable_amount = 0.00
+			 WHERE billable = 1 AND project_id IN ({$placeholders})",
+			$flagless_ids
+		) );
+
+		return false !== $updated;
 	}
 
 	/**

@@ -438,8 +438,16 @@
 				// Apply the project's billability default to the billable checkbox,
 				// but never clobber a manual choice: if the user has toggled billable
 				// on this row, leave it alone (spec: billable defaults once).
+				//
+				// EXCEPT when the project type has no per-entry flag at all
+				// (data-billable-flag="0" — retainer/fixed-fee). There the type gate
+				// OUTRANKS the no-clobber guard: a manual choice made while the row
+				// pointed at an hourly project is not a choice about a retainer, and
+				// honouring it here is what let billable=1 reach 70 retainer/fixed
+				// entries ($2,323.50 of imputed dollars). applyBillableVisibility()
+				// has already forced the box off; this block must not turn it back on.
 				var selectedOpt = this.options[ this.selectedIndex ];
-				if ( selectedOpt && selectedOpt.value ) {
+				if ( selectedOpt && selectedOpt.value && selectedOpt.dataset.billableFlag !== '0' ) {
 					var billDefault = selectedOpt.dataset.billabilityDefault;
 					if ( billDefault !== undefined ) {
 						var entryRow = this.closest( '.pltt-entry-row' );
@@ -481,8 +489,14 @@
 	/**
 	 * Show/hide a row's billable control based on the selected project's type.
 	 * Retainer/fixed-fee projects (data-billable-flag="0") bill at the period
-	 * level, so the per-entry flag is hidden. The checkbox stays in the DOM and
-	 * still submits its (defaulted non-billable) value.
+	 * level, so the per-entry flag is hidden AND forced off.
+	 *
+	 * Hiding alone was the bug: the checkbox stays in the DOM and submits whatever
+	 * it holds, so a row toggled billable while on an hourly project kept billable=1
+	 * after being switched to a retainer — invisible, uneditable, and taken verbatim
+	 * by the save path. Forcing it off (and clearing the userSet stamp, so a later
+	 * switch back to hourly re-applies that project's default) is what makes the
+	 * "still submits its non-billable value" promise true.
 	 *
 	 * @param {HTMLElement} row The .pltt-entry-row element.
 	 */
@@ -494,6 +508,13 @@
 		}
 		var opt = projectSelect.options[ projectSelect.selectedIndex ];
 		var hide = !! ( opt && opt.dataset.billableFlag === '0' );
+		if ( hide ) {
+			setBillableVisual( row, false );
+			var box = row.querySelector( '.pltt-billable' );
+			if ( box ) {
+				delete box.dataset.userSet;
+			}
+		}
 		cell.querySelectorAll( '.pltt-billable-symbol, .pltt-billable' ).forEach( function( el ) {
 			el.classList.toggle( 'pltt-hidden', hide );
 		} );
@@ -1342,7 +1363,8 @@
 	/**
 	 * Show/hide a form row's billable field based on the selected project's type.
 	 * Retainer/fixed-fee projects (data-billable-flag="0") bill at the period
-	 * level, so the per-entry control is hidden. The hidden checkbox still submits.
+	 * level, so the per-entry control is hidden AND forced off — see
+	 * applyBillableVisibility() for why hiding alone leaked billable=1.
 	 *
 	 * @param {HTMLElement} formRow The .pltt-entry-form element.
 	 */
@@ -1356,7 +1378,15 @@
 			return;
 		}
 		const opt = sel.options[ sel.selectedIndex ];
-		field.classList.toggle( 'pltt-hidden', !! ( opt && opt.dataset.billableFlag === '0' ) );
+		const hide = !! ( opt && opt.dataset.billableFlag === '0' );
+		if ( hide ) {
+			const box = field.querySelector( 'input[type="checkbox"]' );
+			if ( box ) {
+				box.checked = false;
+				delete box.dataset.userSet;
+			}
+		}
+		field.classList.toggle( 'pltt-hidden', hide );
 	}
 
 	/**

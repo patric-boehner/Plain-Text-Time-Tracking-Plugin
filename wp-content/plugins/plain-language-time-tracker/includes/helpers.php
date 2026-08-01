@@ -3157,6 +3157,38 @@ function pltt_billable_flag_applies( $project ) {
 }
 
 /**
+ * Clamp a proposed `billable` value to what the entry's project type allows.
+ *
+ * THE INVARIANT: `time_entries.billable` may be 1 only when the entry's project
+ * is plain hourly, or when the entry has no project yet. On retainer, fixed-fee
+ * and internal projects it must be 0 — the flag decides nothing there, and a
+ * stray 1 puts imputed dollars in the Amount column for money that was never
+ * invoiced from time.
+ *
+ * Route EVERY write of `billable` through this. The UI hides the control on
+ * those types, but hidden controls still submit and non-UI paths (AJAX, direct
+ * update) bypass the UI entirely — which is how 70 rows across 4 projects
+ * acquired billable = 1 worth $2,323.50 of imputed dollars.
+ *
+ * @param mixed      $billable       Proposed value (anything truthy = billable).
+ * @param int|null   $project_id     Target project ID, or null/0 for unassigned.
+ * @param array      $projects_cache Optional id => project map, to avoid a query.
+ * @return int 1 or 0.
+ */
+function pltt_clamp_billable( $billable, $project_id, $projects_cache = array() ) {
+	if ( empty( $billable ) ) {
+		return 0;
+	}
+	$project_id = (int) $project_id;
+	if ( $project_id <= 0 ) {
+		// No project yet — same rule as pltt_billable_flag_applies( null ).
+		return 1;
+	}
+	$project = isset( $projects_cache[ $project_id ] ) ? $projects_cache[ $project_id ] : PLTT_Projects::get( $project_id );
+	return pltt_billable_flag_applies( $project ) ? 1 : 0;
+}
+
+/**
  * Echo a labeled badge for a billing type. OPT-DUP6.
  *
  * @param string $billing_type One of: recurring, fixed, hourly, none.

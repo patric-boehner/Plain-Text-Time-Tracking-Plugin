@@ -338,11 +338,16 @@ class PLTT_Ajax {
 			// billable_amount can't drift between read and write.
 			PLTT_Database::begin_transaction();
 
+			// Clamp to the project type before anything else. The toggle is hidden
+			// on retainer/fixed rows, but a hidden control is not a lock — this
+			// handler is reachable directly.
+			$entry      = PLTT_Entries::get( $entry_id );
+			$int_value  = pltt_clamp_billable( $int_value, $entry ? (int) $entry->project_id : 0 );
+
 			$update_data = array( 'billable' => $int_value );
 
 			if ( 1 === $int_value ) {
 				// Recalculate rate and amount when marking as billable.
-				$entry = PLTT_Entries::get( $entry_id );
 				if ( $entry && $entry->duration_minutes > 0 ) {
 					$hourly_rate                    = pltt_resolve_billable_rate( (int) $entry->client_id, (int) $entry->project_id );
 					$update_data['billable_rate']   = $hourly_rate;
@@ -640,7 +645,12 @@ class PLTT_Ajax {
 		$client_id   = isset( $_POST['client_id'] ) && '' !== $_POST['client_id'] ? absint( $_POST['client_id'] ) : 0;
 		$project_id  = isset( $_POST['project_id'] ) && '' !== $_POST['project_id'] ? absint( $_POST['project_id'] ) : 0;
 		$tags        = isset( $_POST['tags'] ) ? sanitize_text_field( wp_unslash( $_POST['tags'] ) ) : '';
-		$billable    = isset( $_POST['billable'] ) && '1' === (string) $_POST['billable'] ? 1 : 0;
+		// Clamped to the project type — the entry-form billable field is hidden for
+		// retainer/fixed, and hidden fields still post.
+		$billable    = pltt_clamp_billable(
+			isset( $_POST['billable'] ) && '1' === (string) $_POST['billable'],
+			$project_id
+		);
 
 		if ( empty( $entry_date ) ) {
 			wp_send_json_error( __( 'A date is required.', 'plain-language-time-tracker' ) );
