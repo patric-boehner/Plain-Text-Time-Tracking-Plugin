@@ -3189,6 +3189,49 @@ function pltt_clamp_billable( $billable, $project_id, $projects_cache = array() 
 }
 
 /**
+ * Re-assert the billable invariant across one project's existing entries.
+ *
+ * pltt_clamp_billable() guards every ENTRY write, but nothing re-checks the
+ * entries when the PROJECT's type changes underneath them. Converting a project
+ * to retainer or fixed-fee — e.g. by giving it a budget — instantly leaves every
+ * one of its entries carrying a flag its new type has no use for, which is the
+ * same broken state DB 1.9.9 was written to repair.
+ *
+ * Idempotent and cheap: one UPDATE that no-ops when the type still uses the flag
+ * or when nothing is flagged. Duration-based figures (allocation burn, overage)
+ * are unaffected, so clamping costs no reporting.
+ *
+ * @param int $project_id Project whose entries should be re-checked.
+ * @return int Rows changed.
+ */
+function pltt_clamp_project_entries( $project_id ) {
+	global $wpdb;
+
+	$project_id = (int) $project_id;
+	if ( $project_id <= 0 ) {
+		return 0;
+	}
+
+	$project = PLTT_Projects::get( $project_id );
+	if ( ! $project || pltt_billable_flag_applies( $project ) ) {
+		return 0; // Type still uses the per-entry flag — nothing to clamp.
+	}
+
+	$table = PLTT_Database::get_table_name( 'time_entries' );
+
+	// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+	$changed = $wpdb->query(
+		$wpdb->prepare(
+			"UPDATE {$table} SET billable = 0, billable_rate = 0.00, billable_amount = 0.00
+			 WHERE project_id = %d AND billable = 1",
+			$project_id
+		)
+	);
+
+	return (int) $changed;
+}
+
+/**
  * Echo a labeled badge for a billing type. OPT-DUP6.
  *
  * @param string $billing_type One of: recurring, fixed, hourly, none.
