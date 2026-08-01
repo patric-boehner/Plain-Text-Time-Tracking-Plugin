@@ -324,16 +324,25 @@ class PLTT_Billing_Records {
 
 	/**
 	 * Sum what existing records already account for over a scope, so the engine
-	 * can subtract it from calculated(scope) to get the unbilled remainder.
+	 * can subtract it from the period's basis to get the unbilled remainder.
 	 *
 	 * Scope = project + billing_type, optionally narrowed to a retainer month by
 	 * period_start (an exact match on the month's first day — how retainer records
 	 * store it). Hourly records carry no period_start, so they are summed in full.
 	 *
+	 * `calculated` and `records` exist so a caller can reconcile a period against
+	 * the terms it was BILLED under rather than against a live recompute. Once a
+	 * period has records, `calculated` is its basis: because absorbed is written as
+	 * (calculated − billed), billed + absorbed sums back to calculated, so the
+	 * remainder settles to exactly zero and a later rate change or back-filled entry
+	 * cannot reopen an invoiced period. The identity holds with a negative absorbed
+	 * too (a rounded-up invoice), so nothing here may floor it. Repair is
+	 * delete-and-recommit, not a supplemental record.
+	 *
 	 * @param int         $project_id   Project ID.
 	 * @param string      $billing_type One of self::TYPES.
 	 * @param string|null $period_start Optional 'Y-m-d' to scope to one retainer month.
-	 * @return array{billed: float, absorbed: float}
+	 * @return array{billed: float, absorbed: float, calculated: float, records: int}
 	 */
 	public static function sum_billed( $project_id, $billing_type, $period_start = null ) {
 		global $wpdb;
@@ -348,15 +357,35 @@ class PLTT_Billing_Records {
 		}
 
 		$sql = "SELECT COALESCE(SUM(billed_amount), 0) AS billed,
-			COALESCE(SUM(absorbed_amount), 0) AS absorbed
+			COALESCE(SUM(absorbed_amount), 0) AS absorbed,
+			COALESCE(SUM(calculated_amount), 0) AS calculated,
+			COUNT(*) AS records
 			FROM {$table} WHERE " . implode( ' AND ', $where );
 
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.NotPrepared
 		$row = $wpdb->get_row( $wpdb->prepare( $sql, $prepare ) );
 
 		return array(
-			'billed'   => $row ? (float) $row->billed : 0.0,
-			'absorbed' => $row ? (float) $row->absorbed : 0.0,
+			'billed'     => $row ? (float) $row->billed : 0.0,
+			'absorbed'   => $row ? (float) $row->absorbed : 0.0,
+			'calculated' => $row ? (float) $row->calculated : 0.0,
+			'records'    => $row ? (int) $row->records : 0,
 		);
+	}
+
+	/**
+	 * The dollar basis a period reconciles against.
+	 *
+	 * No records → the live calculation (nothing has been billed, so today's
+	 * figure is the truth). Any records → what the records were written from, so
+	 * an invoiced period stays closed. See sum_billed() for why the two sum
+	 * identically once records exist.
+	 *
+	 * @param array $sums       Return value of sum_billed().
+	 * @param float $calculated Live-recomputed amount for the same scope.
+	 * @return float
+	 */
+	public static function reconciliation_basis( $sums, $calculated ) {
+		return ! empty( $sums['records'] ) ? (float) $sums['calculated'] : (float) $calculated;
 	}
 }
