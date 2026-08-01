@@ -1755,10 +1755,16 @@ function pltt_format_billing_period( $record ) {
  * }
  */
 function pltt_retainer_period_status_figure( $project, $period_start, $period_end, $gross, $is_over, $is_closed, $records = null ) {
-	$sums     = PLTT_Billing_Records::sum_billed( (int) $project->id, 'retainer_overage', $period_start );
-	$paid     = (float) $sums['billed'] + (float) $sums['absorbed'];
-	$unbilled = round( (float) $gross - $paid, 2 );
-	$settled  = ( $paid > 0.005 && $unbilled <= 0.005 );
+	$sums = PLTT_Billing_Records::sum_billed( (int) $project->id, 'retainer_overage', $period_start );
+	$paid = (float) $sums['billed'] + (float) $sums['absorbed'];
+	// A period reconciles against the terms it was billed under, so an invoiced
+	// month reads Billed even if the live figure has since moved (rate change,
+	// back-filled entry). Settled is now simply "has a record" — the old
+	// paid-vs-live test would flip a closed month back to unbilled. Repair is
+	// delete-and-recommit, not a supplemental record.
+	$basis    = PLTT_Billing_Records::reconciliation_basis( $sums, (float) $gross );
+	$unbilled = round( $basis - $paid, 2 );
+	$settled  = ! empty( $sums['records'] );
 
 	$billable_now = false;
 

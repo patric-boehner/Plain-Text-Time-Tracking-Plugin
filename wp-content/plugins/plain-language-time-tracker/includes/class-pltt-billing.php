@@ -3,9 +3,9 @@
  * Billing engine — the read model that turns a project into its
  * ready-to-invoice scope(s).
  *
- * TWO reconciliation mechanics, not one. They answer the same question
- * differently, and the difference is deliberate on the hourly side and historical
- * on the retainer side:
+ * TWO reconciliation mechanics, not one. They ask the same question in different
+ * shapes, but since 1.9.53 they agree on the answer: a committed record is
+ * immutable, and nothing that happens afterwards can reopen it.
  *
  *   hourly  — set difference against the frozen coverage snapshot. Outstanding =
  *             billable + verified entries in range whose IDs aren't in
@@ -14,14 +14,26 @@
  *             stays Unbilled rather than being swept in, and a later rate change
  *             can't re-value it (entries carry their own rate snapshot).
  *
- *   retainer — dollar remainder, recomputed live:
- *                  unbilled(period) = calculated_now − Σ billed − Σ absorbed
- *             Because absorbed = calculated − billed at write time, this reduces
- *             to (calculated_now − calculated_when_billed). KNOWN CONSEQUENCE: a
- *             rate change or a back-filled entry re-values a closed period and
- *             reopens it as though it were never invoiced. The record already
- *             stores calculated_amount; this path just doesn't read it. See
- *             billing-state-review-2026-07-25.md §3.1 before changing this.
+ *   retainer — dollar remainder against a FROZEN basis:
+ *                  unbilled(period) = basis − Σ billed − Σ absorbed
+ *             where basis is the live calculation only while the period has no
+ *             records, and Σ calculated_amount once it does
+ *             (PLTT_Billing_Records::reconciliation_basis). Because absorbed is
+ *             written as (calculated − billed), the two sum back to calculated,
+ *             so a billed period settles to exactly 0.00 and stays there.
+ *
+ * This closes billing-state-review-2026-07-25.md §3.1, where retainer reconciled
+ * live and hourly reconciled frozen: a rate change or a back-filled entry used to
+ * re-value a closed period and reopen it as though it had never been invoiced.
+ * The record always stored calculated_amount; the read path just ignored it.
+ *
+ * CONSEQUENCE, chosen deliberately (2026-08-01): there is no supplemental record.
+ * A retainer period with any record is closed, so a second commit on it returns
+ * 'nothing_to_bill'. If a closed period genuinely changed, DELETE the record and
+ * re-commit — the coverage rows drop with it and the period returns to open.
+ *
+ * Retainer `overage_amount` in get_retainer_summary() is left on the LIVE figure
+ * on purpose: it describes how much overage happened, not how much is owed.
  *
  * Retainer `calculated` is derived from the CLEAN `overage_minutes` field of
  * pltt_compute_overage_threshold() (used − allocation, pure period arithmetic)
@@ -657,8 +669,13 @@ class PLTT_Billing {
 				$out['overage_amount'] += $calculated;
 
 				if ( ! $is_open ) {
-					$sums     = PLTT_Billing_Records::sum_billed( (int) $project->id, 'retainer_overage', $period_start );
-					$unbilled = round( $calculated - $sums['billed'] - $sums['absorbed'], 2 );
+					$sums = PLTT_Billing_Records::sum_billed( (int) $project->id, 'retainer_overage', $period_start );
+					// Same basis rule as build_retainer_scopes(): a period with records
+					// reconciles against what it was billed from, so it can't reopen.
+					// overage_amount above stays live on purpose — it describes what
+					// happened, not what is owed.
+					$basis    = PLTT_Billing_Records::reconciliation_basis( $sums, $calculated );
+					$unbilled = round( $basis - $sums['billed'] - $sums['absorbed'], 2 );
 					if ( $unbilled > self::EPSILON ) {
 						$out['unbilled_amount'] += $unbilled;
 						$out['unbilled_periods']++;
@@ -738,7 +755,10 @@ class PLTT_Billing {
 				$overage_minutes = (int) $threshold['overage_minutes'];
 				$calculated      = round( pltt_billable_amount( $overage_minutes, $rate ), 2 );
 				$sums            = PLTT_Billing_Records::sum_billed( (int) $project->id, 'retainer_overage', $period_start );
-				$unbilled        = round( $calculated - $sums['billed'] - $sums['absorbed'], 2 );
+				// Reconcile against the terms the period was billed under, not a live
+				// recompute — once it has records it settles to zero and stays there.
+				$basis           = PLTT_Billing_Records::reconciliation_basis( $sums, $calculated );
+				$unbilled        = round( $basis - $sums['billed'] - $sums['absorbed'], 2 );
 
 				if ( $unbilled > self::EPSILON ) {
 					$entries = array();
