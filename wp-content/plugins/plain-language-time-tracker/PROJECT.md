@@ -118,6 +118,26 @@ These are loose notes that I have thought about for features or fixes. Whether o
 
 These are backburnered. Only build if a genuine need emerges from actual use.
 
+### Committed — needs building
+
+- **Overage threshold notifications** — tell me when a retainer crosses its
+  allocation, at the time it happens, not when I sit down to invoice.
+
+  The need emerged from the Aug 2026 Zoho reconciliation, which is the "genuine
+  need from actual use" bar: Democrats of Rossmoor went over its 3h allocation in
+  **all six** tracked months (Feb–Jul), and across Feb–Jun calculated $1,839.00 of
+  overage against $810.40 invoiced — **$1,028.60 absorbed, 56% of it**. Postie went
+  over in 3 of 6 months. None of that was visible until invoicing time, by which
+  point the month is closed and the choice is bill-late or absorb.
+
+  The point is to move the decision from *after* the period to *during* it, so
+  absorbing is a choice rather than a default. Scope is unsettled — a nudge on the
+  Overview, a notice on the project, or something at capture time — but the
+  trigger is clear: crossing `pltt_budgeted_minutes()` for the current period.
+
+  Interacts with the parked recurring-fixed-fee type: a project whose hours are a
+  monitoring reference rather than a billing threshold must NOT notify.
+
 ### From Original Planning
 - **CSV Export** - Export time entry data to CSV for spreadsheets or invoicing tools
 - **Settings Page** - Configure plugin behavior, preferences, defaults
