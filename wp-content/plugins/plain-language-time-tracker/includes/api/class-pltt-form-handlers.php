@@ -252,6 +252,12 @@ class PLTT_Form_Handlers {
 			// SEC-M2: use only the error code (not the raw message) in the redirect URL.
 			self::redirect_back( array( 'pltt_error' => $result->get_error_code() ) );
 		} elseif ( $result ) {
+			// A settings save can change the project's TYPE — adding a budget makes it
+			// fixed-fee, a recurring period makes it a retainer — and the entry-write
+			// clamps don't see that, because no entry was written. Re-assert the
+			// invariant here or the project's existing entries keep a billable flag
+			// its new type has no use for.
+			pltt_clamp_project_entries( $project_id );
 			self::redirect_back( array( 'pltt_message' => 'project_updated' ) );
 		} else {
 			self::redirect_back( array( 'pltt_error' => 'project_update_failed' ) );
