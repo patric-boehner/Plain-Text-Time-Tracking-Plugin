@@ -54,7 +54,7 @@ Added to the project modal so it can be set when the project is created.
 
 | Field | Type | Notes |
 |---|---|---|
-| `notify_threshold_percent` | int, nullable | Blank = site default (70) |
+| `notify_threshold_percent` | int, nullable | Blank = site default. **Means different things per type** — see Firing. Retainer: projected % of allocation (default 100). Fixed: % of budget consumed (default 75). |
 | `notify_enabled` | bool | On by default for types with a ceiling |
 
 **Shown only for retainer and fixed-fee.** Hidden for:
@@ -77,16 +77,79 @@ on retainer/fixed projects are all `billable = 0`).
 
 ## Firing
 
-A **once-daily cron** — agreed 2026-08-01 as sufficient, given the threshold is
-low enough to absorb the lag. Two events per project per period: crossing the
-**threshold**, and crossing **100%**. Each fires once.
-
-Needs a record of what has already been sent — project + period + level — so a
-small table or per-project meta. Without it the job re-sends on every run.
+A **once-daily cron** — agreed 2026-08-01 as sufficient.
 
 **Cron is not a concern:** the live server runs its own system cron (confirmed
 2026-08-01), so this does not depend on WP-Cron's page-load trigger. Set
 `DISABLE_WP_CRON` and hook the daily job normally.
+
+### A single level threshold does NOT work — do not revert to one
+
+Tested against Feb–Jul 2026. The three retainers behave completely differently,
+so one percentage cannot serve them:
+
+| Project | Allocation | Behaviour | A 70% level would… |
+|---|---|---|---|
+| **Postie** | 1h | bimodal — months are 0.22/0.40h **or** 2.12/3.13/4.93h | fire only in the over-months. **Correct.** |
+| **Capital Advantage** | 3h | typically lands 2.45–2.78h and stays **under** | fire in 4 of 6 months, 3 of them **false alarms** |
+| **Democrats of Rossmoor** | 3h | averages **7.6h**, over every single month | fire in week 1, every month, forever. **No level helps.** |
+
+This is the objection raised during the first build attempt ("threshold is
+reached on too many projects too quickly"). The observation is right; the
+conclusion to fire on **overage only** is wrong, because that recreates the exact
+failure this feature exists to fix — finding out after the money is spent.
+
+### Retainers fire on PACE, not level
+
+A retainer has a clock, so the question is not "how much have you used" but "how
+much for this point in the period."
+
+> Fire when **projected consumption exceeds the allocation**, and at least **⅓ of
+> the period has elapsed** so the projection is stable.
+
+Projected = `consumed ÷ elapsed_fraction_of_period`.
+
+This removes the false alarms outright. Capital Advantage at 2.1h on the 25th is
+on pace — silent. At 2.1h on the 8th it projects to ~7h — fires. Same number,
+different meaning.
+
+Below ⅓ elapsed, stay silent regardless: the projection is noise.
+
+### Fixed projects fire on LEVEL
+
+No clock, so level is all there is. **Default 75% of budget.** Noise is not a
+concern — a fixed project crosses once in its life. BTSA's Registration Form
+would have fired at 3.75h, roughly two-thirds through that first 5.43-hour
+session.
+
+### Four layers that stop repeats
+
+1. **Once per project per period per level.** Needs a record of what has been
+   sent — project + period + level — as a small table or per-project meta.
+   Without it the job re-sends every run.
+2. **One digest, not one email per project.** A single daily message listing what
+   crossed. Nothing crossed, no email. Caps the volume at one a day regardless of
+   how many projects trip.
+3. **Chronic detection — the important one.** If a project fires in **3
+   consecutive periods**, stop repeating and change the message:
+
+   > Democrats of Rossmoor has exceeded its 3h allocation for 3 periods running —
+   > averaging 7.6h. This looks like a pricing problem, not a monthly surprise.
+
+   Then suppress until the allocation changes or it exceeds by a materially
+   larger margin. This is the escalation DoR actually needs; repeating the same
+   alert monthly would bury the finding instead of surfacing it.
+4. **Acknowledgement.** Dismissing suppresses that project for the current
+   period, so a known and accepted overage does not nag.
+
+### What this design would have produced on real data
+
+Six months: **Capital Advantage once** (June, genuinely unexpected), **Postie
+three times** (its real over-months), **DoR twice** before converting to the
+pricing message, **BTSA once** mid-session. Roughly **seven messages in six
+months**, every one about something worth knowing.
+
+A flat 70% level would have produced closer to twenty, most of them wrong.
 
 ## What the email says
 
