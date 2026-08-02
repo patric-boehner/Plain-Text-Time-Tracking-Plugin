@@ -163,6 +163,13 @@ $tab_base_url = add_query_arg( $filter_params, admin_url( 'admin.php' ) );
 		</div>
 	</div>
 
+	<?php
+	// Saving a day from the Reports → Edit → Back loop lands here rather than on
+	// the Daily Log, so the same post-save report belongs here too. Silent unless
+	// we arrived from that save; the date rides along on the redirect.
+	pltt_maybe_render_saved_consumption_notice();
+	?>
+
 	<form method="get" action="" class="pltt-report-filters-form">
 		<input type="hidden" name="page" value="pltt-reports">
 		<input type="hidden" name="view" value="<?php echo esc_attr( $view ); ?>">

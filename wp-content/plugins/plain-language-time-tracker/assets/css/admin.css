@@ -1396,9 +1396,17 @@ fieldset.pltt-date-nav-custom-inputs input[type="date"] {
 	flex: none;
 }
 
+/* The figure is what the eye should land on, so it carries the weight in every
+   state. Colour is the only thing that changes: normal ink while there is still
+   budget left, amber once the ceiling is past. A list where every line is amber
+   would say nothing about which line matters. */
 .pltt-consumption-figure {
 	font-weight: 600;
 	font-variant-numeric: tabular-nums;
+	color: var(--pltt-text-base);
+}
+
+.pltt-consumption-row.is-over .pltt-consumption-figure {
 	color: var(--pltt-warning-text);
 }
 

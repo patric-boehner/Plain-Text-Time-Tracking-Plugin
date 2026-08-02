@@ -452,7 +452,17 @@ class PLTT_Form_Handlers {
 				$redirect_url = $default;
 			}
 
-			$redirect_url = add_query_arg( array( 'pltt_message' => 'entries_saved' ), $redirect_url );
+			// Carry the saved date so the landing screen can report what that
+			// day's work did to any retainer or budget it touched. The default
+			// landing is the Daily Log, which already knows the date; a
+			// return_to (Reports → Edit → Back) lands somewhere that does not.
+			$redirect_url = add_query_arg(
+				array(
+					'pltt_message'    => 'entries_saved',
+					'pltt_saved_date' => $date,
+				),
+				$redirect_url
+			);
 			wp_safe_redirect( $redirect_url );
 			exit;
 		} else {
