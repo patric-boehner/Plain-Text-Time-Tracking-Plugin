@@ -36,7 +36,7 @@ The plugin:
 - Calculates durations automatically (9:15am–10:30am = 1.25 hours)
 - Detects "ABC Corp" as a client alias
 - Predicts the project based on your history
-- Extracts any hashtags as tags
+- Pre-fills tags whose name or seeded keywords appear in the description
 - Shows confidence scores for predictions
 
 ---
@@ -68,7 +68,7 @@ The plugin:
 - **Client & Project management** - Two-column admin screen with inline editing
 - **Project lifecycle** - Active (appears in predictions) vs Archived (reporting only)
 - **Project Detail page** - Per-project Report + Settings tabs, stat cards, "where the time went" bars, and a CSS swimlane timeline
-- **Tag system** - Use #hashtags anywhere in descriptions; tags can be organized into groups
+- **Tag system** - Tags are predicted from your wording (tag name or seeded keywords) and editable on review; tags can be organized into groups
 - **Flexible filtering** - Reports by date range, client, project, tags, billable status
 - **Charts** - Hours-by-day volume chart with billable/non-billable/internal encoding
 - **Log history** - Chronological archive of all daily logs

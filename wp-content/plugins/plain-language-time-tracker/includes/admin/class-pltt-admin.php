@@ -384,6 +384,13 @@ class PLTT_Admin {
 					'error'      => __( 'Error', 'plain-language-time-tracker' ),
 					'confirm'    => __( 'Are you sure?', 'plain-language-time-tracker' ),
 					'processing' => __( 'Processing...', 'plain-language-time-tracker' ),
+					// Status-column badges rebuilt client-side when the billable
+					// toggle flips. Must match pltt_render_entry_table()'s markup in
+					// includes/helpers.php — the two states a toggleable row can reach.
+					'statusUnbilled'          => __( 'Unbilled', 'plain-language-time-tracker' ),
+					'statusUnbilledTitle'     => __( 'Chargeable — not on a bill record yet', 'plain-language-time-tracker' ),
+					'statusNotCharged'        => __( 'Not charged', 'plain-language-time-tracker' ),
+					'statusNotChargedTitle'   => __( 'Billable was switched off for this entry', 'plain-language-time-tracker' ),
 				),
 				// Strings for the shared project billing-type picker
 				// (assets/js/project-type-picker.js), used by the Projects modal
@@ -407,6 +414,7 @@ class PLTT_Admin {
 					'recurringTitle' => __( 'RECURRING SETTINGS', 'plain-language-time-tracker' ),
 					'hourAllocation' => __( 'Hour Allocation', 'plain-language-time-tracker' ) . ' ',
 					'recurringDesc'  => __( 'Hours included per period. Time within the allocation is covered by the retainer; hours over the plan are billed as overage when you invoice.', 'plain-language-time-tracker' ),
+					'budgetRequired' => __( 'Enter the total fee for this fixed-budget project.', 'plain-language-time-tracker' ),
 				),
 			)
 		);
@@ -583,9 +591,9 @@ class PLTT_Admin {
 			);
 		}
 
-		// Shared date-navigator widget for the Billing history view's filter bar.
-		// (Overview still carries its own copy inside reports.js — OPT-DUP18.)
-		if ( 'time-tracker_page_pltt-invoicing' === $hook ) {
+		// Shared date-navigator widget: the Overview filter bar and the Billing
+		// history filter bar both render templates/partials/date-nav.php.
+		if ( in_array( $hook, array( 'time-tracker_page_pltt-invoicing', 'time-tracker_page_pltt-reports' ), true ) ) {
 			wp_enqueue_script(
 				'pltt-date-nav',
 				PLTT_PLUGIN_URL . 'assets/js/pltt-date-nav.js',
@@ -637,7 +645,7 @@ class PLTT_Admin {
 			wp_enqueue_script(
 				'pltt-reports',
 				PLTT_PLUGIN_URL . 'assets/js/reports.js',
-				array( 'pltt-shared', 'pltt-tag-picker', 'pltt-tooltip' ),
+				array( 'pltt-shared', 'pltt-tag-picker', 'pltt-tooltip', 'pltt-date-nav' ),
 				$version,
 				true
 			);

@@ -71,24 +71,6 @@ $return_to     = $return_to_raw ? wp_validate_redirect( $return_to_raw, '' ) : '
 			<?php if ( $is_today_view ) : ?>
 			<?php endif; ?>
 		</div>
-		<?php
-		// OPT-DUP1: display success/error notices via shared helper. Inside the
-		// header div on purpose — see memory: WordPress JS relocates notices
-		// that are too far from the H1.
-		pltt_render_admin_notices(
-			array(
-				'entries_saved'       => __( 'Entries saved successfully.', 'plain-language-time-tracker' ),
-				'nothing_reprocessed' => __( 'Nothing new to process — every timestamp is already part of a finalized entry.', 'plain-language-time-tracker' ),
-			),
-			array(
-				'invalid_date'     => __( 'Invalid date.', 'plain-language-time-tracker' ),
-				'no_entries'       => __( 'No entries to save.', 'plain-language-time-tracker' ),
-				'save_failed'      => __( 'Failed to save entries.', 'plain-language-time-tracker' ),
-				'too_many_entries' => __( 'Too many entries in one save (max 200).', 'plain-language-time-tracker' ),
-			)
-		);
-		?>
-
 	<?php // Date nav sits in the header (top-right), where the Today · History toggle used to be. ?>
 	<div class="pltt-daily-log-nav pltt-daily-log-nav-row">
 			<div class="pltt-date-nav pltt-date-nav-single"
@@ -124,6 +106,25 @@ $return_to     = $return_to_raw ? wp_validate_redirect( $return_to_raw, '' ) : '
 		</div>
 	</div>
 
+	<?php
+	// The H1 is nested in the light header, so notices need a landing spot —
+	// see pltt_header_end(). Rendered here too, so the server-side position
+	// matches where WordPress relocates them.
+	pltt_header_end();
+	pltt_render_admin_notices(
+		array(
+			'entries_saved'       => __( 'Entries saved successfully.', 'plain-language-time-tracker' ),
+			'nothing_reprocessed' => __( 'Nothing new to process — every timestamp is already part of a finalized entry.', 'plain-language-time-tracker' ),
+		),
+		array(
+			'invalid_date'     => __( 'Invalid date.', 'plain-language-time-tracker' ),
+			'no_entries'       => __( 'No entries to save.', 'plain-language-time-tracker' ),
+			'save_failed'      => __( 'Failed to save entries.', 'plain-language-time-tracker' ),
+			'too_many_entries' => __( 'Too many entries in one save (max 200).', 'plain-language-time-tracker' ),
+		)
+	);
+	?>
+
 	<?php if ( $return_to ) : ?>
 		<p class="pltt-back-link">
 			<a href="<?php echo esc_url( $return_to ); ?>">&larr; <?php esc_html_e( 'Back to Reports', 'plain-language-time-tracker' ); ?></a>
@@ -134,14 +135,13 @@ $return_to     = $return_to_raw ? wp_validate_redirect( $return_to_raw, '' ) : '
 		<textarea
 			id="pltt-log-textarea"
 			class="pltt-log-textarea"
-			placeholder="<?php esc_attr_e( "Type @ to insert the current time...\n\nExample:\n@9:15am - Email catchup\n@10:30am - Client meeting #meeting\n@12:00pm - done", 'plain-language-time-tracker' ); ?>"
+			placeholder="<?php esc_attr_e( "Type @ to insert the current time...\n\nExample:\n@9:15am - Email catchup\n@10:30am - Client meeting\n@12:00pm - done", 'plain-language-time-tracker' ); ?>"
 		><?php echo esc_textarea( $content ); ?></textarea>
 
 		<div class="pltt-log-footer">
 			<div class="pltt-log-hint">
 				<p>
 					<code>@</code> <?php esc_html_e( 'Insert timestamp', 'plain-language-time-tracker' ); ?> &nbsp;|&nbsp;
-					<code>#tag</code> <?php esc_html_e( 'Add tags', 'plain-language-time-tracker' ); ?> &nbsp;|&nbsp;
 					<code>done</code> <?php esc_html_e( 'End current task', 'plain-language-time-tracker' ); ?>
 				</p>
 			</div>

@@ -36,129 +36,6 @@
 	font-weight: 500;
 }
 
-/* ---- In-card billing section (Reports single-project card) ---- */
-.pltt-pcc-billing {
-	margin-top: 16px;
-	padding-top: 16px;
-	border-top: 1px solid #e0e0e0;
-}
-
-/* Standalone billing card — sits to the LEFT of the info card on the Reports
-   single-project detailed view (moved out of the info card). It's a summary
-   .card, so it inherits bg/border/padding/radius. */
-.pltt-summary-cards .card.pltt-project-billing-card {
-	min-width: 230px;
-	max-width: 300px;
-	gap: 12px;
-	justify-content: flex-start;
-}
-/* Inner scope block: drop its own box entirely (the panel .card frames it) —
-   no accent line for now. */
-.pltt-project-billing-card .pltt-bill-card {
-	border: 0;
-	border-radius: 0;
-	padding: 0;
-	background: transparent;
-}
-
-/* Group the info card + billing card as one "identity / intention" set, spaced
-   apart from the report metric cards that follow it. */
-.pltt-project-summary-group {
-	display: flex;
-	gap: 20px;
-	align-items: stretch;
-	flex-wrap: nowrap;   /* keep billing + info side by side… */
-	flex-shrink: 0;      /* …and wrap the whole group to its own row if space is tight */
-	/* Push the group to the far right on desktop; metrics stay tight-left. */
-	margin-left: auto;
-}
-
-
-.pltt-pcc-bill-scope + .pltt-pcc-bill-scope {
-	margin-top: 12px;
-	padding-top: 12px;
-	border-top: 1px solid #f0f0f1;
-}
-
-/* Label + amount share one line; the button drops to its own line below. */
-.pltt-pcc-bill-head {
-	display: flex;
-	align-items: baseline;
-	justify-content: space-between;
-	gap: 12px;
-	margin-bottom: 8px;
-}
-
-.pltt-pcc-bill-label {
-	font-size: 13px;
-	font-weight: 600;
-}
-
-.pltt-pcc-bill-amount {
-	font-size: 15px;
-	font-weight: 700;
-}
-
-.pltt-pcc-billing-caughtup {
-	display: flex;
-	align-items: center;
-	gap: 6px;
-	margin: 0;
-	color: #50575e;
-	font-size: 13px;
-}
-
-.pltt-pcc-billing-caughtup .dashicons {
-	color: #2a8a43;
-	font-size: 18px;
-	width: 18px;
-	height: 18px;
-}
-
-/* Settled state: the shown retainer period has a committed record. */
-.pltt-pcc-bill-billed {
-	display: flex;
-	align-items: center;
-	gap: 6px;
-	margin: 0;
-	color: var(--pltt-success, #2f9e63);
-	font-size: 14px;
-	font-weight: 600;
-}
-
-.pltt-pcc-bill-billed .dashicons {
-	font-size: 18px;
-	width: 18px;
-	height: 18px;
-}
-
-/* Backlog: outstanding billable work outside the current filter range. */
-.pltt-pcc-billing-backlog {
-	display: flex;
-	align-items: flex-start;
-	gap: 6px;
-	margin: 12px 0 0;
-	color: #50575e;
-	font-size: 13px;
-}
-
-.pltt-pcc-billing-backlog .dashicons {
-	color: #996800; /* amber — worth noticing, not an error */
-	font-size: 18px;
-	width: 18px;
-	height: 18px;
-	flex-shrink: 0;
-}
-
-.pltt-pcc-billing-backlog a {
-	white-space: nowrap;
-}
-
-.pltt-pcc-billing-history-link {
-	margin: 12px 0 0;
-	font-size: 13px;
-}
-
 /* ---- Billing surface card ---- */
 .pltt-billing-card {
 	max-width: 720px;
@@ -1080,4 +957,25 @@
 	background: #135e96;
 	border-color: #135e96;
 	color: #fff;
+}
+
+/* Cancel: quiet text action to the left of the two buttons, matching the modal's
+   .pltt-billing-cancel treatment on the dark bar. Not a third button — leaving
+   the mode shouldn't compete with the two actions that do something. The extra
+   right margin keeps it off "Line items…" so it reads as its own thing. */
+.pltt-billsel-cancel {
+	margin-right: 4px;
+	color: rgba(255, 255, 255, 0.72);
+	font-size: 13px;
+	text-decoration: none;
+}
+.pltt-billsel-cancel:hover,
+.pltt-billsel-cancel:focus {
+	color: #fff;
+	text-decoration: underline;
+}
+.pltt-billsel-cancel:focus-visible {
+	outline: 2px solid #fff;
+	outline-offset: 2px;
+	border-radius: 2px;
 }

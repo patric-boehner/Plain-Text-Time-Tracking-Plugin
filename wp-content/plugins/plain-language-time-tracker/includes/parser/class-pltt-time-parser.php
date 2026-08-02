@@ -83,7 +83,7 @@ class PLTT_Time_Parser {
 				'end_time'    => self::normalize_time( $matches[2] ),
 				'raw_text'    => $line,
 				'description' => self::clean_description( $matches[3] ),
-				'tags'        => implode( ',', pltt_extract_tags( $matches[3] ) ),
+				'tags'        => '',
 				'is_end'      => false,
 			);
 		}
@@ -101,7 +101,7 @@ class PLTT_Time_Parser {
 				'end_time'    => null,
 				'raw_text'    => $line,
 				'description' => $is_end ? '' : self::clean_description( $description ),
-				'tags'        => $is_end ? '' : implode( ',', pltt_extract_tags( $description ) ),
+				'tags'        => '',
 				'is_end'      => $is_end,
 			);
 		}
@@ -177,19 +177,15 @@ class PLTT_Time_Parser {
 	/**
 	 * Clean description text.
 	 *
-	 * Removes hashtags and extra whitespace.
+	 * Normalizes whitespace. The description is kept verbatim otherwise — tags
+	 * come from prediction (literal tag names + seeded keywords), not from
+	 * markup in the log.
 	 *
 	 * @param string $description Raw description.
 	 * @return string Cleaned description.
 	 */
 	private static function clean_description( $description ) {
-		// Remove hashtags.
-		$clean = pltt_remove_tags( $description );
-
-		// Normalize whitespace.
-		$clean = preg_replace( '/\s+/', ' ', $clean );
-
-		return trim( $clean );
+		return trim( preg_replace( '/\s+/', ' ', $description ) );
 	}
 
 	/**
@@ -315,8 +311,7 @@ class PLTT_Time_Parser {
 			}
 
 			// Tags: pre-fill from (a) a tag's own name appearing literally in the
-			// text and (b) seeded keyword->tag matches, merged with any hashtag
-			// tags and de-duped case-insensitively.
+			// text and (b) seeded keyword->tag matches, de-duped case-insensitively.
 			$candidate_tag_names = array();
 			foreach ( $literal_tag_names as $literal_name ) {
 				if ( preg_match( '/\b' . preg_quote( $literal_name, '/' ) . '\b/i', $text ) ) {
@@ -331,8 +326,8 @@ class PLTT_Time_Parser {
 			}
 
 			if ( ! empty( $candidate_tag_names ) ) {
-				$tags     = array_filter( array_map( 'trim', explode( ',', $entry['tags'] ?? '' ) ) );
-				$tags_low = array_map( 'strtolower', $tags );
+				$tags     = array();
+				$tags_low = array();
 				foreach ( $candidate_tag_names as $name ) {
 					if ( ! in_array( strtolower( $name ), $tags_low, true ) ) {
 						$tags[]     = $name;

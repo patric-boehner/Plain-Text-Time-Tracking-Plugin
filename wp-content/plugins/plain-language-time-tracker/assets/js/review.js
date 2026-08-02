@@ -620,6 +620,14 @@
 				return;
 			}
 
+			const typeError = window.PlttProjectType ? PlttProjectType.validate() : '';
+			if ( typeError ) {
+				alert( typeError );
+				const feeInput = document.getElementById( 'pltt-project-budget-fee' );
+				if ( feeInput ) { feeInput.focus(); }
+				return;
+			}
+
 			this.disabled = true;
 
 			PLTT.ajax( 'pltt_create_project', {
@@ -1451,6 +1459,14 @@
 			if ( ! name ) {
 				alert( 'Please enter a project name.' );
 				nameInput.focus();
+				return;
+			}
+
+			const typeError = window.PlttProjectType ? PlttProjectType.validate() : '';
+			if ( typeError ) {
+				alert( typeError );
+				const feeInput = document.getElementById( 'pltt-project-budget-fee' );
+				if ( feeInput ) { feeInput.focus(); }
 				return;
 			}
 

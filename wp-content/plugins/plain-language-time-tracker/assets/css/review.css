@@ -320,10 +320,26 @@
 	background-color: var(--pltt-bg-highlight); /* match the open-form blue tint below */
 }
 
+/* Same flex row the Overview list uses (.pltt-entry-meta in reports.css), so the
+   bullet sits the same distance from the client and the project on both screens.
+   As flex items the separator's own leading/trailing spaces are trimmed and the
+   6px gap alone sets the spacing — inline, they'd be a narrower ~3.5px instead. */
 .pltt-entries-table .pltt-entry-compact .pltt-entry-meta {
 	/* font-size: 12px; */
 	color: var(--pltt-text-subtle);
 	margin-top: 2px;
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 6px;
+}
+
+/* Client name in admin blue so the eye finds "whose work is this" without
+   reading the line. Same treatment the Overview entry list gives it
+   (.pltt-date-group .pltt-entry-client in reports.css); the project name stays
+   subtle there and here, so the two stay tellable apart. */
+.pltt-entries-table .pltt-entry-compact .pltt-entry-meta .pltt-entry-client {
+	color: var(--pltt-primary);
 }
 
 .pltt-entries-table .pltt-entry-compact .pltt-entry-meta-sep {

@@ -42,6 +42,13 @@ $client = isset( $project->client_id ) ? PLTT_Clients::get( (int) $project->clie
 		</div>
 	</div>
 
+	<?php
+	// The H1 is nested in .pltt-detail-title, alongside the billing-type badge —
+	// see pltt_header_end(). Without this, the empty-state notice below gets
+	// pulled out of the content and dropped into that badge row.
+	pltt_header_end();
+	?>
+
 	<?php if ( ! $scope ) : ?>
 		<div class="notice notice-info pltt-billing-empty">
 			<p><?php esc_html_e( 'Nothing is outstanding to bill for this project right now.', 'plain-language-time-tracker' ); ?></p>

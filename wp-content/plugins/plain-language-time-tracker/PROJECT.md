@@ -42,7 +42,7 @@ Two-column admin screen for managing clients and projects. Add, edit, or delete 
 Projects can be Active (appear in predictions) or Archived (excluded from predictions, retained for reporting). Archived projects show "(Archived)" label in dropdowns when editing old entries.
 
 ### Tag System
-Use hashtags anywhere in descriptions (`#dev #wordpress #urgent`). Tags are extracted automatically during parsing. Searchable and filterable. Tags are optional metadata, not part of the prediction system.
+Tags are pre-filled during parsing: a tag whose own name appears in the description, plus any seeded keyword→tag matches (`pltt_tag_aliases`). Nothing is typed into the log to tag an entry — the pre-fill is a suggestion you accept or change on review. Searchable and filterable. Tags are optional metadata, and don't feed client/project prediction.
 
 ### Review & Verify Workflow
 Processed entries appear in a structured table with time ranges, durations, client/project dropdowns, and tag inputs. Inline editing with WordPress-native Edit/Update/Cancel pattern. Confidence indicators show prediction certainty.

@@ -1,9 +1,8 @@
 {
   "permissions": {
+    "defaultMode": "acceptEdits",
     "allow": [
-      "Read(//Users/patrickb/Local Development/plain-text-time-tracker/templates/**)",
-      "Read(//Users/patrickb/Local\\\\ Development/plain-text-time-tracker/app/public/wp-content/plugins/plain-language-time-tracker/templates/**)",
-      "Read(//Users/patrickb/Local\\\\ Development/plain-text-time-tracker/app/public/wp-content/plugins/plain-language-time-tracker/assets/js/**)",
+      "Read(//Users/patrickb/Local Development/plain-text-time-tracker/**)",
       "WebSearch",
       "Bash(wp option get *)",
       "Bash(wp post list *)",
@@ -13,6 +12,21 @@
       "Bash(wp core version)",
       "Bash(npm list *)",
       "Bash(pdftotext *)"
+    ],
+    "deny": [
+      "Bash(wp option update *)",
+      "Bash(wp option delete *)",
+      "Bash(wp post update *)",
+      "Bash(wp post delete *)",
+      "Bash(wp plugin activate *)",
+      "Bash(wp plugin deactivate *)",
+      "Bash(wp theme activate *)",
+      "Bash(wp db import *)",
+      "Bash(wp db export *)",
+      "Bash(npm install *)",
+      "Bash(npm uninstall *)",
+      "Bash(npm run build *)",
+      "Bash(npm run deploy *)"
     ]
   }
 }

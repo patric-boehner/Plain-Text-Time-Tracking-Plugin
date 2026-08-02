@@ -55,6 +55,9 @@ $history_url  = add_query_arg( array( 'page' => 'pltt-invoicing', 'view' => 'his
 	</div>
 
 	<?php
+	// The H1 is nested in the light header — see pltt_header_end().
+	pltt_header_end();
+
 	if ( 'history' === $view ) {
 		include PLTT_PLUGIN_DIR . 'templates/partials/billing-history.php';
 	} else {

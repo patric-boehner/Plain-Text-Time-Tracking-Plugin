@@ -136,6 +136,11 @@
 	padding: 20px 24px 18px;
 	border-bottom: 1px solid var(--pltt-rule-2);
 }
+/* Nothing logged in range → no figure row, so the hairline would rule off an
+   empty space. The identity lines are the whole block in that case. */
+.pltt-scope-block .pltt-scope-id:last-child {
+	border-bottom: 0;
+}
 .pltt-scope-block .pltt-scope-titlerow {
 	display: flex;
 	align-items: center;
