@@ -1381,8 +1381,19 @@ fieldset.pltt-date-nav-custom-inputs input[type="date"] {
 	line-height: 1.5;
 }
 
+/* Name plus its type badge. Wider than the bare name needed, so the figures
+   still line up once the badge is in. The badge keeps its own baseline rather
+   than the row's, or it rides high next to the text. */
 .pltt-consumption-project {
-	min-width: 16em;
+	min-width: 22em;
+	display: inline-flex;
+	align-items: center;
+	flex-wrap: wrap;
+	gap: 6px;
+}
+
+.pltt-consumption-project .pltt-badge {
+	flex: none;
 }
 
 .pltt-consumption-figure {
