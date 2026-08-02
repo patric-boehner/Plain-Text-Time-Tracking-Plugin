@@ -23,10 +23,20 @@ in the follow-up commit; `b92df00` still has it if it is ever wanted back.
 After a save, if that day's work took a project **to or past** its ceiling:
 
 ```
-This day's work took one project to its ceiling
+This day's work reached one project's ceiling
 
-  Democrats of Rossmoor · Website Care Plan Time    3.2 of 3h    8 days in
+  Democrats of Rossmoor · Website Care Plan Time  [Monthly]        3.2 of 3h   8 days in
+  Behind The Scenes Adventures · Registration Form  [Fixed Budget]  5.4 of 5h
 ```
+
+"Reached" covers landing exactly on the ceiling and going past it. Real
+durations almost never land exactly — across 139 days of the dev database, not
+once — so a separate "went past" variant would be the only one anyone ever saw.
+
+The type badge comes from `pltt_render_billing_type_badge()`, the same helper
+Projects and Billing use, so it reads identically wherever it appears. Only
+Monthly and Fixed Budget can reach this list; the other two types have no
+ceiling. Both variants are exercised by real data (10 monthly, 5 fixed).
 
 Retainers get the period fragment; fixed budgets are cumulative and omit it.
 Hourly, internal, and retainers with a deliberately empty allocation (S3NSE's

@@ -3407,12 +3407,15 @@ function pltt_render_consumption_notice( $date ) {
 	<div class="notice notice-warning inline is-dismissible pltt-consumption-notice">
 		<p class="pltt-consumption-notice-head">
 			<?php
+			// "Reached" covers landing exactly on the ceiling and going past it.
+			// Real durations almost never land exactly, so a separate
+			// "went past" variant would be the only one anyone ever saw.
 			echo esc_html(
 				sprintf(
-					/* translators: %d: number of projects taken to or past their ceiling */
+					/* translators: %d: number of projects whose ceiling was reached */
 					_n(
-						"This day's work took one project to its ceiling",
-						"This day's work took %d projects to their ceilings",
+						"This day's work reached one project's ceiling",
+						"This day's work reached %d projects' ceilings",
 						count( $alerts ),
 						'plain-language-time-tracker'
 					),
@@ -3430,7 +3433,16 @@ function pltt_render_consumption_notice( $date ) {
 					: $alert['project']->name;
 				?>
 				<li>
-					<span class="pltt-consumption-project"><?php echo esc_html( $label ); ?></span>
+					<span class="pltt-consumption-project">
+						<?php echo esc_html( $label ); ?>
+						<?php
+						// The type badge explains why there is a ceiling here at
+						// all, and reads the same as it does on Projects and
+						// Billing. Only Monthly and Fixed Budget can reach this
+						// list — the other two types have no ceiling.
+						pltt_render_billing_type_badge( $c['type'] );
+						?>
+					</span>
 					<span class="pltt-consumption-figure">
 						<?php
 						echo esc_html(
