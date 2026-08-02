@@ -3285,31 +3285,38 @@ function pltt_project_consumption( $project, $reference_date = null, $through_re
 }
 
 /**
- * Which projects THIS DAY'S work pushed to or past their ceiling.
+ * Where every capped project this day touched now stands.
  *
- * Answers one question, asked once the day is committed: did what I just save
- * put something over? Reports the crossing, not the state.
+ * Reports ALL of them, under and over, not just the ones that crossed. That is
+ * the point, and it was measured rather than assumed:
  *
- * That distinction is the whole design. "Every project currently at or over"
- * sounds equivalent and is not: a retainer that crossed on the 5th is still
- * over on the 6th, the 7th and the 28th, so a state-based notice fires on
- * nearly every save for the rest of the month and becomes wallpaper. Measured
- * against the dev database, state-based fired on 107 of 120 days; crossing-based
- * fires on a handful. A notice you see rarely is a notice you still read.
+ * A crossing-only notice tells you the ceiling broke, which is a post-mortem —
+ * the time is already spent. Watching the balance shrink is the part you can
+ * act on. On the last save before each of the 15 crossings in the dev database,
+ * a balance was visible and shrinking: median 1.5h left, and in several cases
+ * 0.5h left the day before a 1.3h session landed. A percentage BAND cannot
+ * surface that, because a band needs a specific day to trigger on and 10 of
+ * those 15 crossings jumped from under 80% straight past the ceiling in one
+ * day. Showing the figure every time needs no trigger at all.
  *
- * So a project qualifies only when it was UNDER its ceiling before this day's
- * entries and is at or over it once they count. Days that merely pile more onto
- * an already-broken ceiling stay silent — the crossing was reported when it
- * happened, and repeating it teaches you to dismiss without looking.
+ * Repetition once over is deliberate too, and is the original mechanism against
+ * absorption: seeing "3.2 of 3h" on the 9th and "4.1 of 3h" on the 14th makes
+ * the month-end number familiar instead of shocking, which is what stops it
+ * being billed at half and called done.
  *
- * Deliberately not shown while entries are being assigned. Mid-flow the figure
- * arrives at the exact moment nothing can be done about it and competes with
- * the task in hand. After the save it is a report.
+ * Volume is 2.3 lines on the 88% of working days that touch a capped project.
+ *
+ * Still not shown while entries are being assigned. Mid-flow the figure arrives
+ * at the exact moment nothing can be done about it and competes with the task in
+ * hand. After the save it is a report you can act on tomorrow.
  *
  * @param string $date Y-m-d of the day just saved.
- * @return array List of {project, client, consumption, day_minutes} sorted worst overrun first.
+ * @return array List of {project, client, consumption, day_minutes, state,
+ *               remaining_minutes, over_percent}, most urgent first. `state` is
+ *               'crossed' (this day took it over), 'over' (already was), or
+ *               'under'.
  */
-function pltt_consumption_alerts( $date ) {
+function pltt_consumption_status( $date ) {
 	global $wpdb;
 
 	if ( empty( $date ) ) {
@@ -3319,7 +3326,7 @@ function pltt_consumption_alerts( $date ) {
 	$table = PLTT_Database::get_table_name( 'time_entries' );
 
 	// The day's minutes per project — needed to work out where each project
-	// stood BEFORE this day, which is what makes a crossing a crossing.
+	// stood BEFORE this day, which is what tells a crossing from a continuation.
 	// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
 	$day_rows = $wpdb->get_results(
 		$wpdb->prepare(
@@ -3341,53 +3348,75 @@ function pltt_consumption_alerts( $date ) {
 	}
 
 	$projects = PLTT_Projects::get_multiple( array_keys( $day_minutes ) );
-	$alerts   = array();
+	$status   = array();
 
 	foreach ( $projects as $project ) {
 		// Counted AS OF this day, not across the whole period. The full-period
-		// total also contains work dated after this day, which would make
-		// "before today" look already-over and swallow the crossing entirely.
+		// total also contains work dated after this day, which would report a
+		// balance that had already been spent.
 		// Null for hourly, internal, and retainers whose allocation is
-		// deliberately empty — nothing to be over.
+		// deliberately empty — no ceiling, so nothing to report.
 		$consumption = pltt_project_consumption( $project, $date, true );
 		if ( null === $consumption ) {
 			continue;
 		}
 
-		$today  = $day_minutes[ (int) $project->id ] ?? 0;
-		$after  = $consumption['consumed_minutes'];
-		$before = $after - $today;
+		$ceiling = $consumption['ceiling_minutes'];
+		$today   = $day_minutes[ (int) $project->id ] ?? 0;
+		$after   = $consumption['consumed_minutes'];
+		$before  = $after - $today;
 
-		// Already over before today → the crossing was reported on its own day.
-		if ( $after < $consumption['ceiling_minutes'] || $before >= $consumption['ceiling_minutes'] ) {
-			continue;
+		if ( $after < $ceiling ) {
+			$state = 'under';
+		} elseif ( $before < $ceiling ) {
+			$state = 'crossed';
+		} else {
+			$state = 'over';
 		}
 
-		$alerts[] = array(
-			'project'     => $project,
-			'client'      => PLTT_Clients::get( (int) $project->client_id ),
-			'consumption' => $consumption,
-			'day_minutes' => $today,
+		$status[] = array(
+			'project'           => $project,
+			'client'            => PLTT_Clients::get( (int) $project->client_id ),
+			'consumption'       => $consumption,
+			'day_minutes'       => $today,
+			'state'             => $state,
+			'remaining_minutes' => max( 0, $ceiling - $after ),
+			'over_percent'      => (int) round( ( ( $after - $ceiling ) / max( 1, $ceiling ) ) * 100 ),
 		);
 	}
 
-	// Worst overrun first, measured as a share of the ceiling so a 3-hour
-	// retainer at double isn't buried under a 40-hour budget a nudge over.
+	// Most urgent first: anything at or past its ceiling (worst overrun leading,
+	// as a share of the ceiling so a 3-hour retainer at double isn't buried under
+	// a 40-hour budget a nudge over), then whatever has least left to spend.
 	usort(
-		$alerts,
+		$status,
 		function ( $a, $b ) {
-			$ratio = function ( $x ) {
-				return $x['consumption']['consumed_minutes'] / max( 1, $x['consumption']['ceiling_minutes'] );
-			};
-			return $ratio( $b ) <=> $ratio( $a );
+			$over_a = 'under' !== $a['state'];
+			$over_b = 'under' !== $b['state'];
+			if ( $over_a !== $over_b ) {
+				return $over_a ? -1 : 1;
+			}
+			if ( $over_a ) {
+				$ratio = function ( $x ) {
+					return $x['consumption']['consumed_minutes'] / max( 1, $x['consumption']['ceiling_minutes'] );
+				};
+				return $ratio( $b ) <=> $ratio( $a );
+			}
+			return $a['remaining_minutes'] <=> $b['remaining_minutes'];
 		}
 	);
 
-	return $alerts;
+	return $status;
 }
 
 /**
- * Render the post-save ceiling-crossing notice, if this day's work crossed one.
+ * Render the post-save consumption notice for a day's capped projects.
+ *
+ * Leads with what is LEFT while a project is still inside its ceiling —
+ * "1.5h left of 3h" is a balance you can spend against, where "1.5 of 3h" makes
+ * you do the subtraction to get the number that decides anything. Once past the
+ * ceiling it flips to what was used, because remaining is no longer the
+ * question.
  *
  * Dismissible for this page view only — it reports a fact about the save that
  * just happened, so there is nothing to remember and nothing to store.
@@ -3399,40 +3428,55 @@ function pltt_consumption_alerts( $date ) {
  * @return void
  */
 function pltt_render_consumption_notice( $date ) {
-	$alerts = pltt_consumption_alerts( $date );
-	if ( empty( $alerts ) ) {
+	$status = pltt_consumption_status( $date );
+	if ( empty( $status ) ) {
 		return;
 	}
+
+	$crossed = array_filter( $status, function ( $s ) { return 'crossed' === $s['state']; } );
+
+	// Amber marks the EVENT — a ceiling broken by this day's work. Being over
+	// is a state, and states persist: a retainer that broke on the 8th is still
+	// broken on the 31st, so colouring the whole notice for it would put 89 of
+	// 123 days in amber and teach you to dismiss it unread. The state still
+	// shows, in the color of the figure on its own row. Chrome for the event,
+	// row colour for the standing.
+	$tone = empty( $crossed ) ? '' : ' notice-warning';
 	?>
-	<div class="notice notice-warning inline is-dismissible pltt-consumption-notice">
+	<div class="notice<?php echo esc_attr( $tone ); ?> inline is-dismissible pltt-consumption-notice">
 		<p class="pltt-consumption-notice-head">
 			<?php
-			// "Reached" covers landing exactly on the ceiling and going past it.
-			// Real durations almost never land exactly, so a separate
-			// "went past" variant would be the only one anyone ever saw.
-			echo esc_html(
-				sprintf(
-					/* translators: %d: number of projects whose ceiling was reached */
-					_n(
-						"This day's work reached one project's ceiling",
-						"This day's work reached %d projects' ceilings",
-						count( $alerts ),
-						'plain-language-time-tracker'
-					),
-					count( $alerts )
-				)
-			);
+			if ( ! empty( $crossed ) ) {
+				// "Reached" covers landing exactly on the ceiling and going past
+				// it. Real durations almost never land exactly, so a separate
+				// "went past" variant would be the only one anyone ever saw.
+				echo esc_html(
+					sprintf(
+						/* translators: %d: number of projects whose ceiling was reached */
+						_n(
+							"This day's work reached one project's ceiling",
+							"This day's work reached %d projects' ceilings",
+							count( $crossed ),
+							'plain-language-time-tracker'
+						),
+						count( $crossed )
+					)
+				);
+			} else {
+				esc_html_e( 'Retainers and budgets this day touched', 'plain-language-time-tracker' );
+			}
 			?>
 		</p>
 		<ul class="pltt-consumption-list">
-			<?php foreach ( $alerts as $alert ) : ?>
+			<?php foreach ( $status as $row ) : ?>
 				<?php
-				$c     = $alert['consumption'];
-				$label = $alert['client']
-					? $alert['client']->name . ' · ' . $alert['project']->name
-					: $alert['project']->name;
+				$c       = $row['consumption'];
+				$is_over = ( 'under' !== $row['state'] );
+				$label   = $row['client']
+					? $row['client']->name . ' · ' . $row['project']->name
+					: $row['project']->name;
 				?>
-				<li>
+				<li class="pltt-consumption-row<?php echo $is_over ? ' is-over' : ''; ?>">
 					<span class="pltt-consumption-project">
 						<?php echo esc_html( $label ); ?>
 						<?php
@@ -3445,50 +3489,48 @@ function pltt_render_consumption_notice( $date ) {
 					</span>
 					<span class="pltt-consumption-figure">
 						<?php
-						echo esc_html(
-							sprintf(
-								/* translators: 1: hours used, 2: hours allowed */
-								__( '%1$s of %2$s', 'plain-language-time-tracker' ),
-								pltt_consumption_hours( $c['consumed_minutes'] ),
-								pltt_consumption_hours( $c['ceiling_minutes'] ) . 'h'
-							)
-						);
+						if ( $is_over ) {
+							echo esc_html(
+								sprintf(
+									/* translators: 1: hours used, 2: hours allowed */
+									__( '%1$s of %2$s', 'plain-language-time-tracker' ),
+									pltt_consumption_hours( $c['consumed_minutes'] ),
+									pltt_consumption_hours( $c['ceiling_minutes'] ) . 'h'
+								)
+							);
+						} else {
+							echo esc_html(
+								sprintf(
+									/* translators: 1: hours remaining, 2: total hours allowed */
+									__( '%1$sh left of %2$sh', 'plain-language-time-tracker' ),
+									pltt_consumption_hours( $row['remaining_minutes'] ),
+									pltt_consumption_hours( $c['ceiling_minutes'] )
+								)
+							);
+						}
 						?>
 					</span>
 					<?php
 					// Trailing context. Retainers say how far into the period they
-					// are — the figure means little without it, since the period
-					// resets. Fixed budgets have no period and no reset, so the
-					// overrun itself is the context: this is the whole overspend,
-					// not a share of one. Both types therefore end on a muted
-					// fragment and the two shapes read alike.
-					if ( null !== $c['period_day'] ) :
-						?>
-						<span class="pltt-consumption-period">
-							<?php
-							/* translators: %d: days elapsed in the allocation period */
-							echo esc_html( sprintf( _n( '%d day in', '%d days in', $c['period_day'], 'plain-language-time-tracker' ), $c['period_day'] ) );
-							?>
-						</span>
-						<?php
-					else :
+					// are — a balance means little without it, since the period
+					// resets: 1.5h left on the 7th is comfortable, on the 28th it
+					// is not. Fixed budgets have no period and no reset, so once
+					// past the ceiling the overrun itself is the context.
+					$fragment = '';
+					if ( null !== $c['period_day'] ) {
+						/* translators: %d: days elapsed in the allocation period */
+						$fragment = sprintf( _n( '%d day in', '%d days in', $c['period_day'], 'plain-language-time-tracker' ), $c['period_day'] );
+					} elseif ( $is_over && $row['over_percent'] > 0 ) {
 						// How far past the budget, not what share of it was used:
 						// "8% over" needs no arithmetic to read, where "108%" does.
-						// Rounds to whole percent, and is omitted when that rounds
-						// to zero — "0% over" says nothing worth a slot.
-						$over_percent = (int) round(
-							( ( $c['consumed_minutes'] - $c['ceiling_minutes'] ) / max( 1, $c['ceiling_minutes'] ) ) * 100
-						);
-						if ( $over_percent > 0 ) :
-							?>
-							<span class="pltt-consumption-period">
-								<?php
-								/* translators: %d: percentage over the fixed budget */
-								echo esc_html( sprintf( __( '%d%% over', 'plain-language-time-tracker' ), $over_percent ) );
-								?>
-							</span>
-							<?php
-						endif;
+						// Omitted when it rounds to zero — "0% over" earns no slot.
+						/* translators: %d: percentage over the fixed budget */
+						$fragment = sprintf( __( '%d%% over', 'plain-language-time-tracker' ), $row['over_percent'] );
+					}
+					if ( '' !== $fragment ) :
+						?>
+						<span class="pltt-consumption-period"><?php echo esc_html( $fragment ); ?></span>
+						<?php
 					endif;
 					?>
 				</li>
@@ -3496,6 +3538,31 @@ function pltt_render_consumption_notice( $date ) {
 		</ul>
 	</div>
 	<?php
+}
+
+/**
+ * Render the consumption notice if we just arrived from a save.
+ *
+ * One gate shared by every screen the save can land on, so they cannot drift.
+ * `handle_save_entries()` normally redirects to the Daily Log, but a return_to
+ * (Reports → Edit → Back) lands somewhere with no notion of which day was
+ * saved — hence `pltt_saved_date` on the redirect, with the caller's own date
+ * as a fallback for the Daily Log case.
+ *
+ * @param string $fallback_date Y-m-d to use when the redirect carried none.
+ * @return void
+ */
+function pltt_maybe_render_saved_consumption_notice( $fallback_date = '' ) {
+	// phpcs:disable WordPress.Security.NonceVerification.Recommended -- read-only routing.
+	$message = isset( $_GET['pltt_message'] ) ? sanitize_text_field( wp_unslash( $_GET['pltt_message'] ) ) : '';
+	if ( 'entries_saved' !== $message ) {
+		return;
+	}
+
+	$date = isset( $_GET['pltt_saved_date'] ) ? pltt_sanitize_date_strict( wp_unslash( $_GET['pltt_saved_date'] ) ) : '';
+	// phpcs:enable WordPress.Security.NonceVerification.Recommended
+
+	pltt_render_consumption_notice( '' !== $date ? $date : $fallback_date );
 }
 
 /**

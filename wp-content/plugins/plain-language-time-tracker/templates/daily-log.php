@@ -200,14 +200,11 @@ $return_to     = $return_to_raw ? wp_validate_redirect( $return_to_raw, '' ) : '
 			</div>
 
 			<?php
-			// Ceilings reached by the day that was just committed. Only after a
-			// save — mid-flow this figure competes with the task in hand and lands
-			// exactly when nothing can be done about it. Here it's a report, and
-			// stays silent when the day stayed inside every ceiling.
-			// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only routing.
-			if ( isset( $_GET['pltt_message'] ) && 'entries_saved' === sanitize_text_field( wp_unslash( $_GET['pltt_message'] ) ) ) {
-				pltt_render_consumption_notice( $date );
-			}
+			// Where the day just committed left its retainers and budgets. Only
+			// after a save — mid-flow these figures compete with the task in hand
+			// and land exactly when nothing can be done about them. Here it is a
+			// report, and it stays silent when the day touched nothing capped.
+			pltt_maybe_render_saved_consumption_notice( $date );
 			?>
 
 			<input type="hidden" id="pltt-entry-date" value="<?php echo esc_attr( $date ); ?>">
