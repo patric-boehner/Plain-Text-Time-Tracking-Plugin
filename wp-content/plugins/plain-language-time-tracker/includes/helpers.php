@@ -3157,6 +3157,179 @@ function pltt_billable_flag_applies( $project ) {
 }
 
 /**
+ * How much of a project's ceiling is already used, for the finalize screen.
+ *
+ * Display only — nothing here writes. Returns null whenever the project has no
+ * ceiling to be near, which is the case that matters most:
+ *
+ * - hourly     — no allocation at all.
+ * - internal   — no client, no rate, nothing to overrun.
+ * - recurring with no allocation — a retainer whose hours are tracked but not
+ *   capped. Its empty allocation is deliberate, so it must show NO figure
+ *   rather than "0 of 0". Do not "fix" this by falling back to a zero ceiling.
+ *
+ * The reference date anchors the allocation period, mirroring how
+ * pltt_compute_overage_threshold() uses $filter_args['date_from']. Callers pass
+ * the date being finalized so the figure describes the period that day's work
+ * lands in, not whatever period today happens to sit in.
+ *
+ * Consumption deliberately counts unverified entries too — same as
+ * pltt_compute_overage_threshold(), so the finalize figure and the Overview
+ * figure can't disagree. Captured time is consumed time.
+ *
+ * Results are memoized per (project, reference date): the finalize screen
+ * renders the same project option once per row, and only ceiling-bearing
+ * projects (14 of 49 today) ever reach the query.
+ *
+ * @param object|null $project        Project row.
+ * @param string|null $reference_date Y-m-d anchoring the period; defaults to today.
+ * @return array{
+ *     type: string,
+ *     consumed_minutes: int,
+ *     ceiling_minutes: int,
+ *     period_day: ?int,
+ *     period_days: ?int,
+ * }|null Null when the project has no ceiling.
+ */
+function pltt_project_consumption( $project, $reference_date = null ) {
+	global $wpdb;
+
+	static $cache = array();
+
+	if ( empty( $project ) || empty( $project->id ) ) {
+		return null;
+	}
+
+	if ( empty( $reference_date ) ) {
+		$reference_date = current_time( 'Y-m-d' );
+	}
+
+	$key = (int) $project->id . '|' . $reference_date;
+	if ( array_key_exists( $key, $cache ) ) {
+		return $cache[ $key ];
+	}
+
+	$type = pltt_get_billing_type( $project );
+	if ( 'recurring' !== $type && 'fixed' !== $type ) {
+		$cache[ $key ] = null;
+		return null;
+	}
+
+	// Canonical hours-before-fee cascade — never re-derive the ceiling here.
+	$ceiling = pltt_budgeted_minutes( $project );
+	if ( $ceiling <= 0 ) {
+		$cache[ $key ] = null;
+		return null;
+	}
+
+	// Recurring resets each period; fixed-fee accumulates all-time ([null, null]).
+	list( $period_start, $period_end ) = pltt_get_allocation_period_bounds( $project, $reference_date );
+
+	$table   = PLTT_Database::get_table_name( 'time_entries' );
+	$sql     = "SELECT COALESCE( SUM( duration_minutes ), 0 ) FROM {$table} WHERE project_id = %d";
+	$prepare = array( (int) $project->id );
+	if ( $period_start ) {
+		$sql      .= ' AND entry_date >= %s';
+		$prepare[] = $period_start;
+	}
+	if ( $period_end ) {
+		$sql      .= ' AND entry_date <= %s';
+		$prepare[] = $period_end;
+	}
+
+	// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+	$consumed = (int) $wpdb->get_var( $wpdb->prepare( $sql, $prepare ) );
+
+	$out = array(
+		'type'             => $type,
+		'consumed_minutes' => $consumed,
+		'ceiling_minutes'  => (int) $ceiling,
+		'period_day'       => null,
+		'period_days'      => null,
+	);
+
+	// "5 days in" — only meaningful for a period that resets.
+	if ( $period_start && $period_end ) {
+		$tz = wp_timezone();
+		try {
+			$start = new DateTimeImmutable( $period_start, $tz );
+			$end   = new DateTimeImmutable( $period_end, $tz );
+			$ref   = new DateTimeImmutable( $reference_date, $tz );
+
+			$days = (int) $start->diff( $end )->days + 1;
+			$day  = (int) $start->diff( $ref )->days + 1;
+
+			$out['period_days'] = $days;
+			$out['period_day']  = max( 1, min( $days, $day ) );
+		} catch ( Exception $e ) {
+			// Leave both null — the line just omits the period fragment.
+		}
+	}
+
+	$cache[ $key ] = $out;
+	return $out;
+}
+
+/**
+ * Consumption data attributes for a project `<option>` on the finalize screen.
+ *
+ * Kept in one place so the two templates that render project options can't
+ * drift apart — the same trap that hid the billable-flag bug. Mirrors what the
+ * AJAX endpoints stamp onto project objects and what the four option builders
+ * in assets/js/review.js rebuild client-side; change all of them together.
+ *
+ * `data-ceiling-minutes="0"` is the explicit "no ceiling, render nothing"
+ * signal, so JS never has to distinguish a missing attribute from a real zero.
+ *
+ * All values are integers, so the attribute string needs no further escaping.
+ *
+ * @param object      $project        Project row.
+ * @param string|null $reference_date Y-m-d anchoring the period.
+ * @return string Leading-space-prefixed attribute string.
+ */
+function pltt_consumption_data_attrs( $project, $reference_date = null ) {
+	$consumption = pltt_project_consumption( $project, $reference_date );
+
+	if ( null === $consumption ) {
+		return ' data-ceiling-minutes="0"';
+	}
+
+	$attrs = ' data-ceiling-minutes="' . (int) $consumption['ceiling_minutes'] . '"'
+		. ' data-consumed-minutes="' . (int) $consumption['consumed_minutes'] . '"';
+
+	if ( null !== $consumption['period_day'] ) {
+		$attrs .= ' data-period-day="' . (int) $consumption['period_day'] . '"'
+			. ' data-period-days="' . (int) $consumption['period_days'] . '"';
+	}
+
+	return $attrs;
+}
+
+/**
+ * Stamp consumption values onto a project object for a JSON response.
+ *
+ * Plain integers (0 = no ceiling / not applicable) so the option builders in
+ * review.js need nothing beyond parseInt. Additive: never touches any field the
+ * project already carries.
+ *
+ * @param object      $project        Project row, modified in place.
+ * @param string|null $reference_date Y-m-d anchoring the period.
+ * @return void
+ */
+function pltt_stamp_project_consumption( $project, $reference_date = null ) {
+	if ( empty( $project ) ) {
+		return;
+	}
+
+	$consumption = pltt_project_consumption( $project, $reference_date );
+
+	$project->ceiling_minutes  = $consumption ? (int) $consumption['ceiling_minutes'] : 0;
+	$project->consumed_minutes = $consumption ? (int) $consumption['consumed_minutes'] : 0;
+	$project->period_day       = ( $consumption && null !== $consumption['period_day'] ) ? (int) $consumption['period_day'] : 0;
+	$project->period_days      = ( $consumption && null !== $consumption['period_days'] ) ? (int) $consumption['period_days'] : 0;
+}
+
+/**
  * Clamp a proposed `billable` value to what the entry's project type allows.
  *
  * THE INVARIANT: `time_entries.billable` may be 1 only when the entry's project

@@ -528,3 +528,38 @@
 .pltt-review-table.pltt-no-status-col .pltt-warning-cell {
 	display: none;
 }
+
+/* ── Consumption indicator ───────────────────────────────────────────────────
+   How much of the selected project's ceiling is already used, sitting directly
+   under the project picker on the screen where entries get assigned every day.
+   Familiarity is the point, so it stays quiet: small, muted, no icon, no
+   background — a figure you read in passing, not a warning you dismiss.
+   Absent entirely for projects with no ceiling (the element is [hidden]). */
+.pltt-consumption {
+	display: block;
+	margin-top: 3px;
+	font-size: 11px;
+	line-height: 1.4;
+	color: var(--pltt-ink-3, #8a8d91);
+	font-variant-numeric: tabular-nums;
+}
+
+/* An author `display` beats the UA stylesheet's rule for [hidden], so the
+   no-ceiling case needs saying explicitly or it would leave an empty box
+   (and its margin) under the picker. */
+.pltt-consumption[hidden] {
+	display: none;
+}
+
+/* Past the ceiling. Escalated but still a statement: the same amber the rest of
+   the plugin uses for overage, at weight — not red, not a badge, not an alert. */
+.pltt-consumption.is-over {
+	color: var(--pltt-c-over, #9a6a10);
+	font-weight: 600;
+}
+
+/* In the edit form the line sits under a labeled field, so it needs a little
+   more room to read as belonging to the project select above it. */
+.pltt-entry-form .pltt-consumption {
+	margin-top: 5px;
+}
