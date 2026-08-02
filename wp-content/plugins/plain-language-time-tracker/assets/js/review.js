@@ -118,7 +118,6 @@
 		}
 
 		updateSummary();
-		refreshConsumption();
 	}
 
 	/**
@@ -329,14 +328,6 @@
 		if ( currentProjectId ) {
 			ajaxData.current_project_id = currentProjectId;
 		}
-		// Anchors the consumption figure's allocation period to the day being
-		// finalized, so a retainer reviewed on the 1st still describes the period
-		// its work actually landed in.
-		const refRow = projectSelect.closest( '.pltt-entry-row' );
-		const refDate = refRow && refRow.querySelector( '.pltt-entry-date-input' );
-		if ( refDate && refDate.value ) {
-			ajaxData.reference_date = refDate.value;
-		}
 
 		PLTT.ajax( 'pltt_get_projects', ajaxData, function( response ) {
 			if ( response.success ) {
@@ -355,7 +346,6 @@
 					var billFlag = parseInt( project.billable_flag_applies, 10 ) === 0 ? '0' : '1';
 					var dataAttr = ' data-billability-default="' + billDefault + '"' +
 						' data-billable-flag="' + billFlag + '"' +
-						consumptionAttrs( project ) +
 						( isArchived ? ' data-archived="1"' : '' );
 					// SEC-M13: defense-in-depth — coerce id to int before interpolating.
 					html += '<option value="' + parseInt( project.id, 10 ) + '"' + dataAttr + '>' +
@@ -389,96 +379,7 @@
 				if ( ppRow ) {
 					applyBillableVisibility( ppRow );
 				}
-
-				// New options carry new consumption figures — pick them up before
-				// repainting, or a freshly loaded project shows no line.
-				harvestConsumption( projectSelect );
-				refreshConsumption();
 			}
-		} );
-	}
-
-	/**
-	 * Build the consumption data attributes for a project option (touchpoint 6/8).
-	 *
-	 * MUST stay in step with pltt_consumption_data_attrs() in PHP and with the
-	 * two dataset builders. All values are integers from a JSON response, coerced
-	 * here, so the string is safe to interpolate.
-	 *
-	 * @param {Object} project Project from the pltt_get_projects response.
-	 * @return {string} Attribute string with a leading space.
-	 */
-	function consumptionAttrs( project ) {
-		var ceiling = parseInt( project.ceiling_minutes, 10 ) || 0;
-		var attrs = ' data-ceiling-minutes="' + ceiling + '"' +
-			' data-consumed-minutes="' + ( parseInt( project.consumed_minutes, 10 ) || 0 ) + '"';
-		var day = parseInt( project.period_day, 10 ) || 0;
-		if ( day > 0 ) {
-			attrs += ' data-period-day="' + day + '"' +
-				' data-period-days="' + ( parseInt( project.period_days, 10 ) || 0 ) + '"';
-		}
-		return attrs;
-	}
-
-	/**
-	 * Copy consumption figures onto an option element (touchpoint 7/9).
-	 *
-	 * @param {HTMLOptionElement} option  Option to stamp.
-	 * @param {Object}            project Project from the AJAX response.
-	 */
-	function stampConsumption( option, project ) {
-		option.dataset.ceilingMinutes = String( parseInt( project.ceiling_minutes, 10 ) || 0 );
-		option.dataset.consumedMinutes = String( parseInt( project.consumed_minutes, 10 ) || 0 );
-		var day = parseInt( project.period_day, 10 ) || 0;
-		if ( day > 0 ) {
-			option.dataset.periodDay = String( day );
-			option.dataset.periodDays = String( parseInt( project.period_days, 10 ) || 0 );
-		}
-	}
-
-	/**
-	 * Pull any newly rendered option figures into the consumption lookup.
-	 *
-	 * @param {ParentNode} root Scope to scan.
-	 */
-	function harvestConsumption( root ) {
-		if ( window.PlttConsumption ) {
-			window.PlttConsumption.harvest( root );
-		}
-	}
-
-	/**
-	 * Repaint every row's consumption line.
-	 *
-	 * Live accumulation: a project's figure is its database baseline plus the
-	 * durations of every row on this screen currently pointing at it. Assigning
-	 * three entries to the same retainer makes it climb 3.2 -> 3.5 -> 3.9, which
-	 * is the whole point — a batch of small entries is exactly how a ceiling gets
-	 * crossed without anyone noticing.
-	 */
-	function refreshConsumption() {
-		if ( ! window.PlttConsumption ) {
-			return;
-		}
-
-		var rows = document.querySelectorAll( '.pltt-entry-row' );
-		var live = {};
-
-		rows.forEach( function( row ) {
-			var sel = row.querySelector( '.pltt-project-select' );
-			var dur = row.querySelector( '.pltt-duration-minutes' );
-			var id = sel ? parseInt( sel.value, 10 ) : 0;
-			if ( ! id ) {
-				return;
-			}
-			live[ id ] = ( live[ id ] || 0 ) + ( dur ? parseInt( dur.value, 10 ) || 0 : 0 );
-		} );
-
-		rows.forEach( function( row ) {
-			var sel = row.querySelector( '.pltt-project-select' );
-			var el = row.querySelector( '.pltt-consumption' );
-			var id = sel ? parseInt( sel.value, 10 ) : 0;
-			window.PlttConsumption.paint( el, id, live[ id ] || 0 );
 		} );
 	}
 
@@ -533,9 +434,6 @@
 				if ( pRowVis ) {
 					applyBillableVisibility( pRowVis );
 				}
-
-				// Both the row it left and the row it joined change, so repaint all.
-				refreshConsumption();
 
 				// Apply the project's billability default to the billable checkbox,
 				// but never clobber a manual choice: if the user has toggled billable
@@ -645,31 +543,6 @@
 	} );
 
 	/**
-	 * On page load: prime the consumption indicator.
-	 *
-	 * seed() must run before the first paint. Every row on this screen is already
-	 * counted inside the server's consumed figure (entries exist from parse time,
-	 * not from "Save All"), so their stored contribution has to be netted out
-	 * before anything is added back live — otherwise the day's own work shows up
-	 * twice the moment the page renders.
-	 */
-	if ( window.PlttConsumption ) {
-		harvestConsumption( document );
-		window.PlttConsumption.seed(
-			Array.prototype.map.call(
-				document.querySelectorAll( '.pltt-entry-row' ),
-				function( row ) {
-					return {
-						projectId: row.dataset.dbProjectId,
-						minutes: row.dataset.dbDurationMinutes
-					};
-				}
-			)
-		);
-		refreshConsumption();
-	}
-
-	/**
 	 * Handle new client creation.
 	 */
 	const saveClientBtn = document.getElementById( 'pltt-save-client' );
@@ -749,13 +622,9 @@
 
 			this.disabled = true;
 
-			// Same period anchor the rest of the screen uses (see loadProjects).
-			const newRefDate = activeRow && activeRow.querySelector( '.pltt-entry-date-input' );
-
 			PLTT.ajax( 'pltt_create_project', {
 				name: name,
 				client_id: clientId,
-				reference_date: newRefDate ? newRefDate.value : '',
 				hourly_rate: rate,
 				budget_hours: vals.budget_hours,
 				budget_fee: PLTT.parseCurrencyValue( vals.budget_fee ),
@@ -776,12 +645,10 @@
 						option.textContent = project.name;
 						option.dataset.billabilityDefault = parseInt( project.billability_default, 10 ) === 1 ? '1' : '0';
 						option.dataset.billableFlag = parseInt( project.billable_flag_applies, 10 ) === 0 ? '0' : '1';
-						stampConsumption( option, project );
 						option.selected = true;
 
 						const addNewOption = projectSelect.querySelector( 'option[value="new"]' );
 						projectSelect.insertBefore( option, addNewOption );
-						harvestConsumption( projectSelect );
 						projectSelect.dispatchEvent( new Event( 'change' ) );
 					}
 
@@ -862,9 +729,6 @@
 				if ( response.success ) {
 					row.remove();
 					updateSummary();
-					// The row's database minutes were netted out of the baseline at
-					// load, so dropping its live contribution is the whole fix.
-					refreshConsumption();
 				} else {
 					row.classList.remove( 'deleting' );
 					alert( response.data || 'Error deleting entry.' );
@@ -874,7 +738,6 @@
 			// Just remove from DOM (not saved yet).
 			row.remove();
 			updateSummary();
-			refreshConsumption();
 		}
 	} );
 
@@ -1074,13 +937,6 @@
 
 		openFormRow = formRow;
 		clearFormError( formRow );
-
-		// Server-rendered options carry their own figures; pick them up the first
-		// time this row is opened.
-		if ( window.PlttConsumption ) {
-			window.PlttConsumption.harvest( formRow );
-		}
-		paintFormConsumption( formRow );
 
 		const desc = formRow.querySelector( '.pltt-form-description' );
 		if ( desc ) {
@@ -1407,10 +1263,8 @@
 			if ( minutes !== null ) {
 				formRow.querySelector( '.pltt-form-duration' ).value = minutes;
 			}
-			paintFormConsumption( formRow );
 		} else if ( e.target.classList.contains( 'pltt-form-duration' ) ) {
 			formRow._durationManual = true;
-			paintFormConsumption( formRow );
 		}
 	} );
 
@@ -1468,7 +1322,6 @@
 				}
 			}
 			applyFormBillableVisibility( formRow );
-			paintFormConsumption( formRow );
 		}
 	} );
 
@@ -1486,10 +1339,7 @@
 			return;
 		}
 
-		PLTT.ajax( 'pltt_get_projects', {
-			client_id: clientId,
-			reference_date: formReferenceDate( projectSelect.closest( '.pltt-entry-form' ) )
-		}, function( response ) {
+		PLTT.ajax( 'pltt_get_projects', { client_id: clientId }, function( response ) {
 			if ( ! response.success ) {
 				return;
 			}
@@ -1501,81 +1351,13 @@
 				}
 				const billDefault = parseInt( project.billability_default, 10 ) === 1 ? '1' : '0';
 				const billFlag = parseInt( project.billable_flag_applies, 10 ) === 0 ? '0' : '1';
-				html += '<option value="' + parseInt( project.id, 10 ) + '" data-billability-default="' + billDefault + '" data-billable-flag="' + billFlag + '"' +
-					formConsumptionAttrs( project ) + '>' +
+				html += '<option value="' + parseInt( project.id, 10 ) + '" data-billability-default="' + billDefault + '" data-billable-flag="' + billFlag + '">' +
 					PLTT.escapeHtml( project.name ) + '</option>';
 			} );
 			html += '<option value="new">+ Add new project...</option>';
 			projectSelect.innerHTML = html;
-			const reloadedForm = projectSelect.closest( '.pltt-entry-form' );
-			applyFormBillableVisibility( reloadedForm );
-			if ( window.PlttConsumption ) {
-				window.PlttConsumption.harvest( projectSelect );
-			}
-			paintFormConsumption( reloadedForm );
+			applyFormBillableVisibility( projectSelect.closest( '.pltt-entry-form' ) );
 		} );
-	}
-
-	/**
-	 * The date this form's entry sits on — anchors the allocation period so the
-	 * consumption figure describes the period the work landed in.
-	 *
-	 * @param {HTMLElement} formRow The .pltt-entry-form element.
-	 * @return {string} Y-m-d, or '' to let the server fall back to today.
-	 */
-	function formReferenceDate( formRow ) {
-		const input = formRow && formRow.querySelector( '.pltt-form-date' );
-		return input && input.value ? input.value : '';
-	}
-
-	/**
-	 * Consumption data attributes for an option string (touchpoint 8).
-	 * Mirrors pltt_consumption_data_attrs() in PHP — change both together.
-	 *
-	 * @param {Object} project Project from the pltt_get_projects response.
-	 * @return {string} Attribute string with a leading space.
-	 */
-	function formConsumptionAttrs( project ) {
-		let attrs = ' data-ceiling-minutes="' + ( parseInt( project.ceiling_minutes, 10 ) || 0 ) + '"' +
-			' data-consumed-minutes="' + ( parseInt( project.consumed_minutes, 10 ) || 0 ) + '"';
-		const day = parseInt( project.period_day, 10 ) || 0;
-		if ( day > 0 ) {
-			attrs += ' data-period-day="' + day + '"' +
-				' data-period-days="' + ( parseInt( project.period_days, 10 ) || 0 ) + '"';
-		}
-		return attrs;
-	}
-
-	/**
-	 * Paint one form row's consumption line.
-	 *
-	 * A form row edits a single persisted entry, so the only live adjustment is
-	 * that entry itself: swap what it currently contributes to the database
-	 * figure for what the open form would make it contribute. Moving it to a
-	 * different project adds its time there on top of that project's full total.
-	 *
-	 * @param {HTMLElement} formRow The .pltt-entry-form element.
-	 */
-	function paintFormConsumption( formRow ) {
-		if ( ! formRow || ! window.PlttConsumption ) {
-			return;
-		}
-		const sel = formRow.querySelector( '.pltt-form-project' );
-		const el = formRow.querySelector( '.pltt-consumption' );
-		if ( ! sel || ! el ) {
-			return;
-		}
-
-		const selectedId = parseInt( sel.value, 10 ) || 0;
-		const dbId = parseInt( sel.dataset.dbProjectId, 10 ) || 0;
-		const dbMinutes = parseInt( sel.dataset.dbDurationMinutes, 10 ) || 0;
-		const durInput = formRow.querySelector( '.pltt-form-duration' );
-		const liveMinutes = durInput ? ( parseInt( durInput.value, 10 ) || 0 ) : dbMinutes;
-
-		// Net this entry out of its stored project before adding it where it
-		// now points — otherwise an unmoved entry gets counted twice.
-		const already = ( selectedId && selectedId === dbId ) ? dbMinutes : 0;
-		window.PlttConsumption.paint( el, selectedId, liveMinutes - already );
 	}
 
 	/**
@@ -1673,7 +1455,7 @@
 			}
 
 			this.disabled = true;
-			PLTT.ajax( 'pltt_create_project', { name: name, client_id: clientId, reference_date: formReferenceDate( activeFormRow ), hourly_rate: rate, budget_hours: vals.budget_hours, budget_fee: PLTT.parseCurrencyValue( vals.budget_fee ), recurring_period: vals.recurring_period, non_billable: vals.non_billable }, function( response ) {
+			PLTT.ajax( 'pltt_create_project', { name: name, client_id: clientId, hourly_rate: rate, budget_hours: vals.budget_hours, budget_fee: PLTT.parseCurrencyValue( vals.budget_fee ), recurring_period: vals.recurring_period, non_billable: vals.non_billable }, function( response ) {
 				saveProjectBtn.disabled = false;
 				if ( response.success && response.data.project ) {
 					const project = response.data.project;
@@ -1684,20 +1466,9 @@
 						option.textContent = project.name;
 						option.dataset.billabilityDefault = parseInt( project.billability_default, 10 ) === 1 ? '1' : '0';
 						option.dataset.billableFlag = parseInt( project.billable_flag_applies, 10 ) === 0 ? '0' : '1';
-						// Touchpoint 9 — mirrors formConsumptionAttrs()/PHP.
-						option.dataset.ceilingMinutes = String( parseInt( project.ceiling_minutes, 10 ) || 0 );
-						option.dataset.consumedMinutes = String( parseInt( project.consumed_minutes, 10 ) || 0 );
-						const newDay = parseInt( project.period_day, 10 ) || 0;
-						if ( newDay > 0 ) {
-							option.dataset.periodDay = String( newDay );
-							option.dataset.periodDays = String( parseInt( project.period_days, 10 ) || 0 );
-						}
 						option.selected = true;
 						const addNewOption = projectSelect.querySelector( 'option[value="new"]' );
 						projectSelect.insertBefore( option, addNewOption );
-						if ( window.PlttConsumption ) {
-							window.PlttConsumption.harvest( projectSelect );
-						}
 						projectSelect.dispatchEvent( new Event( 'change' ) );
 					}
 					PLTT.hideModal( 'pltt-project-modal' );

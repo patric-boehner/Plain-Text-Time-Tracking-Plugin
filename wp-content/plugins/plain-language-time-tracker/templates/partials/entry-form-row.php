@@ -131,8 +131,6 @@ if ( ! $row_visible ) {
 							id="pltt-form-project-edit-<?php echo esc_attr( $entry_id ); ?>"
 							class="pltt-form-project"
 							data-current-project-id="<?php echo esc_attr( $selected_pid ); ?>"
-							data-db-project-id="<?php echo esc_attr( (int) ( $form_entry['project_id'] ?? 0 ) ); ?>"
-							data-db-duration-minutes="<?php echo esc_attr( (int) ( $form_entry['duration_minutes'] ?? 0 ) ); ?>"
 						>
 							<option value=""><?php esc_html_e( 'Select project...', 'plain-language-time-tracker' ); ?></option>
 							<?php if ( $selected_cid > 0 && ! empty( $projects_by_client[ $selected_cid ] ) ) : ?>
@@ -155,7 +153,6 @@ if ( ! $row_visible ) {
 										<?php selected( $selected_pid, $project->id ); ?>
 										data-billability-default="<?php echo (int) $project->billability_default; ?>"
 										data-billable-flag="<?php echo $opt_flag_applies ? '1' : '0'; ?>"
-										<?php echo pltt_consumption_data_attrs( $project, $form_entry['entry_date'] ?? null ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- integer-only attribute string. ?>
 										<?php if ( $is_archived ) : ?>data-archived="1"<?php endif; ?>
 									>
 										<?php echo esc_html( $label ); ?>
@@ -164,7 +161,6 @@ if ( ! $row_visible ) {
 							<?php endif; ?>
 							<option value="new">+ <?php esc_html_e( 'Add new project...', 'plain-language-time-tracker' ); ?></option>
 						</select>
-						<span class="pltt-consumption" aria-live="polite"></span>
 					</div>
 					<div class="pltt-field pltt-field-tags">
 						<label><?php esc_html_e( 'Tags', 'plain-language-time-tracker' ); ?></label>

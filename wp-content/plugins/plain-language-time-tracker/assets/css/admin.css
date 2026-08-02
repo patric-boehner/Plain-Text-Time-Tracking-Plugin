@@ -1348,3 +1348,55 @@ fieldset.pltt-date-nav-custom-inputs input[type="date"] {
 }
 
 
+
+/* ── Post-save "ceilings reached" notice ─────────────────────────────────────
+   Sits under the day's summary cards after a save, listing only the projects
+   that reached or passed their ceiling. Silent otherwise, so its presence is
+   itself the signal — which is why it stays a statement rather than an alarm:
+   standard notice chrome, the plugin's amber, no icon, no colour-block. */
+.pltt-consumption-notice {
+	margin: 0 0 25px;
+}
+
+.pltt-consumption-notice-head {
+	font-weight: 600;
+}
+
+.pltt-consumption-list {
+	margin: 8px 0 4px;
+	padding: 0;
+	list-style: none;
+	display: grid;
+	gap: 4px;
+}
+
+/* Name, figure, and period on one line at comfortable widths; the figure is
+   what the eye should land on, so it carries the weight and the amber. */
+.pltt-consumption-list li {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: baseline;
+	gap: 4px 10px;
+	font-size: 13px;
+	line-height: 1.5;
+}
+
+.pltt-consumption-project {
+	min-width: 16em;
+}
+
+.pltt-consumption-figure {
+	font-weight: 600;
+	font-variant-numeric: tabular-nums;
+	color: var(--pltt-warning-text);
+}
+
+.pltt-consumption-period {
+	color: var(--pltt-text-muted);
+}
+
+@media screen and (max-width: 782px) {
+	.pltt-consumption-project {
+		min-width: 100%;
+	}
+}

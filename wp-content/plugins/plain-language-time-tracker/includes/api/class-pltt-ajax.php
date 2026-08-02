@@ -471,9 +471,6 @@ class PLTT_Ajax {
 
 		$client_id          = isset( $_POST['client_id'] ) ? absint( $_POST['client_id'] ) : 0;
 		$current_project_id = isset( $_POST['current_project_id'] ) ? absint( $_POST['current_project_id'] ) : 0;
-		// Anchors the allocation period for the consumption figure. Empty (or
-		// invalid) falls back to today inside pltt_project_consumption().
-		$reference_date = isset( $_POST['reference_date'] ) ? pltt_sanitize_date_strict( wp_unslash( $_POST['reference_date'] ) ) : '';
 
 		$include_ids = $current_project_id > 0 ? array( $current_project_id ) : array();
 		$projects    = PLTT_Projects::get_by_client_recent_first( $client_id, $include_ids );
@@ -483,9 +480,6 @@ class PLTT_Ajax {
 		// the rule in JS.
 		foreach ( $projects as $project ) {
 			$project->billable_flag_applies = pltt_billable_flag_applies( $project ) ? 1 : 0;
-			// Same pipe, one more computed value: how much of the project's
-			// ceiling is already used. 0/0 means "no ceiling, render nothing".
-			pltt_stamp_project_consumption( $project, $reference_date );
 		}
 
 		wp_send_json_success(
@@ -580,11 +574,6 @@ class PLTT_Ajax {
 		$project = PLTT_Projects::get( $project_id );
 		if ( $project ) {
 			$project->billable_flag_applies = pltt_billable_flag_applies( $project ) ? 1 : 0;
-			// A project created mid-finalize has no entries yet, so consumption is
-			// 0 — but it may still have a ceiling, and the period fragment needs
-			// the same anchor the rest of the screen uses.
-			$reference_date = isset( $_POST['reference_date'] ) ? pltt_sanitize_date_strict( wp_unslash( $_POST['reference_date'] ) ) : '';
-			pltt_stamp_project_consumption( $project, $reference_date );
 		}
 		wp_send_json_success(
 			array(

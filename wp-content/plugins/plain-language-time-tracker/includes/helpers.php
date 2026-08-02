@@ -3157,7 +3157,7 @@ function pltt_billable_flag_applies( $project ) {
 }
 
 /**
- * How much of a project's ceiling is already used, for the finalize screen.
+ * How much of a project's ceiling is already used.
  *
  * Display only — nothing here writes. Returns null whenever the project has no
  * ceiling to be near, which is the case that matters most:
@@ -3165,24 +3165,31 @@ function pltt_billable_flag_applies( $project ) {
  * - hourly     — no allocation at all.
  * - internal   — no client, no rate, nothing to overrun.
  * - recurring with no allocation — a retainer whose hours are tracked but not
- *   capped. Its empty allocation is deliberate, so it must show NO figure
+ *   capped. Its empty allocation is deliberate, so it must produce NO figure
  *   rather than "0 of 0". Do not "fix" this by falling back to a zero ceiling.
  *
  * The reference date anchors the allocation period, mirroring how
  * pltt_compute_overage_threshold() uses $filter_args['date_from']. Callers pass
- * the date being finalized so the figure describes the period that day's work
- * lands in, not whatever period today happens to sit in.
+ * the date whose work is in question, so the figure describes the period that
+ * work lands in rather than whatever period today happens to sit in.
  *
  * Consumption deliberately counts unverified entries too — same as
- * pltt_compute_overage_threshold(), so the finalize figure and the Overview
- * figure can't disagree. Captured time is consumed time.
+ * pltt_compute_overage_threshold(), so this figure and the Overview figure
+ * can't disagree. Captured time is consumed time.
  *
- * Results are memoized per (project, reference date): the finalize screen
- * renders the same project option once per row, and only ceiling-bearing
+ * Results are memoized per (project, reference date), and only ceiling-bearing
  * projects (14 of 49 today) ever reach the query.
  *
- * @param object|null $project        Project row.
- * @param string|null $reference_date Y-m-d anchoring the period; defaults to today.
+ * Pass $through_reference to stop counting at the reference date instead of at
+ * the end of the period. Leave it false for the plain "how much of this period
+ * is used" question, which is what agrees with pltt_compute_overage_threshold().
+ * Set it true to ask "how much was used AS OF that day" — the only version that
+ * can answer whether a particular day crossed the line, since the full-period
+ * total also contains work dated after it.
+ *
+ * @param object|null $project           Project row.
+ * @param string|null $reference_date    Y-m-d anchoring the period; defaults to today.
+ * @param bool        $through_reference Stop counting at $reference_date.
  * @return array{
  *     type: string,
  *     consumed_minutes: int,
@@ -3191,7 +3198,7 @@ function pltt_billable_flag_applies( $project ) {
  *     period_days: ?int,
  * }|null Null when the project has no ceiling.
  */
-function pltt_project_consumption( $project, $reference_date = null ) {
+function pltt_project_consumption( $project, $reference_date = null, $through_reference = false ) {
 	global $wpdb;
 
 	static $cache = array();
@@ -3204,7 +3211,7 @@ function pltt_project_consumption( $project, $reference_date = null ) {
 		$reference_date = current_time( 'Y-m-d' );
 	}
 
-	$key = (int) $project->id . '|' . $reference_date;
+	$key = (int) $project->id . '|' . $reference_date . '|' . ( $through_reference ? 't' : 'f' );
 	if ( array_key_exists( $key, $cache ) ) {
 		return $cache[ $key ];
 	}
@@ -3225,6 +3232,13 @@ function pltt_project_consumption( $project, $reference_date = null ) {
 	// Recurring resets each period; fixed-fee accumulates all-time ([null, null]).
 	list( $period_start, $period_end ) = pltt_get_allocation_period_bounds( $project, $reference_date );
 
+	// Counting "as of" the reference date closes the window early. For fixed-fee
+	// there is no period end at all, so the reference date becomes the only bound.
+	$count_to = $period_end;
+	if ( $through_reference ) {
+		$count_to = ( $period_end && $period_end < $reference_date ) ? $period_end : $reference_date;
+	}
+
 	$table   = PLTT_Database::get_table_name( 'time_entries' );
 	$sql     = "SELECT COALESCE( SUM( duration_minutes ), 0 ) FROM {$table} WHERE project_id = %d";
 	$prepare = array( (int) $project->id );
@@ -3232,9 +3246,9 @@ function pltt_project_consumption( $project, $reference_date = null ) {
 		$sql      .= ' AND entry_date >= %s';
 		$prepare[] = $period_start;
 	}
-	if ( $period_end ) {
+	if ( $count_to ) {
 		$sql      .= ' AND entry_date <= %s';
-		$prepare[] = $period_end;
+		$prepare[] = $count_to;
 	}
 
 	// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
@@ -3271,62 +3285,192 @@ function pltt_project_consumption( $project, $reference_date = null ) {
 }
 
 /**
- * Consumption data attributes for a project `<option>` on the finalize screen.
+ * Which projects THIS DAY'S work pushed to or past their ceiling.
  *
- * Kept in one place so the two templates that render project options can't
- * drift apart — the same trap that hid the billable-flag bug. Mirrors what the
- * AJAX endpoints stamp onto project objects and what the four option builders
- * in assets/js/review.js rebuild client-side; change all of them together.
+ * Answers one question, asked once the day is committed: did what I just save
+ * put something over? Reports the crossing, not the state.
  *
- * `data-ceiling-minutes="0"` is the explicit "no ceiling, render nothing"
- * signal, so JS never has to distinguish a missing attribute from a real zero.
+ * That distinction is the whole design. "Every project currently at or over"
+ * sounds equivalent and is not: a retainer that crossed on the 5th is still
+ * over on the 6th, the 7th and the 28th, so a state-based notice fires on
+ * nearly every save for the rest of the month and becomes wallpaper. Measured
+ * against the dev database, state-based fired on 107 of 120 days; crossing-based
+ * fires on a handful. A notice you see rarely is a notice you still read.
  *
- * All values are integers, so the attribute string needs no further escaping.
+ * So a project qualifies only when it was UNDER its ceiling before this day's
+ * entries and is at or over it once they count. Days that merely pile more onto
+ * an already-broken ceiling stay silent — the crossing was reported when it
+ * happened, and repeating it teaches you to dismiss without looking.
  *
- * @param object      $project        Project row.
- * @param string|null $reference_date Y-m-d anchoring the period.
- * @return string Leading-space-prefixed attribute string.
+ * Deliberately not shown while entries are being assigned. Mid-flow the figure
+ * arrives at the exact moment nothing can be done about it and competes with
+ * the task in hand. After the save it is a report.
+ *
+ * @param string $date Y-m-d of the day just saved.
+ * @return array List of {project, client, consumption, day_minutes} sorted worst overrun first.
  */
-function pltt_consumption_data_attrs( $project, $reference_date = null ) {
-	$consumption = pltt_project_consumption( $project, $reference_date );
+function pltt_consumption_alerts( $date ) {
+	global $wpdb;
 
-	if ( null === $consumption ) {
-		return ' data-ceiling-minutes="0"';
+	if ( empty( $date ) ) {
+		return array();
 	}
 
-	$attrs = ' data-ceiling-minutes="' . (int) $consumption['ceiling_minutes'] . '"'
-		. ' data-consumed-minutes="' . (int) $consumption['consumed_minutes'] . '"';
+	$table = PLTT_Database::get_table_name( 'time_entries' );
 
-	if ( null !== $consumption['period_day'] ) {
-		$attrs .= ' data-period-day="' . (int) $consumption['period_day'] . '"'
-			. ' data-period-days="' . (int) $consumption['period_days'] . '"';
+	// The day's minutes per project — needed to work out where each project
+	// stood BEFORE this day, which is what makes a crossing a crossing.
+	// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+	$day_rows = $wpdb->get_results(
+		$wpdb->prepare(
+			"SELECT project_id, COALESCE( SUM( duration_minutes ), 0 ) AS minutes
+			 FROM {$table}
+			 WHERE entry_date = %s AND project_id IS NOT NULL AND project_id > 0
+			 GROUP BY project_id",
+			$date
+		)
+	);
+
+	if ( empty( $day_rows ) ) {
+		return array();
 	}
 
-	return $attrs;
+	$day_minutes = array();
+	foreach ( $day_rows as $row ) {
+		$day_minutes[ (int) $row->project_id ] = (int) $row->minutes;
+	}
+
+	$projects = PLTT_Projects::get_multiple( array_keys( $day_minutes ) );
+	$alerts   = array();
+
+	foreach ( $projects as $project ) {
+		// Counted AS OF this day, not across the whole period. The full-period
+		// total also contains work dated after this day, which would make
+		// "before today" look already-over and swallow the crossing entirely.
+		// Null for hourly, internal, and retainers whose allocation is
+		// deliberately empty — nothing to be over.
+		$consumption = pltt_project_consumption( $project, $date, true );
+		if ( null === $consumption ) {
+			continue;
+		}
+
+		$today  = $day_minutes[ (int) $project->id ] ?? 0;
+		$after  = $consumption['consumed_minutes'];
+		$before = $after - $today;
+
+		// Already over before today → the crossing was reported on its own day.
+		if ( $after < $consumption['ceiling_minutes'] || $before >= $consumption['ceiling_minutes'] ) {
+			continue;
+		}
+
+		$alerts[] = array(
+			'project'     => $project,
+			'client'      => PLTT_Clients::get( (int) $project->client_id ),
+			'consumption' => $consumption,
+			'day_minutes' => $today,
+		);
+	}
+
+	// Worst overrun first, measured as a share of the ceiling so a 3-hour
+	// retainer at double isn't buried under a 40-hour budget a nudge over.
+	usort(
+		$alerts,
+		function ( $a, $b ) {
+			$ratio = function ( $x ) {
+				return $x['consumption']['consumed_minutes'] / max( 1, $x['consumption']['ceiling_minutes'] );
+			};
+			return $ratio( $b ) <=> $ratio( $a );
+		}
+	);
+
+	return $alerts;
 }
 
 /**
- * Stamp consumption values onto a project object for a JSON response.
+ * Render the post-save ceiling-crossing notice, if this day's work crossed one.
  *
- * Plain integers (0 = no ceiling / not applicable) so the option builders in
- * review.js need nothing beyond parseInt. Additive: never touches any field the
- * project already carries.
+ * Dismissible for this page view only — it reports a fact about the save that
+ * just happened, so there is nothing to remember and nothing to store.
  *
- * @param object      $project        Project row, modified in place.
- * @param string|null $reference_date Y-m-d anchoring the period.
+ * The `inline` class matters: WordPress relocates a bare `.notice` up to the
+ * H1, and this one is meant to sit under the summary cards.
+ *
+ * @param string $date Y-m-d of the day just saved.
  * @return void
  */
-function pltt_stamp_project_consumption( $project, $reference_date = null ) {
-	if ( empty( $project ) ) {
+function pltt_render_consumption_notice( $date ) {
+	$alerts = pltt_consumption_alerts( $date );
+	if ( empty( $alerts ) ) {
 		return;
 	}
+	?>
+	<div class="notice notice-warning inline is-dismissible pltt-consumption-notice">
+		<p class="pltt-consumption-notice-head">
+			<?php
+			echo esc_html(
+				sprintf(
+					/* translators: %d: number of projects taken to or past their ceiling */
+					_n(
+						"This day's work took one project to its ceiling",
+						"This day's work took %d projects to their ceilings",
+						count( $alerts ),
+						'plain-language-time-tracker'
+					),
+					count( $alerts )
+				)
+			);
+			?>
+		</p>
+		<ul class="pltt-consumption-list">
+			<?php foreach ( $alerts as $alert ) : ?>
+				<?php
+				$c     = $alert['consumption'];
+				$label = $alert['client']
+					? $alert['client']->name . ' · ' . $alert['project']->name
+					: $alert['project']->name;
+				?>
+				<li>
+					<span class="pltt-consumption-project"><?php echo esc_html( $label ); ?></span>
+					<span class="pltt-consumption-figure">
+						<?php
+						echo esc_html(
+							sprintf(
+								/* translators: 1: hours used, 2: hours allowed */
+								__( '%1$s of %2$s', 'plain-language-time-tracker' ),
+								pltt_consumption_hours( $c['consumed_minutes'] ),
+								pltt_consumption_hours( $c['ceiling_minutes'] ) . 'h'
+							)
+						);
+						?>
+					</span>
+					<?php if ( null !== $c['period_day'] ) : ?>
+						<span class="pltt-consumption-period">
+							<?php
+							/* translators: %d: days elapsed in the allocation period */
+							echo esc_html( sprintf( _n( '%d day in', '%d days in', $c['period_day'], 'plain-language-time-tracker' ), $c['period_day'] ) );
+							?>
+						</span>
+					<?php endif; ?>
+				</li>
+			<?php endforeach; ?>
+		</ul>
+	</div>
+	<?php
+}
 
-	$consumption = pltt_project_consumption( $project, $reference_date );
-
-	$project->ceiling_minutes  = $consumption ? (int) $consumption['ceiling_minutes'] : 0;
-	$project->consumed_minutes = $consumption ? (int) $consumption['consumed_minutes'] : 0;
-	$project->period_day       = ( $consumption && null !== $consumption['period_day'] ) ? (int) $consumption['period_day'] : 0;
-	$project->period_days      = ( $consumption && null !== $consumption['period_days'] ) ? (int) $consumption['period_days'] : 0;
+/**
+ * Minutes as glanceable hours: 180 -> "3", 621 -> "10.4".
+ *
+ * One decimal with the trailing ".0" trimmed. Deliberately coarser than
+ * pltt_format_hours() (2dp) — this is a figure read in passing, not an
+ * accounting number.
+ *
+ * @param int $minutes Duration in minutes.
+ * @return string
+ */
+function pltt_consumption_hours( $minutes ) {
+	$hours = round( ( (int) $minutes ) / 60, 1 );
+	return rtrim( rtrim( number_format( $hours, 1 ), '0' ), '.' );
 }
 
 /**

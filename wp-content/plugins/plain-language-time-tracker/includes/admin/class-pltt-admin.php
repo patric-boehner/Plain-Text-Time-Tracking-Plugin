@@ -468,19 +468,10 @@ class PLTT_Admin {
 				$version,
 				true
 			);
-			// Finalize-screen consumption indicator. A hard dependency of
-			// review.js, which calls window.PlttConsumption on load.
-			wp_enqueue_script(
-				'pltt-consumption',
-				PLTT_PLUGIN_URL . 'assets/js/consumption.js',
-				array( 'pltt-shared' ),
-				$version,
-				true
-			);
 			wp_enqueue_script(
 				'pltt-review',
 				PLTT_PLUGIN_URL . 'assets/js/review.js',
-				array( 'pltt-shared', 'pltt-tag-picker', 'pltt-consumption' ),
+				array( 'pltt-shared', 'pltt-tag-picker' ),
 				$version,
 				true
 			);
