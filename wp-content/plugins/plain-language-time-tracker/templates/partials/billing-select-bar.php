@@ -13,6 +13,8 @@
  * Expects in scope:
  *   $project        — the single project object.
  *   $context_client — owning client (may be empty).
+ *   $date_from      — range start ('Y-m-d'); the span the bill covers.
+ *   $date_to        — range end ('Y-m-d').
  *
  * @package PlainLanguageTimeTracker
  */
@@ -27,19 +29,52 @@ if ( ! defined( 'ABSPATH' ) ) {
 //               the period as a whole (no per-entry picking). The period comes from
 //               the current range start (the retainer card's "Review & bill" opens
 //               the view on period_start..period_end).
+// Normalised locals — the Overview always supplies both bounds (it defaults to
+// month-to-date), but this partial has always tolerated them being unset.
+$pltt_from = isset( $date_from ) && $date_from ? (string) $date_from : '';
+$pltt_to   = isset( $date_to ) && $date_to ? (string) $date_to : '';
+
 $pltt_bill_confirm = ( 'recurring' === pltt_get_billing_type( $project ) );
 if ( $pltt_bill_confirm ) {
-	$pltt_bill_period = isset( $date_from ) ? $date_from : null;
+	$pltt_bill_period = $pltt_from ? $pltt_from : null;
 	$scope            = $pltt_bill_period ? PLTT_Billing::get_scope( $project, 'retainer_overage', $pltt_bill_period ) : null;
 } else {
+	// Scoped to the range on screen (Rule 3). This used to ask for the all-time
+	// scope, so the bar's total, the prefilled amount and the modal's "Billing
+	// <span>" all described every unbilled entry ever while the rows you could
+	// actually tick were the filtered ones — four spans on one screen, and only
+	// the ticked boxes constrained the charge. One span now, stated on the bar.
 	$pltt_bill_period = '';
-	$scope            = PLTT_Billing::get_scope( $project, 'hourly', null );
+	$scope            = PLTT_Billing::get_scope( $project, 'hourly', null, $pltt_from, $pltt_to );
 }
 if ( empty( $scope ) ) {
 	return;
 }
 
 $client_name = ! empty( $context_client ) ? $context_client->name : '';
+
+// Billable rows in this range that didn't fit on the list, and so have no
+// checkbox. Counted against what actually rendered rather than assumed from the
+// cap, because ineligible rows (unverified, already covered) take slots too.
+// Zero in every ordinary case — but if it ever isn't, the bar says so, because a
+// silent version of exactly this is what let a bill cover only the first page.
+//
+// There is no widen control here. Review & bill already opens everything
+// outstanding, and the one place that offers to widen is figure 4's backlog line
+// in the scope block above — a second control for the same thing read as
+// duplication, which it was.
+$pltt_offlist = 0;
+if ( ! $pltt_bill_confirm ) {
+	$pltt_rendered = array();
+	foreach ( ( isset( $entries ) && is_array( $entries ) ? $entries : array() ) as $pltt_row ) {
+		$pltt_rendered[ (int) $pltt_row->id ] = true;
+	}
+	foreach ( $scope['entries'] as $pltt_e ) {
+		if ( ! isset( $pltt_rendered[ (int) $pltt_e->id ] ) ) {
+			$pltt_offlist++;
+		}
+	}
+}
 
 // Scope view-model: the default description plus the AI prompt variants,
 // shared with the "Line items" copy dialog (billing-copy-dialog.php) below.
@@ -48,18 +83,55 @@ $default_description = $v['default_desc'];
 $remainder           = number_format( (float) $scope['unbilled'], 2, '.', '' );
 ?>
 
-<div class="pltt-billsel-bar"<?php echo $pltt_bill_confirm ? ' data-confirm' : ' hidden'; ?> aria-live="polite">
+<?php
+// Not hidden any more. The bar used to start hidden and be revealed by JS once a
+// row was ticked; it now states the span, the widen link and the way out, all of
+// which must be there from first paint and must survive unticking every row.
+// Rendering the opening tally server-side also means no flash of "0 entries" and
+// a usable bar without JS.
+$pltt_start_count = $pltt_bill_confirm ? 0 : max( 0, count( $scope['entries'] ) - $pltt_offlist );
+$pltt_start_total = $pltt_bill_confirm ? 0.0 : (float) $scope['unbilled'];
+?>
+<div class="pltt-billsel-bar"<?php echo $pltt_bill_confirm ? ' data-confirm' : ''; ?> aria-live="polite">
 	<span class="pltt-billsel-summary">
 		<?php if ( $pltt_bill_confirm ) : ?>
 			<strong class="pltt-billsel-total"><?php echo esc_html( pltt_format_currency( (float) $scope['unbilled'] ) ); ?></strong>
 			<?php esc_html_e( 'over allocation', 'plain-language-time-tracker' ); ?>
 			<?php if ( ! empty( $v['date_range'] ) ) : ?> · <?php echo esc_html( $v['date_range'] ); ?><?php endif; ?>
 		<?php else : ?>
-			<strong class="pltt-billsel-count">0</strong> <?php esc_html_e( 'entries selected', 'plain-language-time-tracker' ); ?>
-			· <span class="pltt-billsel-total">$0.00</span>
+			<?php // The span first — what this bill covers, stated rather than implied by whatever the filter happens to be. ?>
+			<?php esc_html_e( 'Bill', 'plain-language-time-tracker' ); ?>
+			<?php if ( $pltt_from && $pltt_to ) : ?>
+				<span class="pltt-mono"><?php echo esc_html( pltt_format_date_range( $pltt_from, $pltt_to ) ); ?></span> ·
+			<?php endif; ?>
+			<strong class="pltt-billsel-count"><?php echo esc_html( (string) $pltt_start_count ); ?></strong> <?php esc_html_e( 'entries selected', 'plain-language-time-tracker' ); ?>
+			· <span class="pltt-billsel-total"><?php echo esc_html( pltt_format_currency( $pltt_start_total ) ); ?></span>
+			<?php if ( $pltt_offlist > 0 ) : ?>
+				<?php // The one case where the list can't show everything billable. Stated, never silent — an unstated version of this is what let a bill cover only the first page. ?>
+				<span class="pltt-billsel-offlist">
+					&mdash;
+					<?php
+					printf(
+						/* translators: %d: billable entries in range that are not on the list. */
+						esc_html( _n( '%d billable entry in this range is not on the list and will not be billed — narrow the range', '%d billable entries in this range are not on the list and will not be billed — narrow the range', $pltt_offlist, 'plain-language-time-tracker' ) ),
+						(int) $pltt_offlist
+					);
+					?>
+				</span>
+			<?php endif; ?>
 		<?php endif; ?>
 	</span>
 	<span class="pltt-billsel-spacer"></span>
+	<?php
+	// Cancel — the way out of billing mode. Same view, minus the bill flag: the
+	// select column and this bar go away, the range and every entry stay exactly
+	// as they were, and nothing is recorded. A real link so it works without JS;
+	// billing-select.js points the Escape key at this same href. Sits left of the
+	// two buttons so the pair that leads to a bill stays adjacent.
+	?>
+	<a class="pltt-billsel-cancel" href="<?php echo esc_url( remove_query_arg( 'bill' ) ); ?>" data-exit-bill>
+		<?php esc_html_e( 'Cancel', 'plain-language-time-tracker' ); ?>
+	</a>
 	<button type="button" class="button pltt-billsel-lineitems" data-lineitems-dialog="pltt-billcopy-<?php echo esc_attr( $v['uid'] ); ?>">
 		<?php esc_html_e( 'Line items…', 'plain-language-time-tracker' ); ?>
 	</button>
@@ -74,8 +146,14 @@ $remainder           = number_format( (float) $scope['unbilled'], 2, '.', '' );
 		<input type="hidden" name="project_id" value="<?php echo esc_attr( (int) $project->id ); ?>">
 		<input type="hidden" name="billing_type" value="<?php echo $pltt_bill_confirm ? 'retainer_overage' : 'hourly'; ?>">
 		<input type="hidden" name="period" value="<?php echo esc_attr( (string) $pltt_bill_period ); ?>">
-		<input type="hidden" name="date_from" value="">
-		<input type="hidden" name="date_to" value="">
+		<?php
+		// The span the record covers. These were posted empty, so commit()
+		// recomputed an all-time scope and stored period_start = null on every
+		// hourly record — the window it billed was never written down. They now
+		// carry the same range the bar, the prefill and the ticked rows describe.
+		?>
+		<input type="hidden" name="date_from" value="<?php echo esc_attr( $pltt_from ); ?>">
+		<input type="hidden" name="date_to" value="<?php echo esc_attr( $pltt_to ); ?>">
 
 		<?php // Title row + terms + when: the scope block's identity shape, matching billing-dialog.php so both routes to a bill look alike. The submit button already says "Record bill", so the heading names the project instead. ?>
 		<div class="pltt-bill-dialog-titlerow">
@@ -113,6 +191,24 @@ $remainder           = number_format( (float) $scope['unbilled'], 2, '.', '' );
 		<?php // Retainer explains its fixed figure; hourly's amount is the live one on the terms line above, and its derivation changes with every tick, so there is nothing static to state here. ?>
 		<?php if ( $pltt_bill_confirm ) : ?>
 			<p class="pltt-bill-dialog-sub"><?php echo esc_html( $v['derivation'] ); ?></p>
+			<?php
+			// Billing on the period's final day (Rule 1). A retainer period
+			// reconciles as a whole, so anything logged to it after this record
+			// exists is stranded — it does not resurface here or roll into next
+			// month. That's a real consequence with a real repair, so the modal
+			// states both rather than a vague "still open". Not a block.
+			if ( ! empty( $scope['period_end'] ) && (string) $scope['period_end'] === pltt_get_current_date() ) :
+				?>
+				<p class="pltt-billing-hint pltt-billsel-sameday">
+					<?php
+					printf(
+						/* translators: %s: billing period label, e.g. "July 2026". */
+						esc_html__( '%s ends today. Time you log later today won\'t be on this record, and a retainer period can\'t be topped up — delete the record and redo it if that happens.', 'plain-language-time-tracker' ),
+						esc_html( $scope['period_label'] )
+					);
+					?>
+				</p>
+			<?php endif; ?>
 		<?php endif; ?>
 
 		<div class="pltt-billing-amount-row">

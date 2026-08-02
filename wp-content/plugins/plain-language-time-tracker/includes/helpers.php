@@ -149,6 +149,27 @@ function pltt_validate_date( $date ) {
 }
 
 /**
+ * Mark where WordPress should drop admin notices on this screen.
+ *
+ * At load, wp-admin/js/common.js moves every .notice on the page (ours, core's
+ * update nags, other plugins') to sit just after the first `.wp-header-end`
+ * element. With no marker it falls back to "right after the first H1 in .wrap".
+ *
+ * That fallback breaks on any screen whose H1 is nested — the light header and
+ * the detail header both wrap theirs in a flex row alongside a badge, so the
+ * notice lands inside that row and gets whatever width is left over, jammed
+ * against the title. Call this immediately after the header block closes and
+ * notices land below the whole header at full width, stacking in normal flow.
+ *
+ * Screens whose H1 is a direct child of the .pltt-header grid don't need it —
+ * the notice becomes a grid cell there and the `.pltt-header .notice` rule in
+ * admin.css already spans it. Core styles .wp-header-end hidden with no height.
+ */
+function pltt_header_end() {
+	echo '<hr class="wp-header-end">';
+}
+
+/**
  * Render admin success/error notices from query params. OPT-DUP1.
  *
  * Reads $_GET['pltt_message'] and $_GET['pltt_error'] and echoes the matching
@@ -204,39 +225,6 @@ function pltt_sanitize_date( $date ) {
 function pltt_sanitize_date_strict( $date ) {
 	$date = sanitize_text_field( $date );
 	return pltt_validate_date( $date ) ? $date : '';
-}
-
-/**
- * Extract hashtags from text.
- *
- * Supports multi-word tags. Tags continue until they hit:
- * - Another # (new tag)
- * - Comma, period, or dash with spaces
- * - End of string
- *
- * @param string $text Text to search.
- * @return array Array of tags (without # prefix).
- */
-function pltt_extract_tags( $text ) {
-	preg_match_all( '/#([a-zA-Z0-9_-]+(?:\s+[a-zA-Z0-9_-]+)*?)(?=\s*#|[,.]|\s+-\s+|$)/', $text, $matches );
-
-	// Trim whitespace from each tag and filter empty values.
-	$tags = array_map( 'trim', $matches[1] );
-	$tags = array_filter( $tags );
-
-	return array_unique( $tags );
-}
-
-/**
- * Remove hashtags from text.
- *
- * Removes multi-word tags that end at punctuation or another #.
- *
- * @param string $text Text to clean.
- * @return string Text without hashtags.
- */
-function pltt_remove_tags( $text ) {
-	return trim( preg_replace( '/#[a-zA-Z0-9_-]+(?:\s+[a-zA-Z0-9_-]+)*?(?=\s*#|[,.]|\s+-\s+|$)/', '', $text ) );
 }
 
 /**
@@ -1823,6 +1811,44 @@ function pltt_retainer_period_status_figure( $project, $period_start, $period_en
 }
 
 /**
+ * Why a scope holding value offers no bill action, as a basis-line fragment.
+ *
+ * Rule 2 of the billing availability spec: an absent bar used to carry no
+ * information at all — a rule and a fault looked identical. The reason belongs on
+ * figure 4, which already owns billing state and already carries the backlog
+ * count, so this reuses that line rather than introducing a second element.
+ *
+ * Register is the basis line's, not a sentence's: a short fragment, linked with a
+ * trailing angle when there's somewhere to go. Only ever built when there IS
+ * value — "Nothing outstanding" already answers the empty case, and fixed-fee and
+ * internal projects say nothing because they never generate value from time.
+ *
+ * @param string $text Short reason, already translated.
+ * @param string $url  Optional destination that resolves it.
+ * @return string Safe inline HTML.
+ */
+function pltt_billing_reason_basis( $text, $url = '' ) {
+	if ( '' === $url ) {
+		return esc_html( $text );
+	}
+	return '<a class="pltt-lk pltt-lk-over" href="' . esc_url( $url ) . '">' . esc_html( $text ) . ' &rsaquo;</a>';
+}
+
+/**
+ * Append a fragment to a basis line, inserting the separator only when needed.
+ *
+ * @param string $basis    Existing basis (safe inline HTML), may be empty.
+ * @param string $fragment Fragment to append (safe inline HTML).
+ * @return string
+ */
+function pltt_append_basis( $basis, $fragment ) {
+	if ( '' === $fragment ) {
+		return $basis;
+	}
+	return ( '' !== $basis ) ? $basis . ' · ' . $fragment : $fragment;
+}
+
+/**
  * Retainer figures when the range sits INSIDE one allocation period.
  *
  * The range is smaller than the billing unit, so neither allocation status nor
@@ -1854,7 +1880,9 @@ function pltt_build_retainer_partial_figures( $project, $stats, $context_overage
 	$is_over   = ( 'over' === $context_overage['state'] );
 	$rate      = pltt_resolve_billable_rate( (int) $project->client_id, (int) $project->id );
 	$period    = PLTT_Billing::format_period_label( $p_start, $p_end, $project->recurring_period ?? '' );
-	$is_closed = ( $p_end && $p_end < pltt_get_current_date() );
+	// The last day is INSIDE the period (Rule 1) — see the note on $is_closed in
+	// pltt_build_single_project_scope_figures().
+	$is_closed = ( $p_end && $p_end <= pltt_get_current_date() );
 
 	$figures = array();
 
@@ -1909,10 +1937,38 @@ function pltt_build_retainer_partial_figures( $project, $stats, $context_overage
 	);
 
 	// 4 — the period's billing status, from the shared state machine.
-	$status    = pltt_retainer_period_status_figure( $project, $p_start, $p_end, $gross, $is_over, $is_closed );
-	$figures[] = $status['figure'];
+	$status = pltt_retainer_period_status_figure( $project, $p_start, $p_end, $gross, $is_over, $is_closed );
+	$f4     = $status['figure'];
 
-	// No bar: a partial period can't produce a record (§3).
+	// No bar: a partial period can't produce a record (§3). A period holding an
+	// unbilled remainder while the filter shows only part of it is the "value, no
+	// action" case, so figure 4 names the fix (Rule 2) — the link widens to the
+	// whole period, which is what makes it billable.
+	if ( $status['unbilled'] > 0.005 ) {
+		$f4['basis'] = pltt_append_basis(
+			$f4['basis'],
+			pltt_billing_reason_basis(
+				sprintf(
+					/* translators: %s: period name, e.g. "June 2026". */
+					__( 'Widen to all of %s to bill', 'plain-language-time-tracker' ),
+					$period
+				),
+				add_query_arg(
+					array(
+						'page'       => 'pltt-reports',
+						'view'       => 'detailed',
+						'client_id'  => (int) $project->client_id,
+						'project_id' => (int) $project->id,
+						'from'       => $p_start,
+						'to'         => $p_end,
+					),
+					admin_url( 'admin.php' )
+				)
+			)
+		);
+	}
+	$figures[] = $f4;
+
 	return array(
 		'figures' => $figures,
 		'bar'     => null,
@@ -2075,6 +2131,18 @@ function pltt_build_retainer_span_figures( $project, $stats, $date_from = null, 
 		);
 	}
 
+	// No bar on a span — a retainer period IS the billing unit, so several of them
+	// have no single record to commit. When one of those periods is owed, figure 4
+	// says what to do about it (Rule 2). The count is already on this line as the
+	// "N periods ›" link, so this adds only the instruction, not a second tally.
+	//
+	// The instruction names the RANGE, not the count. "Narrow to one period" reads
+	// as nonsense next to "1 period ›" — that link counts periods still owed,
+	// which is a different number from how many the filter spans.
+	if ( ! $all_open && $unbilled > 0.005 ) {
+		$f4_parts[] = pltt_billing_reason_basis( __( 'narrow the range to bill', 'plain-language-time-tracker' ) );
+	}
+
 	// Every period in range is still running → the question isn't answerable
 	// yet, so a dash rather than a zero, exactly as §3's open-period rule.
 	$figures[] = array(
@@ -2162,7 +2230,20 @@ function pltt_build_single_project_scope_figures( $project, $stats, $billing_typ
 		$pct        = $alloc_min > 0 ? (int) round( $used_min / $alloc_min * 100 ) : 0;
 		$period_lbl = $p_start ? date_i18n( 'F Y', strtotime( $p_start ) ) : '';
 		$today      = pltt_get_current_date();
-		$is_closed  = ( $p_end && $p_end < $today );
+		// Rule 1 — the final day is inside the period, so July bills ON July 31,
+		// which is when invoicing actually happens. It used to bill on August 1.
+		//
+		// The exposure this accepts: a retainer period reconciles as a whole, so
+		// time logged later on the last day is stranded until the record is
+		// deleted and redone. That's one day, and the commit modal says so. It is
+		// also why this relaxes by exactly a day and no further — two days early,
+		// stranding stops being a risk and becomes a certainty.
+		//
+		// Every surface computing this must move together or the figure and the
+		// bar disagree: here, pltt_build_retainer_partial_figures(),
+		// PLTT_Billing::get_retainer_summary() ($is_open, the complement),
+		// PLTT_Billing::build_retainer_scopes(), and PLTT_Project_Report.
+		$is_closed  = ( $p_end && $p_end <= $today );
 
 		$r_figures = array();
 		// 1 — Total hours (% against allocation on basis).
@@ -2207,11 +2288,13 @@ function pltt_build_single_project_scope_figures( $project, $stats, $billing_typ
 		$unbilled_rem = $f4_state['unbilled'];
 		$show_bar     = $f4_state['billable_now'];
 		$bar_amt      = $show_bar ? $unbilled_rem : 0.0;
-		$r_figures[]  = $f4;
 
-		// Bar — only "Closed, unbilled" offers Review & bill (one action per screen).
-		$r_bar = null;
-		if ( $show_bar ) {
+		// Bar — only "reached its last day, unbilled" offers Review & bill (one
+		// action per screen), and only on a live project. Archived work keeps every
+		// figure it had; what it loses is the action, and Rule 2 says so below.
+		$r_active = ( 'active' === ( $project->status ?? '' ) );
+		$r_bar    = null;
+		if ( $show_bar && $r_active ) {
 			$review_url = add_query_arg(
 				array(
 					'page'       => 'pltt-reports',
@@ -2232,6 +2315,38 @@ function pltt_build_single_project_scope_figures( $project, $stats, $billing_typ
 			);
 		}
 
+		// Value but no action — figure 4 names which rule is holding it (Rule 2).
+		// Ordered by what you can do about it: restore the project, or wait for the
+		// period to reach its last day.
+		if ( ! $r_bar && $unbilled_rem > 0.005 ) {
+			if ( ! $r_active ) {
+				$f4['basis'] = pltt_append_basis(
+					$f4['basis'],
+					pltt_billing_reason_basis(
+						__( 'Archived — restore to bill', 'plain-language-time-tracker' ),
+						PLTT_Project_Detail::get_url( (int) $project->id )
+					)
+				);
+			} elseif ( $p_start > $today ) {
+				$f4['basis'] = pltt_append_basis(
+					$f4['basis'],
+					pltt_billing_reason_basis( __( 'Period hasn\'t started', 'plain-language-time-tracker' ) )
+				);
+			} elseif ( ! $is_closed ) {
+				$f4['basis'] = pltt_append_basis(
+					$f4['basis'],
+					pltt_billing_reason_basis(
+						sprintf(
+							/* translators: %s: the period's last day, e.g. "Jul 31". */
+							__( 'Billable from %s', 'plain-language-time-tracker' ),
+							date_i18n( 'M j', strtotime( $p_end ) )
+						)
+					)
+				);
+			}
+		}
+		$r_figures[] = $f4;
+
 		return array(
 			'figures' => $r_figures,
 			'bar'     => $r_bar,
@@ -2241,6 +2356,7 @@ function pltt_build_single_project_scope_figures( $project, $stats, $billing_typ
 
 	$figures = array();
 	$bar     = null;
+	$blocked = null;
 
 	if ( 'hourly' === $billing_type ) {
 		// Total hours.
@@ -2264,14 +2380,17 @@ function pltt_build_single_project_scope_figures( $project, $stats, $billing_typ
 		// range doesn't disappear — it becomes a count and a link on the basis
 		// line, which is the only place it can appear without the figure lying
 		// about its own frame.
+		// Status gates the ACTION, not the arithmetic (Rule 2). Skipping the scope
+		// for an archived project made figure 4 read "$0.00 · Nothing outstanding"
+		// over real uncovered money, and left "Archived — restore it to bill"
+		// standing next to a zero. It also disagreed with the Project Detail card,
+		// which has always computed this without a status check.
 		$is_active = ( 'active' === ( $project->status ?? '' ) );
 
 		$ready_total = 0.0;
 		$ready_count = 0;
 		$oldest      = '';
-		$ready_scopes = $is_active
-			? PLTT_Billing::get_ready_to_invoice( $project, true, $date_from, $date_to )
-			: array();
+		$ready_scopes = PLTT_Billing::get_ready_to_invoice( $project, true, $date_from, $date_to );
 		foreach ( $ready_scopes as $s ) {
 			$ready_total += (float) $s['unbilled'];
 			foreach ( $s['entries'] as $e ) {
@@ -2288,14 +2407,27 @@ function pltt_build_single_project_scope_figures( $project, $stats, $billing_typ
 		// all-time set and subtracting what's in range, so at "All time" it comes
 		// out at zero and the line is absent, exactly as it should be: nothing is
 		// outside everything.
-		$backlog_count = 0;
-		if ( $is_active ) {
-			$all_count = 0;
-			foreach ( PLTT_Billing::get_ready_to_invoice( $project, true ) as $s ) {
-				$all_count += count( $s['entries'] );
+		// Bounds come with the count: stranded work can sit either side of the
+		// filter, so widening has to reach both ways. A range that only extended
+		// backwards would still hide anything logged after the range end.
+		$backlog_oldest = '';
+		$backlog_latest = '';
+		$all_count      = 0;
+		$all_total      = 0.0;
+		foreach ( PLTT_Billing::get_ready_to_invoice( $project, true ) as $s ) {
+			$all_total += (float) $s['unbilled'];
+			foreach ( $s['entries'] as $e ) {
+				$all_count++;
+				if ( '' === $backlog_oldest || $e->entry_date < $backlog_oldest ) {
+					$backlog_oldest = $e->entry_date;
+				}
+				if ( '' === $backlog_latest || $e->entry_date > $backlog_latest ) {
+					$backlog_latest = $e->entry_date;
+				}
 			}
-			$backlog_count = max( 0, $all_count - $ready_count );
 		}
+		$all_total     = round( $all_total, 2 );
+		$backlog_count = max( 0, $all_count - $ready_count );
 
 		if ( $has_ready ) {
 			$ready_basis = sprintf(
@@ -2311,12 +2443,82 @@ function pltt_build_single_project_scope_figures( $project, $stats, $billing_typ
 		}
 
 		if ( $backlog_count > 0 ) {
-			$backlog_url = admin_url( 'admin.php?page=pltt-invoicing' ) . '#pltt-bill-proj-' . (int) $project->id;
+			// Widen the range in place rather than leaving for the Billing page.
+			// The old destination answered a different question — "what's
+			// outstanding everywhere" — when the thing you actually want is this
+			// project's stranded work in the view you're already in. Widening
+			// re-renders figure 4 and the Review & bill bar over the whole set, so
+			// billing it is the next click instead of a trip to another screen.
+			//
+			// No bill=1: the basis line points at information, never at an action
+			// (spec §3c). It changes what you're looking at; the bar still commits.
+			// Union of the current filter and every unbilled entry, so widening only
+			// ever adds — what you were looking at stays on screen.
+			$wide_from = $backlog_oldest ? $backlog_oldest : (string) $date_from;
+			$wide_to   = $backlog_latest ? $backlog_latest : (string) $date_to;
+			if ( $date_from && $date_from < $wide_from ) {
+				$wide_from = (string) $date_from;
+			}
+			if ( $date_to && $date_to > $wide_to ) {
+				$wide_to = (string) $date_to;
+			}
+			$backlog_url = add_query_arg(
+				array(
+					'page'       => 'pltt-reports',
+					'view'       => 'detailed',
+					'client_id'  => (int) $project->client_id,
+					'project_id' => (int) $project->id,
+					'from'       => $wide_from,
+					'to'         => $wide_to,
+				),
+				admin_url( 'admin.php' )
+			);
 			$ready_basis .= ' · <a class="pltt-lk pltt-lk-over" href="' . esc_url( $backlog_url ) . '">' . sprintf(
 				/* translators: %d: unbilled entries outside the filtered range. */
 				esc_html( _n( '%d outside this range', '%d outside this range', $backlog_count, 'plain-language-time-tracker' ) ),
 				$backlog_count
 			) . ' &rsaquo;</a>';
+		}
+
+		// Value but no action — figure 4 names the rule holding it (Rule 2). Two
+		// silent paths used to end here.
+		//
+		// Archived: every other figure renders live, so the card showed money and
+		// the bar vanished with nothing said.
+		//
+		// Unverified: figure 2 counts every billable entry, figure 4 counts only
+		// the VERIFIED uncovered ones — so billable-but-unverified time reads as
+		// money in one figure, is invisible to the other, and offers no action. Not
+		// a fault, but nothing distinguished it from one.
+		$unverified = ( $stats && isset( $stats->billable_unverified_count ) )
+			? (int) $stats->billable_unverified_count
+			: 0;
+		if ( ! $is_active && $has_ready ) {
+			$ready_basis = pltt_append_basis(
+				$ready_basis,
+				pltt_billing_reason_basis(
+					__( 'Archived — restore to bill', 'plain-language-time-tracker' ),
+					PLTT_Project_Detail::get_url( (int) $project->id )
+				)
+			);
+		} elseif ( $is_active && $unverified > 0 ) {
+			$ready_basis = pltt_append_basis(
+				$ready_basis,
+				pltt_billing_reason_basis(
+					sprintf(
+						/* translators: %d: billable entries in range that aren't verified. */
+						_n( '%d not verified yet', '%d not verified yet', $unverified, 'plain-language-time-tracker' ),
+						$unverified
+					),
+					add_query_arg(
+						array(
+							'page'   => 'pltt-time-tracker',
+							'screen' => 'review',
+						),
+						admin_url( 'admin.php' )
+					)
+				)
+			);
 		}
 
 		// Settled before owed, so "Not yet billed" lands in slot 4 on every type
@@ -2341,15 +2543,32 @@ function pltt_build_single_project_scope_figures( $project, $stats, $billing_typ
 			'tint'  => ( $backlog_count > 0 ),
 		);
 
-		// Action bar — only when something is ready to bill. The button jumps to
-		// the select-row flow (bill=1) over the span of unbilled entries.
-		if ( $has_ready ) {
-			// Bill exactly what the figure above states: the filtered range. Using
-			// the all-time span here made the number, the button and the table
-			// below disagree about what was being billed.
-			$today      = pltt_get_current_date();
-			$from       = $date_from ? $date_from : ( $oldest ? $oldest : $today );
-			$bar_to     = $date_to ? $date_to : $today;
+		// Action bar — only when something is ready to bill, on a live project.
+		// The button jumps to the select-row flow (bill=1).
+		//
+		// It opens EVERYTHING outstanding, not the filtered range. An hourly
+		// project has no natural billing boundary — the unit is a run of unbilled
+		// entries, defined by selection, not by calendar — so defaulting the action
+		// to whatever the date filter happened to be was defaulting to the one
+		// frame the model calls arbitrary. Every row arrives ticked; unticking is
+		// how you narrow, which is the thing that actually constrains the bill.
+		//
+		// The constraint the range-lock existed to protect — figure, button and
+		// table naming the same span — still holds, because the bar STATES the
+		// wider span instead of quietly adopting it. That was the real rule; "the
+		// span must be the filter" was a conflation of it.
+		if ( $has_ready && $is_active ) {
+			$today   = pltt_get_current_date();
+			$wide    = ( $backlog_count > 0 );
+			$from    = $wide
+				? ( $backlog_oldest ? $backlog_oldest : ( $oldest ? $oldest : $today ) )
+				: ( $date_from ? $date_from : ( $oldest ? $oldest : $today ) );
+			$bar_to  = $wide
+				? ( $backlog_latest && $backlog_latest > (string) $date_to ? $backlog_latest : ( $date_to ? $date_to : $today ) )
+				: ( $date_to ? $date_to : $today );
+			$bar_amt = $wide ? $all_total : $ready_total;
+			$bar_cnt = $wide ? $all_count : $ready_count;
+
 			$review_url = add_query_arg(
 				array(
 					'page'       => 'pltt-reports',
@@ -2362,16 +2581,31 @@ function pltt_build_single_project_scope_figures( $project, $stats, $billing_typ
 				),
 				admin_url( 'admin.php' )
 			);
+
+			$bar_desc = sprintf(
+				/* translators: %d: number of unbilled entries. */
+				esc_html( _n( 'across %d unbilled entry', 'across %d unbilled entries', $bar_cnt, 'plain-language-time-tracker' ) ),
+				$bar_cnt
+			);
+			// Name the span when it is wider than the figure above, so the amount on
+			// the button can't be mistaken for figure 4's. Both are labelled: the
+			// card answers for the range, the bar answers for the whole backlog.
+			if ( $wide ) {
+				$bar_desc .= ' · <span class="pltt-mono">' . esc_html( pltt_format_date_range( $from, $bar_to ) ) . '</span>';
+			}
+
 			$bar = array(
-				'amount'     => pltt_format_currency( $ready_total ),
-				'desc'       => sprintf(
-					/* translators: %d: number of unbilled entries. */
-					esc_html( _n( 'across %d unbilled entry', 'across %d unbilled entries', $ready_count, 'plain-language-time-tracker' ) ),
-					$ready_count
-				),
+				// "Ready to bill" / "Ready to bill all outstanding" — the frame lives
+				// in the label, per the spec's "the label names the span" rule.
+				'label'      => $wide
+					? __( 'Ready to bill all outstanding', 'plain-language-time-tracker' )
+					: __( 'Ready to bill', 'plain-language-time-tracker' ),
+				'amount'     => pltt_format_currency( $bar_amt ),
+				'desc'       => $bar_desc,
 				'review_url' => $review_url,
 			);
 		}
+
 	} else {
 		// Fixed budget — awareness figures, no bill action (no records generated).
 		// The budget is a LIFETIME quantity, so the budget figure compares
@@ -2433,10 +2667,16 @@ function pltt_build_single_project_scope_figures( $project, $stats, $billing_typ
 		// 3 — The project fee (the agreed amount). No basis line: the model badge
 		// and the terms line above already say it's fixed.
 		$fee = isset( $project->budget_fee ) ? (float) $project->budget_fee : 0.0;
+		// A fixed fee never enters billing — no record is generated from time. The
+		// card shows a fee and offers no action, so it says why on its own basis
+		// line; without that it reads as the same fault as a missing hourly bar.
+		// Stated only when there IS a fee, so a fixed project with none stays silent.
 		$figures[] = array(
 			'label' => __( 'Project fee', 'plain-language-time-tracker' ),
 			'value' => pltt_format_currency( $fee ),
-			'basis' => '',
+			'basis' => $fee > 0.005
+				? pltt_billing_reason_basis( __( 'Billed outside the tracker', 'plain-language-time-tracker' ) )
+				: '',
 			'over'  => false,
 		);
 	}
