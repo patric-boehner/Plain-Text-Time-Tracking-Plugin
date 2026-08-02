@@ -101,6 +101,15 @@
 	text-decoration: none;
 }
 
+/* The separator and the day's billable amount travel together so the pair can
+   be hidden as one when the day has nothing billable. Repeating the parent's
+   gap keeps the spacing identical to when they were bare siblings. */
+.pltt-day-amount {
+	display: inline-flex;
+	align-items: baseline;
+	gap: 8px;
+}
+
 .pltt-date-group table.widefat {
 	border-radius: 0 0 4px 4px;
 }

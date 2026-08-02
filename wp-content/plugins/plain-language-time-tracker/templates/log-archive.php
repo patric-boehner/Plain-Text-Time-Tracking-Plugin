@@ -134,6 +134,11 @@ if ( ! defined( 'ABSPATH' ) ) {
 		</form>
 	</div>
 
+	<?php
+	// The H1 is nested in the light header — see pltt_header_end().
+	pltt_header_end();
+	?>
+
 	<div class="pltt-report-content">
 		<?php if ( ! empty( $logs ) ) : ?>
 			<?php

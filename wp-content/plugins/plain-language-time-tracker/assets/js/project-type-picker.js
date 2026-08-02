@@ -41,7 +41,8 @@
 		fixedDesc:      S.fixedDesc || 'Entries default to non-billable — you decide when and what to bill against the budget.',
 		recurringTitle: S.recurringTitle || 'RECURRING SETTINGS',
 		hourAllocation: S.hourAllocation || 'Hour Allocation ',
-		recurringDesc:  S.recurringDesc || 'Hours included per period. Time within the allocation is covered by the retainer; hours over the plan are billed as overage when you invoice.'
+		recurringDesc:  S.recurringDesc || 'Hours included per period. Time within the allocation is covered by the retainer; hours over the plan are billed as overage when you invoice.',
+		budgetRequired: S.budgetRequired || 'Enter the total fee for this fixed-budget project.'
 	};
 
 	function applyBudgetModeUI( mode ) {
@@ -81,11 +82,15 @@
 		var hoursInput       = el( 'pltt-project-budget-hours' );
 		var feeInput         = el( 'pltt-project-budget-fee' );
 
-		// Compact quick-add (entry editor) renders only the type cards — no
-		// settings box, rate, or non-billable toggle. Once the card selection is
-		// recorded there's nothing else to toggle; getValues() derives the
-		// type-driving fields from the chosen type.
+		// Compact quick-add (entry editor) renders the type cards and one budget
+		// field — no settings box, rate, or non-billable toggle. The budget field
+		// shows for Fixed only, because that's the one type that can't be saved
+		// without a number; getValues() derives the rest from the chosen type.
 		if ( ! settingsBox ) {
+			var compactBudget = el( 'pltt-project-budget-compact' );
+			if ( compactBudget ) {
+				compactBudget.classList.toggle( 'pltt-hidden', 'fixed' !== type );
+			}
 			return;
 		}
 
@@ -229,12 +234,19 @@
 		selectBillingType( 'hourly', true );
 	}
 
+	function val( id ) {
+		var node = el( id );
+		return node ? node.value : '';
+	}
+
+	// Read a money/hours field as a number, ignoring $ and thousands separators.
+	function num( id ) {
+		var raw = val( id ).replace( /[^0-9.]/g, '' );
+		return raw === '' ? 0 : ( parseFloat( raw ) || 0 );
+	}
+
 	// Read the fields a pltt_create_project call needs.
 	function getValues() {
-		function val( id ) {
-			var node = el( id );
-			return node ? node.value : '';
-		}
 		var typeEl = el( 'pltt-project-billing-type' );
 		var type = typeEl ? typeEl.value : 'hourly';
 		var recurEl = el( 'pltt-project-recurring-period' );
@@ -245,18 +257,40 @@
 			budget_hours: val( 'pltt-project-budget-hours' ),
 			budget_fee: val( 'pltt-project-budget-fee' ),
 			// When the settings inputs aren't rendered (compact quick-add), derive
-			// the type-driving values from the chosen card: retainer → monthly,
-			// internal → non-billable.
+			// the type-driving values from the chosen card: retainer → monthly, and
+			// non-billable for every type whose money is decided at the period or
+			// project level rather than per entry — the same values the full modal
+			// forces in applyBillingTypeUI().
 			recurring_period: recurEl ? recurEl.value : ( type === 'recurring' ? 'monthly' : '' ),
-			non_billable: nb ? ( nb.checked ? '1' : '0' ) : ( type === 'none' ? '1' : '0' )
+			non_billable: nb
+				? ( nb.checked ? '1' : '0' )
+				: ( 'hourly' === type ? '0' : '1' )
 		};
+	}
+
+	// Why a project can't be saved as picked, or '' when it can.
+	//
+	// Only Fixed budget can fail: its type is derived from having a budget number
+	// (pltt_get_billing_type()), so saving one with no budget would quietly file it
+	// as an internal project. The full Projects modal catches this with `required`
+	// on a real form; the quick-add saves over AJAX, so it asks here.
+	function validate() {
+		var typeEl = el( 'pltt-project-billing-type' );
+		if ( ! typeEl || 'fixed' !== typeEl.value ) {
+			return '';
+		}
+		if ( num( 'pltt-project-budget-hours' ) > 0 || num( 'pltt-project-budget-fee' ) > 0 ) {
+			return '';
+		}
+		return TXT.budgetRequired;
 	}
 
 	window.PlttProjectType = {
 		init: init,
 		select: selectBillingType,
 		reset: reset,
-		getValues: getValues
+		getValues: getValues,
+		validate: validate
 	};
 
 	// Self-wire the card group as soon as the DOM is ready, so neither the

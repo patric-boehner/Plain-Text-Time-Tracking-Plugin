@@ -17,11 +17,11 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-// Compact mode (the entry-editor "Add project" quick-add): show only the type
-// cards — the billing type sets the new entry's billable default, which is what
-// matters mid-capture. The setting numbers (allocation, budget) are project
-// setup, so they stay on the Projects page. Retainer auto-defaults to monthly;
-// Fixed budget is omitted here because it's meaningless without a budget number.
+// Compact mode (the entry-editor "Add project" quick-add): the type cards, plus
+// the one number Fixed budget can't go without. The billing type sets the new
+// entry's billable default, which is what matters mid-capture; the rest of the
+// setting numbers are project setup, so they stay on the Projects page. Retainer
+// auto-defaults to monthly with its allocation added later.
 $pltt_compact = ! empty( $pltt_billing_compact );
 ?>
 <p>
@@ -35,12 +35,10 @@ $pltt_compact = ! empty( $pltt_billing_compact );
 			<span class="pltt-typecard-t"><span class="pltt-typecard-dot" aria-hidden="true"></span><?php esc_html_e( 'Monthly retainer', 'plain-language-time-tracker' ); ?></span>
 			<span class="pltt-typecard-d"><?php esc_html_e( 'A set allocation of hours each period. Time is covered; only overage is billable.', 'plain-language-time-tracker' ); ?></span>
 		</button>
-		<?php if ( ! $pltt_compact ) : ?>
 		<button type="button" class="pltt-typecard" data-type="fixed" role="radio" aria-checked="false">
 			<span class="pltt-typecard-t"><span class="pltt-typecard-dot" aria-hidden="true"></span><?php esc_html_e( 'Fixed budget', 'plain-language-time-tracker' ); ?></span>
 			<span class="pltt-typecard-d"><?php esc_html_e( 'A total project budget. Track burn; bill on your own schedule, non-billable by default.', 'plain-language-time-tracker' ); ?></span>
 		</button>
-		<?php endif; ?>
 		<button type="button" class="pltt-typecard" data-type="none" role="radio" aria-checked="false">
 			<span class="pltt-typecard-t"><span class="pltt-typecard-dot" aria-hidden="true"></span><?php esc_html_e( 'Internal', 'plain-language-time-tracker' ); ?></span>
 			<span class="pltt-typecard-d"><?php esc_html_e( 'Your own work. Tracked for insight, never billed.', 'plain-language-time-tracker' ); ?></span>
@@ -49,11 +47,29 @@ $pltt_compact = ! empty( $pltt_billing_compact );
 	<?php // Value holder read/written by the modal JS; type itself isn't submitted — it's derived server-side from the fields below. ?>
 	<input type="hidden" id="pltt-project-billing-type" value="hourly">
 	<?php if ( $pltt_compact ) : ?>
-		<small class="description"><?php esc_html_e( 'Set the allocation or a fixed budget later, in Projects.', 'plain-language-time-tracker' ); ?></small>
+		<small class="description"><?php esc_html_e( 'Set the retainer allocation and the rate later, in Projects.', 'plain-language-time-tracker' ); ?></small>
 	<?php endif; ?>
 </p>
 
-<?php if ( $pltt_compact ) { return; } // Quick-add stops here: no setting inputs, rate, or non-billable toggle. ?>
+<?php if ( $pltt_compact ) : ?>
+	<?php
+	// A project counts as Fixed budget only once it has a budget number — the type
+	// is derived from the budget, never stored on its own (pltt_get_billing_type()).
+	// Without a number here, picking Fixed would save an internal project instead,
+	// so the quick-add asks for the total fee and nothing else. Hour-based budgets
+	// are a Projects-page switch.
+	?>
+	<div id="pltt-project-budget-compact" class="pltt-billing-settings pltt-hidden">
+		<label for="pltt-project-budget-fee"><?php esc_html_e( 'Total Fee ($)', 'plain-language-time-tracker' ); ?></label>
+		<div class="pltt-input-adornment-wrap">
+			<span class="pltt-adornment pltt-adornment-prefix">$</span>
+			<input type="text" inputmode="decimal" id="pltt-project-budget-fee" name="budget_fee" class="widefat pltt-currency-input" placeholder="0.00">
+		</div>
+		<p class="description"><?php esc_html_e( 'Budget by hours instead? Create it here, then switch it in Projects.', 'plain-language-time-tracker' ); ?></p>
+	</div>
+<?php endif; ?>
+
+<?php if ( $pltt_compact ) { return; } // Quick-add stops here: no allocation, rate, or non-billable toggle. ?>
 
 <!-- Type-specific settings box: shown for Fixed Fee and Recurring only -->
 <div id="pltt-project-billing-settings" class="pltt-billing-settings pltt-hidden">

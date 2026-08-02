@@ -23,7 +23,6 @@
 	var dropdown    = widget.querySelector( '.pltt-date-nav-dropdown' );
 	var prevBtn     = widget.querySelector( '.pltt-date-nav-prev' );
 	var nextBtn     = widget.querySelector( '.pltt-date-nav-next' );
-	var customInputs = widget.querySelector( '.pltt-date-nav-custom-inputs' );
 	var customFrom  = document.getElementById( 'pltt-date-custom-from' );
 	var customTo    = document.getElementById( 'pltt-date-custom-to' );
 	var applyBtn    = widget.querySelector( '.pltt-date-nav-custom-apply' );
@@ -133,7 +132,19 @@
 	}
 
 	/**
+	 * Order two Y-m-d strings, so a reversed range still means the span between
+	 * them rather than an empty result. Lexical compare is safe on Y-m-d.
+	 */
+	function orderRange( a, b ) {
+		return a <= b ? { from: a, to: b } : { from: b, to: a };
+	}
+
+	/**
 	 * Apply a new date range: update hidden inputs, label, and submit.
+	 *
+	 * form.submit() deliberately does NOT fire the form's `submit` event, so the
+	 * sync handler below is skipped: a preset or prev/next click wins over
+	 * whatever is still sitting in the custom date fields.
 	 */
 	function applyRange( from, to ) {
 		fromInput.value = from;
@@ -234,17 +245,20 @@
 		} );
 	} );
 
-	// Custom date validation.
-	if ( customFrom && customTo ) {
-		customFrom.addEventListener( 'change', function() {
-			if ( customTo.value && this.value > customTo.value ) {
-				customTo.value = this.value;
+	// The custom date fields carry no name= — they are a staging area for the
+	// hidden from/to pair, which is what actually gets submitted. Copy them over
+	// on any real form submission, so pressing Enter in a date field and the
+	// filter bar's own submit button behave like the Apply button below. Without
+	// this the typed dates are dropped and the page reloads on the old range.
+	var form = fromInput.form;
+	if ( form && customFrom && customTo ) {
+		form.addEventListener( 'submit', function() {
+			if ( ! customFrom.value || ! customTo.value ) {
+				return; // Half-filled: keep the range the page loaded with.
 			}
-		} );
-		customTo.addEventListener( 'change', function() {
-			if ( customFrom.value && this.value < customFrom.value ) {
-				customFrom.value = this.value;
-			}
+			var range = orderRange( customFrom.value, customTo.value );
+			fromInput.value = range.from;
+			toInput.value   = range.to;
 		} );
 	}
 
@@ -252,7 +266,8 @@
 	if ( applyBtn ) {
 		applyBtn.addEventListener( 'click', function() {
 			if ( customFrom && customTo && customFrom.value && customTo.value ) {
-				applyRange( customFrom.value, customTo.value );
+				var range = orderRange( customFrom.value, customTo.value );
+				applyRange( range.from, range.to );
 			}
 		} );
 	}
