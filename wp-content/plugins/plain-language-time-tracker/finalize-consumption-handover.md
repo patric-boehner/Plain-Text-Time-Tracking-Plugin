@@ -1,117 +1,87 @@
-# Finalize consumption indicator — handover
+# Consumption indicator — handover
 
-Built 2026-08-01 on `feature/finalize-consumption` from the BUILD PLAN in
-`finalize-consumption-indicator-spec.md`. All 9 touchpoints done, display only,
-no database writes, no schema change.
+Built 2026-08-01 on `feature/finalize-consumption`. Display only, no database
+writes, no schema change.
 
-This note records the decisions the plan did not cover. Three of them changed
-what got built, so read them before reviewing the diff.
+**The surface changed during the build.** The spec put the figure under the
+project picker on the finalize screen, live-updating as entries were assigned.
+Built that way first (commit `b92df00`), reviewed, and rejected:
 
----
+> "Not while I am actually confirming an entry. It doesn't do anything for me to
+> have it under the drop down exactly when I set it, in fact it's distracting —
+> now I have something to think about while I am trying to do another task
+> exactly when I can't do anything about it." — Patrick, 2026-08-01
 
-## 1. DECIDED (needs your sign-off): the period is anchored to the day being finalized, not to today
-
-The spec says a retainer shows "minutes in the **current** allocation period".
-That is unambiguous when you finalize today's log, which is the daily flow. It
-is ambiguous when you finalize an older day — reviewing 31 July on 1 August, is
-"current" July or August?
-
-**Chosen: the day being finalized.** So reviewing 31 July shows July's
-consumption and "31 days in", not August's empty slate.
-
-Why:
-
-- It matches the existing idiom. `pltt_compute_overage_threshold()` already
-  takes its period anchor from `$filter_args['date_from']` rather than assuming
-  today, and this reuses that.
-- It is the only version where the arithmetic in §2 below is correct. Anchored
-  to today, the rows on screen can sit outside the period the baseline covers,
-  and netting them out would produce a wrong figure.
-- In the common case the two readings are identical.
-
-The anchor travels as a `reference_date` POST parameter on `pltt_get_projects`
-and `pltt_create_project`, sanitized with `pltt_sanitize_date_strict()` so
-anything invalid falls back to today rather than failing.
-
-**If you want "always today" instead**, it is a one-line change in each of the
-two AJAX handlers plus dropping the `reference_date` sends in `review.js` — but
-the netting-out in §2 then needs a period-membership check per row.
-
-## 2. The baseline had to be adjusted, or the day's own work would count twice
-
-The plan says "server renders each project's *starting* consumption; the client
-accumulates the durations of rows assigned to that project." Taken literally
-that double-counts, and the plan does not mention it.
-
-The reason: **entries on the finalize screen are already in the database.** They
-are created at parse time, not at "Save All" (`PLTT_Review::save_entries` —
-"Entries are created during processing, this just updates them"). So a plain
-`SUM(duration_minutes)` baseline already contains every row you are looking at.
-Adding those rows on top would have shown a 3-hour retainer at 6 hours the
-instant the page rendered.
-
-**Fix:** each row publishes what it currently contributes to that SUM —
-`data-db-project-id` and `data-db-duration-minutes` — and the client subtracts
-those **once** at load, before it starts accumulating live. The figure is:
-
-    consumed − whatTheseRowsAlreadyContributed + whatTheyContributeNow
-
-With nothing touched the two correction terms cancel and the figure equals the
-database exactly. Verified in `test-consumption.js`.
-
-Sealing the subtraction at load is also what makes deletion work: removing a row
-drops its live contribution, and the database row it deleted is already netted
-out. Nothing is recomputed.
-
-Note `data-db-project-id` is deliberately **not** the existing
-`data-original-project-id`, which carries the *predicted* project (filled from
-recency for guessed rows) and so does not match what is stored.
-
-## 3. The line omits the project name
-
-The spec's example line is:
-
-    Democrats of Rossmoor — 2.1 of 3h, 5 days in
-
-The container sits directly under the project picker, which already shows the
-name, and the finalize table's project column is narrow. Rendering
-`2.1 of 3h, 5 days in` on its own avoids repeating the name and wrapping the
-cell. The spec's line reads as illustrating the *content*, not mandating the
-name in situ — but it is a presentation call you may want to overrule.
-
-## 4. Over 100% escalates colour and weight only — no percentage shown
-
-The spec says "escalate the styling past 100%, but keep it a statement, not a
-warning," and separately mentions BTSA's entry being showable as "108% of the
-project's budget."
-
-Built: `.is-over` switches to the plugin's existing overage amber
-(`--pltt-c-over`) at weight 600. No percentage, no badge, no icon, no background.
-A percentage would have been a second number competing with the one that matters.
-Easy to add if you want it — it is one line in `describe()`.
-
-## 5. The edit form got the indicator too, without cross-row accumulation
-
-Touchpoints 5, 8 and 9 are the entry edit form, so it is in scope. But a form row
-edits one persisted entry at a time, so "accumulate the rows assigned to that
-project" has no cross-row meaning there. It renders the same line with the same
-formula restricted to a single row: swap what that entry currently contributes
-for what the open form would make it contribute.
-
-The two surfaces never co-render (`review.php` and `daily-log.php` both branch
-`if ( $is_post_parse ) … else …`), so their bookkeeping cannot collide.
+It is now a dismissible notice under the day's summary cards, shown **after
+Save All Entries**. The per-row version and everything that fed it were reverted
+in the follow-up commit; `b92df00` still has it if it is ever wanted back.
 
 ---
 
-## Parked — not built, not decided
+## What it does now
 
-- **Nothing shows on the Daily Log.** Correct per spec ("Not on the Daily Log"),
-  noting only that the inline editor there does get the form-row version, since
-  it shares `entry-form-row.php`.
-- **No projection / pace.** Correct per spec — that belongs on the Overview with
-  the budget-threshold notification work.
-- **Archived projects** carry the figure like any other. Nobody asked; it fell
-  out of following the `billable_flag_applies` pattern exactly.
+After a save, if that day's work took a project **to or past** its ceiling:
+
+```
+This day's work took one project to its ceiling
+
+  Democrats of Rossmoor · Website Care Plan Time    3.2 of 3h    8 days in
+```
+
+Retainers get the period fragment; fixed budgets are cumulative and omit it.
+Hourly, internal, and retainers with a deliberately empty allocation (S3NSE's
+Content Plan Time) never appear. Dismissible for the page view only — nothing
+is stored anywhere.
+
+## The one decision that overrode a stated answer
+
+You chose **"only at or over the ceiling"**, with the reasoning that the notice
+should be silent on a normal day so its presence is itself the signal.
+
+Implemented literally, that rule **fired on 107 of the last 120 days** in the
+dev database. The reason is structural: a retainer that crosses on the 5th is
+still over on the 6th, the 7th and the 28th, so a state-based test re-reports the
+same crossing on every save for the rest of the month. That is the wallpaper you
+were trying to get away from.
+
+So it reports the **crossing**, not the state: a project qualifies only when it
+was under its ceiling before that day's entries and is at or over once they
+count. Same 120 days, **14 firings** — about one in nine. Days that merely pile
+more onto an already-broken ceiling stay silent.
+
+**If you would rather have the literal rule**, it is a two-line change in
+`pltt_consumption_alerts()` — drop the `$before` computation and the
+`$before >= ceiling` clause.
+
+## Things worth knowing
+
+**The figure is "as of that day", not the whole period.** `3.2 of 3h` on 8 July,
+not July's eventual 10.9. This required a `$through_reference` flag on
+`pltt_project_consumption()`; without it the full-period total also contains
+work dated *after* the day in question, which makes "before today" look
+already-over and swallows the crossing entirely. That was a real bug mid-build —
+it cut firings to 2 of 120 for the wrong reason. The flag defaults to off, so the
+plain full-period call still agrees with `pltt_compute_overage_threshold()` on
+all 14 ceiling-bearing projects.
+
+**Only on the Daily Log.** `handle_save_entries()` normally redirects to
+`daily-log?date=…&pltt_message=entries_saved`, which is where the notice renders.
+If a `return_to` was set (Reports → Edit → Back), the redirect goes there instead
+and the notice is not shown. Not wired up for that path — say the word if it
+should be.
+
+**Ordering is by share of ceiling**, so a 3-hour retainer at double sorts above a
+40-hour budget a nudge over.
+
+## Parked
+
+- **No projection / pace.** Per spec, that belongs on the Overview with the
+  budget-threshold notification work.
+- **Nothing on the Daily Log capture side.** Capture-first is protected.
 - **Recurring fixed-fee**, once that type exists, must return `null` from
-  `pltt_project_consumption()`. There is a comment marking the spot; it will need
-  an explicit branch rather than falling through to `recurring`.
+  `pltt_project_consumption()` — it will need an explicit branch rather than
+  falling through to `recurring`.
+- **A day can only be reported once.** Re-saving the same day re-evaluates from
+  scratch, so editing a finalized day and saving again will re-show the notice
+  if the crossing still computes. Harmless, but it is not idempotent in the
+  "you've already seen this" sense — that would need stored state.

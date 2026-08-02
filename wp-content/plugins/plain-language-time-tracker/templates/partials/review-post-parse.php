@@ -122,20 +122,7 @@ if ( $rc['untagged'] > 0 ) {
 					$warning_tooltip = implode( ' ', $reasons );
 				}
 				?>
-				<?php
-				// The consumption indicator's baseline is a straight SUM from the
-				// database, which ALREADY includes every row on this screen (entries
-				// are created at parse time, not at Save All). So the row also
-				// publishes what it currently contributes to that SUM — its stored
-				// project and stored duration — and the client subtracts those once
-				// at load before it starts accumulating live. Without this the day's
-				// own entries would be counted twice the moment the page rendered.
-				// Note data-original-project-id is the PREDICTED project (filled from
-				// recency for guesses) and is not the same thing.
-				$db_project_id = (int) ( $entry['project_id'] ?? 0 );
-				$db_duration   = (int) ( $entry['duration_minutes'] ?? 0 );
-				?>
-				<tr class="<?php echo esc_attr( implode( ' ', $row_classes ) ); ?>" data-entry-id="<?php echo esc_attr( $entry_id ); ?>" data-index="<?php echo esc_attr( $index ); ?>" data-original-project-id="<?php echo esc_attr( $predicted_project ); ?>" data-db-project-id="<?php echo esc_attr( $db_project_id ); ?>" data-db-duration-minutes="<?php echo esc_attr( $db_duration ); ?>" data-resolution-state="<?php echo esc_attr( $entry['resolution_state'] ?? '' ); ?>">
+				<tr class="<?php echo esc_attr( implode( ' ', $row_classes ) ); ?>" data-entry-id="<?php echo esc_attr( $entry_id ); ?>" data-index="<?php echo esc_attr( $index ); ?>" data-original-project-id="<?php echo esc_attr( $predicted_project ); ?>" data-resolution-state="<?php echo esc_attr( $entry['resolution_state'] ?? '' ); ?>">
 					<td class="pltt-warning-cell">
 						<?php if ( $has_warning ) : ?>
 							<span class="pltt-warning-indicator dashicons dashicons-warning" role="img" aria-label="<?php echo esc_attr( $warning_tooltip ); ?>" title="<?php echo esc_attr( $warning_tooltip ); ?>"></span>
@@ -246,7 +233,6 @@ if ( $rc['untagged'] > 0 ) {
 										<?php selected( $predicted_project, $project->id ); ?>
 										data-billability-default="<?php echo (int) $project->billability_default; ?>"
 										data-billable-flag="<?php echo $opt_flag_applies ? '1' : '0'; ?>"
-										<?php echo pltt_consumption_data_attrs( $project, $entry['entry_date'] ?? $date ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- integer-only attribute string. ?>
 										<?php if ( $is_archived ) : ?>
 											data-archived="1"
 										<?php endif; ?>
@@ -257,11 +243,6 @@ if ( $rc['untagged'] > 0 ) {
 							<?php endif; ?>
 							<option value="new">+ <?php esc_html_e( 'Add new project...', 'plain-language-time-tracker' ); ?></option>
 						</select>
-						<?php
-						// Filled by PlttConsumption on load and on every project /
-						// duration change. Stays empty for projects with no ceiling.
-						?>
-						<span class="pltt-consumption" aria-live="polite"></span>
 					</td>
 					<td>
 						<?php
