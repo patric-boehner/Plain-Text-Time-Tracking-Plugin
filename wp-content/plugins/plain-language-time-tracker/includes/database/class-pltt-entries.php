@@ -527,7 +527,7 @@ class PLTT_Entries {
 	 * in a single query so the reports page doesn't need to load all rows.
 	 *
 	 * @param array $args Query arguments (date_from, date_to, client_id, project_id, tag, billable).
-	 * @return object Stats with total_count, total_minutes, billable_minutes, unbilled_billable_minutes, verified_count, first_entry_date, last_entry_date.
+	 * @return object Stats with total_count, total_minutes, billable_minutes, unbilled_billable_minutes, verified_count, billable_unverified_count, first_entry_date, last_entry_date.
 	 */
 	public static function get_stats( $args = array() ) {
 		global $wpdb;
@@ -566,6 +566,11 @@ class PLTT_Entries {
 		// per-entry `billed` flag was a manual tick nothing verified.
 		$record_entries = PLTT_Database::get_table_name( 'billing_record_entries' );
 
+		// billable_unverified_count is the gap between two figures that look like
+		// they should agree: billable_amount counts every billable entry, while
+		// every billing surface additionally requires verified = 1. Without the
+		// count, billable-but-unverified work shows as money in one figure, is
+		// invisible to the other, and offers no action and no explanation.
 		$sql = "SELECT
 			COUNT(*) AS total_count,
 			COALESCE(SUM(e.duration_minutes), 0) AS total_minutes,
@@ -576,6 +581,7 @@ class PLTT_Entries {
 			COALESCE(SUM(CASE WHEN ({$exclude_clause}) THEN e.duration_minutes ELSE 0 END), 0) AS client_total_minutes,
 			COALESCE(SUM(CASE WHEN ({$exclude_clause}) AND e.billable = 1 THEN e.duration_minutes ELSE 0 END), 0) AS client_billable_minutes,
 			SUM(CASE WHEN e.verified = 1 THEN 1 ELSE 0 END) AS verified_count,
+			SUM(CASE WHEN e.billable = 1 AND e.verified = 0 THEN 1 ELSE 0 END) AS billable_unverified_count,
 			COALESCE(SUM(CASE WHEN e.billable = 1 THEN {$amount} ELSE 0 END), 0) AS billable_amount,
 			COUNT(DISTINCT CASE WHEN ({$exclude_clause}) THEN e.project_id END) AS active_projects,
 			COUNT(DISTINCT CASE WHEN ({$exclude_clause}) THEN e.client_id END) AS active_clients,

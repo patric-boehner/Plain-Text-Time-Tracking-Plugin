@@ -21,6 +21,16 @@ class PLTT_Reports {
 	const PER_PAGE = PLTT_ENTRIES_PER_PAGE;
 
 	/**
+	 * Rows shown in billing select mode (bill=1).
+	 *
+	 * Selection can't span pages — the ticked boxes ARE the bill — so the whole
+	 * range renders at once. This is a backstop against an unbounded query, not a
+	 * page size: when it bites, the bar says how many rows are off the list rather
+	 * than letting the bill quietly cover only what fitted.
+	 */
+	const BILL_SELECT_MAX = 500;
+
+	/**
 	 * Valid `view` values and the default (OPT-S8: single source of truth).
 	 */
 	const VIEWS        = array( 'summary', 'detailed' );
@@ -81,28 +91,25 @@ class PLTT_Reports {
 			'tag_negate'     => $tag_negate,
 		);
 
-		// Client context card data: loaded only when a single client is selected.
-		$context_client   = null;
-		$context_projects = array();
+		// Scope-block context: loaded whenever a single client is selected. With a
+		// project as well, the block names the project ($context_projects[0]);
+		// with the client alone it names the client, and the count of that client's
+		// active projects is the only extra fact its terms line needs.
+		$context_client        = null;
+		$context_projects      = array();
+		$context_project_count = 0;
 
 		if ( $client_id > 0 && ! $client_negate ) {
 			$context_client = PLTT_Clients::get( $client_id );
 
 			if ( $context_client ) {
-				$is_internal_client = ! empty( $context_client->is_internal );
-
-				if ( ! $is_internal_client ) {
-					if ( is_numeric( $project_id ) && (int) $project_id > 0 ) {
-						$single = PLTT_Projects::get( (int) $project_id );
-						if ( $single && (int) $single->client_id === (int) $client_id ) {
-							$context_projects = array( $single );
-						}
-					} else {
-						$range_days = ( strtotime( $date_to ) - strtotime( $date_from ) ) / DAY_IN_SECONDS + 1;
-						if ( $range_days <= 92 ) {
-							$context_projects = PLTT_Projects::get_by_client( $client_id, true );
-						}
+				if ( $project_id > 0 && ! $project_negate ) {
+					$single = PLTT_Projects::get( (int) $project_id );
+					if ( $single && (int) $single->client_id === (int) $client_id ) {
+						$context_projects = array( $single );
 					}
+				} else {
+					$context_project_count = count( PLTT_Projects::get_by_client( $client_id, true ) );
 				}
 			}
 		}
@@ -259,13 +266,24 @@ class PLTT_Reports {
 			// picture ($stats is left untouched); only the list count is adjusted.
 			$entry_args = $filter_args;
 			// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only mode flag.
-			if ( ! empty( $_GET['bill'] ) && $project_id > 0 ) {
+			$billing_mode = ( ! empty( $_GET['bill'] ) && $project_id > 0 );
+			if ( $billing_mode ) {
 				$covered_ids = PLTT_Billing::get_covered_entry_ids( $project_id );
 				if ( ! empty( $covered_ids ) ) {
 					$entry_args['exclude_entry_ids'] = $covered_ids;
 					$list_stats    = PLTT_Entries::get_stats( $entry_args );
 					$total_entries = $list_stats ? (int) $list_stats->total_count : 0;
 				}
+
+				// Selection can't be paginated. The checkbox is the only thing that
+				// constrains the charge, so a 50-row page under a bar claiming the
+				// range total meant "Bill selected" silently covered the first page
+				// and dropped the rest. Show the whole range instead, and cap only as
+				// a backstop — the template says so when the cap bites, because a
+				// silent truncation here is exactly the failure being fixed.
+				$per_page = self::BILL_SELECT_MAX;
+				$offset   = 0;
+				$paged    = 1;
 			}
 
 			$total_pages = $total_entries > 0 ? (int) ceil( $total_entries / $per_page ) : 1;

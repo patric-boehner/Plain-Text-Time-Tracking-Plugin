@@ -643,12 +643,15 @@ class PLTT_Billing {
 
 			$out['periods']++;
 
-			// A period still running can't be billed — billing it would mean either
-			// a second record for the month or a partial one, which breaks the
-			// one-record-per-period assumption the model rests on. It still counts
-			// toward hours and overage (that work happened); it just can't count
-			// toward what's waiting to be invoiced.
-			$is_open = ( $period_end >= $today );
+			// A period that hasn't reached its last day can't be billed — billing it
+			// would mean either a second record for the month or a partial one,
+			// which breaks the one-record-per-period assumption the model rests on.
+			// It still counts toward hours and overage (that work happened); it just
+			// can't count toward what's waiting to be invoiced.
+			//
+			// The complement of $is_closed elsewhere (Rule 1): the last day belongs
+			// to the period, so a period ending today is billable, not open.
+			$is_open = ( $period_end > $today );
 			if ( $is_open ) {
 				$out['open_periods']++;
 				$out['open_period_label'] = self::format_period_label( $period_start, $period_end, $project->recurring_period );
@@ -741,6 +744,20 @@ class PLTT_Billing {
 			list( $period_start, $period_end ) = pltt_get_allocation_period_bounds( $project, $ref );
 			if ( ! $period_start || ! $period_end ) {
 				break; // Not a recurring project.
+			}
+
+			// A period that hasn't reached its last day isn't billable (Rule 1).
+			// This test was missing entirely, so the running period was offered as a
+			// live scope: the Billing queue showed a Bill button for it and commit()
+			// accepted it, while the Overview figures said the question wasn't
+			// answerable yet. Three surfaces, three answers, same period, same day.
+			//
+			// Periods are scanned oldest-first, so once one is unfinished every
+			// later one is too — break rather than continue. This also covers the
+			// commit path: get_scope() on an unfinished period now returns null, and
+			// commit() answers nothing_to_bill.
+			if ( $period_end > $today ) {
+				break;
 			}
 
 			$threshold = pltt_compute_overage_threshold(

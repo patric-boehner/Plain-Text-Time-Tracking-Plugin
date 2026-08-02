@@ -47,9 +47,18 @@
 		}
 		const boxes = selected();
 		const total = selectionTotal( boxes );
-		bar.hidden = boxes.length === 0;
+		// The bar stays put once billing mode is on. It used to hide itself on an
+		// empty selection, back when it held nothing but the tally — but it now
+		// states the span being billed and carries the widen link and the way out,
+		// and those have to survive unticking every row. The submit button is what
+		// reflects an empty selection; the bar is not.
+		bar.hidden = false;
 		bar.querySelectorAll( '.pltt-billsel-count' ).forEach( function ( el ) { el.textContent = String( boxes.length ); } );
 		bar.querySelectorAll( '.pltt-billsel-total' ).forEach( function ( el ) { el.textContent = formatCurrency( total ); } );
+		const openBtn = bar.querySelector( '[data-open-billsel]' );
+		if ( openBtn ) {
+			openBtn.disabled = boxes.length === 0;
+		}
 	}
 
 	// Sync the modal to the current selection when it opens.
@@ -106,6 +115,58 @@
 		if ( closer && closer.closest( 'dialog' ) === dialog ) {
 			dialog.close();
 		}
+	} );
+
+	// --- leaving billing mode (bar Cancel / Escape) ---
+	// The bar's Cancel is a plain link to this view minus bill=1, so it needs no
+	// JS of its own. Escape follows the same href. Committing lands here too:
+	// same URL, so the just-billed entries come back as covered.
+	const exitLink = bar.querySelector( '[data-exit-bill]' );
+
+	function exitBillingUrl() {
+		if ( exitLink ) {
+			return exitLink.href;
+		}
+		const url = new URL( window.location.href );
+		url.searchParams.delete( 'bill' );
+		return url.toString();
+	}
+
+	// "Mid-edit" means text is being entered, not merely that an <input> has focus.
+	// Ticking an "Include in bill" checkbox leaves focus on it, and that must not
+	// swallow Escape — it's the most common thing to be focused when you decide to
+	// back out. So: textareas and text-ish inputs block, toggles and buttons don't.
+	const NON_TEXT_INPUT = /^(checkbox|radio|button|submit|reset|file|range|color)$/i;
+
+	function isTypingTarget( el ) {
+		if ( ! el ) {
+			return false;
+		}
+		if ( el.isContentEditable || 'TEXTAREA' === el.tagName ) {
+			return true;
+		}
+		return 'INPUT' === el.tagName && ! NON_TEXT_INPUT.test( el.type );
+	}
+
+	// Anything layered over the page owns Escape first: the Record-bill and
+	// Line-items dialogs, the shared .pltt-modal editors, the date-range
+	// dropdown, a chart tooltip. Those close on Escape via their own handlers
+	// and don't mark the event handled, so check for them by sight. First
+	// Escape dismisses the layer, a second one leaves billing mode.
+	const OVERLAY_SELECTOR = 'dialog[open], .pltt-modal:not(.pltt-hidden), .pltt-date-nav-dropdown:not([hidden]), .pltt-tip:not([hidden])';
+
+	document.addEventListener( 'keydown', function ( e ) {
+		if ( 'Escape' !== e.key || e.defaultPrevented ) {
+			return;
+		}
+		if ( document.querySelector( OVERLAY_SELECTOR ) ) {
+			return;
+		}
+		// Mid-edit in a field (inline entry editing, the amount box): leave it alone.
+		if ( isTypingTarget( e.target ) ) {
+			return;
+		}
+		window.location.href = exitBillingUrl();
 	} );
 
 	// --- light-dismiss fallback (no `closedby` support) ---
@@ -169,9 +230,7 @@
 					dialog.close();
 					// Exit billing mode: drop the bill flag so the select column goes
 					// away and the just-billed entries show as covered in the normal view.
-					const url = new URL( window.location.href );
-					url.searchParams.delete( 'bill' );
-					window.location.href = url.toString();
+					window.location.href = exitBillingUrl();
 					return;
 				}
 				buttons.forEach( function ( b ) { b.disabled = false; } );
