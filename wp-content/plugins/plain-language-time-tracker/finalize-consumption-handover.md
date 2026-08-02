@@ -83,6 +83,50 @@ should be.
 **Ordering is by share of ceiling**, so a 3-hour retainer at double sorts above a
 40-hour budget a nudge over.
 
+## Measured: an "approaching the ceiling" band would not work
+
+Measured against every ceiling-bearing project-period in the dev database —
+26 periods, 15 of which crossed, over ~6 months. Script:
+`band-analysis.php` (scratchpad; re-runnable).
+
+| band | alerts | warned before the crossing | fired same day (no lead) |
+|---|---|---|---|
+| 50% | 21 | 7 of 15 (47%) | 8 (38% of alerts) |
+| 70% | 19 | 6 of 15 (40%) | 9 (47%) |
+| 80% | 18 | 5 of 15 (33%) | 10 (56%) |
+| 90% | 17 | 2 of 15 (13%) | 13 (76%) |
+
+**No band earns its place.** The best of them warns ahead of fewer than half the
+crossings, and at 80% more than half of all alerts fire on the very day the
+ceiling breaks — a "you're getting close" that arrives simultaneously with "you
+went past" is just noise with an extra step. Volume roughly doubles, from 2.5
+notices a month to 5.5.
+
+The reason is in the data, not the threshold:
+
+```
+project                     day before   after
+Website Care Plan Time            0%      109%
+Website Care Plan Time            0%      112%
+Website Health Report             0%      154%
+Registration Form System U        0%      109%
+Website Care Plan Time           49%      105%
+```
+
+**10 of 15 crossings jumped from under 80% straight past the ceiling in a single
+day, and 5 of those started the period at zero.** These overruns are not a slope
+anyone could watch approaching — they are one sitting that consumes the whole
+allocation. A band can only warn on a day that exists, and for a third of these
+there was no earlier day.
+
+So: **don't build it.** Recommend leaving the crossing notice as the only one.
+
+What the data *does* point at, if this is worth another pass: the real event is
+**a single session bigger than what was left** — "today's 100 minutes on DoR was
+more than the 91 you had left" — not "you have reached 80%". Same post-save
+placement, but it explains the overrun instead of failing to predict it. Nobody
+has asked for it; noting it because the numbers argue for it.
+
 ## Parked
 
 - **No projection / pace.** Per spec, that belongs on the Overview with the

@@ -3455,14 +3455,42 @@ function pltt_render_consumption_notice( $date ) {
 						);
 						?>
 					</span>
-					<?php if ( null !== $c['period_day'] ) : ?>
+					<?php
+					// Trailing context. Retainers say how far into the period they
+					// are — the figure means little without it, since the period
+					// resets. Fixed budgets have no period and no reset, so the
+					// overrun itself is the context: this is the whole overspend,
+					// not a share of one. Both types therefore end on a muted
+					// fragment and the two shapes read alike.
+					if ( null !== $c['period_day'] ) :
+						?>
 						<span class="pltt-consumption-period">
 							<?php
 							/* translators: %d: days elapsed in the allocation period */
 							echo esc_html( sprintf( _n( '%d day in', '%d days in', $c['period_day'], 'plain-language-time-tracker' ), $c['period_day'] ) );
 							?>
 						</span>
-					<?php endif; ?>
+						<?php
+					else :
+						// How far past the budget, not what share of it was used:
+						// "8% over" needs no arithmetic to read, where "108%" does.
+						// Rounds to whole percent, and is omitted when that rounds
+						// to zero — "0% over" says nothing worth a slot.
+						$over_percent = (int) round(
+							( ( $c['consumed_minutes'] - $c['ceiling_minutes'] ) / max( 1, $c['ceiling_minutes'] ) ) * 100
+						);
+						if ( $over_percent > 0 ) :
+							?>
+							<span class="pltt-consumption-period">
+								<?php
+								/* translators: %d: percentage over the fixed budget */
+								echo esc_html( sprintf( __( '%d%% over', 'plain-language-time-tracker' ), $over_percent ) );
+								?>
+							</span>
+							<?php
+						endif;
+					endif;
+					?>
 				</li>
 			<?php endforeach; ?>
 		</ul>
