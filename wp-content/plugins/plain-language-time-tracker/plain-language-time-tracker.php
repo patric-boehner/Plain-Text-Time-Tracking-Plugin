@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Plain Language Time Tracker
  * Plugin URI: https://github.com/patrickb/plain-language-time-tracker
- * Description: Time tracking with a "capture first, categorize later" workflow. Jot plain text notes with timestamps, then process them into structured time entries.
+ * Description: Capture first, categorize later. Interstitial journaling and time tracking in one plain-text log — jot timestamped notes between tasks, then process them into structured time entries. Everything you wrote around the timestamps stays as a journal.
  * Version: 1.9.66
  * Author: Patrick Boehner
  * Text Domain: plain-language-time-tracker

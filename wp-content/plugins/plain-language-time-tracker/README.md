@@ -2,7 +2,7 @@
 
 **Stop interrupting your work to fill out time tracking forms.**
 
-A WordPress plugin that reduces monthly time entry from 1-2 hours of catch-up to 2-3 minutes daily—a 95% time reduction.
+A WordPress plugin that turns interstitial journaling into your timesheet. You write a short note in the gap between tasks; the plugin reads the timestamps as durations. Monthly time entry drops from 1-2 hours of catch-up to 2-3 minutes daily.
 
 ---
 
@@ -24,11 +24,15 @@ This plugin flips that model: **capture first, categorize later.**
 ```
 @9:15am - Kickoff meeting with ABC Corp about website redesign
 @10:30am - Started wireframes for homepage
+  Nav is the hard part. They want mega-menu behavior on three top-level
+  items, and nobody has said what happens on mobile.
 @12:00pm - Lunch
 @1:00pm - Continued wireframes - product pages
 @2:50pm - Client call - approved mockups #client-communication
 @4:20pm - done
 ```
+
+The indented line has no timestamp, so it never becomes a time entry. It stays in the log as a journal note.
 
 **End of day:** Click "Process Notes" → Review predictions → Save
 
@@ -38,6 +42,21 @@ The plugin:
 - Predicts the project based on your history
 - Pre-fills tags whose name or seeded keywords appear in the description
 - Shows confidence scores for predictions
+
+---
+
+## Interstitial Journaling
+
+Interstitial journaling is the practice of writing a short note in the gap between tasks: a timestamp, then a line or two about what you just finished, what you're starting next, or what's in the way. People do it to stay focused — the note forces a pause and a decision before the next thing starts.
+
+That note already contains everything a timesheet needs. This plugin is built on that overlap. You keep the journaling habit; the timesheet is a byproduct.
+
+What that means in practice:
+
+- **Write for yourself, not for the invoice.** Half-formed thoughts, blockers, and decisions belong in the log. Only the timestamped lines become time entries.
+- **Lines without a timestamp are never parsed.** Write as much prose as you want between timestamps — it stays in the log and never turns into an entry you have to categorize or delete.
+- **Nothing is thrown away.** Every day's log is stored whole, exactly as you typed it. Processing a log into entries doesn't consume or rewrite it.
+- **The journal outlives the timesheet.** Months later, **Time Tracker → History** gives you the full text of any day, not just the hours you billed for it.
 
 ---
 
@@ -73,10 +92,12 @@ The plugin:
 - **Charts** - Hours-by-day volume chart with billable/non-billable/internal encoding
 - **Log history** - Chronological archive of all daily logs
 
-### Dual-Purpose Tool
-- **Time tracking + journaling** - Freeform notes preserved alongside timestamped entries
-- **Interstitial journaling** - Process thoughts between tasks without tracking
-- **Historical reference** - Review old logs via calendar navigation
+### Journal and Timesheet in One Log
+- **Freeform notes preserved** - Anything without a timestamp stays in the log and is never parsed into an entry
+- **Whole logs kept** - Each day is stored as you typed it; processing it into entries leaves the text untouched
+- **Historical reference** - Read back any day's full log via calendar navigation
+
+See [Interstitial Journaling](#interstitial-journaling) for how the two halves fit together.
 
 ---
 
