@@ -651,7 +651,7 @@ class PLTT_Billing {
 			//
 			// The complement of $is_closed elsewhere (Rule 1): the last day belongs
 			// to the period, so a period ending today is billable, not open.
-			$is_open = ( $period_end > $today );
+			$is_open = ( $period_end >= $today );
 			if ( $is_open ) {
 				$out['open_periods']++;
 				$out['open_period_label'] = self::format_period_label( $period_start, $period_end, $project->recurring_period );

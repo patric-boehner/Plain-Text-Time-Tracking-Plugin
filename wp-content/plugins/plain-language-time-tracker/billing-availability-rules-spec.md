@@ -25,7 +25,60 @@ Each is reasonable alone. Together they are unpredictable.
 
 ---
 
-## Rule 1 — The action appears whenever there is uncovered billable value. No time gate.
+## Rule 1 — HOURLY ONLY. Applied to retainers by mistake, reverted 2026-08-01.
+
+> **CORRECTION.** Rule 1 shipped in `1f48bd7` and was applied to **both** types.
+> That was wrong for retainers and is now reverted. What follows describes the
+> original reasoning; read the correction at the end of this section before
+> touching any closure test.
+
+### The retainer strand — why the last day must stay unbillable
+
+Hourly and retainer freeze **different things**:
+
+- **Hourly** freezes a **set of entry IDs**. A later entry isn't in the set, so
+  it is uncovered, so it is outstanding. It resurfaces on its own. Early billing
+  is safe.
+- **Retainer** freezes a **dollar basis**. `reconciliation_basis()` returns
+  `Σ calculated_at_commit` once records exist, so `unbilled = basis − billed −
+  absorbed = 0` **permanently**, whatever happens to the minutes afterwards.
+  Nothing notices a later entry.
+
+**Tested against live data 2026-08-01.** June 2026 on Democrats of Rossmoor is
+billed (record #18). Adding a 2-hour entry dated 30 June:
+
+| | |
+|---|---|
+| Overage recomputes to | 8.47h, **$762.00** |
+| June outstanding | **$0.00** |
+| Entry shows as covered? | **No — displays as unbilled** |
+
+The time is **stranded**: visibly unbilled, permanently unbillable. That is worse
+than the §3.1 bug this morning's work fixed, because at least that one surfaced
+as money.
+
+**Why it bites in practice:** capture-first means the day's entries are finalised
+in the evening. Bill on the 31st and that evening's work strands.
+
+**Reverted:** all four closure tests are back to excluding the final day —
+`PLTT_Billing::get_retainer_summary()` (`$is_open = period_end >= today`),
+`pltt_build_retainer_partial_figures()`, `pltt_build_single_project_scope_figures()`,
+and `PLTT_Project_Report` (all `$is_closed = p_end < today`). **They must always
+move together** or the figure and the bar disagree.
+
+**Instead, Rule 2 answers the original complaint** — the last day now explains
+itself rather than going quiet:
+
+- Period ends today → *"Period closes tonight — billable tomorrow"*
+- Period ends later → *"Billable after Aug 31"*
+
+**The model change that would make early retainer billing safe** — freeze the
+**rate**, not the minutes: recompute overage minutes now, value them at the
+record's stored `rate`, subtract billed + absorbed. Rate changes still cannot
+reopen a period (§3.1 holds) but added time does. **Parked — this changes
+reconciliation semantics and deserves its own decision.**
+
+### Original reasoning (hourly only)
 
 **Today:** closure is computed as `period_end < today` in two places —
 `PLTT_Billing::get_retainer_summary()` (~line 651, `$is_open`) and

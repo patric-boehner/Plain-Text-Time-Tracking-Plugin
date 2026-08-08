@@ -1757,10 +1757,27 @@ function pltt_retainer_period_status_figure( $project, $period_start, $period_en
 	$billable_now = false;
 
 	if ( ! $is_closed ) {
-		// Billing waits for the period to end — a retainer period is also the
-		// billing unit, so billing mid-period means either a second record or a
-		// partial one. (The Billing page can still do it when genuinely needed.)
-		$figure = array( 'label' => __( 'Not yet billed', 'plain-language-time-tracker' ), 'value' => '—', 'basis' => '', 'over' => false, 'muted' => true );
+		// Billing waits for the period to END, last day included. A retainer record
+		// freezes its dollar basis, so anything logged to the period afterwards can
+		// never be billed — it isn't a set difference the way hourly coverage is, so
+		// nothing notices it. Billing on the final day would strand that evening's
+		// entries (capture-first means they usually land after the fact). Rule 1 in
+		// billing-availability-rules-spec.md was applied to retainers by mistake and
+		// reverted 2026-08-01; see the strand test recorded there.
+		//
+		// Say WHEN it becomes billable rather than going quiet — an absent action
+		// with no explanation is what made this confusing in the first place.
+		$basis = '';
+		if ( $period_end && $period_end === pltt_get_current_date() ) {
+			$basis = esc_html__( 'Period closes tonight — billable tomorrow', 'plain-language-time-tracker' );
+		} elseif ( $period_end ) {
+			$basis = sprintf(
+				/* translators: %s: date the retainer period ends, e.g. "Aug 31". */
+				esc_html__( 'Billable after %s', 'plain-language-time-tracker' ),
+				'<span class="pltt-mono">' . esc_html( date_i18n( 'M j', strtotime( $period_end ) ) ) . '</span>'
+			);
+		}
+		$figure = array( 'label' => __( 'Not yet billed', 'plain-language-time-tracker' ), 'value' => '—', 'basis' => $basis, 'over' => false, 'muted' => true );
 	} elseif ( $settled ) {
 		if ( null === $records ) {
 			$records = PLTT_Billing::get_for_project_history( (int) $project->id );
@@ -1882,7 +1899,7 @@ function pltt_build_retainer_partial_figures( $project, $stats, $context_overage
 	$period    = PLTT_Billing::format_period_label( $p_start, $p_end, $project->recurring_period ?? '' );
 	// The last day is INSIDE the period (Rule 1) — see the note on $is_closed in
 	// pltt_build_single_project_scope_figures().
-	$is_closed = ( $p_end && $p_end <= pltt_get_current_date() );
+	$is_closed = ( $p_end && $p_end < pltt_get_current_date() );
 
 	$figures = array();
 
@@ -2243,7 +2260,7 @@ function pltt_build_single_project_scope_figures( $project, $stats, $billing_typ
 		// bar disagree: here, pltt_build_retainer_partial_figures(),
 		// PLTT_Billing::get_retainer_summary() ($is_open, the complement),
 		// PLTT_Billing::build_retainer_scopes(), and PLTT_Project_Report.
-		$is_closed  = ( $p_end && $p_end <= $today );
+		$is_closed  = ( $p_end && $p_end < $today );
 
 		$r_figures = array();
 		// 1 — Total hours (% against allocation on basis).

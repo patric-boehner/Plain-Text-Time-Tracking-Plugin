@@ -474,7 +474,7 @@ class PLTT_Project_Report {
 			$p_end     = (string) $window['to'];
 			// The last day is INSIDE the period (Rule 1) — see the note on
 			// $is_closed in pltt_build_single_project_scope_figures().
-			$is_closed = ( $p_end && $p_end <= $today );
+			$is_closed = ( $p_end && $p_end < $today );
 			$status    = pltt_retainer_period_status_figure(
 				$project,
 				$p_start,
