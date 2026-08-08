@@ -1061,6 +1061,74 @@ function pltt_render_tag_badges( $tags ) {
 }
 
 /**
+ * Render an ⓘ that reveals a sentence on hover or focus.
+ *
+ * For things you read once and never again — how a filter is scoped, what will
+ * eventually fill an empty screen. Standing body copy earns its space only if
+ * you'd read it more than once; this is the alternative.
+ *
+ * PlttTooltip does the showing (and Escape-to-dismiss), but it paints its card
+ * into <body> with nothing pointing at it, so assistive tech would never reach
+ * the text. The sentence is therefore ALSO rendered into a visually-hidden span
+ * that the button names via aria-describedby — that copy is the accessible one.
+ *
+ * Requires the `pltt-tooltip` CSS + JS (enqueued on every PLTT screen).
+ *
+ * @param string $text     Plain-text sentence. Markup would render as literal
+ *                         characters — PlttTooltip writes with textContent.
+ * @param string $sr_label Accessible name for the button. Defaults to "More information".
+ */
+function pltt_render_info_note( $text, $sr_label = '' ) {
+	$text = trim( (string) $text );
+	if ( '' === $text ) {
+		return;
+	}
+
+	// Unique per render: the description span and the button that names it must
+	// pair up even with several notes on one screen.
+	static $seq = 0;
+	++$seq;
+	$id = 'pltt-info-note-' . $seq;
+
+	if ( '' === $sr_label ) {
+		$sr_label = __( 'More information', 'plain-language-time-tracker' );
+	}
+	?>
+	<?php // type="button" — these sit inside GET filter forms on some screens. ?>
+	<button type="button" class="pltt-info-note"
+		data-pltt-tip
+		data-tip-color="none"
+		data-tip-rows="<?php echo esc_attr( wp_json_encode( array( array( '', $text ) ) ) ); ?>"
+		aria-describedby="<?php echo esc_attr( $id ); ?>">
+		<span aria-hidden="true">i</span>
+		<span class="screen-reader-text"><?php echo esc_html( $sr_label ); ?></span>
+	</button>
+	<span id="<?php echo esc_attr( $id ); ?>" class="screen-reader-text"><?php echo esc_html( $text ); ?></span>
+	<?php
+}
+
+/**
+ * Render the standard empty state — what a screen shows in place of a list.
+ *
+ * One treatment everywhere (see .pltt-empty-state in admin.css): centered, muted,
+ * no card. The lead says what isn't there; the optional note — why, or what will
+ * put something there — hangs off an ⓘ beside it rather than sitting on screen.
+ *
+ * @param string $lead Short sentence naming what's missing.
+ * @param string $note Optional plain-text follow-up, shown via pltt_render_info_note().
+ */
+function pltt_render_empty_state( $lead, $note = '' ) {
+	?>
+	<div class="pltt-empty-state">
+		<p class="pltt-empty-state-lead">
+			<?php echo esc_html( $lead ); ?>
+			<?php pltt_render_info_note( $note, __( 'More about this', 'plain-language-time-tracker' ) ); ?>
+		</p>
+	</div>
+	<?php
+}
+
+/**
  * Render pagination controls.
  *
  * Outputs the standard WordPress-style tablenav pagination block.
@@ -1081,10 +1149,20 @@ function pltt_render_pagination( $paged, $total_pages, $total_items, $base_url, 
 		<div class="tablenav-pages">
 			<span class="displaying-num">
 				<?php
+				// One literal _n() per noun so the strings stay extractable — the
+				// caller's $singular_label picks which. Anything unrecognized falls
+				// back to entries, which is what every caller meant before 'record'
+				// existed. Billed history counted records and said "entries".
 				if ( 'log' === $singular_label ) {
 					printf(
 						/* translators: %s: number of logs */
 						esc_html( _n( '%s log', '%s logs', $total_items, 'plain-language-time-tracker' ) ),
+						esc_html( number_format_i18n( $total_items ) )
+					);
+				} elseif ( 'record' === $singular_label ) {
+					printf(
+						/* translators: %s: number of billing records */
+						esc_html( _n( '%s record', '%s records', $total_items, 'plain-language-time-tracker' ) ),
 						esc_html( number_format_i18n( $total_items ) )
 					);
 				} else {
@@ -3720,7 +3798,11 @@ function pltt_render_consumption_notice( $date ) {
 					)
 				);
 			} else {
-				esc_html_e( 'Retainers and budgets this day touched', 'plain-language-time-tracker' );
+				// Nothing happened today worth announcing, so the heading names
+				// what the list IS rather than what the day did to it: a balance
+				// check on the capped projects. Count-agnostic on purpose — it
+				// describes the category, so it reads the same with one row or six.
+				esc_html_e( 'Where your retainers and budgets stand', 'plain-language-time-tracker' );
 			}
 			?>
 		</p>
@@ -3729,13 +3811,22 @@ function pltt_render_consumption_notice( $date ) {
 				<?php
 				$c       = $row['consumption'];
 				$is_over = ( 'under' !== $row['state'] );
-				$label   = $row['client']
-					? $row['client']->name . ' · ' . $row['project']->name
-					: $row['project']->name;
 				?>
 				<li class="pltt-consumption-row<?php echo $is_over ? ' is-over' : ''; ?>">
 					<span class="pltt-consumption-project">
-						<?php echo esc_html( $label ); ?>
+						<?php
+						// Client in admin blue, project in normal ink, bullet
+						// between — the same split the entry lists use on Overview
+						// and Review, so "whose work is this" reads the same way
+						// wherever it appears.
+						if ( $row['client'] ) :
+							?>
+							<span class="pltt-consumption-client"><?php echo esc_html( $row['client']->name ); ?></span>
+							<span class="pltt-consumption-sep">·</span>
+							<?php
+						endif;
+						?>
+						<span class="pltt-consumption-name"><?php echo esc_html( $row['project']->name ); ?></span>
 						<?php
 						// The type badge explains why there is a ceiling here at
 						// all, and reads the same as it does on Projects and

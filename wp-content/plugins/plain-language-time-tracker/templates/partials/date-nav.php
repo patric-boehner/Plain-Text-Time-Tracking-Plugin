@@ -7,10 +7,19 @@
  * that carries the page's other params. Styling is in assets/css/admin.css.
  *
  * Expects in scope:
- *   $dn_presets    — array of [ 'label' => string, 'from' => 'Y-m-d', 'to' => 'Y-m-d' ].
+ *   $dn_presets    — array of [ 'label' => string, 'from' => 'Y-m-d', 'to' => 'Y-m-d',
+ *                    'unit' => 'week'|'month'|'year' (optional) ]. 'unit' tells the
+ *                    stepper what one step means for that preset; without it the JS
+ *                    infers from the dates, which is ambiguous for a partial range
+ *                    that is both a week and a month (see detectStep).
  *   $dn_from       — active range start (Y-m-d).
  *   $dn_to         — active range end (Y-m-d).
  *   $dn_week_start — start_of_week option (int), for the JS stepper.
+ *
+ * This briefly carried a $dn_note slot rendering an ⓘ beside the stepper, used
+ * on Billing to say the range matches invoice dates. Removed: the Billed-history
+ * empty state says the same thing, and its column headers ("Invoiced" / "Work
+ * covered") say it whenever there ARE rows. Two tooltips, one fact.
  *
  * @package PlainLanguageTimeTracker
  */
@@ -19,11 +28,14 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-// Which preset (if any) matches the active range — drives the label + highlight.
+// Which preset (if any) matches the active range — drives the label + highlight,
+// and hands the stepper the unit it can't reliably infer from two dates alone.
 $dn_active_label = '';
+$dn_active_unit  = '';
 foreach ( $dn_presets as $dn_p ) {
 	if ( $dn_from === $dn_p['from'] && $dn_to === $dn_p['to'] ) {
 		$dn_active_label = $dn_p['label'];
+		$dn_active_unit  = isset( $dn_p['unit'] ) ? (string) $dn_p['unit'] : '';
 		break;
 	}
 }
@@ -33,7 +45,8 @@ $dn_range_label = pltt_format_date_range( $dn_from, $dn_to );
 	<div class="pltt-date-nav"
 		role="group"
 		aria-label="<?php esc_attr_e( 'Date range', 'plain-language-time-tracker' ); ?>"
-		data-week-start="<?php echo esc_attr( $dn_week_start ); ?>">
+		data-week-start="<?php echo esc_attr( $dn_week_start ); ?>"
+		<?php if ( '' !== $dn_active_unit ) : ?>data-unit="<?php echo esc_attr( $dn_active_unit ); ?>"<?php endif; ?>>
 
 		<input type="hidden" name="from" id="pltt-date-from" value="<?php echo esc_attr( $dn_from ); ?>">
 		<input type="hidden" name="to"   id="pltt-date-to"   value="<?php echo esc_attr( $dn_to ); ?>">

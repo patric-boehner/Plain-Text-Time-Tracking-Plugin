@@ -77,7 +77,12 @@ if ( ! empty( $clients ) ) {
 	</div>
 
 	<?php if ( empty( $clients ) ) : ?>
-		<p class="description"><?php esc_html_e( 'No clients yet. Add your first client to get started.', 'plain-language-time-tracker' ); ?></p>
+		<?php
+		pltt_render_empty_state(
+			__( 'No clients yet.', 'plain-language-time-tracker' ),
+			__( 'Add your first client to get started.', 'plain-language-time-tracker' )
+		);
+		?>
 	<?php else : ?>
 		<table class="widefat">
 			<thead>

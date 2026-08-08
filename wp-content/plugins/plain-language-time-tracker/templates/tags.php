@@ -82,7 +82,12 @@ if ( ! empty( $ungrouped_tags ) ) {
 	</div>
 
 	<?php if ( empty( $all_tags ) ) : ?>
-		<p class="description"><?php esc_html_e( 'No tags yet. Tags will appear here once you add them to time entries or create them manually.', 'plain-language-time-tracker' ); ?></p>
+		<?php
+		pltt_render_empty_state(
+			__( 'No tags yet.', 'plain-language-time-tracker' ),
+			__( 'Tags will appear here once you add them to time entries or create them manually.', 'plain-language-time-tracker' )
+		);
+		?>
 	<?php else : ?>
 		<?php foreach ( $tag_sections as $section ) : ?>
 			<div class="pltt-tag-group">

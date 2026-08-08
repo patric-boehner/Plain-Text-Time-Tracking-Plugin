@@ -37,9 +37,9 @@ foreach ( $billing_history as $rec ) {
 <table class="widefat striped pltt-billing-history-table">
 	<thead>
 		<tr>
-			<th><?php esc_html_e( 'Billed', 'plain-language-time-tracker' ); ?></th>
+			<th><?php esc_html_e( 'Invoiced', 'plain-language-time-tracker' ); ?></th>
 			<th><?php esc_html_e( 'Type', 'plain-language-time-tracker' ); ?></th>
-			<th><?php esc_html_e( 'Covers', 'plain-language-time-tracker' ); ?></th>
+			<th><?php esc_html_e( 'Work covered', 'plain-language-time-tracker' ); ?></th>
 			<th class="pltt-amount-col"><?php esc_html_e( 'Amount', 'plain-language-time-tracker' ); ?></th>
 			<th class="pltt-amount-col"><?php esc_html_e( 'Absorbed', 'plain-language-time-tracker' ); ?></th>
 		</tr>

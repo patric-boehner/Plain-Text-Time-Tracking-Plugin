@@ -209,6 +209,36 @@
 	line-height: 1.5;
 }
 
+/* Empty state — one treatment everywhere ------------------------------------
+
+   Used by Overview's entry list, Billing's ready + history views, and the
+   project report. Lives here (admin.css loads on every PLTT screen) rather
+   than in a per-screen sheet: Billing's panels used to borrow the project
+   report's classes and got nothing, because that stylesheet doesn't load there.
+
+   No card. An empty state has no content to hold, and a bordered box drawn
+   around one sentence reads as heavier than the thing it stands in for — it
+   should occupy the space quietly, not frame its own absence. Centered because
+   there are no columns left to align to. Muted rather than body-dark, and not
+   bold: nothing here is a finding, it's the absence of one. */
+.pltt-empty-state {
+	padding: 32px 20px;
+	text-align: center;
+	color: var(--pltt-text-muted);
+}
+
+/* The message itself. A step above body text so it registers as the answer to
+   "where is everything?", but only a step — weight and colour are inherited, so
+   size is the only thing marking it, and it shouldn't read as a heading. */
+.pltt-empty-state-lead {
+	font-size: 15px;
+	margin: 0 0 4px;
+}
+
+.pltt-empty-state .description {
+	margin: 0;
+}
+
 /* Card breakdown rows (Total Hours card): label, value, percent on each row.
    Value is emphasized (dark, weight 600); percent is muted. The label and
    percent share the muted secondary color; the value pops as the data point. */
@@ -679,6 +709,43 @@
 .pltt-date-nav {
 	display: inline-flex;
 	align-items: stretch;
+}
+
+/* ⓘ — reveals a sentence on hover/focus via PlttTooltip. Rendered by
+   pltt_render_info_note(). A circled letter rather than an icon font or SVG:
+   one element, scales with the text, no extra request.
+
+   Filled rather than outlined. An outline in --pltt-text-faint sat at about 3:1
+   on white, under the 4.5:1 AA floor for a glyph this size, and read as disabled
+   next to whatever it sits beside. White on --pltt-text-muted clears 5.6:1 and
+   is legible at a glance without competing with a primary button.
+
+   vertical-align keeps it centred on the line when it follows running text. */
+.pltt-info-note {
+	align-items: center;
+	background: var(--pltt-text-muted);
+	border: 0;
+	border-radius: 50%;
+	color: #fff;
+	cursor: help;
+	display: inline-flex;
+	flex: 0 0 auto;
+	font-family: Georgia, "Times New Roman", serif;
+	font-size: 12px;
+	font-style: italic;
+	height: 18px;
+	justify-content: center;
+	line-height: 1;
+	margin-left: 4px;
+	padding: 0;
+	transition: background-color 0.1s;
+	vertical-align: text-bottom;
+	width: 18px;
+}
+
+.pltt-info-note:hover,
+.pltt-info-note:focus-visible {
+	background: var(--pltt-primary);
 }
 
 /* Shared border/background for every segment in the group */
@@ -1217,6 +1284,19 @@ fieldset.pltt-date-nav-custom-inputs input[type="date"] {
 
 .pltt-consumption-project .pltt-badge {
 	flex: none;
+}
+
+/* Client name in admin blue, the same signal the entry lists on Overview and
+   Review give it (.pltt-entry-client in reports.css / review.css). Those rules
+   are scoped to their own lists and neither file loads on both screens this
+   notice appears on, so the colour is restated here rather than borrowed. The
+   project name stays in normal ink, so the two halves stay tellable apart. */
+.pltt-consumption-client {
+	color: var(--pltt-primary);
+}
+
+.pltt-consumption-sep {
+	color: var(--pltt-border);
 }
 
 /* The figure is what the eye should land on, so it carries the weight in every

@@ -28,10 +28,12 @@ $is_period   = ! empty( $window['is_period'] );
 ?>
 
 <?php if ( ! $has_entries ) : ?>
-	<div class="pltt-card pltt-report-empty">
-		<p class="pltt-report-placeholder-lead"><?php esc_html_e( 'No time logged on this project yet.', 'plain-language-time-tracker' ); ?></p>
-		<p class="description"><?php esc_html_e( 'Once entries are verified for this project, its lifetime report appears here.', 'plain-language-time-tracker' ); ?></p>
-	</div>
+	<?php
+	pltt_render_empty_state(
+		__( 'No time logged on this project yet.', 'plain-language-time-tracker' ),
+		__( 'Once entries are verified for this project, its lifetime report appears here.', 'plain-language-time-tracker' )
+	);
+	?>
 	<?php return; ?>
 <?php endif; ?>
 

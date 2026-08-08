@@ -22,31 +22,36 @@ $today   = pltt_get_current_date();
 $now_dt  = new DateTimeImmutable( $today, wp_timezone() );
 $last_yr = (int) $now_dt->format( 'Y' ) - 1;
 
-// Ledger-appropriate presets. 'phrase' feeds the dynamic card labels.
+// Ledger-appropriate presets. 'phrase' feeds the dynamic card labels; 'unit' tells
+// the prev/next stepper what one step means (see date-nav.php).
 $presets = array(
 	array(
 		'label'  => __( 'This Month', 'plain-language-time-tracker' ),
 		'phrase' => __( 'this month', 'plain-language-time-tracker' ),
 		'from'   => $now_dt->format( 'Y-m-01' ),
 		'to'     => $today,
+		'unit'   => 'month',
 	),
 	array(
 		'label'  => __( 'Last Month', 'plain-language-time-tracker' ),
 		'phrase' => __( 'last month', 'plain-language-time-tracker' ),
 		'from'   => $now_dt->modify( 'first day of last month' )->format( 'Y-m-01' ),
 		'to'     => $now_dt->modify( 'first day of last month' )->format( 'Y-m-t' ),
+		'unit'   => 'month',
 	),
 	array(
 		'label'  => __( 'This Year', 'plain-language-time-tracker' ),
 		'phrase' => __( 'this year', 'plain-language-time-tracker' ),
 		'from'   => $now_dt->format( 'Y-01-01' ),
 		'to'     => $today,
+		'unit'   => 'year',
 	),
 	array(
 		'label'  => __( 'Last Year', 'plain-language-time-tracker' ),
 		'phrase' => __( 'last year', 'plain-language-time-tracker' ),
 		'from'   => $last_yr . '-01-01',
 		'to'     => $last_yr . '-12-31',
+		'unit'   => 'year',
 	),
 );
 
@@ -117,15 +122,17 @@ $card_label = static function ( $base, $phrase ) {
 </form>
 
 <div class="pltt-summary-cards pltt-numbar pltt-bill-cards-summary">
+	<?php // Each card's second line names the basis as well as the dates, so a
+	// figure lifted from here can't be mistaken for "work done in this range". ?>
 	<div class="card">
-		<div class="card-label"><?php echo esc_html( $card_label( __( 'Records', 'plain-language-time-tracker' ), $active_phrase ) ); ?></div>
+		<div class="card-label"><?php echo esc_html( $card_label( __( 'Records invoiced', 'plain-language-time-tracker' ), $active_phrase ) ); ?></div>
 		<div class="card-value"><?php echo esc_html( number_format_i18n( (int) $log['count'] ) ); ?></div>
-		<div class="card-secondary"><?php echo esc_html( $range_label ); ?></div>
+		<div class="card-secondary"><?php echo esc_html( sprintf( /* translators: %s: date range. */ __( 'invoiced %s', 'plain-language-time-tracker' ), $range_label ) ); ?></div>
 	</div>
 	<div class="card">
 		<div class="card-label"><?php echo esc_html( $card_label( __( 'Billed', 'plain-language-time-tracker' ), $active_phrase ) ); ?></div>
 		<div class="card-value"><?php echo esc_html( pltt_format_currency( (float) $log['total_billed'] ) ); ?></div>
-		<div class="card-secondary"><?php echo esc_html( $range_label ); ?></div>
+		<div class="card-secondary"><?php echo esc_html( sprintf( /* translators: %s: date range. */ __( 'invoiced %s', 'plain-language-time-tracker' ), $range_label ) ); ?></div>
 	</div>
 	<div class="card">
 		<div class="card-label"><?php echo esc_html( $card_label( __( 'Absorbed', 'plain-language-time-tracker' ), $active_phrase ) ); ?></div>
@@ -135,10 +142,12 @@ $card_label = static function ( $base, $phrase ) {
 </div>
 
 <?php if ( empty( $log['rows'] ) ) : ?>
-	<div class="pltt-card pltt-bill-empty">
-		<p class="pltt-report-placeholder-lead"><?php esc_html_e( 'No records match these filters.', 'plain-language-time-tracker' ); ?></p>
-		<p class="description"><?php esc_html_e( 'Widen the date range or clear the filters. Once you bill outstanding work, each record shows up here.', 'plain-language-time-tracker' ); ?></p>
-	</div>
+	<?php
+	pltt_render_empty_state(
+		__( 'No records match these filters.', 'plain-language-time-tracker' ),
+		__( 'Widen the date range or clear the filters. If you are looking for a particular job, check the month you sent the invoice rather than the month you did the work. Once you bill outstanding work, each record shows up here.', 'plain-language-time-tracker' )
+	);
+	?>
 <?php else : ?>
 	<?php
 	// Build each row's record view-model once (loads its frozen entries) so the
@@ -154,11 +163,14 @@ $card_label = static function ( $base, $phrase ) {
 	<table class="widefat striped pltt-bill-records-table">
 		<thead>
 			<tr>
-				<th><?php esc_html_e( 'Billed', 'plain-language-time-tracker' ); ?></th>
+				<?php // "Invoiced" vs "Work covered": one date column and one period
+				// column sat next to each other as "Billed" and "Covers", which left
+				// it to the reader to work out which was which. ?>
+				<th><?php esc_html_e( 'Invoiced', 'plain-language-time-tracker' ); ?></th>
 				<th><?php esc_html_e( 'Client', 'plain-language-time-tracker' ); ?></th>
 				<th><?php esc_html_e( 'Project', 'plain-language-time-tracker' ); ?></th>
 				<th><?php esc_html_e( 'Type', 'plain-language-time-tracker' ); ?></th>
-				<th><?php esc_html_e( 'Covers', 'plain-language-time-tracker' ); ?></th>
+				<th><?php esc_html_e( 'Work covered', 'plain-language-time-tracker' ); ?></th>
 				<th class="pltt-amount-col"><?php esc_html_e( 'Amount', 'plain-language-time-tracker' ); ?></th>
 				<th class="pltt-amount-col"><?php esc_html_e( 'Absorbed', 'plain-language-time-tracker' ); ?></th>
 			</tr>
@@ -266,9 +278,11 @@ $card_label = static function ( $base, $phrase ) {
 	?>
 
 	<?php // "View record" opens the committed record inside the Overview detailed
-	// view (read-only, with its Line-items dialog) — no in-page modal here. ?>
-
-	<p class="description pltt-bill-recordnote">
-		<?php esc_html_e( 'A record freezes what you billed and marks those entries billed, so “outstanding” resolves itself. There’s no sent/paid tracking — that’s your invoicing tool’s job.', 'plain-language-time-tracker' ); ?>
-	</p>
+	// view (read-only, with its Line-items dialog) — no in-page modal here.
+	//
+	// A standing paragraph used to sit here explaining that a record freezes what
+	// was billed and that there is no sent/paid tracking. Dropped: it rendered
+	// only alongside rows, so the one reader it could teach — someone meeting an
+	// empty ledger — never saw it. The scope boundary lives in
+	// design-philosophy.md; the mechanism in this file's docblock. ?>
 <?php endif; ?>

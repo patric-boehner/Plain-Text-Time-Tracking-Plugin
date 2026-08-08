@@ -263,9 +263,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 
 		<?php else : ?>
-			<p class="description" style="padding: 20px; text-align: center;">
-				<?php esc_html_e( 'No logs found for the selected month.', 'plain-language-time-tracker' ); ?>
-			</p>
+			<?php pltt_render_empty_state( __( 'No logs found for the selected month.', 'plain-language-time-tracker' ) ); ?>
 		<?php endif; ?>
 	</div>
 </div>

@@ -34,31 +34,39 @@ $now_dt     = new DateTimeImmutable( $today, wp_timezone() );
 $current_dow      = (int) $now_dt->format( 'w' );
 $days_since_start = ( $current_dow - $week_start + 7 ) % 7;
 
+// 'unit' is what one prev/next step means. Stated rather than inferred: in the
+// first week of a month that begins on the week-start day, "This Week" and "This
+// Month" are the same two dates, so the stepper cannot tell them apart on its own.
 $presets = array(
 	array(
 		'label' => __( 'This Week', 'plain-language-time-tracker' ),
 		'from'  => $now_dt->modify( "-{$days_since_start} days" )->format( 'Y-m-d' ),
 		'to'    => $today,
+		'unit'  => 'week',
 	),
 	array(
 		'label' => __( 'Last Week', 'plain-language-time-tracker' ),
 		'from'  => $now_dt->modify( '-' . ( $days_since_start + 7 ) . ' days' )->format( 'Y-m-d' ),
 		'to'    => $now_dt->modify( '-' . ( $days_since_start + 1 ) . ' days' )->format( 'Y-m-d' ),
+		'unit'  => 'week',
 	),
 	array(
 		'label' => __( 'This Month', 'plain-language-time-tracker' ),
 		'from'  => $now_dt->format( 'Y-m-01' ),
 		'to'    => $today,
+		'unit'  => 'month',
 	),
 	array(
 		'label' => __( 'Last Month', 'plain-language-time-tracker' ),
 		'from'  => $now_dt->modify( 'first day of last month' )->format( 'Y-m-01' ),
 		'to'    => $now_dt->modify( 'first day of last month' )->format( 'Y-m-t' ),
+		'unit'  => 'month',
 	),
 	array(
 		'label' => __( 'This Year', 'plain-language-time-tracker' ),
 		'from'  => $now_dt->format( 'Y-01-01' ),
 		'to'    => $today,
+		'unit'  => 'year',
 	),
 );
 
@@ -805,9 +813,7 @@ $tab_base_url = add_query_arg( $filter_params, admin_url( 'admin.php' ) );
 					</tbody>
 				</table>
 			<?php else : ?>
-				<p class="description" style="padding: 20px; text-align: center;">
-					<?php esc_html_e( 'No verified entries found for the selected filters.', 'plain-language-time-tracker' ); ?>
-				</p>
+				<?php pltt_render_empty_state( __( 'No verified entries found for the selected filters.', 'plain-language-time-tracker' ) ); ?>
 			<?php endif; ?>
 
 		<?php else : ?>
@@ -1007,9 +1013,7 @@ $tab_base_url = add_query_arg( $filter_params, admin_url( 'admin.php' ) );
 
 
 			<?php else : ?>
-				<p class="description" style="padding: 20px; text-align: center;">
-					<?php esc_html_e( 'No entries found for the selected filters.', 'plain-language-time-tracker' ); ?>
-				</p>
+				<?php pltt_render_empty_state( __( 'No entries found for the selected filters.', 'plain-language-time-tracker' ) ); ?>
 			<?php endif; ?>
 
 		<?php endif; ?>
