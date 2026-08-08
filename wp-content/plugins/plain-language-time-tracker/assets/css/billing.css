@@ -856,11 +856,6 @@
 	color: var(--pltt-text-muted, #646970);
 	font-size: 12px;
 }
-.pltt-bill-recordnote {
-	max-width: 70ch;
-	margin-top: 12px;
-	color: var(--pltt-text-muted, #646970);
-}
 
 /* --- summary cards (both views) --- */
 .pltt-bill-cards-summary {

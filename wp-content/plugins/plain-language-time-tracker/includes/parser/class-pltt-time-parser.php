@@ -16,6 +16,15 @@ if ( ! defined( 'ABSPATH' ) ) {
 class PLTT_Time_Parser {
 
 	/**
+	 * Most tags a parsed entry may be pre-filled with.
+	 *
+	 * A long guessed list costs more to correct than it saves, so prediction
+	 * stops at the two strongest candidates and leaves the rest to the person
+	 * reviewing.
+	 */
+	const MAX_PREDICTED_TAGS = 2;
+
+	/**
 	 * Parse a full day's log into time entries.
 	 *
 	 * @param string $text Raw log text.
@@ -311,7 +320,9 @@ class PLTT_Time_Parser {
 			}
 
 			// Tags: pre-fill from (a) a tag's own name appearing literally in the
-			// text and (b) seeded keyword->tag matches, de-duped case-insensitively.
+			// text and (b) seeded keyword->tag matches, de-duped case-insensitively
+			// and capped at MAX_PREDICTED_TAGS. Literal name hits are collected
+			// first, so they win the cap over the looser keyword matches.
 			$candidate_tag_names = array();
 			foreach ( $literal_tag_names as $literal_name ) {
 				if ( preg_match( '/\b' . preg_quote( $literal_name, '/' ) . '\b/i', $text ) ) {
@@ -332,6 +343,9 @@ class PLTT_Time_Parser {
 					if ( ! in_array( strtolower( $name ), $tags_low, true ) ) {
 						$tags[]     = $name;
 						$tags_low[] = strtolower( $name );
+					}
+					if ( count( $tags ) >= self::MAX_PREDICTED_TAGS ) {
+						break;
 					}
 				}
 				$entry['tags'] = implode( ', ', $tags );

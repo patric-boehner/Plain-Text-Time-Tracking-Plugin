@@ -69,7 +69,12 @@ if ( ! empty( $projects ) ) {
 			</p>
 		</div>
 	<?php elseif ( empty( $projects ) ) : ?>
-		<p class="description"><?php esc_html_e( 'No projects yet. Add your first project to get started.', 'plain-language-time-tracker' ); ?></p>
+		<?php
+		pltt_render_empty_state(
+			__( 'No projects yet.', 'plain-language-time-tracker' ),
+			__( 'Add your first project to get started.', 'plain-language-time-tracker' )
+		);
+		?>
 	<?php else : ?>
 		<?php
 		$group_mode = isset( $_GET['group'] ) ? sanitize_key( wp_unslash( $_GET['group'] ) ) : 'type';
@@ -182,7 +187,7 @@ if ( ! empty( $projects ) ) {
 			</form>
 		</div>
 		<?php if ( empty( $project_groups ) ) : ?>
-			<p class="description"><?php esc_html_e( 'No projects match this filter.', 'plain-language-time-tracker' ); ?></p>
+			<?php pltt_render_empty_state( __( 'No projects match this filter.', 'plain-language-time-tracker' ) ); ?>
 		<?php endif; ?>
 		<?php foreach ( $project_groups as $group ) : ?>
 			<div class="pltt-project-group">

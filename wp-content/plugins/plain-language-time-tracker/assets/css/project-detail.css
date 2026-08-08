@@ -66,18 +66,9 @@
 	padding: var(--pltt-pd-space-lg);
 }
 
-.pltt-report-placeholder,
-.pltt-report-empty {
-	text-align: center;
-	color: var(--pltt-text-muted);
-}
-
-.pltt-report-placeholder-lead {
-	font-size: 16px;
-	font-weight: 600;
-	color: var(--pltt-text-base);
-	margin-top: 0;
-}
+/* The empty-state rules that used to sit here are now .pltt-empty-state in
+   admin.css — Billing renders the same markup and this sheet doesn't load
+   there. .pltt-card stays: its remaining users are all on this screen. */
 
 /* Stat cards — reuse the shared .pltt-summary-cards / .card pattern (admin.css).
    Here there are exactly four, so let them grow to fill the row evenly. */

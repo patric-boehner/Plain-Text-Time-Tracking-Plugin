@@ -192,6 +192,7 @@
 				}
 			}
 
+			const processLabel     = processBtn.textContent;
 			processBtn.disabled    = true;
 			processBtn.textContent = plttData.i18n.processing;
 
@@ -199,20 +200,39 @@
 				date:    dateInput.value,
 				content: content,
 			}, function( response ) {
-				if ( response.success && response.data.redirect ) {
+				if ( response.success && response.data && response.data.redirect ) {
+					let redirectUrl = null;
 					try {
-						const redirectUrl = new URL( response.data.redirect, window.location.origin );
-						if ( redirectUrl.origin === window.location.origin ) {
+						redirectUrl = new URL( response.data.redirect, window.location.origin );
+					} catch ( e ) {
+						// Malformed URL — fall through to the recovery below.
+					}
+
+					if ( redirectUrl && redirectUrl.origin === window.location.origin ) {
+						const here  = window.location.href.split( '#' )[ 0 ];
+						const there = redirectUrl.href.split( '#' )[ 0 ];
+
+						if ( here === there ) {
+							// Same page, and the redirect only adds/keeps a fragment.
+							// Assigning href would scroll the anchor without reloading,
+							// leaving the button stuck on "Processing..." and the new
+							// drafts unrendered until a manual refresh. Force the reload.
+							if ( redirectUrl.hash && redirectUrl.hash !== window.location.hash ) {
+								window.location.hash = redirectUrl.hash;
+							}
+							window.location.reload();
+						} else {
 							window.location.href = redirectUrl.href;
 						}
-					} catch ( e ) {
-						// Malformed URL — ignore.
+						return;
 					}
-				} else {
-					alert( response.data || 'Error processing entries.' );
-					processBtn.disabled    = false;
-					processBtn.textContent = 'Process Time Entries →';
 				}
+
+				// Nothing navigated — report it and give the button back rather than
+				// leaving a dead control on screen.
+				alert( ( response && response.data ) || 'Error processing entries.' );
+				processBtn.disabled    = false;
+				processBtn.textContent = processLabel;
 			} );
 		} );
 	}

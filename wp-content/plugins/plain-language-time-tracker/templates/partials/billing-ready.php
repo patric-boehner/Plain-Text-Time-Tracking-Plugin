@@ -58,10 +58,12 @@ $q_clients = isset( $queue['clients'] ) ? $queue['clients'] : array();
 </div>
 
 <?php if ( empty( $q_clients ) ) : ?>
-	<div class="pltt-card pltt-bill-empty">
-		<p class="pltt-report-placeholder-lead"><?php esc_html_e( 'Nothing outstanding to bill.', 'plain-language-time-tracker' ); ?></p>
-		<p class="description"><?php esc_html_e( 'When a retainer runs over, an hourly project has unbilled time, or a fixed budget is ready, it shows up here.', 'plain-language-time-tracker' ); ?></p>
-	</div>
+	<?php
+	pltt_render_empty_state(
+		__( 'Nothing outstanding to bill.', 'plain-language-time-tracker' ),
+		__( 'When a retainer runs over, an hourly project has unbilled time, or a fixed budget is ready, it shows up here.', 'plain-language-time-tracker' )
+	);
+	?>
 <?php else : ?>
 	<table class="widefat striped pltt-bill-ready-table">
 		<thead>

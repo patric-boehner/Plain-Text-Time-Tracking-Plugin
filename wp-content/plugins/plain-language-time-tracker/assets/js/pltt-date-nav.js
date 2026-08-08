@@ -55,11 +55,23 @@
 	 * Preset ranges like "This Week"/"This Month"/"This Year" are PARTIAL —
 	 * they run from the period start through today, not to the period end.
 	 * We still treat those as week/month/year so stepping snaps to the full
-	 * adjacent period rather than sliding an odd-length window. Order matters:
-	 * week is checked before month so a week beginning on the 1st of a month
-	 * isn't misread as a month.
+	 * adjacent period rather than sliding an odd-length window.
+	 *
+	 * Inference alone can't always tell those apart: in the first week of a month
+	 * that begins on the week-start day, partial "This Week" and partial "This
+	 * Month" are the SAME two dates, so no rule reading (from, to) can separate
+	 * them — whichever check ran first won, and stepping back from "This Month"
+	 * landed on the previous week. So the server stamps data-unit on the widget
+	 * whenever the active range matches a preset (date-nav.php), and that declared
+	 * unit wins. Inference below still covers custom ranges and already-stepped
+	 * full periods, which are unambiguous.
 	 */
 	function detectStep( from, to ) {
+		var declared = widget.dataset.unit;
+		if ( declared === 'week' || declared === 'month' || declared === 'year' ) {
+			return { unit: declared };
+		}
+
 		var f = parseDate( from );
 		var t = parseDate( to );
 		var diffMs   = t - f;
