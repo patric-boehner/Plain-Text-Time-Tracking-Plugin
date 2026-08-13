@@ -282,7 +282,17 @@ class PLTT_Form_Handlers {
 			// SEC-M2: Use only the error code (not the raw message) in the redirect URL.
 			self::redirect_back( array( 'pltt_error' => $result->get_error_code() ) );
 		} elseif ( $result ) {
-			self::redirect_back( array( 'pltt_message' => 'project_deleted' ) );
+			// Go to the list, not back where we came from. The settings modal is now
+			// reachable from a project's own detail page, and redirect_back() would
+			// return to the detail URL of the project just deleted — a "Project not
+			// found" screen. The list is the right destination from either surface.
+			// Projects is its own submenu page (pltt-projects), not a screen of the
+			// Today page, so this is admin_url() directly — pltt_get_admin_url() would
+			// build page=pltt-time-tracker&screen=projects, which is not this list.
+			wp_safe_redirect(
+				add_query_arg( 'pltt_message', 'project_deleted', admin_url( 'admin.php?page=pltt-projects' ) )
+			);
+			exit;
 		} else {
 			self::redirect_back( array( 'pltt_error' => 'project_delete_failed' ) );
 		}

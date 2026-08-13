@@ -98,7 +98,7 @@
 .pltt-existing-entries {
 	margin-top: 30px;
 	padding-top: 20px;
-	border-top: 1px solid var(--pltt-border);
+	/* border-top: 1px solid var(--pltt-border); */
 }
 
 .pltt-existing-entries h3 {
@@ -108,6 +108,14 @@
 
 .pltt-existing-entries table {
 	margin-top: 15px;
+}
+
+/* Inside the Recorded Entries group the table is welded to its own header, so
+   the gap above has to go — the header supplies the separation. The rule above
+   still applies to the post-parse "Review parsed entries" table, which has no
+   header of its own. */
+.pltt-existing-entries .pltt-entries-group table {
+	margin-top: 0;
 }
 
 /* Wrapper: pill + standalone Today button side by side in the header */

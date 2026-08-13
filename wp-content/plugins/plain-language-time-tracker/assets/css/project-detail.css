@@ -35,6 +35,13 @@
 	padding: 0;
 }
 
+/* Back sits in the header grid's first (1fr) column, where the title normally is
+   — this screen's H1 is screen-reader-only, so that column is otherwise empty.
+   justify-self keeps it hard left instead of stretching across the column. */
+.pltt-detail-header .pltt-header-back {
+	justify-self: start;
+}
+
 /* Notices sit on their own row beneath the title (WP keeps them near the H1). */
 .pltt-detail-header .notice {
 	grid-column: 1 / -1;
@@ -87,21 +94,11 @@
 	color: var(--pltt-text-muted);
 }
 
-/* Card section header (title row). Originally the "Where the time went" header;
-   that card was removed 2026-07-18 but Billing history reuses these. */
-.pltt-where-header {
-	display: flex;
-	justify-content: space-between;
-	align-items: center;
-	flex-wrap: wrap;
-	gap: var(--pltt-pd-space-md);
-	margin-bottom: var(--pltt-pd-space-lg);
-}
-
-.pltt-where-title {
-	margin: 0;
-	font-size: 16px;
-}
+/* Billing history's header is a group band (.pltt-bill-history-group-header in
+   admin.css), sharing the rule Projects and Tags already use. The old
+   .pltt-where-header / .pltt-where-title pair lived here — leftovers from the
+   "Where the time went" card removed 2026-07-18, which had outlived it as
+   Billing history's box. */
 
 /* ==========================================================================
    Type-aware report hero — headline gauge/figure above the stat cards.
@@ -119,8 +116,14 @@
 .pltt-report-hero.pltt-hero-solo {
 	grid-template-columns: 1fr;
 }
+/* The header spans both columns so its rule runs the full width of the panel,
+   the way .pltt-panel-header does on the chart. */
+.pltt-hero-header {
+	grid-column: 1 / -1;
+}
+
 .pltt-hero-left {
-	padding: 20px 22px;
+	padding: 22px 20px 16px; /* matches .pltt-panel-body */
 	min-width: 0;
 }
 .pltt-hero-right {
@@ -131,19 +134,6 @@
 	flex-direction: column;
 	justify-content: center;
 	gap: 2px;
-}
-
-.pltt-hero-tag {
-	font-size: 11px;
-	text-transform: uppercase;
-	letter-spacing: 0.05em;
-	color: var(--pltt-text-muted, #646970);
-}
-.pltt-hero-period {
-	text-transform: none;
-	letter-spacing: 0;
-	font-weight: 600;
-	color: var(--pltt-text-dark, #1d2327);
 }
 
 .pltt-hero-figure {
@@ -164,37 +154,88 @@
 	font-size: 13px;
 }
 
-/* Gauge track — two proportional segments (within-limit + overage), mirroring
-   the Reports allocation bar so the overage magnitude is visible. */
+/* Gauge track. The limit is a POSITION marked on the track, not the end of it —
+   see the marker note in templates/partials/project-report-hero.php.
+   overflow stays visible so the marker and its label can sit proud of the bar;
+   the segments are absolutely positioned, so they can't be clipped by it. */
 .pltt-hero-track {
-	display: flex;
-	height: 16px;
-	background: #eceded;
-	border-radius: 9px;
-	overflow: hidden;
-	margin: 14px 0 6px;
+	position: relative;
+	height: 10px;
+	background: var(--pltt-track);
+	border-radius: 5px;
+	margin: 26px 0 8px; /* top margin leaves room for the marker's label */
 }
 .pltt-hero-track i {
+	position: absolute;
+	top: 0;
+	bottom: 0;
 	display: block;
-	height: 100%;
 }
-/* Within-limit fill = admin blue; overage = the light-blue overage color the
-   allocation bar uses (never red — overage is billable, not a failure). */
-.pltt-hero-seg-within { background: var(--pltt-primary, #2271b1); }
-.pltt-hero-seg-over   { background: var(--pltt-primary-light, #72aee6); }
+/* Within-limit fill is blue; past the limit is amber. It used to be a LIGHTER
+   BLUE, which is the universal idiom for "remaining" — a bar 60% light read as
+   "60% left" when it meant 60% over. Amber can only mean extra. Never red:
+   over is a fact about hours, not an error. */
+.pltt-hero-seg-within {
+	left: 0;
+	background: var(--pltt-primary, #2271b1);
+	border-radius: 5px 0 0 5px;
+}
+.pltt-hero-seg-within.is-whole { border-radius: 5px; }
+.pltt-hero-seg-over {
+	background: var(--pltt-s-over);
+	border-radius: 0 5px 5px 0;
+}
 
+/* The limit marker, labelled with what it is ("budget", "3h included"). */
+.pltt-hero-limit {
+	position: absolute;
+	top: -5px;
+	bottom: -5px;
+	width: 2px;
+	background: var(--pltt-text-dark, #1d2327);
+	border-radius: 1px;
+}
+.pltt-hero-limit b {
+	position: absolute;
+	bottom: 100%;
+	left: 50%;
+	transform: translateX(-50%);
+	margin-bottom: 5px;
+	font-size: 11px;
+	font-weight: 400;
+	line-height: 1;
+	white-space: nowrap;
+	color: var(--pltt-text-muted, #646970);
+}
+/* At the right edge the label would overhang the panel — pin it inside. */
+.pltt-hero-limit[style*="left:100"] b {
+	left: auto;
+	right: 0;
+	transform: none;
+}
+
+/* Text matches the basis line under a stat card (.card-secondary in its numbar
+   form, pltt-system.css) — the meter's caption and the cards' basis lines are
+   the same kind of supporting sentence, and they sit within a few pixels of each
+   other on this page. Layout and tabular figures are this caption's own: it is
+   two figures pushed to opposite edges, which a card's basis line is not. */
 .pltt-hero-trackcap {
 	display: flex;
 	justify-content: space-between;
 	gap: 12px;
-	font-size: 12px;
-	color: var(--pltt-text-muted, #646970);
+	font-size: 12.5px;
+	color: var(--pltt-ink-3);
+	line-height: 1.5;
 	font-variant-numeric: tabular-nums;
 }
-.pltt-hero-trackcap b { color: var(--pltt-text-dark, #1d2327); }
 .pltt-hero-cap { white-space: nowrap; }
 .pltt-gauge-cap-warn { color: var(--pltt-warning-text, #b45309); }
-.pltt-gauge-cap-over { color: var(--pltt-primary, #2271b1); font-weight: 600; }
+/* Over reads in the ochre the app uses for "past a limit" everywhere else, not
+   in blue — blue is the within-limit fill, so a blue "254% over" put the colour
+   of being under the limit on the sentence saying you are past it. --pltt-c-over
+   rather than the bar's --pltt-s-over: the bar colour is tuned for a 10px block
+   and is too light to read as text. */
+.pltt-gauge-cap-over { color: var(--pltt-c-over); font-weight: 600; }
 
 /* Right-column mini-rows */
 .pltt-hero-row {

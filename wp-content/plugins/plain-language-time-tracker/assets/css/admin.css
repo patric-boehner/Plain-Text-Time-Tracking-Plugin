@@ -286,12 +286,16 @@
 }
 
 /* Badges */
+/* A badge is a single short label — breaking one across two lines turns it into
+   two things. Kept here on the base rule so no column can wrap any badge; a
+   column too narrow for its badge should look too narrow, not quietly reflow. */
 .pltt-badge {
 	display: inline-block;
 	padding: 3px 8px;
 	border-radius: 3px;
 	font-size: 13px;
 	font-weight: 500;
+	white-space: nowrap;
 	background: var(--pltt-badge-bg);
 	color: var(--pltt-badge-text);
 }
@@ -772,6 +776,16 @@
 	z-index: 1;
 }
 
+/* At the ends of the available span the step renders as an inert <span> rather
+   than disappearing, so the control keeps its width and the label doesn't shift
+   under the pointer. Lives here, beside the rest of the component, because every
+   screen using the month picker loads admin.css. */
+.pltt-date-nav-step.is-disabled {
+	opacity: 0.4;
+	cursor: default;
+	pointer-events: none;
+}
+
 /* ‹ prev / › next — icon buttons. Chevron is rendered via CSS mask so it
    inherits currentColor (so the hover/focus tints from .pltt-date-nav-step
    apply to the icon without swapping data URIs). Shape is the same WP-core
@@ -898,10 +912,17 @@
 	padding: 0;
 }
 
+/* An option is a <button> (History, which submits a form) or an <a> (project
+   detail, which navigates). box-sizing must be stated: width:100% plus 14px of
+   side padding overflows the dropdown on any element that isn't already
+   border-box, and WP admin only sets that for buttons — so the link options
+   spilled past the panel edge. text-decoration likewise: buttons never had one,
+   links do. */
 .pltt-date-nav-option {
 	background: transparent;
 	border: 0;
 	border-radius: 0;
+	box-sizing: border-box;
 	color: var(--pltt-text-base);
 	cursor: pointer;
 	display: block;
@@ -909,6 +930,7 @@
 	font-size: 13px;
 	padding: 9px 14px;
 	text-align: left;
+	text-decoration: none;
 	width: 100%;
 }
 
@@ -1098,7 +1120,8 @@ fieldset.pltt-date-nav-custom-inputs input[type="date"] {
 
 /* Projects page: active/archived grouping. Tags page reuses the same section pattern. */
 .pltt-project-group,
-.pltt-tag-group {
+.pltt-tag-group,
+.pltt-bill-history-group {
 	margin-bottom: 28px;
 }
 
@@ -1108,7 +1131,9 @@ fieldset.pltt-date-nav-custom-inputs input[type="date"] {
 }
 
 .pltt-project-group-header,
-.pltt-tag-group-header-row {
+.pltt-tag-group-header-row,
+.pltt-bill-history-group-header,
+.pltt-entries-group-header {
 	display: flex;
 	justify-content: space-between;
 	align-items: center;
@@ -1120,15 +1145,49 @@ fieldset.pltt-date-nav-custom-inputs input[type="date"] {
 	border-radius: 4px 4px 0 0;
 }
 
-.pltt-tag-group table.widefat {
+.pltt-tag-group table.widefat,
+.pltt-bill-history-group table.widefat,
+.pltt-entries-group table {
 	border-radius: 0 0 4px 4px;
 }
 
 .pltt-project-group-title,
-.pltt-tag-group-title {
+.pltt-tag-group-title,
+.pltt-bill-history-group-title,
+.pltt-entries-group-title {
 	font-weight: 600;
 	font-size: 14px;
 	color: var(--pltt-text-dark);
+}
+
+/* Day totals at the right of a table header — the day's time, then its billable
+   amount. Lives here rather than in reports.css because two screens now render
+   it: Overview's day cards and Today's Recorded Entries header, and reports.css
+   only loads on Overview. The separator and the amount travel together inside
+   .pltt-day-amount so the pair hides as one when nothing is billable. */
+.pltt-date-group-meta,
+.pltt-entries-group-meta {
+	display: inline-flex;
+	align-items: baseline;
+	gap: 8px;
+	font-size: 12px;
+	color: var(--pltt-text-muted);
+}
+
+.pltt-date-group-meta a {
+	text-decoration: none;
+}
+
+.pltt-day-amount {
+	display: inline-flex;
+	align-items: baseline;
+	gap: 8px;
+}
+
+/* Right-hand count, same treatment as History's week band. */
+.pltt-bill-history-group-meta {
+	font-size: 13px;
+	color: var(--pltt-text-muted);
 }
 
 .pltt-project-group table.widefat {
@@ -1140,7 +1199,7 @@ fieldset.pltt-date-nav-custom-inputs input[type="date"] {
 /* Lock column widths so multiple grouped tables line up for vertical scanning. */
 .pltt-project-group table.widefat th:nth-child(1) { width: auto; }    /* Name */
 .pltt-project-group table.widefat th:nth-child(2) { width: 18%; }     /* Client */
-.pltt-project-group table.widefat th:nth-child(3) { width: 140px; }   /* Type */
+.pltt-project-group table.widefat th:nth-child(3) { width: 160px; }   /* Type — fits "Monthly retainer" */
 .pltt-project-group table.widefat th:nth-child(4) { width: 140px; }   /* Rate */
 .pltt-project-group table.widefat th:nth-child(5) { width: 140px; }   /* Budget */
 .pltt-project-group table.widefat th:nth-child(6) { width: 80px; }    /* Billable */

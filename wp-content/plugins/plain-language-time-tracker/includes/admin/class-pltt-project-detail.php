@@ -69,11 +69,74 @@ class PLTT_Project_Detail {
 			: $stats;
 		$subhead = self::build_subhead( $project, $subhead_stats, $billing_type, $window, $client );
 
+		// Every period the project spans, for the date filter's dropdown. Newest
+		// first, so the months you actually bill are at the top of the list.
+		$period_options = self::build_period_options( $window, $stats );
+
 		// Pass $subhead_stats through as the windowed stats so build() reuses them
 		// instead of re-running the same windowed get_stats() (OPT-N-A).
 		$report = PLTT_Project_Report::build( $project_id, $project, null, $stats, $window, $subhead_stats );
 
 		include PLTT_PLUGIN_DIR . 'templates/project-detail.php';
+	}
+
+	/**
+	 * Every period in the project's span, for the date filter's dropdown.
+	 *
+	 * The control this feeds is a period picker, not a chart granularity switch:
+	 * choosing an entry re-scopes the whole page. Listing the periods outright is
+	 * what makes reaching an older month one click instead of N steps back.
+	 *
+	 * Newest first. Returns [] when the project has no period lens (any
+	 * non-recurring type, or no entries), which also hides the whole control.
+	 *
+	 * Each option carries two labels: 'label' names the period on its own ("June
+	 * 2026", for the picker's trigger), while 'short_label' drops the year ("June")
+	 * because inside a year group the switcher above already states it.
+	 *
+	 * @param array|null  $window Resolved window from pltt_resolve_project_chart_window().
+	 * @param object|null $stats  Lifetime stats (for the span bounds).
+	 * @return array List of [ 'anchor', 'label', 'short_label', 'year', 'is_current' ].
+	 */
+	private static function build_period_options( $window, $stats ) {
+		if ( empty( $window['show_control'] ) ) {
+			return array();
+		}
+		$first = $stats->first_entry_date ?? '';
+		$last  = $stats->last_entry_date ?? '';
+		if ( ! $first || ! $last ) {
+			return array();
+		}
+
+		$unit    = $window['unit'];
+		$tz      = wp_timezone();
+		$cursor  = pltt_period_start( new DateTimeImmutable( $last, $tz ), $unit );
+		$floor   = pltt_period_start( new DateTimeImmutable( $first, $tz ), $unit );
+		$active  = ! empty( $window['anchor'] ) ? (string) $window['anchor'] : '';
+		$options = array();
+
+		// Walk back one period at a time. Bounded by the project's own span, so the
+		// list is as long as the project is old — no arbitrary cap to explain.
+		while ( $cursor >= $floor ) {
+			$anchor = $cursor->format( 'Y-m-d' );
+
+			// Short label = the period without its year. Only 'month' has a clean
+			// year-free form; the other units keep the full label, which reads fine
+			// in a year group ("Q1 2026", "Week of Jun 9, 2026").
+			$label = pltt_period_label( $cursor, $unit );
+			$short = ( 'month' === $unit ) ? $cursor->format( 'F' ) : $label;
+
+			$options[] = array(
+				'anchor'      => $anchor,
+				'label'       => $label,
+				'short_label' => $short,
+				'year'        => $cursor->format( 'Y' ),
+				'is_current'  => ( $anchor === $active ),
+			);
+			$cursor = pltt_period_start( $cursor->modify( '-1 day' ), $unit );
+		}
+
+		return $options;
 	}
 
 	/**
@@ -97,7 +160,7 @@ class PLTT_Project_Detail {
 	private static function build_subhead( $project, $stats, $billing_type, $window = null, $client = null ) {
 		$type_labels = array(
 			'hourly'    => __( 'Hourly', 'plain-language-time-tracker' ),
-			'recurring' => __( 'Monthly', 'plain-language-time-tracker' ),
+			'recurring' => __( 'Monthly retainer', 'plain-language-time-tracker' ),
 			'fixed'     => __( 'Fixed Budget', 'plain-language-time-tracker' ),
 			'none'      => __( 'Internal', 'plain-language-time-tracker' ),
 		);

@@ -179,8 +179,6 @@ $return_to     = $return_to_raw ? wp_validate_redirect( $return_to_raw, '' ) : '
 		</div>
 	<?php elseif ( $has_entries ) : ?>
 		<div class="pltt-existing-entries" id="pltt-entries">
-			<h3><?php esc_html_e( 'Recorded Entries', 'plain-language-time-tracker' ); ?></h3>
-
 			<?php // Pared day summary (matches Reports): hours, billable hours, amount. ?>
 			<div class="pltt-summary-cards pltt-numbar">
 				<div class="card">
@@ -210,10 +208,30 @@ $return_to     = $return_to_raw ? wp_validate_redirect( $return_to_raw, '' ) : '
 			<input type="hidden" id="pltt-entry-date" value="<?php echo esc_attr( $date ); ?>">
 
 			<?php
-			// Inline editable list (compact rows + expandable edit form) — wired by
-			// review.js IIFE 2, the same editor the review screen uses.
-			include PLTT_PLUGIN_DIR . 'templates/partials/entries-editor.php';
+			// Header attached to the top of the table, the same shape Projects, Tags,
+			// History and Overview use. The figures match Overview's day header: the
+			// day's total time, then its billable amount. Both come from variables the
+			// summary cards above already read, so the two can't disagree.
+			$dl_day_amount = (float) $summary['billable_amount'];
 			?>
+			<div class="pltt-entries-group">
+				<div class="pltt-entries-group-header">
+					<span class="pltt-entries-group-title"><?php esc_html_e( 'Recorded Entries', 'plain-language-time-tracker' ); ?></span>
+					<?php // Same markup as reports.php's day header, down to the hook classes. ?>
+					<span class="pltt-entries-group-meta" data-day-amount="<?php echo esc_attr( number_format( $dl_day_amount, 2, '.', '' ) ); ?>">
+						<span class="pltt-mono"><?php echo esc_html( pltt_format_duration( $total_minutes ) ); ?></span>
+						<span class="pltt-day-amount<?php echo $dl_day_amount > 0 ? '' : ' pltt-hidden'; ?>">
+							&middot;
+							<span class="pltt-mono pltt-day-amount-value"><?php echo esc_html( pltt_format_currency( $dl_day_amount ) ); ?></span>
+						</span>
+					</span>
+				</div>
+				<?php
+				// Inline editable list (compact rows + expandable edit form) — wired by
+				// review.js IIFE 2, the same editor the review screen uses.
+				include PLTT_PLUGIN_DIR . 'templates/partials/entries-editor.php';
+				?>
+			</div>
 		</div>
 	<?php endif; ?>
 

@@ -548,7 +548,6 @@ function pltt_build_chart_buckets( $date_from, $date_to, $bucket_size ) {
 		$cursor  = $start;
 		while ( $cursor <= $end ) {
 			$ymd       = $cursor->format( 'Y-m-d' );
-			$dow       = (int) $cursor->format( 'N' ); // 1=Mon..7=Sun
 			$buckets[] = array(
 				'key'         => $ymd,
 				'start'       => $ymd,
@@ -556,7 +555,6 @@ function pltt_build_chart_buckets( $date_from, $date_to, $bucket_size ) {
 				'short_top'   => $cursor->format( 'D' ), // Short day-of-week, e.g. "Mon".
 				'short'       => $cursor->format( 'n/j' ), // Numeric date, e.g. "5/4".
 				'long'        => $cursor->format( 'F j, Y' ),
-				'is_weekend'  => ( $dow >= 6 ),
 			);
 			$cursor = $cursor->modify( '+1 day' );
 		}
@@ -570,15 +568,23 @@ function pltt_build_chart_buckets( $date_from, $date_to, $bucket_size ) {
 		while ( $cursor <= $last ) {
 			$month_start = $cursor->format( 'Y-m-01' );
 			$month_end   = $cursor->format( 'Y-m-t' );
-			// Clip to the requested range edges for the screen-reader cell.
+			// Clip to the requested range edges.
 			$clipped_start = max( $month_start, $date_from );
 			$clipped_end   = min( $month_end, $date_to );
-			$buckets[]     = array(
+
+			// A part-month says so on hover. The tick keeps the month name — it
+			// names a month rather than a date, so it can't claim a start day the
+			// range doesn't reach, which is the failure the weekly ticks had.
+			$is_partial = ( $clipped_start !== $month_start || $clipped_end !== $month_end );
+
+			$buckets[]  = array(
 				'key'   => $cursor->format( 'Y-m' ),
 				'start' => $clipped_start,
 				'end'   => $clipped_end,
 				'short' => $cross_year ? $cursor->format( "M 'y" ) : $cursor->format( 'M' ),
-				'long'  => $cursor->format( 'F Y' ),
+				'long'  => $is_partial
+					? pltt_format_date_range( $clipped_start, $clipped_end )
+					: $cursor->format( 'F Y' ),
 			);
 			$cursor = $cursor->modify( '+1 month' );
 		}
@@ -596,17 +602,28 @@ function pltt_build_chart_buckets( $date_from, $date_to, $bucket_size ) {
 		$week_start = $cursor;
 		$week_end   = $cursor->modify( '+6 days' );
 
-		// Clip to the requested range edges for the screen-reader cell.
+		// Clip to the requested range edges.
 		$clipped_start = max( $week_start->format( 'Y-m-d' ), $date_from );
 		$clipped_end   = min( $week_end->format( 'Y-m-d' ), $date_to );
+
+		// The first and last buckets are usually part-weeks, because a range
+		// rarely begins on a week-start day. Label those by the days they
+		// actually cover, not by the week they belong to: a range running from
+		// May 15 drew its first tick as "May 11" and its tooltip as "Week of May
+		// 11", four days before anything the chart contains and before the date
+		// the panel header states.
+		$is_partial = ( $clipped_start !== $week_start->format( 'Y-m-d' ) || $clipped_end !== $week_end->format( 'Y-m-d' ) );
+		$tick_date  = $is_partial ? new DateTimeImmutable( $clipped_start, $tz ) : $week_start;
 
 		$buckets[] = array(
 			'key'   => $week_start->format( 'Y-m-d' ),
 			'start' => $clipped_start,
 			'end'   => $clipped_end,
-			'short' => $cross_year ? $week_start->format( "M j 'y" ) : $week_start->format( 'M j' ),
-			/* translators: %s: human-readable week start date, e.g. "May 4, 2026". */
-			'long'  => sprintf( __( 'Week of %s', 'plain-language-time-tracker' ), $week_start->format( 'F j, Y' ) ),
+			'short' => $cross_year ? $tick_date->format( "M j 'y" ) : $tick_date->format( 'M j' ),
+			'long'  => $is_partial
+				? pltt_format_date_range( $clipped_start, $clipped_end )
+				/* translators: %s: human-readable week start date, e.g. "May 4, 2026". */
+				: sprintf( __( 'Week of %s', 'plain-language-time-tracker' ), $week_start->format( 'F j, Y' ) ),
 		);
 		$cursor = $cursor->modify( '+7 days' );
 	}
@@ -3129,7 +3146,7 @@ function pltt_build_billing_scope_view( $scope, $client_name ) {
 	// ("June 2026"); hourly shows the span of its unbilled entries.
 	$type_labels = array(
 		'hourly'    => __( 'Hourly', 'plain-language-time-tracker' ),
-		'recurring' => __( 'Retainer', 'plain-language-time-tracker' ),
+		'recurring' => __( 'Monthly retainer', 'plain-language-time-tracker' ),
 		'fixed'     => __( 'Fixed Fee', 'plain-language-time-tracker' ),
 		'none'      => __( 'Internal', 'plain-language-time-tracker' ),
 	);
@@ -4011,7 +4028,7 @@ function pltt_clamp_project_entries( $project_id ) {
 function pltt_render_billing_type_badge( $billing_type ) {
 	$styles = array(
 		'none'      => array( 'pltt-badge-model-internal', __( 'Internal', 'plain-language-time-tracker' ) ),
-		'recurring' => array( 'pltt-badge-model-monthly', __( 'Monthly', 'plain-language-time-tracker' ) ),
+		'recurring' => array( 'pltt-badge-model-monthly', __( 'Monthly retainer', 'plain-language-time-tracker' ) ),
 		'fixed'     => array( 'pltt-badge-model-fixed', __( 'Fixed Budget', 'plain-language-time-tracker' ) ),
 		'hourly'    => array( 'pltt-badge-model-hourly', __( 'Hourly', 'plain-language-time-tracker' ) ),
 	);
@@ -4060,7 +4077,7 @@ function pltt_format_project_info_line( $project ) {
 
 	switch ( $type ) {
 		case 'recurring':
-			$parts[] = __( 'Retainer', 'plain-language-time-tracker' );
+			$parts[] = __( 'Monthly retainer', 'plain-language-time-tracker' );
 
 			if ( ! empty( $project->budget_fee ) ) {
 				$period_abbr = array(
@@ -4127,6 +4144,122 @@ function pltt_format_project_info_line( $project ) {
 	}
 
 	return implode( ' · ', $parts );
+}
+
+/**
+ * State a project's terms as a sentence, for the project report's scope block.
+ *
+ * The middot-joined pltt_format_project_info_line() above answers "what kind of
+ * project is this" in a row of labels. This answers "what did we agree to" in
+ * words, because it sits under the project's name on its own report page where
+ * there is room to say it plainly:
+ *
+ *   Retainer     "3 hours included each month at $90/hr"
+ *   Fixed budget "$3,870 budgeted as 38h 42m at $100/hr"
+ *   Hourly       "$100/hr"
+ *   Internal     "" (nothing was agreed — there is no client and no rate)
+ *
+ * The two are deliberately not merged: one is a label strip, the other is a
+ * sentence. Keep them adjacent so a change to the underlying figures gets applied
+ * to both.
+ *
+ * Budgeted time comes from pltt_budgeted_minutes(), the canonical cascade — an
+ * explicit hour budget wins, otherwise fee ÷ rate. That is why a fixed project
+ * with only a fee still states hours.
+ *
+ * @param object $project Project row.
+ * @return string Plain text, unescaped (caller escapes). '' when there is nothing to state.
+ */
+function pltt_format_project_terms( $project ) {
+	$type = pltt_get_billing_type( $project );
+	$rate = (float) pltt_resolve_billable_rate( (int) $project->client_id, (int) $project->id );
+
+	// "$90/hr" on its own, and " at $90/hr" as a tail. Both are dropped when no
+	// rate resolves, so the line never trails off into "at $0/hr". The bare form is
+	// what a branch falls back to when it has no terms to attach the rate to —
+	// "Client · at $90/hr" would start mid-sentence.
+	$bare_rate = ( $rate > 0 )
+		? sprintf(
+			/* translators: %s: hourly rate, e.g. "$90". */
+			__( '%s/hr', 'plain-language-time-tracker' ),
+			pltt_format_currency_compact( $rate )
+		)
+		: '';
+	$at_rate = ( '' !== $bare_rate )
+		? sprintf(
+			/* translators: %s: a rate phrase like "$90/hr". */
+			__( ' at %s', 'plain-language-time-tracker' ),
+			$bare_rate
+		)
+		: '';
+
+	if ( 'recurring' === $type ) {
+		$hours = isset( $project->budget_hours ) ? (float) $project->budget_hours : 0.0;
+		if ( $hours <= 0 ) {
+			// A retainer with no allocation recorded: state the rate alone rather than
+			// inventing a "0 hours included".
+			return $bare_rate;
+		}
+
+		$period_nouns = array(
+			'weekly'    => __( 'each week', 'plain-language-time-tracker' ),
+			'monthly'   => __( 'each month', 'plain-language-time-tracker' ),
+			'quarterly' => __( 'each quarter', 'plain-language-time-tracker' ),
+			'yearly'    => __( 'each year', 'plain-language-time-tracker' ),
+		);
+		$period = $period_nouns[ $project->recurring_period ?? '' ] ?? $period_nouns['monthly'];
+
+		// "3", not "3.00"; "3.5" survives.
+		$hours_txt = rtrim( rtrim( number_format( $hours, 2 ), '0' ), '.' );
+
+		return sprintf(
+			/* translators: 1: hour count, e.g. "3"; 2: period, e.g. "each month"; 3: " at $90/hr" or empty. */
+			_n( '%1$s hour included %2$s%3$s', '%1$s hours included %2$s%3$s', (int) ceil( $hours ), 'plain-language-time-tracker' ),
+			$hours_txt,
+			$period,
+			$at_rate
+		);
+	}
+
+	if ( 'fixed' === $type ) {
+		$fee     = isset( $project->budget_fee ) ? (float) $project->budget_fee : 0.0;
+		$minutes = pltt_budgeted_minutes( $project, $rate );
+
+		if ( $fee > 0 && $minutes > 0 ) {
+			return sprintf(
+				/* translators: 1: total fee, e.g. "$3,870"; 2: budgeted time, e.g. "38h 42m"; 3: " at $100/hr" or empty. */
+				__( '%1$s budgeted as %2$s%3$s', 'plain-language-time-tracker' ),
+				pltt_format_currency_compact( $fee ),
+				pltt_format_duration( $minutes ),
+				$at_rate
+			);
+		}
+		if ( $fee > 0 ) {
+			// No rate, so no hours to imply — state the fee alone.
+			return sprintf(
+				/* translators: %s: total fee, e.g. "$3,870". */
+				__( '%s budgeted', 'plain-language-time-tracker' ),
+				pltt_format_currency_compact( $fee )
+			);
+		}
+		if ( $minutes > 0 ) {
+			// Budgeted in hours rather than money.
+			return sprintf(
+				/* translators: 1: budgeted time, e.g. "38h 42m"; 2: " at $100/hr" or empty. */
+				__( '%1$s budgeted%2$s', 'plain-language-time-tracker' ),
+				pltt_format_duration( $minutes ),
+				$at_rate
+			);
+		}
+		return $bare_rate;
+	}
+
+	if ( 'hourly' === $type ) {
+		return $bare_rate;
+	}
+
+	// Internal: no client, no rate, nothing agreed.
+	return '';
 }
 
 

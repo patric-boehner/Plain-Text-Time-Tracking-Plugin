@@ -86,29 +86,9 @@
 	color: var(--pltt-text-muted);
 }
 
-/* Day totals sit where the Edit button used to (spec §2.3). Inline-flex so the
-   gap opens up both sides of the "·" — the two figures need room to read as two
-   figures, not one run-on string. */
-.pltt-date-group-meta {
-	display: inline-flex;
-	align-items: baseline;
-	gap: 8px;
-	font-size: 12px;
-	color: var(--pltt-text-muted);
-}
-
-.pltt-date-group-meta a {
-	text-decoration: none;
-}
-
-/* The separator and the day's billable amount travel together so the pair can
-   be hidden as one when the day has nothing billable. Repeating the parent's
-   gap keeps the spacing identical to when they were bare siblings. */
-.pltt-day-amount {
-	display: inline-flex;
-	align-items: baseline;
-	gap: 8px;
-}
+/* Day totals (.pltt-date-group-meta / .pltt-day-amount) moved to admin.css —
+   Today's Recorded Entries header renders the same figures and this sheet only
+   loads on Overview. */
 
 .pltt-date-group table.widefat {
 	border-radius: 0 0 4px 4px;
@@ -207,7 +187,9 @@
 /* Summary table column widths — Project column gets remaining space */
 .pltt-summary-table th:nth-child(2),
 .pltt-summary-table td:nth-child(2) { /* Type */
-	width: 110px;
+	/* Fits the longest model badge, "Monthly retainer": ~125px of badge at 13px
+	   with 8px side padding, plus the cell's own padding. At 110px it wrapped. */
+	width: 160px;
 }
 .pltt-summary-table th:nth-child(3),
 .pltt-summary-table td:nth-child(3) { /* Hours */

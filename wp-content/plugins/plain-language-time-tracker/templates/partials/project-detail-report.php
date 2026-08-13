@@ -41,26 +41,34 @@ $is_period   = ! empty( $window['is_period'] );
 // Scope block — this screen IS a scope with agreed terms, so identity and
 // figures live in one bordered object (see pltt-system.css). Identity is the
 // project's lifetime; the figure row (cards) re-scopes with the period lens.
+// Client, then the terms agreed with them — "3 hours included each month at
+// $90/hr", "$3,870 budgeted as 38h 42m at $100/hr". Previously only hourly
+// projects said anything here, so a retainer's page never stated its allocation
+// and a fixed project never stated its budget.
 $scope_terms = ( isset( $client ) && $client && ! empty( $client->name ) )
 	? $client->name
 	: __( 'Internal', 'plain-language-time-tracker' );
-if ( 'hourly' === $billing_type ) {
-	$hr_rate = pltt_resolve_billable_rate( (int) $project->client_id, (int) $project->id );
-	if ( $hr_rate > 0 ) {
-		/* translators: %s: hourly rate, e.g. "$100.00". */
-		$scope_terms .= ' · ' . sprintf( __( '%s/hr', 'plain-language-time-tracker' ), pltt_format_currency( $hr_rate ) );
-	}
+
+$terms_txt = pltt_format_project_terms( $project );
+if ( '' !== $terms_txt ) {
+	$scope_terms .= ' · ' . $terms_txt;
 }
 
-$span_first = $stats->first_entry_date ?? '';
-$span_last  = $stats->last_entry_date ?? '';
+// The "Showing …" line is the readout of the date control, so it has to follow
+// the selected period — it used to read $stats (lifetime) unconditionally and so
+// still said the project's whole span while the figures beside it showed one
+// month. $window's from/to already collapse to the lifetime span on "All time",
+// and $subhead_stats is the matching windowed count (== $stats when not windowed).
+$span_first = ! empty( $window['from'] ) ? $window['from'] : ( $stats->first_entry_date ?? '' );
+$span_last  = ! empty( $window['to'] ) ? $window['to'] : ( $stats->last_entry_date ?? '' );
 $span_txt   = '';
 if ( $span_first && $span_last ) {
 	$span_txt = ( $span_first === $span_last )
 		? date_i18n( 'M j, Y', strtotime( $span_first ) )
 		: date_i18n( 'M j, Y', strtotime( $span_first ) ) . ' – ' . date_i18n( 'M j, Y', strtotime( $span_last ) );
 }
-$span_count = isset( $stats->total_count ) ? (int) $stats->total_count : 0;
+$span_stats = isset( $subhead_stats ) ? $subhead_stats : $stats;
+$span_count = isset( $span_stats->total_count ) ? (int) $span_stats->total_count : 0;
 ?>
 <div class="pltt-scope-block">
 	<div class="pltt-scope-id">
@@ -193,68 +201,11 @@ endif;
 ?>
 
 <?php
-// Period lens (recurring projects only) — sits beneath the cards and drives the
-// cards, the volume chart, and the "Where the time went" bars; the swimlane
-// stays lifetime. Styling mirrors the Reports view-toggle + date-nav approach.
-if ( $window && ! empty( $window['show_control'] ) ) :
-	$pid       = (int) $project->id;
-	$base_args = array(
-		'page'       => 'pltt-projects',
-		'action'     => 'view',
-		'project_id' => $pid,
-		'tab'        => 'report',
-	);
-	$unit_labels = array(
-		'week'    => __( 'By week', 'plain-language-time-tracker' ),
-		'month'   => __( 'By month', 'plain-language-time-tracker' ),
-		'quarter' => __( 'By quarter', 'plain-language-time-tracker' ),
-		'year'    => __( 'By year', 'plain-language-time-tracker' ),
-	);
-	$period_btn_label = $unit_labels[ $window['unit'] ] ?? $unit_labels['month'];
-	$full_url         = add_query_arg( array_merge( $base_args, array( 'chart_scope' => 'full' ) ), admin_url( 'admin.php' ) );
-	$period_url       = add_query_arg( array_merge( $base_args, array( 'chart_scope' => 'period' ) ), admin_url( 'admin.php' ) );
-	?>
-	<div class="pltt-period-lens">
-		<!-- Full / by-period: segmented toggle, same treatment as the Reports view switch. -->
-		<div class="pltt-period-modes" role="group" aria-label="<?php esc_attr_e( 'Report scope', 'plain-language-time-tracker' ); ?>">
-			<a class="button<?php echo $is_period ? '' : ' button-primary'; ?>" href="<?php echo esc_url( $full_url ); ?>" aria-pressed="<?php echo $is_period ? 'false' : 'true'; ?>">
-				<?php esc_html_e( 'Full', 'plain-language-time-tracker' ); ?>
-			</a>
-			<a class="button<?php echo $is_period ? ' button-primary' : ''; ?>" href="<?php echo esc_url( $period_url ); ?>" aria-pressed="<?php echo $is_period ? 'true' : 'false'; ?>">
-				<?php echo esc_html( $period_btn_label ); ?>
-			</a>
-		</div>
-
-		<?php if ( $is_period ) : ?>
-			<!-- Period nav, right-aligned: the prev/period/next stepper reuses the
-			     shared .pltt-date-nav styling, with a "Latest" reset button after it
-			     (mirrors the daily-log "Today" reset). -->
-			<div class="pltt-period-nav">
-				<div class="pltt-period-stepper" role="group" aria-label="<?php esc_attr_e( 'Period', 'plain-language-time-tracker' ); ?>">
-					<?php if ( ! empty( $window['prev_anchor'] ) ) : ?>
-						<?php $prev_url = add_query_arg( array_merge( $base_args, array( 'chart_scope' => 'period', 'chart_period' => $window['prev_anchor'] ) ), admin_url( 'admin.php' ) ); ?>
-						<a class="pltt-date-nav-step pltt-date-nav-prev" href="<?php echo esc_url( $prev_url ); ?>" aria-label="<?php esc_attr_e( 'Previous period', 'plain-language-time-tracker' ); ?>"></a>
-					<?php else : ?>
-						<span class="pltt-date-nav-step pltt-date-nav-prev is-disabled" aria-disabled="true"></span>
-					<?php endif; ?>
-
-					<span class="pltt-period-label-seg"><?php echo esc_html( $window['period_label'] ); ?></span>
-
-					<?php if ( ! empty( $window['next_anchor'] ) ) : ?>
-						<?php $next_url = add_query_arg( array_merge( $base_args, array( 'chart_scope' => 'period', 'chart_period' => $window['next_anchor'] ) ), admin_url( 'admin.php' ) ); ?>
-						<a class="pltt-date-nav-step pltt-date-nav-next" href="<?php echo esc_url( $next_url ); ?>" aria-label="<?php esc_attr_e( 'Next period', 'plain-language-time-tracker' ); ?>"></a>
-					<?php else : ?>
-						<span class="pltt-date-nav-step pltt-date-nav-next is-disabled" aria-disabled="true"></span>
-					<?php endif; ?>
-				</div>
-
-				<?php if ( empty( $window['is_latest'] ) ) : ?>
-					<a class="button button-secondary pltt-period-latest" href="<?php echo esc_url( $period_url ); ?>"><?php esc_html_e( 'Latest', 'plain-language-time-tracker' ); ?></a>
-				<?php endif; ?>
-			</div>
-		<?php endif; ?>
-	</div>
-<?php endif; ?>
+// The period lens used to sit here, beneath the cards. It moved to the header's
+// action group (templates/partials/project-period-lens.php) so the date control
+// is in the same place as on every other screen. It still drives the cards, the
+// volume chart, and the "Where the time went" bars.
+?>
 
 <?php
 // Volume bar chart (Hours by day/week/month over the active window). Same
@@ -264,6 +215,9 @@ if ( ! empty( $report['chart'] ) && $window ) :
 	$date_from         = $window['from'];
 	$date_to           = $window['to'];
 	$chart_empty_label = $is_period ? $window['period_label'] : '';
+	// No panel control here: the chart's granularity follows the selected period,
+	// and a day/week/month switch on top of that didn't earn its place on this
+	// screen. $chart_controls stays empty (the chart partial skips the slot).
 	$chart_controls    = '';
 	include PLTT_PLUGIN_DIR . 'templates/partials/chart-by-period.php';
 endif;
@@ -282,9 +236,26 @@ endif;
 $billing_history = PLTT_Billing::get_for_project_history( (int) $project->id );
 if ( ! empty( $billing_history ) ) :
 	?>
-	<div class="pltt-card pltt-billing-history" id="pltt-billing-history">
-		<div class="pltt-where-header">
-			<h2 class="pltt-where-title"><?php esc_html_e( 'Billing history', 'plain-language-time-tracker' ); ?></h2>
+	<?php
+	// Group band + table, the same shape Projects, Tags, History and Reports use:
+	// a titled header that sits directly on the table it labels. The id stays on
+	// the group — three places link to #pltt-billing-history.
+	$bh_count = count( $billing_history );
+	?>
+	<div class="pltt-bill-history-group" id="pltt-billing-history">
+		<div class="pltt-bill-history-group-header">
+			<span class="pltt-bill-history-group-title"><?php esc_html_e( 'Billing history', 'plain-language-time-tracker' ); ?></span>
+			<span class="pltt-bill-history-group-meta">
+				<?php
+				echo esc_html(
+					sprintf(
+						/* translators: %s: number of bill records. */
+						_n( '%s record', '%s records', $bh_count, 'plain-language-time-tracker' ),
+						number_format_i18n( $bh_count )
+					)
+				);
+				?>
+			</span>
 		</div>
 		<?php include PLTT_PLUGIN_DIR . 'templates/partials/billing-history-table.php'; ?>
 	</div>
