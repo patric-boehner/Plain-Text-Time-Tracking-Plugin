@@ -453,6 +453,25 @@ class PLTT_Admin {
 			);
 		}
 
+		// Which Projects screen: the list, or a project's detail view. Resolved here
+		// because several blocks below (and the shared month picker) branch on it.
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only asset routing.
+		$projects_action = isset( $_GET['action'] ) ? sanitize_key( wp_unslash( $_GET['action'] ) ) : '';
+
+		// Shared month picker (templates/partials/month-picker.php): History's month
+		// browser and a retainer project's period filter render the same control, so
+		// its open/close + year-switcher behaviour is enqueued for both.
+		if ( 'time-tracker_page_pltt-log-archive' === $hook
+			|| ( 'time-tracker_page_pltt-projects' === $hook && 'view' === $projects_action ) ) {
+			wp_enqueue_script(
+				'pltt-month-picker',
+				PLTT_PLUGIN_URL . 'assets/js/pltt-month-picker.js',
+				array(),
+				$version,
+				true
+			);
+		}
+
 		// History — the log archive / month browser, its own page again.
 		if ( 'time-tracker_page_pltt-log-archive' === $hook ) {
 			wp_enqueue_style(
@@ -540,8 +559,6 @@ class PLTT_Admin {
 			);
 		}
 
-		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only asset routing.
-		$projects_action = isset( $_GET['action'] ) ? sanitize_key( wp_unslash( $_GET['action'] ) ) : '';
 		if ( 'time-tracker_page_pltt-projects' === $hook && 'view' === $projects_action ) {
 			// pltt-tooltip (CSS + JS) is enqueued globally above — it powers the
 			// volume chart's hover tooltips here, and the ⓘ notes everywhere.

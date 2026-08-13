@@ -732,8 +732,22 @@ class PLTT_Project_Report {
 	private static function build_hero( $project, $stats, $rate, $window = null ) {
 		switch ( pltt_get_billing_type( $project ) ) {
 			case 'fixed':
+				// The fixed hero gauges dollars against the fee, so a project
+				// budgeted only in hours has nothing for it to draw either.
+				if ( self::num( $project->budget_fee ) <= 0 ) {
+					return null;
+				}
 				return self::hero_fixed( $project, $stats, $rate );
 			case 'recurring':
+				// A retainer with no allocation recorded has no ceiling. It used to
+				// draw a gauge reading 0% of nothing, which says less than no gauge
+				// at all. Matches what the rest of the app already does with these:
+				// the Overview summary's Budget column shows a dash
+				// (templates/reports.php), and the day's consumption notice skips
+				// them outright (pltt_consumption_status).
+				if ( self::num( $project->budget_hours ) <= 0 ) {
+					return null;
+				}
 				return self::hero_recurring( $project, $stats, $rate, $window );
 			default:
 				// Hourly and internal have no limit to gauge against, so there is
@@ -765,23 +779,28 @@ class PLTT_Project_Report {
 			'type'     => 'fixed',
 			'mode'     => 'gauge',
 			'tag'      => __( 'Budget consumed', 'plain-language-time-tracker' ),
-			'period'   => '',
 			'gauge'    => array(
 				'pct'        => $pct,
 				'state'      => self::gauge_state( $pct ),
 				'within_pct' => $seg['within'],
 				'over_pct'   => $seg['over'],
-				'used'  => pltt_format_currency( $consumed ),
-				'total' => pltt_format_currency( max( 0.0, $budget ) ),
-				'cap'   => $remaining >= 0
-					/* translators: %s: dollars remaining. */
-					? sprintf( __( '%s left', 'plain-language-time-tracker' ), pltt_format_currency( $remaining ) )
-					/* translators: %s: dollars over budget. */
-					: sprintf( __( '%s over', 'plain-language-time-tracker' ), pltt_format_currency( abs( $remaining ) ) ),
-				'note'  => $budget > 0
-					/* translators: 1: percent used; 2: hours logged. */
-					? sprintf( __( '%1$d%% used · %2$s logged', 'plain-language-time-tracker' ), (int) round( $pct * 100 ), pltt_format_duration( $total_minutes ) )
-					: __( 'no budget set', 'plain-language-time-tracker' ),
+				// What the limit is, printed on the marker so the meter reads
+				// without its caption.
+				'marker'     => __( 'budget', 'plain-language-time-tracker' ),
+				/* translators: 1: value consumed; 2: the budget. */
+				'basis'      => sprintf(
+					__( '%1$s against a %2$s budget', 'plain-language-time-tracker' ),
+					pltt_format_currency( $consumed ),
+					pltt_format_currency( max( 0.0, $budget ) )
+				),
+				'delta'      => self::gauge_delta(
+					$pct,
+					$remaining >= 0
+						/* translators: %s: dollars remaining. */
+						? sprintf( __( '%s left', 'plain-language-time-tracker' ), pltt_format_currency( $remaining ) )
+						/* translators: %s: dollars over budget. */
+						: sprintf( __( '%s over', 'plain-language-time-tracker' ), pltt_format_currency( abs( $remaining ) ) )
+				),
 			),
 			// No mini-rows: remaining, hours and effective rate are all figures in
 			// the scope block above. What's left is the meter, which is the one
@@ -825,36 +844,18 @@ class PLTT_Project_Report {
 			$used_minutes = isset( $ps->total_minutes ) ? (int) $ps->total_minutes : 0;
 		}
 
-		$is_current = ( $p_start && $p_end && $today >= $p_start && $today <= $p_end );
+		// build_hero() only reaches here with a real allocation, so there is always
+		// a limit to be under or over.
+		$pct      = $used_minutes / $alloc_minutes;
+		$over_min = max( 0, $used_minutes - $alloc_minutes );
+		$rem_min  = max( 0, $alloc_minutes - $used_minutes );
 
-		// With no allocation configured there's nothing to be "over" — a retainer
-		// missing budget_hours is misconfigured, so show plain usage, not overage.
-		$has_alloc = $alloc_minutes > 0;
-		$pct       = $has_alloc ? ( $used_minutes / $alloc_minutes ) : 0.0;
-		$over_min  = $has_alloc ? max( 0, $used_minutes - $alloc_minutes ) : 0;
-		$rem_min   = $has_alloc ? max( 0, $alloc_minutes - $used_minutes ) : 0;
-		$overage   = round( ( $over_min / 60.0 ) * $rate, 2 );
-
-		// Caption: overage / remaining when there's an allocation; plain usage when not.
-		if ( ! $has_alloc ) {
-			/* translators: %s: hours logged this period. */
-			$cap = sprintf( __( '%s logged', 'plain-language-time-tracker' ), pltt_format_duration( $used_minutes ) );
-		} elseif ( $over_min > 0 ) {
-			/* translators: 1: hours over allocation; 2: overage dollars. */
-			$cap = sprintf( __( '%1$s over · %2$s', 'plain-language-time-tracker' ), pltt_format_duration( $over_min ), pltt_format_currency( $overage ) );
+		if ( $over_min > 0 ) {
+			/* translators: %s: hours over the allocation. */
+			$cap = sprintf( __( '%s over', 'plain-language-time-tracker' ), pltt_format_duration( $over_min ) );
 		} else {
 			/* translators: %s: hours remaining in the allocation. */
-			$cap = sprintf( __( '%s remaining', 'plain-language-time-tracker' ), pltt_format_duration( $rem_min ) );
-		}
-
-		// Tag: "This period" when the shown period is live; a stepped-to period is
-		// just "Period" (the label names which); the default fallback is "Latest".
-		if ( $is_current ) {
-			$tag = __( 'This period', 'plain-language-time-tracker' );
-		} elseif ( $follows_lens ) {
-			$tag = __( 'Period', 'plain-language-time-tracker' );
-		} else {
-			$tag = __( 'Latest period', 'plain-language-time-tracker' );
+			$cap = sprintf( __( '%s left', 'plain-language-time-tracker' ), pltt_format_duration( $rem_min ) );
 		}
 
 		$seg = self::gauge_segments( $used_minutes, $alloc_minutes );
@@ -862,20 +863,28 @@ class PLTT_Project_Report {
 		return array(
 			'type'     => 'recurring',
 			'mode'     => 'gauge',
-			'tag'      => $tag,
-			'period'   => ( $p_start && $p_end ) ? self::period_label( $project, $p_start, $p_end ) : '',
+			// Same label as the fixed-fee meter: both answer "how much of the
+			// limit is gone", and the marker below names which limit it is. The
+			// tag used to carry the period too ("Period · July 2026"), which made
+			// the page state the same month three times — date filter, scope
+			// block, and here.
+			'tag'      => __( 'Budget consumed', 'plain-language-time-tracker' ),
 			'gauge'    => array(
 				'pct'        => $pct,
 				'state'      => self::gauge_state( $pct ),
 				'within_pct' => $seg['within'],
 				'over_pct'   => $seg['over'],
-				'used'  => pltt_format_duration( $used_minutes ),
-				'total' => $has_alloc ? pltt_format_duration( $alloc_minutes ) : '—',
-				'cap'   => $cap,
-				'note'  => $has_alloc
-					/* translators: %d: percent of allocation used. */
-					? sprintf( __( '%d%% of allocation', 'plain-language-time-tracker' ), (int) round( $pct * 100 ) )
-					: __( 'no allocation set', 'plain-language-time-tracker' ),
+				// The marker states the allocation itself — "3h included" — so the
+				// meter says what the limit is without the caption underneath.
+				/* translators: %s: the period's hour allocation, e.g. "3h". */
+				'marker'     => sprintf( __( '%s included', 'plain-language-time-tracker' ), pltt_format_duration( $alloc_minutes ) ),
+				/* translators: 1: hours used this period; 2: the hour allocation. */
+				'basis'      => sprintf(
+					__( '%1$s against the %2$s included', 'plain-language-time-tracker' ),
+					pltt_format_duration( $used_minutes ),
+					pltt_format_duration( $alloc_minutes )
+				),
+				'delta'      => self::gauge_delta( $pct, $cap ),
 			),
 			// No mini-rows: overage, average and the allocation are all figures in
 			// the scope block above. What's left is the meter — proportion, which
@@ -907,6 +916,31 @@ class PLTT_Project_Report {
 	 * @param float $total Limit (allocation minutes or budget dollars).
 	 * @return array{within: float, over: float}
 	 */
+	/**
+	 * The meter's right-hand caption: "84% · 5h 57m left", "249% · $5,771.67 over".
+	 *
+	 * Exactly 100% reads "fully used" rather than "0 left" — at the limit is a
+	 * state worth naming, and "0m left" reads like a rounding artefact.
+	 *
+	 * Tested against the true ratio, not the rounded percent: one minute past a
+	 * 3h allocation is 100.06%, which rounds to 100 but does put an amber sliver
+	 * on the bar. Saying "fully used" beside it would have the caption contradict
+	 * the meter. It reads "100% · 1m over" instead — blunt, but true.
+	 *
+	 * @param float  $pct   Used ÷ limit (1.0 = exactly at the limit).
+	 * @param string $delta Already-formatted remainder, e.g. "5h 57m left".
+	 * @return string
+	 */
+	private static function gauge_delta( $pct, $delta ) {
+		$whole = (int) round( $pct * 100 );
+		if ( abs( $pct - 1.0 ) < 0.00001 ) {
+			/* translators: shown when consumption exactly equals the limit. */
+			return __( '100% · fully used', 'plain-language-time-tracker' );
+		}
+		/* translators: 1: percent of the limit used; 2: what is left or over. */
+		return sprintf( __( '%1$d%% · %2$s', 'plain-language-time-tracker' ), $whole, $delta );
+	}
+
 	private static function gauge_segments( $used, $total ) {
 		if ( $total > 0 && $used > $total ) {
 			$within = ( $total / $used ) * 100;
@@ -916,26 +950,6 @@ class PLTT_Project_Report {
 			'within' => $total > 0 ? min( 100.0, ( $used / $total ) * 100 ) : 0.0,
 			'over'   => 0.0,
 		);
-	}
-
-	/**
-	 * Human label for an allocation period: "July 2026" for a calendar month,
-	 * "2026" for a full year, else a date range.
-	 *
-	 * @param object $project Project row (for recurring_period).
-	 * @param string $start   Period start (Y-m-d).
-	 * @param string $end     Period end (Y-m-d).
-	 * @return string
-	 */
-	private static function period_label( $project, $start, $end ) {
-		$period = isset( $project->recurring_period ) ? $project->recurring_period : '';
-		if ( 'monthly' === $period ) {
-			return date_i18n( 'F Y', strtotime( $start ) );
-		}
-		if ( 'yearly' === $period ) {
-			return date_i18n( 'Y', strtotime( $start ) );
-		}
-		return date_i18n( 'M j', strtotime( $start ) ) . ' – ' . date_i18n( 'M j, Y', strtotime( $end ) );
 	}
 
 	/**

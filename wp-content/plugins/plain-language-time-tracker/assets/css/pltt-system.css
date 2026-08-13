@@ -46,6 +46,18 @@
 	--pltt-c-over:     #9a6a10;  --pltt-c-over-bg:    #fbefd8;
 	--pltt-c-tag:      #1d5f8a;  --pltt-c-tag-bg:     #e4eef7;
 
+	/* ---- Chart series (spec "Fixed series colours"). Never reassigned per
+	   chart: the same colour means the same kind of work on every chart.
+	   --pltt-s-bill repeats the --pltt-c-hourly hex and is deliberately NOT an
+	   alias of it — one names a billing model on a badge, the other names
+	   billable time in a chart, and if the badge colour ever moves the bars
+	   should stay put. ---- */
+	--pltt-s-bill:     #146b42;  /* Billable client work */
+	--pltt-s-nonbill:  #7fb094;  /* Client work not billed by time × rate */
+	--pltt-s-own:      #c5c2bd;  /* Your own time */
+	--pltt-s-over:     #c08f2a;  /* Past a limit — amber, never red: over is a fact */
+	--pltt-track:      #e9e7e3;  /* Unfilled meter track */
+
 	/* ---- Type: two families, one rule about which is which. ---- */
 	--pltt-font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
 	                  "Helvetica Neue", sans-serif;
@@ -63,6 +75,36 @@
 .pltt-badge.pltt-badge-model-monthly  { background: var(--pltt-c-monthly-bg); color: var(--pltt-c-monthly); }
 .pltt-badge.pltt-badge-model-fixed    { background: var(--pltt-c-fixed-bg);   color: var(--pltt-c-fixed); }
 .pltt-badge.pltt-badge-model-internal { background: var(--pltt-c-own-bg);     color: var(--pltt-c-own); }
+
+/* ============================================================
+   PANEL HEADER — the title bar on a bordered panel (the volume chart, the
+   project report's meter). One rule so two panels sitting on the same page
+   can't head themselves differently; the rule runs edge to edge, which is why
+   a panel's padding belongs on its header and body, not on the panel itself.
+   Tables use the group-band header in admin.css instead — same idea, but it
+   welds to a table rather than opening a padded body.
+   ============================================================ */
+.pltt-panel-header {
+	display: flex;
+	align-items: baseline;
+	flex-wrap: wrap;
+	gap: 11px;
+	padding: 13px 18px;
+	/* Lighter than the panel's own border: an inner rule shouldn't read as
+	   heavy as the frame around it. */
+	border-bottom: 1px solid var(--pltt-border-light);
+}
+
+.pltt-panel-title {
+	margin: 0;
+	font-size: 14px;
+	font-weight: 600;
+	color: var(--pltt-text-dark);
+}
+
+.pltt-panel-body {
+	padding: 22px 20px 16px;
+}
 
 /* ============================================================
    TYPE — a real scale, plus the mono utility.

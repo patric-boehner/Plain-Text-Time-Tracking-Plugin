@@ -58,79 +58,44 @@ if ( ! defined( 'ABSPATH' ) ) {
 		<input type="hidden" name="from" id="pltt-date-from" value="<?php echo esc_attr( $date_from ); ?>">
 		<input type="hidden" name="to"   id="pltt-date-to"   value="<?php echo esc_attr( $date_to ); ?>">
 
-		<div class="pltt-date-nav-row">
-			<nav class="pltt-date-nav"
-				aria-label="<?php esc_attr_e( 'Month navigation', 'plain-language-time-tracker' ); ?>">
+		<?php
+		// Shared month picker (templates/partials/month-picker.php). Months here are
+		// form-submitting options — the screen is driven by the hidden from/to pair
+		// above — so each carries from/to rather than a URL.
+		$mp_years = array();
+		foreach ( $months_by_year as $year => $year_months ) {
+			$mp_years[ $year ] = array();
+			foreach ( $year_months as $ym ) {
+				$ym_dt   = new DateTimeImmutable( $ym . '-01', wp_timezone() );
+				$ym_from = $ym_dt->format( 'Y-m-d' );
+				// The current month runs to today, not to a future month-end.
+				$ym_to = ( $ym === substr( pltt_get_current_date(), 0, 7 ) )
+					? pltt_get_current_date()
+					: $ym_dt->format( 'Y-m-t' );
 
-				<?php if ( $prev_url ) : ?>
-				<a href="<?php echo esc_url( $prev_url ); ?>"
-					class="pltt-date-nav-step pltt-date-nav-prev"
-					aria-label="<?php esc_attr_e( 'Previous month', 'plain-language-time-tracker' ); ?>"></a>
-				<?php endif; ?>
+				$mp_years[ $year ][] = array(
+					'label'  => $ym_dt->format( 'F' ),
+					'from'   => $ym_from,
+					'to'     => $ym_to,
+					'active' => ( $ym_from === $date_from ),
+				);
+			}
+		}
 
-				<div class="pltt-date-nav-picker">
-					<button type="button" class="pltt-date-nav-label"
-						aria-expanded="false"
-						id="pltt-date-nav-trigger">
-						<span class="pltt-date-nav-label-main"><?php echo esc_html( $nav_label ); ?></span>
-					</button>
+		$mp_label       = $nav_label;
+		$mp_active_year = $active_year;
+		$mp_prev        = $prev_url;
+		$mp_next        = $has_next ? $next_url : '';
+		$mp_aria        = __( 'Month navigation', 'plain-language-time-tracker' );
+		$mp_reset       = ( substr( $date_from, 0, 7 ) !== substr( $today, 0, 7 ) )
+			? array(
+				'url'   => pltt_get_admin_url( 'history' ),
+				'label' => __( 'This Month', 'plain-language-time-tracker' ),
+			)
+			: null;
 
-					<div class="pltt-date-nav-dropdown" hidden>
-
-						<?php if ( $multi_year ) : ?>
-							<div class="pltt-date-nav-year-switcher" data-year="<?php echo esc_attr( $active_year ); ?>">
-								<button type="button" class="pltt-date-nav-year-prev"
-									aria-label="<?php esc_attr_e( 'Previous year', 'plain-language-time-tracker' ); ?>">&#8249;</button>
-								<span class="pltt-date-nav-year-label"><?php echo esc_html( $active_year ); ?></span>
-								<button type="button" class="pltt-date-nav-year-next"
-									aria-label="<?php esc_attr_e( 'Next year', 'plain-language-time-tracker' ); ?>">&#8250;</button>
-							</div>
-							<hr class="pltt-date-nav-separator">
-						<?php endif; ?>
-
-						<?php foreach ( $months_by_year as $year => $year_months ) : ?>
-							<div class="pltt-date-nav-year-months"
-								data-year="<?php echo esc_attr( $year ); ?>"
-								<?php if ( (string) $year !== (string) $active_year ) : ?>hidden<?php endif; ?>>
-								<ul class="pltt-date-nav-options">
-								<?php foreach ( $year_months as $ym ) :
-									$ym_dt   = new DateTimeImmutable( $ym . '-01', wp_timezone() );
-									$ym_from = $ym_dt->format( 'Y-m-d' );
-									$ym_to   = ( $ym === substr( pltt_get_current_date(), 0, 7 ) )
-										? pltt_get_current_date()
-										: $ym_dt->format( 'Y-m-t' );
-									$is_active = ( $ym_from === $date_from );
-									?>
-									<li><button type="button"
-										class="pltt-date-nav-option"
-										data-from="<?php echo esc_attr( $ym_from ); ?>"
-										data-to="<?php echo esc_attr( $ym_to ); ?>"
-										<?php if ( $is_active ) : ?>aria-current="true"<?php endif; ?>>
-										<?php echo esc_html( $ym_dt->format( 'F' ) ); ?>
-									</button></li>
-								<?php endforeach; ?>
-								</ul>
-							</div>
-						<?php endforeach; ?>
-
-					</div>
-				</div>
-
-				<?php if ( $has_next ) : ?>
-					<a href="<?php echo esc_url( $next_url ); ?>"
-						class="pltt-date-nav-step pltt-date-nav-next"
-						aria-label="<?php esc_attr_e( 'Next month', 'plain-language-time-tracker' ); ?>"></a>
-				<?php endif; ?>
-
-			</nav>
-
-			<?php if ( substr( $date_from, 0, 7 ) !== substr( $today, 0, 7 ) ) : ?>
-				<a href="<?php echo esc_url( pltt_get_admin_url( 'history' ) ); ?>"
-					class="button button-secondary">
-					<?php esc_html_e( 'This Month', 'plain-language-time-tracker' ); ?>
-				</a>
-			<?php endif; ?>
-		</div>
+		include PLTT_PLUGIN_DIR . 'templates/partials/month-picker.php';
+		?>
 		</form>
 	</div>
 

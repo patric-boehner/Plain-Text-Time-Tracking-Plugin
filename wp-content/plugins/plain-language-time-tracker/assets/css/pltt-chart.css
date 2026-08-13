@@ -1,115 +1,72 @@
 /**
  * Volume bar chart (billable / non-billable / internal hours per day/week/month)
- * and the Project Detail period-lens toolbar. Shared by the Reports summary view
+ * Shared by the Reports summary view
  * and the Project Detail report tab — markup lives in
  * templates/partials/chart-by-period.php.
  */
 
-/* ---------- Period lens (Project Detail, recurring projects) ----------
-   Reuses the Reports "connected segmented group" approach: the Full / by-period
-   toggle mirrors .pltt-view-toggle, and the prev/period/next stepper reuses the
-   shared .pltt-date-nav-step / -prev / -next styling from admin.css. */
+/* ---------- Project Detail period filter ----------
+   The control itself is the shared month picker (.pltt-date-nav, styled in
+   admin.css) — the same one History uses. Only its placement in this screen's
+   header needs saying here.
 
-.pltt-period-lens {
-	display: flex;
+   In the header's action group the picker is one item in a row that ends with
+   Settings, so it must not stretch or add its own vertical rhythm — the row owns
+   both. Wrapping is kept for narrow screens; the picker drops to its own line
+   rather than squashing the buttons. Scoped to this header on purpose:
+   .pltt-header-actions is the shared class on every plugin screen. */
+.pltt-detail-header .pltt-header-actions {
 	align-items: center;
-	justify-content: space-between; /* toggle on the left, period nav on the right */
 	flex-wrap: wrap;
-	gap: 12px;
-	margin: 0 0 20px;
+	justify-content: flex-end;
 }
 
-/* Right-hand group: stepper + "Latest" reset (matches the daily-log nav row). */
-.pltt-period-nav {
-	display: flex;
-	align-items: center;
-	gap: 8px;
+.pltt-detail-header .pltt-date-nav-row {
+	margin: 0;
 }
 
-/* Full / by-period — segmented buttons (same treatment as .pltt-view-toggle). */
-.pltt-period-modes {
-	display: inline-flex;
-}
-
-.pltt-period-modes .button {
-	border-radius: 0;
-	margin-left: -1px;
-	text-decoration: none;
-}
-
-.pltt-period-modes .button:first-child {
-	border-radius: 3px 0 0 3px;
-	margin-left: 0;
-}
-
-.pltt-period-modes .button:last-child {
-	border-radius: 0 3px 3px 0;
-}
-
-/* Prev / period / next stepper. The arrows carry .pltt-date-nav-step + -prev/-next
-   (border, hover, chevron mask) from admin.css; this just lays them out and adds
-   the static center label segment. */
-.pltt-period-stepper {
-	display: inline-flex;
-	align-items: stretch;
-}
-
-.pltt-period-label-seg {
-	box-sizing: border-box;
-	display: inline-flex;
-	align-items: center;
-	justify-content: center;
-	min-width: 9em;
-	min-height: 40px; /* matches WP .button (40px) and the Reports date-nav label */
-	margin-left: -1px;
-	padding: 0 14px;
-	background: var(--pltt-bg-white);
-	border: 1px solid var(--pltt-border);
-	font-size: 13px;
-	font-weight: 600;
-	color: var(--pltt-text-base);
-	cursor: default;
-}
-
-/* Disabled prev/next at the ends of the project's active span. */
-.pltt-date-nav-step.is-disabled {
-	opacity: 0.4;
-	pointer-events: none;
-}
 
 /* ---------- Chart ---------- */
 
+/* Panel padding lives on the header and body, not here, so the header's rule
+   runs edge to edge like a table's header band. */
 .pltt-chart-section {
 	background: var(--pltt-bg-white);
 	border: 1px solid var(--pltt-border);
 	border-radius: 4px;
-	padding: 25px;
 	margin: 0 0 20px;
 }
 
-.pltt-chart-header {
-	display: flex;
-	align-items: baseline;
-	justify-content: space-between;
-	gap: 16px;
-	flex-wrap: wrap;
-	margin-bottom: 12px;
+/* Layout + title come from .pltt-panel-header / .pltt-panel-title (pltt-system.css),
+   shared with the project report's meter panel. Only the chart's own additions
+   live here. */
+
+/* The span the chart covers, stated beside its title in lighter weight — the
+   title says what is measured, this says over what. */
+.pltt-chart-range {
+	font-weight: 400;
+	font-size: 13px;
+	color: var(--pltt-text-muted);
 }
 
-.pltt-chart-title {
-	margin: 0;
-	font-size: 14px;
-	font-weight: 600;
-	color: var(--pltt-text-dark);
+/* Anything the caller drops into the header's control slot sits right. */
+.pltt-chart-header > *:not(.pltt-panel-title) {
+	margin-left: auto;
 }
 
+
+/* Key at the foot of the panel, left-aligned, above a rule. Inset by the body's
+   padding rather than running edge to edge — it belongs to the plot, not to the
+   panel the way the header rule does. */
 .pltt-chart-legend {
 	display: flex;
-	gap: 16px;
-	margin: 0;
-	padding: 0;
+	flex-wrap: wrap;
+	gap: 20px;
+	margin: 16px 0 0;
+	padding: 13px 0 0;
+	border-top: 1px solid var(--pltt-border-light);
 	list-style: none;
-	font-size: 12px;
+	font-size: 12.5px;
 	color: var(--pltt-text-muted);
 }
 
@@ -126,18 +83,12 @@
 	border-radius: 2px;
 }
 
-.pltt-chart-swatch-billable    { background: var(--pltt-success); }
-.pltt-chart-swatch-client-flat {
-	background-color: var(--pltt-success);
-	background-image: repeating-linear-gradient(
-		45deg,
-		transparent,
-		transparent 3px,
-		rgba(255, 255, 255, 0.5) 3px,
-		rgba(255, 255, 255, 0.5) 6px
-	);
-}
-.pltt-chart-swatch-internal    { background: var(--pltt-border); }
+/* Swatches read the same three tokens the bars do, so the legend can't drift
+   from the chart. (It had: the internal swatch was --pltt-border while the
+   internal bar segment was #dadada.) */
+.pltt-chart-swatch-billable    { background: var(--pltt-s-bill); }
+.pltt-chart-swatch-client-flat { background: var(--pltt-s-nonbill); }
+.pltt-chart-swatch-internal    { background: var(--pltt-s-own); }
 
 /* Empty-window note (period lens stepped to a span with no logged time). */
 .pltt-chart-empty {
@@ -208,26 +159,25 @@
 	background-repeat: no-repeat;
 }
 
-/* Weekend day-buckets get a near-imperceptible gray tint (daily view only). */
-.pltt-chart-col-weekend .pltt-chart-bar {
-	background: var(--pltt-bg-subtle);
-}
-
 /* Today's bar gets a faint primary-color background — slim column tint at bar
    width, so it reads as "this one" without shouting at full-column width. */
 .pltt-chart-col-today .pltt-chart-bar {
 	background: var(--pltt-bg-highlight);
 }
 
-/* Period-average reference line, drawn over the columns. */
+/* Period-average reference line, drawn over the columns.
+   1px and muted grey, not 2px in --pltt-border: that border grey is #c3c4c7 and
+   the internal series is #c5c2bd, so the line all but vanished wherever it
+   crossed an internal bar (1.02:1). This reads at 3.1:1 against internal and
+   matches its own label's colour, so line and label are one object. Thinner as
+   well as darker — it's a reference mark, not a bar. */
 .pltt-chart-avg-line {
 	position: absolute;
 	left: 4px;
 	right: 4px;
 	bottom: calc(var(--avg-pct, 0) * 100%);
 	height: 0;
-	/* Matches the swimlane idle-gap connector (.pltt-tl-connector). */
-	border-top: 2px dashed var(--pltt-border);
+	border-top: 1px dashed var(--pltt-text-muted);
 	pointer-events: none;
 	z-index: 2;
 }
@@ -307,27 +257,21 @@
 /* Stack order (bottom → top): billable, client (flat-fee), internal. Only the
    top segment is rounded — see the .pltt-chart-seg rules above. */
 .pltt-chart-seg-billable {
-	background: var(--pltt-success);
+	background: var(--pltt-s-bill);
 	height: calc(var(--billable-pct, 0) * 100%);
 }
 
-/* Non-billable client time: same green as billable, diagonally striped — solid
-   reads as invoiceable, striped as "still client work, just not billed from
-   time × rate". Matches the swimlane / day-view billable-status encoding. */
+/* Non-billable client time: a lighter green, not the same green striped. The
+   stripes read as a texture rather than a category once a bar is narrow — which
+   a month of daily bars always is — and they carried the whole distinction, so
+   at small sizes billable and non-billable became one block. */
 .pltt-chart-seg-client-flat {
-	background-color: var(--pltt-success);
-	background-image: repeating-linear-gradient(
-		45deg,
-		transparent,
-		transparent 5px,
-		rgba(255, 255, 255, 0.15) 5px,
-		rgba(255, 255, 255, 0.15) 10px
-	);
+	background: var(--pltt-s-nonbill);
 	height: calc(var(--client-flat-pct, 0) * 100%);
 }
 
 .pltt-chart-seg-internal {
-	background: #dadada;
+	background: var(--pltt-s-own);
 	height: calc(var(--internal-pct, 0) * 100%);
 }
 

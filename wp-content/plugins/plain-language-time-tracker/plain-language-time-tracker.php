@@ -3,7 +3,7 @@
  * Plugin Name: Plain Language Time Tracker
  * Plugin URI: https://github.com/patrickb/plain-language-time-tracker
  * Description: Capture first, categorize later. Interstitial journaling and time tracking in one plain-text log — jot timestamped notes between tasks, then process them into structured time entries. Everything you wrote around the timestamps stays as a journal.
- * Version: 1.9.66
+ * Version: 1.9.67
  * Author: Patrick Boehner
  * Text Domain: plain-language-time-tracker
  * Domain Path: /languages
@@ -20,7 +20,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 // Plugin constants.
-define( 'PLTT_VERSION', '1.9.66' );
+define( 'PLTT_VERSION', '1.9.67' );
 define( 'PLTT_PLUGIN_FILE', __FILE__ );
 define( 'PLTT_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'PLTT_PLUGIN_URL', plugin_dir_url( __FILE__ ) );

@@ -62,18 +62,23 @@ $y_ceiling_mins = $y_ceiling * 60;
 $chart_show_values = count( $chart_buckets ) <= 14;
 ?>
 <section class="pltt-chart-section" aria-labelledby="pltt-chart-title">
-	<header class="pltt-chart-header">
-		<h2 id="pltt-chart-title" class="pltt-chart-title"><?php echo esc_html( $chart_title ); ?></h2>
+	<?php
+	// Header: title, then the span it covers in lighter weight — the panel states
+	// its own period rather than leaving you to infer it from the page's filter.
+	// A rule under it separates head from body, the same way a table's header band
+	// sits on the table it labels.
+	?>
+	<header class="pltt-panel-header pltt-chart-header">
+		<h2 id="pltt-chart-title" class="pltt-panel-title">
+			<?php echo esc_html( $chart_title ); ?>
+			<span class="pltt-chart-range">&middot; <?php echo esc_html( pltt_format_date_range( $date_from, $date_to ) ); ?></span>
+		</h2>
 		<?php if ( ! empty( $chart_controls ) ) : ?>
 			<?php echo $chart_controls; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- caller builds escaped markup. ?>
 		<?php endif; ?>
-		<ul class="pltt-chart-legend" aria-hidden="true">
-			<li><span class="pltt-chart-swatch pltt-chart-swatch-billable"></span><?php esc_html_e( 'Billable', 'plain-language-time-tracker' ); ?></li>
-			<li><span class="pltt-chart-swatch pltt-chart-swatch-client-flat"></span><?php esc_html_e( 'Non-billable', 'plain-language-time-tracker' ); ?></li>
-			<li><span class="pltt-chart-swatch pltt-chart-swatch-internal"></span><?php esc_html_e( 'Internal', 'plain-language-time-tracker' ); ?></li>
-		</ul>
 	</header>
 
+	<div class="pltt-panel-body">
 	<?php if ( ! $chart_has_data ) : ?>
 		<p class="pltt-chart-empty">
 			<?php
@@ -144,20 +149,32 @@ $chart_show_values = count( $chart_buckets ) <= 14;
 						$total_minutes   = isset( $bucket['total_minutes'] ) ? $bucket['total_minutes'] : ( $bucket['billable_minutes'] + $bucket['client_flat_minutes'] + $bucket['internal_minutes'] );
 						$is_empty        = 0 === $total_minutes;
 						$is_today        = ! empty( $chart_today_key ) && $bucket['key'] === $chart_today_key;
-						$is_weekend      = ! empty( $bucket['is_weekend'] );
 
 						$col_classes = array( 'pltt-chart-col' );
-						if ( $is_empty )   $col_classes[] = 'pltt-chart-col-empty';
-						if ( $is_today )   $col_classes[] = 'pltt-chart-col-today';
-						if ( $is_weekend ) $col_classes[] = 'pltt-chart-col-weekend';
+						if ( $is_empty ) $col_classes[] = 'pltt-chart-col-empty';
+						if ( $is_today ) $col_classes[] = 'pltt-chart-col-today';
 
-						// Formatted tooltip — color-coded legend matching the stacked segments.
-						$col_rows = array(
-							array( __( 'Billable', 'plain-language-time-tracker' ), pltt_format_duration( $bucket['billable_minutes'] ), 'var(--pltt-success)' ),
-							array( __( 'Non-billable', 'plain-language-time-tracker' ), pltt_format_duration( $bucket['client_flat_minutes'] ), 'var(--pltt-success)' ),
-							array( __( 'Internal', 'plain-language-time-tracker' ), pltt_format_duration( $bucket['internal_minutes'] ), 'var(--pltt-border)' ),
-							array( __( 'Total', 'plain-language-time-tracker' ), pltt_format_duration( $total_minutes ) ),
-						);
+						// Tooltip. A day with nothing logged gets one line saying so —
+						// the full split would be four rows of "0m", which is a lot of
+						// reading to arrive at "nothing". An empty label renders the row
+						// full-width (see pltt-tooltip.js).
+						// The dot colours read the same tokens the bar segments do, so the
+						// tooltip key can't drift from what's on screen.
+						$col_rows = $is_empty
+							? array(
+								array( '', __( 'No time logged', 'plain-language-time-tracker' ) ),
+							)
+							: array(
+								// Short labels here, long ones in the legend. The legend is
+								// read once to learn the colours; the tooltip is read at a
+								// glance against a value, inside a 280px box that also
+								// carries the bucket's date range. The colour dots are what
+								// tie the two together, so the wording doesn't have to.
+								array( __( 'Billable', 'plain-language-time-tracker' ), pltt_format_duration( $bucket['billable_minutes'] ), 'var(--pltt-s-bill)' ),
+								array( __( 'Non-billable', 'plain-language-time-tracker' ), pltt_format_duration( $bucket['client_flat_minutes'] ), 'var(--pltt-s-nonbill)' ),
+								array( __( 'Internal', 'plain-language-time-tracker' ), pltt_format_duration( $bucket['internal_minutes'] ), 'var(--pltt-s-own)' ),
+								array( __( 'Total', 'plain-language-time-tracker' ), pltt_format_duration( $total_minutes ) ),
+							);
 						?>
 						<div class="<?php echo esc_attr( implode( ' ', $col_classes ) ); ?>"
 							style="--billable-pct: <?php echo esc_attr( number_format( $billable_pct, 4, '.', '' ) ); ?>; --client-flat-pct: <?php echo esc_attr( number_format( $client_flat_pct, 4, '.', '' ) ); ?>; --internal-pct: <?php echo esc_attr( number_format( $internal_pct, 4, '.', '' ) ); ?>;"
@@ -213,5 +230,19 @@ $chart_show_values = count( $chart_buckets ) <= 14;
 				</div>
 			</div>
 		</figure>
+
+		<?php
+		// Key at the foot of the panel, left-aligned under the bars it explains,
+		// separated by a rule. It sat in the header, which put the key further from
+		// the marks than the title was. Omitted when there are no bars — a key to
+		// nothing is just three words about colour.
+		// aria-hidden: the figure's aria-label already names the three series.
+		?>
+		<ul class="pltt-chart-legend" aria-hidden="true">
+			<li><span class="pltt-chart-swatch pltt-chart-swatch-billable"></span><?php esc_html_e( 'Billable client work', 'plain-language-time-tracker' ); ?></li>
+			<li><span class="pltt-chart-swatch pltt-chart-swatch-client-flat"></span><?php esc_html_e( 'Non-billable client work', 'plain-language-time-tracker' ); ?></li>
+			<li><span class="pltt-chart-swatch pltt-chart-swatch-internal"></span><?php esc_html_e( 'Internal', 'plain-language-time-tracker' ); ?></li>
+		</ul>
 	<?php endif; ?>
+	</div>
 </section>
