@@ -56,7 +56,7 @@
 	--pltt-s-nonbill:  #7fb094;  /* Client work not billed by time × rate */
 	--pltt-s-own:      #c5c2bd;  /* Your own time */
 	--pltt-s-over:     #c08f2a;  /* Past a limit — amber, never red: over is a fact */
-	--pltt-track:      #e9e7e3;  /* Unfilled meter track */
+	--pltt-track:      #e9e7e3;  /* Unfilled track behind a proportional bar */
 
 	/* ---- Type: two families, one rule about which is which. ---- */
 	--pltt-font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
@@ -78,7 +78,7 @@
 
 /* ============================================================
    PANEL HEADER — the title bar on a bordered panel (the volume chart, the
-   project report's meter). One rule so two panels sitting on the same page
+   billing history box). One rule so two panels sitting on the same page
    can't head themselves differently; the rule runs edge to edge, which is why
    a panel's padding belongs on its header and body, not on the panel itself.
    Tables use the group-band header in admin.css instead — same idea, but it
@@ -188,6 +188,21 @@
 	align-items: center;
 	gap: 10px;
 	flex-wrap: wrap;
+}
+/* The one thing in the identity lines that leaves the screen: into the project's
+   own record. Pushed to the right edge so it reads as a destination rather than
+   another badge on the title, and held at body size so it doesn't compete with
+   the 24px name. Only Reports renders it — Project Detail's copy of this block is
+   the destination, so it never links to itself. */
+.pltt-scope-block .pltt-scope-open {
+	margin-left: auto;
+	font-size: 13px;
+	white-space: nowrap;
+}
+.pltt-scope-block .pltt-scope-open:focus-visible {
+	outline: 2px solid var(--pltt-blue);
+	outline-offset: 2px;
+	border-radius: 2px;
 }
 .pltt-scope-block .pltt-scope-title,
 .pltt-scope-block .pltt-scope-id h1 {
