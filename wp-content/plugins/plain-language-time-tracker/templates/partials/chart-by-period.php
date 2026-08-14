@@ -15,6 +15,15 @@
  *                              period stepper). Omit on the Reports view.
  *   $chart_empty_label string  Label for the "no time logged" note shown when the
  *                              range has buckets but zero minutes.
+ *   $chart_cross       array   Fixed-budget crossing mark: { date_label, over_minutes,
+ *                              f, floor, n }. Draws a rule where the budget ran out
+ *                              and washes everything after it.
+ *   $chart_alloc       array   Retainer allocation: { minutes, label, over_periods,
+ *                              periods }. Draws a horizontal limit and puts each
+ *                              month's excess above it in amber.
+ *
+ * Both optional marks are set by the Project Detail report only; the Reports
+ * summary leaves them unset, so nothing below changes for it.
  *
  * @package PlainLanguageTimeTracker
  */
@@ -44,14 +53,46 @@ $chart_titles = array(
 );
 $chart_caption_formats = array(
 	/* translators: %s: human-readable date range, e.g. "May 1–15, 2026". */
-	'day'   => __( 'Billable, non-billable, and internal hours per day for %s.', 'plain-language-time-tracker' ),
+	'day'   => __( 'Hours per day for %s, split by how the time is billed.', 'plain-language-time-tracker' ),
 	/* translators: %s: human-readable date range. */
-	'week'  => __( 'Billable, non-billable, and internal hours per week for %s.', 'plain-language-time-tracker' ),
+	'week'  => __( 'Hours per week for %s, split by how the time is billed.', 'plain-language-time-tracker' ),
 	/* translators: %s: human-readable date range. */
-	'month' => __( 'Billable, non-billable, and internal hours per month for %s.', 'plain-language-time-tracker' ),
+	'month' => __( 'Hours per month for %s, split by how the time is billed.', 'plain-language-time-tracker' ),
 );
-$chart_title   = $chart_titles[ $chart_bucket_size ];
-$chart_caption = sprintf( $chart_caption_formats[ $chart_bucket_size ], pltt_format_date_range( $date_from, $date_to ) );
+$chart_title = $chart_titles[ $chart_bucket_size ];
+
+// Which series actually appear, so the key can name only those. A fixed-budget
+// project bills a fee rather than time, so none of its hours are billable and a
+// "Billable client work" swatch stands for a colour that is nowhere in the
+// picture. True of any chart, not just that one: a key to an absent colour is
+// something to rule out rather than something to read.
+$chart_series_minutes = array(
+	'billable'    => 0,
+	'client_flat' => 0,
+	'internal'    => 0,
+);
+foreach ( $chart_buckets as $chart_bucket ) {
+	$chart_series_minutes['billable']    += (int) $chart_bucket['billable_minutes'];
+	$chart_series_minutes['client_flat'] += (int) $chart_bucket['client_flat_minutes'];
+	$chart_series_minutes['internal']    += (int) $chart_bucket['internal_minutes'];
+}
+
+// Optional marks — absent on the Reports summary, so everything they drive
+// short-circuits there.
+$chart_cross = ( isset( $chart_cross ) && is_array( $chart_cross ) ) ? $chart_cross : null;
+$chart_alloc = ( isset( $chart_alloc ) && is_array( $chart_alloc ) ) ? $chart_alloc : null;
+
+// The caption is the figure's whole content for anyone who can't see it, so it
+// has to name the split actually drawn — against the allocation, or by billing
+// status.
+$chart_caption = $chart_alloc
+	? sprintf(
+		/* translators: 1: the allocation, e.g. "3h"; 2: human-readable date range. */
+		__( 'Hours per month against the %1$s monthly allocation, for %2$s.', 'plain-language-time-tracker' ),
+		pltt_format_duration( (int) $chart_alloc['minutes'] ),
+		pltt_format_date_range( $date_from, $date_to )
+	)
+	: sprintf( $chart_caption_formats[ $chart_bucket_size ], pltt_format_date_range( $date_from, $date_to ) );
 
 $chart_has_data = ( $chart_max_minutes > 0 );
 
@@ -110,6 +151,37 @@ $chart_show_values = count( $chart_buckets ) <= 14;
 				</div>
 				<div class="pltt-chart-plot">
 					<?php
+					// Where the budget ran out: an amber rule with the work that came
+					// after it washed behind the bars. Both sit BEHIND the bars — this
+					// is a highlight on the picture, not a label on it, so it carries no
+					// text of its own and states its date on hover. Position comes from
+					// the crossing DATE, so it sits at the point in the week or month
+					// the budget actually went rather than snapped to a bar's edge.
+					//
+					// The left offset has to reproduce the plot's own flex geometry:
+					// columns share the width left after the side padding and the gaps,
+					// and each whole column to the left adds one gap. PHP hands over the
+					// fractional column index and its floor, since CSS can't floor.
+					if ( $chart_cross ) :
+						$cross_style = sprintf(
+							'--cross-f: %s; --cross-fl: %d; --cross-n: %d;',
+							number_format( (float) $chart_cross['f'], 4, '.', '' ),
+							(int) $chart_cross['floor'],
+							max( 1, (int) $chart_cross['n'] )
+						);
+						$cross_rows  = array(
+							array( __( 'Ran out', 'plain-language-time-tracker' ), $chart_cross['date_label'] ),
+							array( __( 'Over by', 'plain-language-time-tracker' ), pltt_format_duration( (int) $chart_cross['over_minutes'] ) ),
+						);
+						?>
+						<div class="pltt-chart-wash" style="<?php echo esc_attr( $cross_style ); ?>"></div>
+						<div class="pltt-chart-cross" style="<?php echo esc_attr( $cross_style ); ?>"
+							data-pltt-tip
+							data-tip-title="<?php esc_attr_e( 'Budget spent', 'plain-language-time-tracker' ); ?>"
+							data-tip-color="none"
+							data-tip-rows='<?php echo esc_attr( wp_json_encode( $cross_rows ) ); ?>'></div>
+					<?php endif; ?>
+					<?php
 					$show_avg_line = count( $chart_buckets ) >= 2 && $chart_avg_minutes > 0 && $y_ceiling_mins > 0;
 					if ( $show_avg_line ) :
 						$avg_pct  = $chart_avg_minutes / $y_ceiling_mins;
@@ -150,6 +222,25 @@ $chart_show_values = count( $chart_buckets ) <= 14;
 						$is_empty        = 0 === $total_minutes;
 						$is_today        = ! empty( $chart_today_key ) && $bucket['key'] === $chart_today_key;
 
+						// In allocation mode the bar is split against the limit instead of
+						// by billing status: within the allocation, and the part above it.
+						// Retainer time is nearly all non-billable by definition, so the
+						// three-series split had one colour doing all the work anyway.
+						$alloc_minutes  = $chart_alloc ? (int) $chart_alloc['minutes'] : 0;
+						$within_minutes = $chart_alloc ? min( $total_minutes, $alloc_minutes ) : 0;
+						$over_minutes   = $chart_alloc ? max( 0, $total_minutes - $alloc_minutes ) : 0;
+						$within_pct     = ( $chart_alloc && $y_ceiling_mins > 0 ) ? ( $within_minutes / $y_ceiling_mins ) : 0;
+						$over_pct       = ( $chart_alloc && $y_ceiling_mins > 0 ) ? ( $over_minutes / $y_ceiling_mins ) : 0;
+						// Only carried in allocation mode, so a chart without one emits
+						// exactly the style attribute it always did.
+						$alloc_vars     = $chart_alloc
+							? sprintf(
+								' --within-pct: %s; --over-pct: %s;',
+								number_format( $within_pct, 4, '.', '' ),
+								number_format( $over_pct, 4, '.', '' )
+							)
+							: '';
+
 						$col_classes = array( 'pltt-chart-col' );
 						if ( $is_empty ) $col_classes[] = 'pltt-chart-col-empty';
 						if ( $is_today ) $col_classes[] = 'pltt-chart-col-today';
@@ -164,20 +255,38 @@ $chart_show_values = count( $chart_buckets ) <= 14;
 							? array(
 								array( '', __( 'No time logged', 'plain-language-time-tracker' ) ),
 							)
-							: array(
+							: ( $chart_alloc
+							? array(
+								array( __( 'Within allocation', 'plain-language-time-tracker' ), pltt_format_duration( $within_minutes ), 'var(--pltt-s-bill)' ),
+								array( __( 'Overage', 'plain-language-time-tracker' ), pltt_format_duration( $over_minutes ), 'var(--pltt-s-over)' ),
+								array( __( 'Total', 'plain-language-time-tracker' ), pltt_format_duration( $total_minutes ) ),
+							)
+							: array_values( array_filter( array(
 								// Short labels here, long ones in the legend. The legend is
 								// read once to learn the colours; the tooltip is read at a
 								// glance against a value, inside a 280px box that also
 								// carries the bucket's date range. The colour dots are what
 								// tie the two together, so the wording doesn't have to.
-								array( __( 'Billable', 'plain-language-time-tracker' ), pltt_format_duration( $bucket['billable_minutes'] ), 'var(--pltt-s-bill)' ),
-								array( __( 'Non-billable', 'plain-language-time-tracker' ), pltt_format_duration( $bucket['client_flat_minutes'] ), 'var(--pltt-s-nonbill)' ),
-								array( __( 'Internal', 'plain-language-time-tracker' ), pltt_format_duration( $bucket['internal_minutes'] ), 'var(--pltt-s-own)' ),
+								//
+								// A series absent from the whole chart is dropped, the same
+								// as in the key: on a fixed-budget project every bar would
+								// otherwise open with "Billable 0m · Internal 0m". Judged
+								// across the chart, not per bar, so the rows don't shuffle
+								// as you move along the bars.
+								$chart_series_minutes['billable'] > 0
+									? array( __( 'Billable', 'plain-language-time-tracker' ), pltt_format_duration( $bucket['billable_minutes'] ), 'var(--pltt-s-bill)' )
+									: null,
+								$chart_series_minutes['client_flat'] > 0
+									? array( __( 'Non-billable', 'plain-language-time-tracker' ), pltt_format_duration( $bucket['client_flat_minutes'] ), 'var(--pltt-s-nonbill)' )
+									: null,
+								$chart_series_minutes['internal'] > 0
+									? array( __( 'Internal', 'plain-language-time-tracker' ), pltt_format_duration( $bucket['internal_minutes'] ), 'var(--pltt-s-own)' )
+									: null,
 								array( __( 'Total', 'plain-language-time-tracker' ), pltt_format_duration( $total_minutes ) ),
-							);
+							) ) ) );
 						?>
 						<div class="<?php echo esc_attr( implode( ' ', $col_classes ) ); ?>"
-							style="--billable-pct: <?php echo esc_attr( number_format( $billable_pct, 4, '.', '' ) ); ?>; --client-flat-pct: <?php echo esc_attr( number_format( $client_flat_pct, 4, '.', '' ) ); ?>; --internal-pct: <?php echo esc_attr( number_format( $internal_pct, 4, '.', '' ) ); ?>;"
+							style="--billable-pct: <?php echo esc_attr( number_format( $billable_pct, 4, '.', '' ) ); ?>; --client-flat-pct: <?php echo esc_attr( number_format( $client_flat_pct, 4, '.', '' ) ); ?>; --internal-pct: <?php echo esc_attr( number_format( $internal_pct, 4, '.', '' ) ); ?>;<?php echo esc_attr( $alloc_vars ); ?>"
 							data-pltt-tip
 							data-tip-title="<?php echo esc_attr( $bucket['long'] ); ?>"
 							data-tip-color="none"
@@ -192,14 +301,23 @@ $chart_show_values = count( $chart_buckets ) <= 14;
 								// (a zero-height span would still count for :first-of-type, so
 								// omitting empties is what keeps the rounding on the real top).
 								?>
-								<?php if ( $bucket['internal_minutes'] > 0 ) : ?>
-									<span class="pltt-chart-seg pltt-chart-seg-internal"></span>
-								<?php endif; ?>
-								<?php if ( $bucket['client_flat_minutes'] > 0 ) : ?>
-									<span class="pltt-chart-seg pltt-chart-seg-client-flat"></span>
-								<?php endif; ?>
-								<?php if ( $bucket['billable_minutes'] > 0 ) : ?>
-									<span class="pltt-chart-seg pltt-chart-seg-billable"></span>
+								<?php if ( $chart_alloc ) : ?>
+									<?php if ( $over_minutes > 0 ) : ?>
+										<span class="pltt-chart-seg pltt-chart-seg-over"></span>
+									<?php endif; ?>
+									<?php if ( $within_minutes > 0 ) : ?>
+										<span class="pltt-chart-seg pltt-chart-seg-within"></span>
+									<?php endif; ?>
+								<?php else : ?>
+									<?php if ( $bucket['internal_minutes'] > 0 ) : ?>
+										<span class="pltt-chart-seg pltt-chart-seg-internal"></span>
+									<?php endif; ?>
+									<?php if ( $bucket['client_flat_minutes'] > 0 ) : ?>
+										<span class="pltt-chart-seg pltt-chart-seg-client-flat"></span>
+									<?php endif; ?>
+									<?php if ( $bucket['billable_minutes'] > 0 ) : ?>
+										<span class="pltt-chart-seg pltt-chart-seg-billable"></span>
+									<?php endif; ?>
 								<?php endif; ?>
 							</div>
 						</div>
@@ -238,10 +356,42 @@ $chart_show_values = count( $chart_buckets ) <= 14;
 		// nothing is just three words about colour.
 		// aria-hidden: the figure's aria-label already names the three series.
 		?>
+		<?php
+		// The marks in words. Everything inside the figure is aria-hidden (it's a
+		// picture), and the crossing rule is a hover target rather than a focus
+		// stop, so this sentence is the whole of it for anyone not looking at bars.
+		?>
+		<?php if ( $chart_cross ) : ?>
+			<p class="screen-reader-text">
+				<?php
+				printf(
+					/* translators: 1: date the budget ran out; 2: hours past the budget. */
+					esc_html__( 'The budget ran out on %1$s. The project is %2$s past it.', 'plain-language-time-tracker' ),
+					esc_html( $chart_cross['date_label'] ),
+					esc_html( pltt_format_duration( (int) $chart_cross['over_minutes'] ) )
+				);
+				?>
+			</p>
+		<?php endif; ?>
 		<ul class="pltt-chart-legend" aria-hidden="true">
-			<li><span class="pltt-chart-swatch pltt-chart-swatch-billable"></span><?php esc_html_e( 'Billable client work', 'plain-language-time-tracker' ); ?></li>
-			<li><span class="pltt-chart-swatch pltt-chart-swatch-client-flat"></span><?php esc_html_e( 'Non-billable client work', 'plain-language-time-tracker' ); ?></li>
-			<li><span class="pltt-chart-swatch pltt-chart-swatch-internal"></span><?php esc_html_e( 'Internal', 'plain-language-time-tracker' ); ?></li>
+			<?php if ( $chart_alloc ) : ?>
+				<li><span class="pltt-chart-swatch pltt-chart-swatch-within"></span><?php esc_html_e( 'Within allocation', 'plain-language-time-tracker' ); ?></li>
+				<li><span class="pltt-chart-swatch pltt-chart-swatch-over"></span><?php esc_html_e( 'Overage', 'plain-language-time-tracker' ); ?></li>
+			<?php else : ?>
+				<?php if ( $chart_series_minutes['billable'] > 0 ) : ?>
+					<li><span class="pltt-chart-swatch pltt-chart-swatch-billable"></span><?php esc_html_e( 'Billable client work', 'plain-language-time-tracker' ); ?></li>
+				<?php endif; ?>
+				<?php if ( $chart_series_minutes['client_flat'] > 0 ) : ?>
+					<li><span class="pltt-chart-swatch pltt-chart-swatch-client-flat"></span><?php esc_html_e( 'Non-billable client work', 'plain-language-time-tracker' ); ?></li>
+				<?php endif; ?>
+				<?php if ( $chart_series_minutes['internal'] > 0 ) : ?>
+					<li><span class="pltt-chart-swatch pltt-chart-swatch-internal"></span><?php esc_html_e( 'Internal', 'plain-language-time-tracker' ); ?></li>
+				<?php endif; ?>
+				<?php // The tint has no label of its own on the chart, so the key is where it gets named. ?>
+				<?php if ( $chart_cross ) : ?>
+					<li><span class="pltt-chart-swatch pltt-chart-swatch-past"></span><?php esc_html_e( 'Past the budget', 'plain-language-time-tracker' ); ?></li>
+				<?php endif; ?>
+			<?php endif; ?>
 		</ul>
 	<?php endif; ?>
 	</div>

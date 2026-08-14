@@ -1,0 +1,404 @@
+<meta charset="utf-8">
+<title>PLTT — Budget on the chart</title>
+<style>
+  :root{
+    --paper:#fff; --canvas:#f4f3f1; --sunk:#faf9f7;
+    --rule:#e4e2de; --rule-2:#efedea;
+    --ink:#1a1c1e; --ink-2:#55595e; --ink-3:#8a8d91;
+    --blue:#2271b1;
+    --c-over:#9a6a10;
+    --s-bill:#146b42;
+    --s-nonbill:#7fb094;
+    --s-own:#c5c2bd;
+    --s-over:#c08f2a;
+    --wash:rgba(192,143,42,.085);
+    --track:#e9e7e3;
+    --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",sans-serif;
+    --mono:Menlo,Consolas,monaco,monospace;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:#e3e1de;font:14px/1.6 var(--sans);color:var(--ink);-webkit-font-smoothing:antialiased}
+  .wrap{max-width:1120px;margin:0 auto;padding:36px 24px 90px}
+  .typed{font-family:var(--mono);font-variant-numeric:tabular-nums}
+
+  .doc{background:var(--ink);color:#fff;padding:30px 34px;border-radius:6px}
+  .doc h1{margin:0 0 11px;font-size:22px;font-weight:600;letter-spacing:-.2px}
+  .doc p{margin:0 0 9px;color:#b9bcc0;max-width:76ch;line-height:1.75}
+  .doc p:last-child{margin:0}
+  .doc b{color:#fff;font-weight:500}
+
+  .sec{margin-top:44px}
+  .sec-head{padding-bottom:12px;border-bottom:2px solid var(--ink);margin-bottom:20px;display:flex;align-items:baseline;gap:13px}
+  .sec-num{font:500 12px/1 var(--mono);color:var(--ink-3);letter-spacing:.7px}
+  .sec-head h2{margin:0;font-size:18px;font-weight:600;letter-spacing:-.15px}
+  .sec-head .say{margin-left:auto;font-size:13px;color:var(--ink-2)}
+  .lead{max-width:80ch;color:var(--ink-2);margin:0 0 20px;line-height:1.8}
+
+  .card{background:var(--paper);border:1px solid var(--rule);border-radius:6px}
+  .card-h{padding:13px 18px;border-bottom:1px solid var(--rule-2);font-weight:600;font-size:14px;display:flex;align-items:center;gap:11px}
+  .card-h .lite{font-weight:400;color:var(--ink-3);font-size:13px}
+  .card-b{padding:26px 20px 16px}
+  .row{display:flex;align-items:center;gap:12px}
+  .grow{flex:1}
+  .muted{color:var(--ink-3)}
+
+  .pseg{display:inline-flex;border:1px solid var(--rule);border-radius:3px;overflow:hidden;background:var(--paper)}
+  .pseg span{padding:3px 10px;font-size:12.5px;color:var(--ink-3);border-right:1px solid var(--rule-2)}
+  .pseg span:last-child{border-right:0}
+  .pseg span.on{background:var(--sunk);color:var(--ink);font-weight:500;box-shadow:inset 0 -2px 0 var(--blue)}
+
+  /* ---- BAR CHART ---- */
+  .chart{position:relative;padding-left:44px}
+  .yax{position:absolute;left:0;top:0;bottom:26px;width:40px}
+  .yax span{position:absolute;right:0;font:11.5px/1 var(--mono);color:var(--ink-3);transform:translateY(-50%)}
+  .plot{position:relative;height:150px;border-bottom:1px solid var(--rule);display:flex;align-items:flex-end;gap:4px}
+  .grid{position:absolute;left:0;right:0;border-top:1px solid var(--rule-2)}
+  .avg{position:absolute;left:0;right:0;border-top:1px dashed #bfbcb7}
+  .avg b{position:absolute;right:0;top:-8px;background:var(--paper);padding:0 5px;font:11.5px/1 var(--sans);color:var(--ink-3);font-weight:400}
+  .bar{flex:1;display:flex;flex-direction:column;justify-content:flex-end;min-width:0;position:relative;z-index:2}
+  .bar i{display:block}
+  .bar .b1{background:var(--s-bill)}
+  .bar .b2{background:var(--s-nonbill)}
+  .bar .b3{background:var(--s-own)}
+  .bar .bo{background:var(--s-over)}
+  .bar.none::after{content:"";position:absolute;bottom:-1px;left:22%;right:22%;height:2px;background:var(--rule)}
+  .xax{display:flex;gap:4px;margin-top:8px}
+  .xax div{flex:1;text-align:center;font:11.5px/1.4 var(--mono);color:var(--ink-3);min-width:0}
+  .legend{display:flex;gap:20px;align-items:center;margin-top:16px;padding-top:13px;border-top:1px solid var(--rule-2);font-size:12.5px;color:var(--ink-2);flex-wrap:wrap}
+  .legend i{width:11px;height:11px;border-radius:2px;display:inline-block;vertical-align:-1px;margin-right:7px}
+
+  /* ---- BUDGET CROSSING ---- */
+  .wash{position:absolute;top:0;bottom:0;right:0;background:var(--wash);z-index:0;pointer-events:none}
+  .cross{position:absolute;top:-6px;bottom:0;width:2px;background:var(--ink);z-index:3}
+  .cross b{position:absolute;top:-9px;left:6px;background:var(--paper);padding:1px 6px;border:1px solid var(--rule);border-radius:3px;
+           font:11.5px/1.5 var(--mono);color:var(--ink);white-space:nowrap;font-weight:400}
+  .cross.flip b{left:auto;right:6px}
+  .alloc{position:absolute;left:0;right:0;border-top:2px solid var(--ink);z-index:3}
+  .alloc b{position:absolute;right:0;top:-9px;background:var(--paper);padding:0 6px;font:11.5px/1.5 var(--mono);color:var(--ink);font-weight:400}
+
+  /* ---- PACE LINE ---- */
+  .pace{margin-top:14px;padding-top:13px;border-top:1px solid var(--rule-2);font-size:13px;color:var(--ink-2);display:flex;gap:9px;align-items:baseline}
+  .pace .dot{width:5px;height:5px;border-radius:50%;background:var(--ink-3);flex:none;position:relative;top:-3px}
+  .pace.off{color:var(--ink-3)}
+
+  /* ---- METER (for the removal comparison) ---- */
+  .track{position:relative;height:10px;background:var(--track);border-radius:5px}
+  .track .fill{position:absolute;left:0;top:0;bottom:0;background:var(--blue);border-radius:5px 0 0 5px}
+  .track .fill.overpart{background:var(--s-over);border-radius:0 5px 5px 0;left:auto}
+  .track .limit{position:absolute;top:-5px;bottom:-5px;width:2px;background:var(--ink);border-radius:1px}
+  .track .limit b{position:absolute;top:-19px;left:50%;transform:translateX(-50%);font:11px/1 var(--mono);color:var(--ink-2);white-space:nowrap;font-weight:400}
+  .mlabels{display:flex;margin-top:11px;font-size:13px;color:var(--ink-2);align-items:baseline}
+
+  .stat{padding:15px 20px 17px;border-right:1px solid var(--rule-2);flex:1;min-width:150px}
+  .stat:last-child{border-right:0}
+  .stat .k{font-size:12.5px;color:var(--ink-2)}
+  .stat .v{font:450 25px/1.2 var(--mono);letter-spacing:-.8px;margin-top:4px;font-variant-numeric:tabular-nums}
+  .stat .v.over{color:var(--c-over)}
+  .stat .m{font-size:12.5px;color:var(--ink-3);margin-top:4px}
+
+  .note{background:var(--sunk);border:1px solid var(--rule);border-left:3px solid var(--blue);border-radius:5px;padding:15px 19px;margin-top:16px}
+  .note h4{margin:0 0 7px;font-size:13.5px;font-weight:600}
+  .note p{margin:0;font-size:13px;color:var(--ink-2);line-height:1.75}
+  .note p + p{margin-top:8px}
+
+  .rules{width:100%;border-collapse:collapse;background:var(--paper);border:1px solid var(--rule);border-radius:6px;overflow:hidden}
+  .rules th{text-align:left;font-weight:450;color:var(--ink-3);font-size:11.5px;letter-spacing:.5px;text-transform:uppercase;padding:11px 18px;border-bottom:1px solid var(--rule);background:var(--sunk)}
+  .rules td{padding:13px 18px;border-bottom:1px solid var(--rule-2);font-size:13.5px;vertical-align:top}
+  .rules tr:last-child td{border-bottom:0}
+
+  .ba{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  .ba h5{margin:0 0 9px;font:500 11px/1 var(--mono);letter-spacing:.6px;color:var(--ink-3)}
+  .ba .box{background:var(--paper);border:1px solid var(--rule);border-radius:6px;padding:18px 20px;height:100%}
+  .cut{text-decoration:line-through;color:var(--ink-3)}
+</style>
+
+<div class="wrap">
+
+<div class="doc">
+  <h1>Budget on the chart</h1>
+  <p>The <b>Budget consumed</b> panel restates the scope figure and takes a full panel to do it. It comes out. The budget moves onto the bar chart, where it answers something the figure can't: <b>when</b> you went over, and how much work happened after.</p>
+  <p>The pace forecast is a <b>line of text under the chart</b>, not a burndown. It is one sentence of information and a chart would be a container for a sentence.</p>
+</div>
+
+<!-- ===== 01 REMOVAL ===== -->
+<div class="sec">
+  <div class="sec-head"><span class="sec-num">01</span><h2>What comes out</h2><span class="say">The figure already said it.</span></div>
+
+  <div class="ba">
+    <div>
+      <h5>OUT — a panel to restate one figure</h5>
+      <div class="box">
+        <div style="font-weight:600;font-size:13.5px;padding-bottom:13px;margin-bottom:16px;border-bottom:1px solid var(--rule-2)" class="cut">Budget consumed</div>
+        <div class="track" style="opacity:.45">
+          <div class="fill" style="width:40.1%"></div>
+          <div class="fill overpart" style="left:40.1%;width:59.9%"></div>
+          <div class="limit" style="left:40.1%"></div>
+        </div>
+        <div class="mlabels" style="opacity:.45">
+          <span><span class="typed">$9,641.67</span> of <span class="typed">$3,870.00</span></span>
+          <span class="grow"></span>
+          <span class="typed" style="color:var(--c-over)">249% · $5,771.67 over</span>
+        </div>
+        <p style="margin:15px 0 0;font-size:12.5px;color:var(--ink-3);line-height:1.7">Every number here is in the figure beside it. The only thing the bar adds is proportion, and <span class="typed">249%</span> states proportion in a quarter of the pixels.</p>
+      </div>
+    </div>
+    <div>
+      <h5>STAYS — the scope figure</h5>
+      <div class="box" style="padding:0">
+        <div style="display:flex">
+          <div class="stat">
+            <div class="k">Budget overrun</div>
+            <div class="v over">57h 43m</div>
+            <div class="m"><span class="typed">249%</span> of the <span class="typed">38h 42m</span> budgeted</div>
+          </div>
+          <div class="stat">
+            <div class="k">Fixed fee</div>
+            <div class="v">$3,870</div>
+            <div class="m"><span class="typed">$100/hr</span> budgeted</div>
+          </div>
+        </div>
+        <div style="padding:0 20px 18px">
+          <p style="margin:0;font-size:12.5px;color:var(--ink-3);line-height:1.7">Amount, percentage, and basis, in the slot that already exists. Nothing is lost by deleting the panel.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== 02 CROSSING ===== -->
+<div class="sec">
+  <div class="sec-head"><span class="sec-num">02</span><h2>The crossing</h2><span class="say">Fixed fee, over budget.</span></div>
+  <p class="lead">A vertical rule at the period where the running total passed the budget, and an amber wash over everything after it. The wash sits behind the bars, so the series colours are untouched.</p>
+
+  <div class="card">
+    <div class="card-h">
+      Time logged <span class="lite">· <span class="typed">Feb 19 – Jun 10, 2026</span></span>
+      <div class="grow"></div>
+      <span class="pseg"><span>By day</span><span class="on">By week</span><span>By month</span></span>
+    </div>
+    <div class="card-b">
+      <div class="chart">
+        <div class="yax">
+          <span style="top:0">12h</span>
+          <span style="top:50%">6h</span>
+          <span style="top:100%">0</span>
+        </div>
+        <div class="plot">
+          <div class="grid" style="top:0"></div>
+          <div class="grid" style="top:50%"></div>
+          <div class="wash" style="left:calc((100% - 60px)/16*5.54 + 20px)"></div>
+          <div class="avg" style="top:50%"><b>avg 6h 00m</b></div>
+          <div class="cross" style="left:calc((100% - 60px)/16*5.54 + 20px)"><b>budget spent · Mar 29</b></div>
+
+          <div class="bar"><i class="b1" style="height:44px"></i></div>
+          <div class="bar"><i class="b1" style="height:75px"></i></div>
+          <div class="bar"><i class="b2" style="height:9px"></i><i class="b1" style="height:97px"></i></div>
+          <div class="bar"><i class="b1" style="height:88px"></i></div>
+          <div class="bar"><i class="b1" style="height:138px"></i></div>
+          <div class="bar"><i class="b1" style="height:63px"></i></div>
+          <div class="bar none"></div>
+          <div class="bar"><i class="b1" style="height:56px"></i></div>
+          <div class="bar"><i class="b2" style="height:14px"></i><i class="b1" style="height:105px"></i></div>
+          <div class="bar"><i class="b1" style="height:100px"></i></div>
+          <div class="bar"><i class="b1" style="height:81px"></i></div>
+          <div class="bar"><i class="b1" style="height:38px"></i></div>
+          <div class="bar"><i class="b2" style="height:11px"></i><i class="b1" style="height:83px"></i></div>
+          <div class="bar"><i class="b1" style="height:69px"></i></div>
+          <div class="bar"><i class="b1" style="height:81px"></i></div>
+          <div class="bar"><i class="b1" style="height:50px"></i></div>
+        </div>
+        <div class="xax">
+          <div>Feb 19</div><div></div><div></div><div></div>
+          <div>Mar 19</div><div></div><div></div><div></div>
+          <div>Apr 16</div><div></div><div></div><div></div>
+          <div>May 14</div><div></div><div></div><div></div>
+        </div>
+        <div class="legend">
+          <span><i style="background:var(--s-bill)"></i>Billable</span>
+          <span><i style="background:var(--s-nonbill)"></i>Non-billable</span>
+          <span class="grow"></span>
+          <span><span class="typed">96h 25m</span> across 16 weeks · <span class="typed" style="color:var(--c-over)">57h 43m</span> after the budget was spent</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="note">
+    <h4>What the chart earns that the figure didn't</h4>
+    <p><i>Mar 29</i> is the date, and the wash covers ten of sixteen weeks. That's the finding: the budget was gone in six weeks and the project ran nearly twice as long again afterwards. The figure says <span class="typed">249%</span>; the chart says the estimate was wrong from the start rather than the end drifting.</p>
+    <p>The crossing rule is ink, not amber, for the same reason the meter's marker is ink — the marker is the limit, amber is the excess. Sits inside the bar, at the point in the week the total actually passed, not snapped to the week edge.</p>
+  </div>
+</div>
+
+<!-- ===== 03 PACE ===== -->
+<div class="sec">
+  <div class="sec-head"><span class="sec-num">03</span><h2>The pace line</h2><span class="say">Active, under budget.</span></div>
+  <p class="lead">One sentence in the chart footer. No dotted projection, no second axis, no toggle.</p>
+
+  <div class="card">
+    <div class="card-h">
+      Time logged <span class="lite">· <span class="typed">Jun 1 – Aug 13, 2026</span></span>
+      <div class="grow"></div>
+      <span class="pseg"><span>By day</span><span class="on">By week</span><span>By month</span></span>
+    </div>
+    <div class="card-b">
+      <div class="chart">
+        <div class="yax">
+          <span style="top:0">10h</span>
+          <span style="top:50%">5h</span>
+          <span style="top:100%">0</span>
+        </div>
+        <div class="plot">
+          <div class="grid" style="top:0"></div>
+          <div class="grid" style="top:50%"></div>
+          <div class="avg" style="top:38%"><b>avg 6h 12m</b></div>
+
+          <div class="bar"><i class="b1" style="height:63px"></i></div>
+          <div class="bar"><i class="b1" style="height:126px"></i></div>
+          <div class="bar"><i class="b2" style="height:12px"></i><i class="b1" style="height:78px"></i></div>
+          <div class="bar"><i class="b1" style="height:52px"></i></div>
+          <div class="bar none"></div>
+          <div class="bar"><i class="b1" style="height:111px"></i></div>
+          <div class="bar"><i class="b1" style="height:96px"></i></div>
+          <div class="bar"><i class="b2" style="height:9px"></i><i class="b1" style="height:66px"></i></div>
+          <div class="bar"><i class="b1" style="height:88px"></i></div>
+          <div class="bar"><i class="b1" style="height:44px"></i></div>
+          <div class="bar"><i class="b1" style="height:81px"></i></div>
+        </div>
+        <div class="xax">
+          <div>Jun 1</div><div></div><div></div>
+          <div>Jun 22</div><div></div><div></div>
+          <div>Jul 13</div><div></div><div></div>
+          <div>Aug 3</div><div></div>
+        </div>
+        <div class="legend">
+          <span><i style="background:var(--s-bill)"></i>Billable</span>
+          <span><i style="background:var(--s-nonbill)"></i>Non-billable</span>
+          <span class="grow"></span>
+          <span><span class="typed">34h 12m</span> across 11 weeks</span>
+        </div>
+        <div class="pace">
+          <span class="dot"></span>
+          <span>At <span class="typed">6h 12m</span> a week, the <span class="typed">60h</span> budget is spent around <span class="typed">Sep 10</span> — <span class="typed">25h 48m</span> left.</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="note">
+    <h4>What it can't say</h4>
+    <p>It can't say "and you'll still have x to go." That needs a remaining-scope estimate, which the tool doesn't store and shouldn't start guessing. The sentence is a pace extrapolation and nothing more: at this rate, the budget runs out on this date. You supply the judgment about whether the work will be done by then.</p>
+    <p>The average is the same <span class="typed">6h 12m</span> already drawn on the chart as the average line, so the sentence is showing its work rather than introducing a number from nowhere.</p>
+  </div>
+
+  <div class="ba" style="margin-top:18px">
+    <div>
+      <h5>SUPPRESSED — already over</h5>
+      <div class="box">
+        <div class="pace off" style="margin:0;padding:0;border:0">
+          <span class="dot" style="background:var(--rule)"></span>
+          <span>No pace line. The crossing marker on the chart is the fact; a forecast of an event that already happened is noise.</span>
+        </div>
+      </div>
+    </div>
+    <div>
+      <h5>SUPPRESSED — not enough history</h5>
+      <div class="box">
+        <div class="pace off" style="margin:0;padding:0;border:0">
+          <span class="dot" style="background:var(--rule)"></span>
+          <span>Under three weeks of entries, or under 15% of budget used. A pace built on two weeks predicts a date that moves by a month each time you log.</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== 04 RETAINER ===== -->
+<div class="sec">
+  <div class="sec-head"><span class="sec-num">04</span><h2>Retainers get a line, not a crossing</h2><span class="say">The allocation resets.</span></div>
+  <p class="lead">A retainer has no single moment it went over — it goes over every month. A vertical crossing would be wrong. The allocation is a horizontal rule on the by-month chart and the part of each bar above it is amber.</p>
+
+  <div class="card">
+    <div class="card-h">
+      Time logged <span class="lite">· <span class="typed">the whole project</span></span>
+      <div class="grow"></div>
+      <span class="pseg"><span>By day</span><span>By week</span><span class="on">By month</span></span>
+    </div>
+    <div class="card-b">
+      <div class="chart">
+        <div class="yax">
+          <span style="top:0">9h</span>
+          <span style="top:50%">4.5h</span>
+          <span style="top:100%">0</span>
+        </div>
+        <div class="plot" style="gap:22px">
+          <div class="grid" style="top:0"></div>
+          <div class="alloc" style="bottom:50px;top:auto"><b>3h included</b></div>
+
+          <div class="bar"><i class="bo" style="height:45px"></i><i class="b1" style="height:50px"></i></div>
+          <div class="bar"><i class="bo" style="height:87px"></i><i class="b1" style="height:50px"></i></div>
+          <div class="bar"><i class="bo" style="height:18px"></i><i class="b1" style="height:50px"></i></div>
+          <div class="bar"><i class="bo" style="height:58px"></i><i class="b1" style="height:50px"></i></div>
+          <div class="bar"><i class="bo" style="height:70px"></i><i class="b1" style="height:50px"></i></div>
+        </div>
+        <div class="xax" style="gap:22px">
+          <div>Feb</div><div>Mar</div><div>Apr</div><div>May</div><div>Jun</div>
+        </div>
+        <div class="legend">
+          <span><i style="background:var(--s-bill)"></i>Within allocation</span>
+          <span><i style="background:var(--s-over)"></i>Overage</span>
+          <span class="grow"></span>
+          <span><span class="typed">31h 41m</span> across 5 months · <span class="typed" style="color:var(--c-over)">5 of 5</span> over allocation</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="note">
+    <h4>Same question, different mechanism</h4>
+    <p>"When did I go over" on a retainer means "which months," and the answer here is all of them — which is the argument for resizing the plan, and the same thing the <i>average per month</i> figure says. No pace line: a monthly period is too short to forecast, and the threshold notice on Today already covers the current month.</p>
+  </div>
+</div>
+
+<!-- ===== 05 RULES ===== -->
+<div class="sec">
+  <div class="sec-head"><span class="sec-num">05</span><h2>Where each element appears</h2></div>
+
+  <table class="rules">
+    <thead><tr><th style="width:18%"></th><th style="width:20%">Hourly</th><th style="width:21%">Retainer</th><th style="width:23%">Fixed fee</th><th>Internal</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><b>Budget panel</b></td>
+        <td class="muted">removed</td><td class="muted">removed</td><td class="muted">removed</td><td class="muted">removed</td>
+      </tr>
+      <tr>
+        <td><b>Crossing rule<br>+ wash</b></td>
+        <td class="muted">no budget to cross</td>
+        <td class="muted">use the allocation line</td>
+        <td>when over budget</td>
+        <td class="muted">none</td>
+      </tr>
+      <tr>
+        <td><b>Allocation line</b></td>
+        <td class="muted">none</td>
+        <td>by-month chart, lifetime view</td>
+        <td class="muted">none</td>
+        <td class="muted">none</td>
+      </tr>
+      <tr>
+        <td><b>Pace line</b></td>
+        <td class="muted">none</td>
+        <td class="muted">period too short</td>
+        <td>active · under budget · 3+ weeks of history</td>
+        <td class="muted">none</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="note">
+    <h4>One thing to watch after a month of use</h4>
+    <p>If the pace date bounces week to week, the rule that suppresses it is wrong, not the idea. Widen the averaging window to the last four weeks before adding anything else — and if it still bounces, drop the line rather than dressing it with a confidence range.</p>
+  </div>
+</div>
+
+</div>

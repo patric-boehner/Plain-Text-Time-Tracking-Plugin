@@ -1,6 +1,7 @@
 <?php
 /**
- * Report tab — period lens + type-aware hero + stat cards + volume chart.
+ * Report tab — period lens + stat cards + volume chart (with the budget marked
+ * on it for the two types that have a limit).
  *
  * For recurring projects a period lens (Full / step-by-period) re-scopes the
  * cards and the volume chart to the chosen window. Every other billing type
@@ -138,10 +139,11 @@ $span_count = isset( $span_stats->total_count ) ? (int) $span_stats->total_count
 </div>
 
 <?php
-// Type-aware hero — the gauge/figure headline, now a detail card below the
-// block (the block's number bar carries the top-line figures). Null for internal.
-$hero = $report['hero'] ?? null;
-include PLTT_PLUGIN_DIR . 'templates/partials/project-report-hero.php';
+// The "Budget consumed" meter sat here until 2026-08-13. It restated the cards
+// directly above it — they already say "32h 45m of 38h 42m used · 84%" — so what
+// it added was proportion, twice. The budget moved onto the volume chart below,
+// where it answers what no figure can: when the budget went, and how much work
+// came after. See ui/pltt-budget-on-chart.html.
 ?>
 
 <?php
@@ -219,6 +221,10 @@ if ( ! empty( $report['chart'] ) && $window ) :
 	// and a day/week/month switch on top of that didn't earn its place on this
 	// screen. $chart_controls stays empty (the chart partial skips the slot).
 	$chart_controls    = '';
+	// The budget marks. Only this screen sets them — the Reports summary includes
+	// the same partial and leaves all three unset, so its chart is untouched.
+	$chart_cross = $report['budget']['cross'] ?? null;
+	$chart_alloc = $report['budget']['alloc'] ?? null;
 	include PLTT_PLUGIN_DIR . 'templates/partials/chart-by-period.php';
 endif;
 ?>

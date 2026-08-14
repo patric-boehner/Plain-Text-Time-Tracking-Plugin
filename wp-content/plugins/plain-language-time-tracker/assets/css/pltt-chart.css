@@ -37,9 +37,8 @@
 	margin: 0 0 20px;
 }
 
-/* Layout + title come from .pltt-panel-header / .pltt-panel-title (pltt-system.css),
-   shared with the project report's meter panel. Only the chart's own additions
-   live here. */
+/* Layout + title come from .pltt-panel-header / .pltt-panel-title (pltt-system.css).
+   Only the chart's own additions live here. */
 
 /* The span the chart covers, stated beside its title in lighter weight — the
    title says what is measured, this says over what. */
@@ -135,6 +134,11 @@
 .pltt-chart-y-label-bottom { bottom: 0; }
 
 .pltt-chart-plot {
+	/* The plot's own geometry, named once: the budget crossing has to reproduce it
+	   to place a rule between two bars, and a gap that drifted from the rule's math
+	   would put the mark on the wrong side of a bar. */
+	--pltt-chart-gap: 8px;
+	--pltt-chart-pad: 4px;
 	position: relative; /* containing block for the average reference line */
 	/* Confine the chart's internal z-indexes (avg line = 2, value chips = 3) to
 	   its own stacking context so they can't paint over page overlays like the
@@ -144,11 +148,11 @@
 	flex: 1 1 auto;
 	display: flex;
 	align-items: stretch;
-	gap: 8px;
+	gap: var(--pltt-chart-gap);
 	min-width: 0;
 	border-bottom: 1px solid var(--pltt-border);
 	border-left:   1px solid var(--pltt-border);
-	padding: 0 4px;
+	padding: 0 var(--pltt-chart-pad);
 	/* Horizontal gridlines at 25%, 50%, 75% of the plot height. */
 	background-image:
 		linear-gradient(to right, var(--pltt-border-faint), var(--pltt-border-faint)),
@@ -182,19 +186,112 @@
 	z-index: 2;
 }
 
+/* ── Budget on the chart (project report only) ────────────────────────────────
+   The meter panel that used to state proportion came out; what the chart adds is
+   WHEN a limit was reached. Three marks, none of which the Reports summary ever
+   sets: a vertical crossing for a fixed budget, the wash behind the work that
+   happened after it, and a horizontal allocation line for retainers.
+   See ui/pltt-budget-on-chart.html. */
+
+/* Where the crossing sits: the columns share what's left of the width after the
+   side padding and the gaps, and every whole column to the left adds one gap.
+   --cross-f is the fractional column index, --cross-fl its floor (CSS can't
+   floor), --cross-n the column count. */
+.pltt-chart-cross,
+.pltt-chart-wash {
+	--cross-x: calc(
+		var(--pltt-chart-pad)
+		+ (100% - var(--pltt-chart-pad) * 2 - var(--pltt-chart-gap) * (var(--cross-n) - 1))
+		  / var(--cross-n) * var(--cross-f)
+		+ var(--pltt-chart-gap) * var(--cross-fl)
+	);
+}
+
+/* Behind the bars, like the wash it starts: this is a highlight on the picture,
+   not a mark laid over it. It carries no label — the legend names the tint and
+   hovering states the date. Reachable in the gaps between bars and above their
+   tops, which is enough of a target for a hover that repeats what the legend and
+   the screen-reader sentence already say. */
+.pltt-chart-cross {
+	position: absolute;
+	top: 0;
+	bottom: 0;
+	left: var(--cross-x);
+	width: 11px;              /* hit area; the visible rule is the ::before */
+	margin-left: -6px;
+	z-index: -1;
+}
+
+.pltt-chart-cross::before {
+	content: "";
+	position: absolute;
+	top: 0;
+	bottom: 0;
+	left: 5px;
+	width: 2px;
+	background: var(--pltt-c-over);
+}
+
+/* Past the crossing. Behind the bars at z-index -1 rather than lifting the
+   columns above it: a z-index on .pltt-chart-col would make each column a
+   stacking context and sink its value chip under the average line. */
+.pltt-chart-wash {
+	position: absolute;
+	top: 0;
+	bottom: 0;
+	left: var(--cross-x);
+	right: 0;
+	z-index: -1;
+	background: color-mix(in srgb, var(--pltt-s-over) 9%, transparent);
+	pointer-events: none;
+}
+
+/* Bar split against the allocation instead of by billing status. The allocation
+   was drawn as a horizontal rule here too; it came out — the seam between the two
+   colours already shows where the limit is, and the average line says more about
+   how the retainer runs than a limit repeated.
+
+   Retainer time is covered by the fee, so the within-allocation part takes the
+   non-billable green it would carry anywhere else on this chart rather than the
+   billable dark green, and the excess sits above it in the lighter gold. */
+.pltt-chart-seg-within {
+	background: var(--pltt-s-nonbill);
+	height: calc(var(--within-pct, 0) * 100%);
+}
+
+.pltt-chart-seg-over {
+	background: var(--pltt-warning);
+	height: calc(var(--over-pct, 0) * 100%);
+}
+
+.pltt-chart-swatch-within { background: var(--pltt-s-nonbill); }
+.pltt-chart-swatch-over   { background: var(--pltt-warning); }
+
+/* The tinted stretch after a budget ran out. Filled at the wash's own strength
+   would read as an empty box at 10px, so the swatch states the tint with its
+   fill and the rule with its border — the two marks it stands for. */
+.pltt-chart-swatch-past {
+	background: color-mix(in srgb, var(--pltt-s-over) 18%, transparent);
+	border: 1px solid var(--pltt-c-over);
+}
+
+/* Sits above its own line rather than astride it, on a white ground with a
+   hairline border, so a bar behind it can't make the number ambiguous and the
+   dashed line never runs through the words. */
 .pltt-chart-avg-label {
 	position: absolute;
 	right: 0;
 	bottom: 100%;
-	margin-bottom: 2px;
-	padding: 1px 4px;
+	margin-bottom: 3px;
+	padding: 1px 5px;
 	font-size: 10px;
 	font-weight: 600;
-	line-height: 1.2;
+	line-height: 1.4;
+	white-space: nowrap;
 	color: var(--pltt-text-muted);
 	background: var(--pltt-bg-white);
-	white-space: nowrap;
-	border-radius: 2px;
+	border: 1px solid var(--pltt-border-faint);
+	border-radius: 3px;
 }
 
 .pltt-chart-col {
