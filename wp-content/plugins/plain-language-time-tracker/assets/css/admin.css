@@ -1242,6 +1242,11 @@ fieldset.pltt-date-nav-custom-inputs input[type="date"] {
 	margin-top: 4px;
 }
 .pltt-typecard {
+	/* Each card carries its own type's colour — the same pair the type badge uses.
+	   Hover, selection, focus and the dot all read from these two, so a card never
+	   tints in a colour other than its own. Internal falls back to the neutral. */
+	--pltt-typecard-accent: var(--pltt-badge-text);
+	--pltt-typecard-tint:   var(--pltt-badge-bg);
 	display: flex;
 	flex-direction: column;
 	gap: 2px;
@@ -1253,17 +1258,31 @@ fieldset.pltt-date-nav-custom-inputs input[type="date"] {
 	cursor: pointer;
 	font: inherit;
 }
+.pltt-typecard[data-type="hourly"] {
+	--pltt-typecard-accent: var(--pltt-badge-success-text);
+	--pltt-typecard-tint:   var(--pltt-badge-success-bg);
+}
+.pltt-typecard[data-type="recurring"] {
+	--pltt-typecard-accent: var(--pltt-badge-info-text);
+	--pltt-typecard-tint:   var(--pltt-badge-info-bg);
+}
+.pltt-typecard[data-type="fixed"] {
+	--pltt-typecard-accent: var(--pltt-badge-purple-text);
+	--pltt-typecard-tint:   var(--pltt-badge-purple-bg);
+}
+/* Hover is a half-strength wash of the tint so the selected card still reads as
+   the stronger of the two when the pointer is on one of its neighbours. */
 .pltt-typecard:hover {
-	border-color: var(--pltt-primary-light);
-	background: var(--pltt-bg-subtle);
+	border-color: color-mix(in srgb, var(--pltt-typecard-accent) 45%, #fff);
+	background: color-mix(in srgb, var(--pltt-typecard-tint) 50%, #fff);
 }
 .pltt-typecard.is-selected {
-	border-color: var(--pltt-primary);
-	background: var(--pltt-bg-highlight);
-	box-shadow: 0 0 0 3px rgba(34, 113, 177, 0.12);
+	border-color: var(--pltt-typecard-accent);
+	background: var(--pltt-typecard-tint);
+	box-shadow: 0 0 0 3px color-mix(in srgb, var(--pltt-typecard-accent) 14%, transparent);
 }
 .pltt-typecard:focus-visible {
-	outline: 2px solid var(--pltt-primary);
+	outline: 2px solid var(--pltt-typecard-accent);
 	outline-offset: 1px;
 }
 .pltt-typecard-t {
@@ -1272,12 +1291,12 @@ fieldset.pltt-date-nav-custom-inputs input[type="date"] {
 	color: var(--pltt-text-dark);
 }
 .pltt-typecard-d {
-	font-size: 11.5px;
+	/* font-size: 11.5px; */
 	line-height: 1.4;
 	color: var(--pltt-text-muted);
 }
 
-/* Small color dot per type — colors match the type badges (.pltt-badge-*). */
+/* Small color dot per type — same accent the card tints with, set above. */
 .pltt-typecard-dot {
 	display: inline-block;
 	width: 9px;
@@ -1285,12 +1304,8 @@ fieldset.pltt-date-nav-custom-inputs input[type="date"] {
 	margin-right: 7px;
 	border-radius: 50%;
 	vertical-align: middle;
-	background: var(--pltt-badge-text);
+	background: var(--pltt-typecard-accent);
 }
-.pltt-typecard[data-type="hourly"] .pltt-typecard-dot { background: var(--pltt-badge-success-text); }
-.pltt-typecard[data-type="recurring"] .pltt-typecard-dot { background: var(--pltt-badge-info-text); }
-.pltt-typecard[data-type="fixed"] .pltt-typecard-dot { background: var(--pltt-badge-purple-text); }
-.pltt-typecard[data-type="none"] .pltt-typecard-dot { background: var(--pltt-badge-text); }
 
 @media (max-width: 480px) {
 	.pltt-typepick { grid-template-columns: 1fr; }
