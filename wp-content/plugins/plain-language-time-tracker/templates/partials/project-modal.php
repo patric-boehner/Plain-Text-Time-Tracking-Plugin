@@ -80,13 +80,12 @@ if ( ! isset( $clients ) ) {
 			</div>
 		</form>
 
-		<!-- Archive/Restore form (hidden, submitted via JS) -->
-		<form id="pltt-archive-project-form" method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" class="pltt-hidden">
-			<input type="hidden" name="action" value="pltt_update_project">
-			<input type="hidden" name="project_id" id="pltt-archive-project-id" value="">
-			<input type="hidden" name="status" id="pltt-archive-project-status" value="">
-			<?php wp_nonce_field( 'pltt_update_project', '_wpnonce', true, true ); ?>
-		</form>
+		<?php
+		// The hidden Archive/Restore form went with the row actions (2026-08-13).
+		// Archiving now happens through this modal's own Project Status field, which
+		// posts on the main form above — one path, and it passes the same
+		// unbilled-time confirmation on the way.
+		?>
 
 		<!-- Delete form (hidden, submitted via JS) -->
 		<form id="pltt-delete-project-form" method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" class="pltt-hidden">
@@ -173,23 +172,6 @@ if ( ! isset( $clients ) ) {
 		var msg = '<?php echo esc_js( __( 'This project has %s of billable time that hasn\'t been invoiced. Archive anyway?', 'plain-language-time-tracker' ) ); ?>'.replace('%s', formatted);
 		return window.confirm(msg);
 	}
-
-	// Archive/Restore Project links (row-actions) — Projects list only.
-	document.querySelectorAll('.pltt-archive-project').forEach(function(link) {
-		link.addEventListener('click', function(e) {
-			e.preventDefault();
-			var row = this.closest('[data-project-id]');
-			if (!row) return;
-			var newStatus = this.dataset.newStatus;
-			var unbilled = parseInt(row.dataset.unbilledMinutes || '0', 10);
-			if (!confirmArchiveIfUnbilled(newStatus, unbilled)) {
-				return;
-			}
-			el('pltt-archive-project-id').value = row.dataset.projectId;
-			el('pltt-archive-project-status').value = newStatus;
-			el('pltt-archive-project-form').submit();
-		});
-	});
 
 	// Project form submission.
 	el('pltt-project-form').addEventListener('submit', function(e) {
