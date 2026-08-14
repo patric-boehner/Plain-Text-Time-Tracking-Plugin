@@ -40,8 +40,15 @@ class PLTT_Reports {
 	 * Render the Reports screen.
 	 */
 	public static function render() {
+		// Default range: the current month, whole. It used to end today, which made
+		// the landing view a 13-day window that happened to start on the 1st — so
+		// the comparison line read it as a FINISHED period and measured it against
+		// the preceding 13 days, while picking "August 2026" from the date control
+		// measured the same figures against the same 13 days of July. Two baselines
+		// for one screen. The month is the unit either way, so the default now says
+		// so, and the two routes are the same range.
 		$date_from  = isset( $_GET['from'] ) ? pltt_sanitize_date( wp_unslash( $_GET['from'] ) ) : current_time( 'Y-m-01' );
-		$date_to    = isset( $_GET['to'] ) ? pltt_sanitize_date( wp_unslash( $_GET['to'] ) ) : pltt_get_current_date();
+		$date_to    = isset( $_GET['to'] ) ? pltt_sanitize_date( wp_unslash( $_GET['to'] ) ) : current_time( 'Y-m-t' );
 		$view       = isset( $_GET['view'] ) ? sanitize_text_field( wp_unslash( $_GET['view'] ) ) : self::DEFAULT_VIEW;
 		$client_id  = isset( $_GET['client_id'] ) ? absint( $_GET['client_id'] ) : 0;
 		$project_id = isset( $_GET['project_id'] ) ? absint( $_GET['project_id'] ) : 0;
