@@ -510,6 +510,19 @@ $tab_base_url = add_query_arg( $filter_params, admin_url( 'admin.php' ) );
 							<?php if ( 'archived' === ( $scope_project->status ?? '' ) ) : ?>
 								<span class="pltt-badge pltt-badge-archived"><?php esc_html_e( 'Archived', 'plain-language-time-tracker' ); ?></span>
 							<?php endif; ?>
+							<?php
+							// Into the project's own record. Navigation, not an action on this
+							// range — it commits nothing and carries no dates; Project Detail
+							// sets its own period. The block still holds no buttons (§3c).
+							// Worded, and worded as the destination: an icon would have to
+							// stand for "the project's own page", and no single glyph says
+							// that — an eye reads as preview, an arrow-out as a new tab.
+							// .pltt-lk with a trailing chevron is how every other link that
+							// leaves for another screen is written here.
+							?>
+							<a class="pltt-lk pltt-scope-open" href="<?php echo esc_url( PLTT_Project_Detail::get_url( (int) $scope_project->id ) ); ?>">
+								<?php esc_html_e( 'Project details', 'plain-language-time-tracker' ); ?> &rsaquo;
+							</a>
 						<?php endif; ?>
 					</div>
 					<?php if ( '' !== $sb_terms ) : ?>
