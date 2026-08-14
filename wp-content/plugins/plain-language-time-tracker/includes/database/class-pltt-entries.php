@@ -809,6 +809,45 @@ class PLTT_Entries {
 	}
 
 	/**
+	 * Total minutes per day for one project, oldest day first.
+	 *
+	 * Counts EVERY entry, reviewed or not — the same rule pltt_project_consumption()
+	 * follows: captured time is consumed time. That deliberately differs from
+	 * get_chart_daily_totals() below, which draws verified time only. The difference
+	 * matters where this is used: finding the day a budget ran out. That day has to
+	 * agree with the stat cards saying the budget is gone, not with the bars.
+	 *
+	 * @param int    $project_id Project ID.
+	 * @param string $date_from  Start date (Y-m-d).
+	 * @param string $date_to    End date (Y-m-d).
+	 * @return array Map of Y-m-d => minutes, in date order.
+	 */
+	public static function get_daily_minutes_for_project( $project_id, $date_from, $date_to ) {
+		global $wpdb;
+		$entries_table = PLTT_Database::get_table_name( 'time_entries' );
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+		$rows = $wpdb->get_results(
+			$wpdb->prepare(
+				"SELECT entry_date, COALESCE(SUM(duration_minutes), 0) AS minutes
+				FROM {$entries_table}
+				WHERE project_id = %d AND entry_date >= %s AND entry_date <= %s
+				GROUP BY entry_date
+				ORDER BY entry_date ASC",
+				(int) $project_id,
+				$date_from,
+				$date_to
+			)
+		);
+
+		$out = array();
+		foreach ( (array) $rows as $row ) {
+			$out[ $row->entry_date ] = (int) $row->minutes;
+		}
+		return $out;
+	}
+
+	/**
 	 * Get billable/non-billable daily totals for the reports chart.
 	 *
 	 * Returns one row per entry_date in the range, with the same filter set

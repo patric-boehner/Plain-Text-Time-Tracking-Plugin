@@ -2,9 +2,12 @@
 /**
  * Project Report — read-only aggregations for the Report tab.
  *
- * Pure data layer: turns a project's stats into the type-aware hero, the stat
- * cards, and the volume ("Hours by …") chart. No output, no per-entry queries in
- * loops. Consumed by templates/partials/project-detail-report.php.
+ * Pure data layer: turns a project's stats into the stat cards, the volume
+ * ("Hours by …") chart, and the budget marks drawn on that chart. No output, no
+ * per-entry queries in loops. Consumed by templates/partials/project-detail-report.php.
+ *
+ * The "Budget consumed" meter panel was removed 2026-08-13 in favour of those
+ * marks — see build_budget() and ui/pltt-budget-on-chart.html.
  *
  * The per-tag "Where the time went" bars and the "Activity over time" swimlane
  * (and all their entry/tag grouping + timeline-axis machinery) were removed
@@ -35,7 +38,7 @@ class PLTT_Project_Report {
 	 *                                   re-querying (OPT-N-A: render() already computes these for the subhead).
 	 * @return array {
 	 *     @type bool   $has_entries Whether any time is logged.
-	 *     @type array  $hero        Type-aware hero view-model (or null).
+	 *     @type array  $budget      Budget marks for the chart: { cross, alloc } (or null).
 	 *     @type array  $cards       Stat-card figures.
 	 *     @type array  $chart       Volume ("Hours by …") chart data (or null).
 	 *     @type array  $window      Active period-lens window (or null).
@@ -83,7 +86,7 @@ class PLTT_Project_Report {
 
 		return array(
 			'has_entries' => ( isset( $stats->total_minutes ) ? (int) $stats->total_minutes : 0 ) > 0,
-			'hero'        => self::build_hero( $project, $stats, $rate, $window ),
+			'budget'      => self::build_budget( $project, $stats, $rate, $window, $chart ),
 			'cards'       => self::build_cards( $project, $card_stats, $rate, $window, $stats ),
 			'chart'       => $chart,
 			'window'      => is_array( $window ) ? $window : null,
@@ -502,7 +505,7 @@ class PLTT_Project_Report {
 		// month" but "is this retainer healthy across its whole run"
 		// (ui/pltt-scope-by-type.html §02). Average per month is the load-bearing
 		// figure — it's the one that starts a conversation about resizing the plan.
-		$summary  = PLTT_Billing::get_retainer_summary( $project );
+		$summary  = self::retainer_summary( $project );
 		$periods  = (int) $summary['periods'];
 		$adj      = self::period_adjective( $project );
 		$avg_life = $periods > 0 ? (int) round( $life_minutes / $periods ) : $life_minutes;
@@ -712,244 +715,200 @@ class PLTT_Project_Report {
 	}
 
 	/**
-	 * Type-aware hero: the gauge block beneath the scope block.
+	 * The budget, moved onto the volume chart (ui/pltt-budget-on-chart.html).
 	 *
-	 * Only the two types with a limit get one — the gauge is the meter, and a meter
-	 * needs something to measure against:
+	 * This replaced the "Budget consumed" meter panel. The meter stated proportion,
+	 * and the stat cards above it already state proportion in words — "32h 45m of
+	 * 38h 42m used · 84%" — so the panel was the third telling. What no figure can
+	 * say is WHEN the limit was reached and how much work happened after it, which
+	 * is a fact about the calendar and belongs on the chart of the calendar.
 	 *
-	 * Fixed   → "Budget consumed" gauge + Remaining / Hours / Effective-rate rows.
-	 * Retainer→ current-period "This period" allocation gauge + Overage / Avg / Fee rows.
-	 * Hourly / Internal → none.
+	 * Returns up to three independent pieces, each null when its own gate fails:
 	 *
-	 * Kept strictly factual — no pace projections or "went over N of M" framing.
+	 *   cross → fixed fee, over budget: the day the budget ran out, and where that
+	 *           day falls across the chart's columns.
+	 *   pace  → fixed fee, still under: one sentence projecting when it runs out.
+	 *   alloc → retainer on the by-month lifetime chart: the allocation as a
+	 *           horizontal line, since a retainer goes over every month rather
+	 *           than at one moment.
+	 *
+	 * Hourly and internal have no limit, so they get none of it.
 	 *
 	 * @param object      $project Project row.
 	 * @param object|null $stats   Lifetime aggregate stats.
 	 * @param float       $rate    Resolved hourly rate.
 	 * @param array|null  $window  Active period window (recurring period lens).
-	 * @return array|null Hero view-model, or null when the type has no hero.
+	 * @param array|null  $chart   The pltt_build_period_chart_data() result, for column positions.
+	 * @return array|null { cross, pace, alloc }, or null when the type has no limit.
 	 */
-	private static function build_hero( $project, $stats, $rate, $window = null ) {
-		switch ( pltt_get_billing_type( $project ) ) {
-			case 'fixed':
-				// The fixed hero gauges dollars against the fee, so a project
-				// budgeted only in hours has nothing for it to draw either.
-				if ( self::num( $project->budget_fee ) <= 0 ) {
-					return null;
-				}
-				return self::hero_fixed( $project, $stats, $rate );
-			case 'recurring':
-				// A retainer with no allocation recorded has no ceiling. It used to
-				// draw a gauge reading 0% of nothing, which says less than no gauge
-				// at all. Matches what the rest of the app already does with these:
-				// the Overview summary's Budget column shows a dash
-				// (templates/reports.php), and the day's consumption notice skips
-				// them outright (pltt_consumption_status).
-				if ( self::num( $project->budget_hours ) <= 0 ) {
-					return null;
-				}
-				return self::hero_recurring( $project, $stats, $rate, $window );
-			default:
-				// Hourly and internal have no limit to gauge against, so there is
-				// nothing for a hero to show that the scope block's figures don't
-				// already say (ui/pltt-scope-by-type.html §01, §05).
-				return null;
+	private static function build_budget( $project, $stats, $rate, $window = null, $chart = null ) {
+		$type = pltt_get_billing_type( $project );
+		if ( 'fixed' !== $type && 'recurring' !== $type ) {
+			return null;
 		}
+
+		// One ceiling rule for both types: hours if set, else the fee at the resolved
+		// rate. A fee-budgeted project with no rate to divide by has no ceiling, and
+		// says nothing rather than drawing 0% of a number it can't compute — which is
+		// what the old meter did. A fixed project budgeted only in HOURS now gets a
+		// line for the first time; the meter skipped those, because it gauged dollars.
+		$ceiling = (int) pltt_budgeted_minutes( $project, $rate );
+		if ( $ceiling <= 0 || empty( $chart['buckets'] ) ) {
+			return null;
+		}
+
+		$out = array(
+			'cross' => null,
+			'alloc' => null,
+		);
+
+		if ( 'recurring' === $type ) {
+			$out['alloc'] = self::budget_alloc( $ceiling, $window, $chart );
+			return $out;
+		}
+
+		// A pace sentence for projects still under budget ("At 6h 58m a month, the
+		// budget runs out around Jan 13, 2027") was built here and DROPPED
+		// 2026-08-13 before it shipped — Patrick's call, while we were still
+		// settling its wording. Recoverable from git; don't rebuild it on a hunch.
+		$total = isset( $stats->total_minutes ) ? (int) $stats->total_minutes : 0;
+		if ( $total > $ceiling ) {
+			$out['cross'] = self::budget_cross( $project, $stats, $ceiling, $total, $chart );
+		}
+
+		return $out;
 	}
 
 	/**
-	 * Fixed-budget hero: value consumed against the fixed fee.
+	 * The day a fixed budget ran out, and where it sits across the chart.
+	 *
+	 * The position is worked out from the DATE, not from a running total of the
+	 * bars: the chart draws verified time only while the budget counts everything,
+	 * so a cumulative walked across the bars would put the mark somewhere the cards
+	 * disagree with. A date lands in exactly one column either way.
 	 *
 	 * @param object      $project Project row.
 	 * @param object|null $stats   Lifetime stats.
-	 * @param float       $rate    Resolved hourly rate.
-	 * @return array
+	 * @param int         $ceiling Budgeted minutes.
+	 * @param int         $total   Minutes logged.
+	 * @param array       $chart   Chart data.
+	 * @return array|null
 	 */
-	private static function hero_fixed( $project, $stats, $rate ) {
-		$total_minutes = isset( $stats->total_minutes ) ? (int) $stats->total_minutes : 0;
-		$budget        = self::num( $project->budget_fee );
-		// Value burned = hours × rate (fixed-fee entries are non-billable, so
-		// billable_amount is $0 — mirror the Reports allocation bar's spent_dollars).
-		$consumed  = round( ( $total_minutes / 60.0 ) * $rate, 2 );
-		$remaining = round( $budget - $consumed, 2 );
-		$pct       = $budget > 0 ? ( $consumed / $budget ) : 0.0;
-		$seg       = self::gauge_segments( $consumed, $budget );
+	private static function budget_cross( $project, $stats, $ceiling, $total, $chart ) {
+		$first = ! empty( $stats->first_entry_date ) ? $stats->first_entry_date : '';
+		$last  = ! empty( $stats->last_entry_date ) ? $stats->last_entry_date : '';
+		if ( ! $first || ! $last ) {
+			return null;
+		}
+
+		$daily      = PLTT_Entries::get_daily_minutes_for_project( (int) $project->id, $first, $last );
+		$cumulative = 0;
+		$cross_date = '';
+		foreach ( $daily as $date => $minutes ) {
+			$cumulative += (int) $minutes;
+			if ( $cumulative >= $ceiling ) {
+				$cross_date = $date;
+				break;
+			}
+		}
+		if ( ! $cross_date ) {
+			return null;
+		}
+
+		$pos = self::chart_position( $chart, $cross_date );
+		if ( null === $pos ) {
+			// The crossing predates the charted window (or postdates it). Nothing to
+			// mark — and nothing invented at the chart's edge to suggest otherwise.
+			return null;
+		}
 
 		return array(
-			'type'     => 'fixed',
-			'mode'     => 'gauge',
-			'tag'      => __( 'Budget consumed', 'plain-language-time-tracker' ),
-			'gauge'    => array(
-				'pct'        => $pct,
-				'state'      => self::gauge_state( $pct ),
-				'within_pct' => $seg['within'],
-				'over_pct'   => $seg['over'],
-				// What the limit is, printed on the marker so the meter reads
-				// without its caption.
-				'marker'     => __( 'budget', 'plain-language-time-tracker' ),
-				/* translators: 1: value consumed; 2: the budget. */
-				'basis'      => sprintf(
-					__( '%1$s against a %2$s budget', 'plain-language-time-tracker' ),
-					pltt_format_currency( $consumed ),
-					pltt_format_currency( max( 0.0, $budget ) )
-				),
-				'delta'      => self::gauge_delta(
-					$pct,
-					$remaining >= 0
-						/* translators: %s: dollars remaining. */
-						? sprintf( __( '%s left', 'plain-language-time-tracker' ), pltt_format_currency( $remaining ) )
-						/* translators: %s: dollars over budget. */
-						: sprintf( __( '%s over', 'plain-language-time-tracker' ), pltt_format_currency( abs( $remaining ) ) )
-				),
-			),
-			// No mini-rows: remaining, hours and effective rate are all figures in
-			// the scope block above. What's left is the meter, which is the one
-			// thing the block can't say — proportion.
-			'minirows' => array(),
+			'date'         => $cross_date,
+			'date_label'   => date_i18n( 'M j', strtotime( $cross_date ) ),
+			'over_minutes' => $total - $ceiling,
+			'f'            => $pos['f'],
+			'floor'        => $pos['floor'],
+			'n'            => $pos['n'],
 		);
 	}
 
 	/**
-	 * Retainer hero: an allocation-period usage gauge.
+	 * The retainer allocation, as the line each month's bar is split against.
 	 *
-	 * Follows the page's period lens — stepping the lens to a month re-points the
-	 * gauge to that month. With no period selected (Full scope) it defaults to the
-	 * LATEST period that had activity, so a retainer whose most recent work was
-	 * last month never headlines an empty "this month" gauge.
+	 * A retainer has no single moment it went over — it goes over every month — so
+	 * the question "when" becomes "which months", and the answer is every bar with
+	 * amber on top of it. The allocation was drawn as a horizontal rule as well for
+	 * one build; it came out (2026-08-13) because the chart's own average line says
+	 * more about how a retainer is running than a limit already visible as the seam
+	 * in every bar.
 	 *
-	 * @param object      $project Project row.
-	 * @param object|null $stats   Lifetime stats.
-	 * @param float       $rate    Resolved hourly rate.
-	 * @param array|null  $window  Active period lens window (from the controller).
-	 * @return array
+	 * Only on the lifetime by-month view: a month's allocation applied to a chart of
+	 * days would split each day against a whole month's hours, which is nonsense. In
+	 * the single-period view the cards already carry the period's own figures.
+	 *
+	 * @param int        $ceiling Allocation minutes.
+	 * @param array|null $window  Active period window.
+	 * @param array      $chart   Chart data.
+	 * @return array|null
 	 */
-	private static function hero_recurring( $project, $stats, $rate, $window = null ) {
-		$alloc_minutes = (int) round( self::num( $project->budget_hours ) * 60 );
-		$today         = pltt_get_current_date();
-
-		$follows_lens = is_array( $window ) && ! empty( $window['is_period'] );
-		if ( $follows_lens ) {
-			$p_start = (string) $window['from'];
-			$p_end   = (string) $window['to'];
-		} else {
-			// Default: the latest period that had activity (falls back to today when
-			// there are no entries — the hero doesn't render in that case anyway).
-			$ref_date = ! empty( $stats->last_entry_date ) ? $stats->last_entry_date : $today;
-			list( $p_start, $p_end ) = pltt_get_allocation_period_bounds( $project, $ref_date );
+	private static function budget_alloc( $ceiling, $window, $chart ) {
+		$is_period = is_array( $window ) && ! empty( $window['is_period'] );
+		if ( $is_period || 'month' !== ( $chart['bucket_size'] ?? '' ) ) {
+			return null;
 		}
 
-		$used_minutes = 0;
-		if ( $p_start && $p_end ) {
-			$ps = PLTT_Entries::get_stats( array( 'project_id' => (int) $project->id, 'date_from' => $p_start, 'date_to' => $p_end ) );
-			$used_minutes = isset( $ps->total_minutes ) ? (int) $ps->total_minutes : 0;
-		}
-
-		// build_hero() only reaches here with a real allocation, so there is always
-		// a limit to be under or over.
-		$pct      = $used_minutes / $alloc_minutes;
-		$over_min = max( 0, $used_minutes - $alloc_minutes );
-		$rem_min  = max( 0, $alloc_minutes - $used_minutes );
-
-		if ( $over_min > 0 ) {
-			/* translators: %s: hours over the allocation. */
-			$cap = sprintf( __( '%s over', 'plain-language-time-tracker' ), pltt_format_duration( $over_min ) );
-		} else {
-			/* translators: %s: hours remaining in the allocation. */
-			$cap = sprintf( __( '%s left', 'plain-language-time-tracker' ), pltt_format_duration( $rem_min ) );
-		}
-
-		$seg = self::gauge_segments( $used_minutes, $alloc_minutes );
-
-		return array(
-			'type'     => 'recurring',
-			'mode'     => 'gauge',
-			// Same label as the fixed-fee meter: both answer "how much of the
-			// limit is gone", and the marker below names which limit it is. The
-			// tag used to carry the period too ("Period · July 2026"), which made
-			// the page state the same month three times — date filter, scope
-			// block, and here.
-			'tag'      => __( 'Budget consumed', 'plain-language-time-tracker' ),
-			'gauge'    => array(
-				'pct'        => $pct,
-				'state'      => self::gauge_state( $pct ),
-				'within_pct' => $seg['within'],
-				'over_pct'   => $seg['over'],
-				// The marker states the allocation itself — "3h included" — so the
-				// meter says what the limit is without the caption underneath.
-				/* translators: %s: the period's hour allocation, e.g. "3h". */
-				'marker'     => sprintf( __( '%s included', 'plain-language-time-tracker' ), pltt_format_duration( $alloc_minutes ) ),
-				/* translators: 1: hours used this period; 2: the hour allocation. */
-				'basis'      => sprintf(
-					__( '%1$s against the %2$s included', 'plain-language-time-tracker' ),
-					pltt_format_duration( $used_minutes ),
-					pltt_format_duration( $alloc_minutes )
-				),
-				'delta'      => self::gauge_delta( $pct, $cap ),
-			),
-			// No mini-rows: overage, average and the allocation are all figures in
-			// the scope block above. What's left is the meter — proportion, which
-			// is the one thing the block can't state in words.
-			'minirows' => array(),
-		);
+		return array( 'minutes' => $ceiling );
 	}
 
 	/**
-	 * Classify gauge fill into a state color: ok / warn (>=85%) / over (>100%).
+	 * Per-request memo for the retainer period scan.
 	 *
-	 * @param float $pct Fraction used (0..>1).
-	 * @return string
+	 * It walks every allocation period with a query apiece, so anything on this
+	 * screen that needs "how many periods, how many over" shares one answer.
+	 *
+	 * @param object $project Project row.
+	 * @return array PLTT_Billing::get_retainer_summary() result.
 	 */
-	private static function gauge_state( $pct ) {
-		if ( $pct > 1.0 ) {
-			return 'over';
+	private static function retainer_summary( $project ) {
+		static $cache = array();
+		$key = (int) $project->id;
+		if ( ! isset( $cache[ $key ] ) ) {
+			$cache[ $key ] = PLTT_Billing::get_retainer_summary( $project );
 		}
-		return $pct >= 0.85 ? 'warn' : 'ok';
+		return $cache[ $key ];
 	}
 
 	/**
-	 * Split a used/total pair into within-limit and overage bar segments (percent
-	 * of the full track), mirroring pltt_render_allocation_bar: when over, the bar
-	 * fills 100% split proportionally so the overage magnitude is visible; when
-	 * under, a single segment fills used/total.
+	 * Where a date sits across the chart's columns, as a fractional column index.
 	 *
-	 * @param float $used  Amount used (minutes or dollars).
-	 * @param float $total Limit (allocation minutes or budget dollars).
-	 * @return array{within: float, over: float}
+	 * Returns the index plus how far into that column's own span the date falls, so
+	 * a week or month bucket puts the mark at the right point inside the bar rather
+	 * than snapped to its edge. `floor` is handed over with it because the CSS has to
+	 * add one column gap per whole column to its left, and CSS can't floor.
+	 *
+	 * @param array  $chart Chart data.
+	 * @param string $date  Y-m-d.
+	 * @return array|null { f, floor, n }
 	 */
-	/**
-	 * The meter's right-hand caption: "84% · 5h 57m left", "249% · $5,771.67 over".
-	 *
-	 * Exactly 100% reads "fully used" rather than "0 left" — at the limit is a
-	 * state worth naming, and "0m left" reads like a rounding artefact.
-	 *
-	 * Tested against the true ratio, not the rounded percent: one minute past a
-	 * 3h allocation is 100.06%, which rounds to 100 but does put an amber sliver
-	 * on the bar. Saying "fully used" beside it would have the caption contradict
-	 * the meter. It reads "100% · 1m over" instead — blunt, but true.
-	 *
-	 * @param float  $pct   Used ÷ limit (1.0 = exactly at the limit).
-	 * @param string $delta Already-formatted remainder, e.g. "5h 57m left".
-	 * @return string
-	 */
-	private static function gauge_delta( $pct, $delta ) {
-		$whole = (int) round( $pct * 100 );
-		if ( abs( $pct - 1.0 ) < 0.00001 ) {
-			/* translators: shown when consumption exactly equals the limit. */
-			return __( '100% · fully used', 'plain-language-time-tracker' );
+	private static function chart_position( $chart, $date ) {
+		$buckets = $chart['buckets'] ?? array();
+		$n       = count( $buckets );
+		foreach ( $buckets as $i => $bucket ) {
+			$start = $bucket['start'] ?? '';
+			$end   = $bucket['end'] ?? '';
+			if ( ! $start || ! $end || $date < $start || $date > $end ) {
+				continue;
+			}
+			$span = max( 1, (int) round( ( strtotime( $end ) - strtotime( $start ) ) / DAY_IN_SECONDS ) + 1 );
+			$into = (int) round( ( strtotime( $date ) - strtotime( $start ) ) / DAY_IN_SECONDS );
+			// Mid-day, so a one-day bucket marks its own centre rather than its edge.
+			return array(
+				'f'     => round( $i + ( ( $into + 0.5 ) / $span ), 4 ),
+				'floor' => $i,
+				'n'     => $n,
+			);
 		}
-		/* translators: 1: percent of the limit used; 2: what is left or over. */
-		return sprintf( __( '%1$d%% · %2$s', 'plain-language-time-tracker' ), $whole, $delta );
-	}
-
-	private static function gauge_segments( $used, $total ) {
-		if ( $total > 0 && $used > $total ) {
-			$within = ( $total / $used ) * 100;
-			return array( 'within' => $within, 'over' => 100 - $within );
-		}
-		return array(
-			'within' => $total > 0 ? min( 100.0, ( $used / $total ) * 100 ) : 0.0,
-			'over'   => 0.0,
-		);
+		return null;
 	}
 
 	/**
@@ -971,17 +930,6 @@ class PLTT_Project_Report {
 	private static function rate_str( $rate ) {
 		/* translators: %s: dollar amount per hour. */
 		return sprintf( __( '%s/hr', 'plain-language-time-tracker' ), pltt_format_currency_compact( round( $rate ) ) );
-	}
-
-	/**
-	 * "vs $X target" sub-line.
-	 *
-	 * @param float $rate Target hourly rate.
-	 * @return string
-	 */
-	private static function vs_target( $rate ) {
-		/* translators: %s: target hourly rate. */
-		return sprintf( __( 'vs %s target', 'plain-language-time-tracker' ), pltt_format_currency_compact( round( $rate ) ) );
 	}
 
 	/**
