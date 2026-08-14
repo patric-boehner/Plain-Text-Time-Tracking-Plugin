@@ -2547,9 +2547,6 @@ function pltt_build_single_project_scope_figures( $project, $stats, $billing_typ
 				esc_html( _n( '%d unbilled entry', '%d unbilled entries', $ready_count, 'plain-language-time-tracker' ) ),
 				$ready_count
 			);
-			if ( $oldest ) {
-				$ready_basis .= ' · ' . esc_html__( 'oldest', 'plain-language-time-tracker' ) . ' <span class="pltt-mono">' . esc_html( date_i18n( 'M j', strtotime( $oldest ) ) ) . '</span>';
-			}
 		} else {
 			$ready_basis = esc_html__( 'Nothing outstanding', 'plain-language-time-tracker' );
 		}
@@ -2590,6 +2587,18 @@ function pltt_build_single_project_scope_figures( $project, $stats, $billing_typ
 				esc_html( _n( '%d outside this range', '%d outside this range', $backlog_count, 'plain-language-time-tracker' ) ),
 				$backlog_count
 			) . ' &rsaquo;</a>';
+		}
+
+		// Oldest unbilled entry ANYWHERE, not the oldest one the filter reaches.
+		// The count in front of it is range-scoped by design (§6), but the date
+		// isn't a second measurement of the same thing — it says how far back the
+		// unbilled work goes, and answering that inside the filter made a line with
+		// stranded work on it claim the backlog started at the range edge.
+		// It sits last, after the stranded-work link, so it's read against the whole
+		// set rather than against the count it used to follow.
+		$oldest_all = $backlog_oldest ? $backlog_oldest : $oldest;
+		if ( $has_ready && $oldest_all ) {
+			$ready_basis .= ' · ' . esc_html__( 'oldest', 'plain-language-time-tracker' ) . ' <span class="pltt-mono">' . esc_html( date_i18n( 'M j', strtotime( $oldest_all ) ) ) . '</span>';
 		}
 
 		// Value but no action — figure 4 names the rule holding it (Rule 2). Two
