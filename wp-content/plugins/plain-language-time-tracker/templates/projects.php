@@ -229,13 +229,15 @@ if ( ! empty( $projects ) ) {
 								<?php if ( 'archived' === $project->status ) : ?>
 									<span class="pltt-badge pltt-badge-archived"><?php esc_html_e( 'Archived', 'plain-language-time-tracker' ); ?></span>
 								<?php endif; ?>
+								<?php
+								// Edit and View only. Archive and Restore were row actions
+								// until 2026-08-13; archiving is a change to the project, and
+								// it already has a control inside Edit (Project Status), so
+								// the row was offering a second way to do one thing — the
+								// riskier way, one click from a list with no context.
+								?>
 								<div class="row-actions">
 									<span class="edit"><a href="#edit" class="pltt-edit-project" role="button"><?php esc_html_e( 'Edit', 'plain-language-time-tracker' ); ?></a> | </span>
-									<?php if ( 'archived' === $project->status ) : ?>
-										<span><a href="#restore" class="pltt-archive-project" data-new-status="active" role="button"><?php esc_html_e( 'Restore', 'plain-language-time-tracker' ); ?></a> | </span>
-									<?php else : ?>
-										<span class="trash"><a href="#archive" class="pltt-archive-project submitdelete" data-new-status="archived" role="button"><?php esc_html_e( 'Archive', 'plain-language-time-tracker' ); ?></a> | </span>
-									<?php endif; ?>
 									<span class="view"><a href="<?php echo esc_url( $view_url ); ?>"><?php esc_html_e( 'View', 'plain-language-time-tracker' ); ?></a></span>
 								</div>
 							</td>
