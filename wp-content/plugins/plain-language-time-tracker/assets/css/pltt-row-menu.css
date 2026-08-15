@@ -1,0 +1,153 @@
+/**
+ * PlttRowMenu — the always-visible row action menu (kebab).
+ *
+ * Spec §6: one menu in the last column of every row, replacing WordPress's
+ * hover-revealed .row-actions. Always visible on purpose — hover actions shift
+ * the row when they appear, don't exist on touch, and give no sign that actions
+ * are there at all.
+ *
+ * The panel is a single [popover] element reused by every trigger on the page,
+ * positioned in JS (pltt-row-menu.js). It renders in the top layer, so it needs
+ * no z-index and can't be clipped by the tables' `overflow-x: auto` or their
+ * `table-layout: fixed` cells — which is the reason it isn't built on
+ * .pltt-date-nav-dropdown, whose absolute positioning would be trapped in the
+ * last column.
+ *
+ * Option styling deliberately mirrors .pltt-date-nav-option (admin.css) so the
+ * two dropdowns read as the same control.
+ */
+
+/* ── Trigger ─────────────────────────────────────────────────────────────
+ * Three dots, drawn rather than typed: no glyph, no dashicon. The border is
+ * transparent at rest so the hover chip doesn't resize the button.
+ */
+.pltt-row-menu-trigger {
+	background: transparent;
+	border: 1px solid transparent;
+	border-radius: 4px;
+	box-sizing: border-box;
+	cursor: pointer;
+	display: inline-flex;
+	flex-direction: column;
+	gap: 3px;
+	line-height: 1;
+	padding: 7px 8px;
+	vertical-align: middle;
+}
+
+.pltt-row-menu-trigger i {
+	background: var(--pltt-text-faint);
+	border-radius: 50%;
+	display: block;
+	height: 3px;
+	width: 3px;
+}
+
+.pltt-row-menu-trigger:hover,
+.pltt-row-menu-trigger[aria-expanded="true"] {
+	background: var(--pltt-bg-subtle);
+	border-color: var(--pltt-border-light);
+}
+
+.pltt-row-menu-trigger:hover i,
+.pltt-row-menu-trigger[aria-expanded="true"] i {
+	background: var(--pltt-text-subtle);
+}
+
+.pltt-row-menu-trigger:focus-visible {
+	outline: 2px solid var(--pltt-primary);
+	outline-offset: 1px;
+}
+
+/* ── Panel ───────────────────────────────────────────────────────────────
+ * The UA stylesheet gives [popover] `inset: 0` and `margin: auto` to centre it.
+ * Both have to go before the JS insets mean anything.
+ */
+.pltt-row-menu {
+	background: var(--pltt-bg-white);
+	border: 1px solid var(--pltt-border);
+	border-radius: 4px;
+	box-shadow: var(--pltt-shadow-dropdown);
+	inset: auto;
+	margin: 0;
+	min-width: 200px;
+	overflow: visible;
+	padding: 4px 0;
+	position: fixed;
+}
+
+.pltt-row-menu:not(:popover-open) {
+	display: none;
+}
+
+/* ── Items ───────────────────────────────────────────────────────────────
+ * An item is a <button> (acts) or an <a> (navigates), same as the date-nav
+ * dropdown — hence the explicit box-sizing and text-decoration, without which
+ * link items overflow the panel and arrive underlined.
+ */
+.pltt-row-menu-item {
+	background: transparent;
+	border: 0;
+	border-radius: 0;
+	box-sizing: border-box;
+	color: var(--pltt-text-base);
+	cursor: pointer;
+	display: block;
+	font-family: inherit;
+	font-size: 13px;
+	padding: 9px 14px;
+	text-align: left;
+	text-decoration: none;
+	width: 100%;
+}
+
+.pltt-row-menu-item:hover,
+.pltt-row-menu-item:focus {
+	background: var(--pltt-bg-subtle);
+	color: var(--pltt-text-base);
+	outline: none;
+}
+
+/* The primary action — first in the menu, so the item you want most is always
+   in the same place. */
+.pltt-row-menu-item.is-primary {
+	color: var(--pltt-primary);
+	font-weight: 600;
+}
+
+.pltt-row-menu-item.is-primary:hover,
+.pltt-row-menu-item.is-primary:focus {
+	background: var(--pltt-bg-highlight);
+	color: var(--pltt-primary);
+}
+
+/* Destructive sits below a divider, in red, and always confirms. Spec §1: this
+   is the only place red appears in the app. */
+.pltt-row-menu-item.is-destructive {
+	color: var(--pltt-danger-dark);
+}
+
+.pltt-row-menu-item.is-destructive:hover,
+.pltt-row-menu-item.is-destructive:focus {
+	background: var(--pltt-bg-danger);
+	color: var(--pltt-danger);
+}
+
+hr.pltt-row-menu-separator {
+	border: 0;
+	border-top: 1px solid var(--pltt-border-light);
+	margin: 4px 0;
+}
+
+/* ── The column the trigger sits in ──────────────────────────────────────
+ * Class-based, not nth-child: reports.css sizes the entries table positionally
+ * and repeats the whole block shifted right for .pltt-has-billselect. A
+ * class-based column survives that shift the way .pltt-status-col does.
+ */
+/* 44px: the trigger is 21px wide (3px dot + 8px padding either side + border),
+   and .widefat cells add 10px of their own padding on each side. Below this the
+   column stops being able to hold the button and pushes back out. */
+.pltt-rowmenu-col {
+	text-align: center;
+	width: 44px;
+}

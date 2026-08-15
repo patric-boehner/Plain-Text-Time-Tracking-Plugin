@@ -203,6 +203,7 @@ if ( ! empty( $projects ) ) {
 							<th><?php esc_html_e( 'Rate', 'plain-language-time-tracker' ); ?></th>
 							<th><?php esc_html_e( 'Budget', 'plain-language-time-tracker' ); ?></th>
 							<th class="pltt-col-billable"><?php esc_html_e( 'Billable', 'plain-language-time-tracker' ); ?></th>
+							<th class="pltt-rowmenu-col"><span class="screen-reader-text"><?php esc_html_e( 'Actions', 'plain-language-time-tracker' ); ?></span></th>
 						</tr>
 					</thead>
 					<tbody<?php echo $group['tbody_id'] ? ' id="' . esc_attr( $group['tbody_id'] ) . '"' : ''; ?>>
@@ -225,21 +226,22 @@ if ( ! empty( $projects ) ) {
 						?>
 						<tr<?php echo $row_class ? ' class="' . esc_attr( $row_class ) . '"' : ''; ?> data-project-id="<?php echo esc_attr( $project->id ); ?>" data-unbilled-minutes="<?php echo esc_attr( $project_unbilled_minutes ); ?>" data-name="<?php echo esc_attr( $project->name ); ?>" data-client-id="<?php echo esc_attr( $project->client_id ); ?>" data-status="<?php echo esc_attr( $project->status ); ?>" data-rate="<?php echo esc_attr( $project->hourly_rate ?? '' ); ?>" data-billability-default="<?php echo esc_attr( $project->billability_default ?? '1' ); ?>" data-recurring-period="<?php echo esc_attr( $project->recurring_period ?? '' ); ?>" data-billing-type="<?php echo esc_attr( $billing_type ); ?>" data-budget-hours="<?php echo esc_attr( $project->budget_hours ?? '' ); ?>" data-budget-fee="<?php echo esc_attr( $project->budget_fee ?? '' ); ?>" data-entry-count="<?php echo esc_attr( $project_entry_count ); ?>">
 							<td>
-								<strong><a href="<?php echo esc_url( $view_url ); ?>"><?php echo esc_html( $project->name ); ?></a></strong>
+								<a class="pltt-row-link" href="<?php echo esc_url( $view_url ); ?>"><?php echo esc_html( $project->name ); ?></a>
 								<?php if ( 'archived' === $project->status ) : ?>
 									<span class="pltt-badge pltt-badge-archived"><?php esc_html_e( 'Archived', 'plain-language-time-tracker' ); ?></span>
 								<?php endif; ?>
 								<?php
-								// Edit and View only. Archive and Restore were row actions
-								// until 2026-08-13; archiving is a change to the project, and
-								// it already has a control inside Edit (Project Status), so
-								// the row was offering a second way to do one thing — the
+								// The trailing "View" is gone — the project name above is
+								// already that link (spec §6 rule 1), so the row was
+								// carrying the same destination twice. Edit moved to the
+								// row's kebab in the last column.
+								//
+								// Archive and Restore were row actions until 2026-08-13 and
+								// stay out: archiving is a change to the project, and it
+								// already has a control inside Edit (Project Status), so the
+								// row was offering a second way to do one thing — the
 								// riskier way, one click from a list with no context.
 								?>
-								<div class="row-actions">
-									<span class="edit"><a href="#edit" class="pltt-edit-project" role="button"><?php esc_html_e( 'Edit', 'plain-language-time-tracker' ); ?></a> | </span>
-									<span class="view"><a href="<?php echo esc_url( $view_url ); ?>"><?php esc_html_e( 'View', 'plain-language-time-tracker' ); ?></a></span>
-								</div>
 							</td>
 							<td>
 								<?php echo $project_client ? esc_html( $project_client->name ) : '—'; ?>
@@ -279,6 +281,24 @@ if ( ! empty( $projects ) ) {
 								<?php else : ?>
 									<span class="pltt-empty">—</span>
 								<?php endif; ?>
+							</td>
+							<td class="pltt-rowmenu-col">
+								<?php
+								// Edit only. Delete lives inside the Edit dialog, where it
+								// can tell whether anything is behind the project; archiving
+								// is the Project Status field in that same dialog.
+								pltt_render_row_menu_trigger(
+									'project',
+									/* translators: %s: project name. */
+									sprintf( __( 'Actions for %s', 'plain-language-time-tracker' ), $project->name ),
+									array(
+										'project-id' => $project->id,
+										// Same destination the name links to, repeated so
+										// the menu is a full inventory of the row.
+										'view-url'   => $view_url,
+									)
+								);
+								?>
 							</td>
 						</tr>
 						<?php endforeach; ?>

@@ -1,0 +1,148 @@
+/**
+ * The entry edit form.
+ *
+ * Moved out of review.css, which only loads on Review and Today — the Overview
+ * opens the same form now and needs the same rules.
+ *
+ * The layout is unchanged from the inline version it replaces: two rows of
+ * four, sized so Date/Start/End/Duration and Client/Project/Tags/Billable each
+ * stay on one line.
+ *
+ * What the form used to draw for itself, the modal shell now provides — the
+ * header band is the modal's <h3> (admin.css), and the action footer is
+ * .pltt-modal-actions. .pltt-entry-form stays as the wrapper the field rules
+ * hang off.
+ */
+
+/* ── Modal shell ─────────────────────────────────────────────────────────
+ * .pltt-modal-content is 600px, which wraps the assignment row — Client 200 +
+ * Project 200 + Tags 180 + Billable + gaps needs ~656px before padding.
+ */
+.pltt-modal-content.pltt-modal-wide {
+	width: min(760px, calc(100vw - 40px));
+}
+
+/* ── Fields ──────────────────────────────────────────────────────────────
+ * No padding of its own inside the modal: .pltt-modal-content already has 25px,
+ * and the old 16px was the inline card's own inset.
+ */
+.pltt-entry-form-fields {
+	display: flex;
+	flex-direction: column;
+	gap: 12px;
+}
+
+/* Direct child only. Without the combinator this also hit the labels the tag
+   picker builds inside .pltt-field-tags, leaving that one dropdown bold, 12px
+   and dark while the same picker on Overview and the finalize table was not. */
+.pltt-entry-form .pltt-field > label {
+	display: block;
+	font-weight: 600;
+	font-size: 12px;
+	color: var(--pltt-text-dark);
+	margin-bottom: 4px;
+}
+
+.pltt-entry-form .pltt-field-description input {
+	width: 100%;
+}
+
+.pltt-field-row {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 12px;
+	align-items: flex-end;
+}
+
+.pltt-field-row-time .pltt-field-date {
+	flex: 0 0 150px;
+}
+
+.pltt-field-row-time .pltt-field-start,
+.pltt-field-row-time .pltt-field-end {
+	flex: 0 0 110px;
+}
+
+.pltt-field-row-time .pltt-field-duration {
+	flex: 0 1 100px;
+	max-width: 100px;
+}
+
+/* Client and Project are sized to fixed widths so the row stays uniform.
+ * Tags is content-sized but can grow as more chips are added — Tags and
+ * Billable sit next to each other rather than Tags filling all remaining space. */
+.pltt-field-row-assignment .pltt-field-client,
+.pltt-field-row-assignment .pltt-field-project {
+	flex: 0 1 200px;
+	min-width: 180px;
+}
+
+.pltt-field-row-assignment .pltt-field-tags {
+	flex: 0 1 auto;
+	min-width: 180px;
+}
+
+.pltt-field-row-assignment .pltt-field-billable {
+	flex: 0 0 auto;
+}
+
+.pltt-field-row-assignment select {
+	width: 100%;
+}
+
+/* The hidden checkbox carries the form value; the button is the user-facing control.
+ * `hidden` attribute alone is overridden by WP admin form styles, so force it. */
+.pltt-entry-form .pltt-form-billable {
+	display: none !important;
+}
+
+/* Billable toggle in the form — reuses the .pltt-billable-symbol color states
+ * from admin.css. The reset rules below mirror .pltt-inline-toggle in reports.css,
+ * which isn't enqueued on the review screen. */
+.pltt-form-billable-btn {
+	background: none;
+	border: none;
+	padding: 4px 8px;
+	cursor: pointer;
+	line-height: 1;
+	transition: opacity 0.1s;
+}
+
+.pltt-form-billable-btn:focus {
+	outline: 2px solid var(--pltt-primary);
+	outline-offset: 2px;
+	border-radius: 2px;
+}
+
+/* ── Error region ────────────────────────────────────────────────────────
+ * Sits between the fields and the modal's action band.
+ */
+.pltt-entry-form-error {
+	display: none;
+	margin: 12px 0 0;
+	padding: 8px 12px;
+	background-color: var(--pltt-bg-danger);
+	border-left: 3px solid var(--pltt-danger);
+	color: var(--pltt-danger-text);
+	font-size: 13px;
+}
+
+.pltt-entry-form-error.is-visible {
+	display: block;
+}
+
+/* "Saving…" in the action band. .pltt-modal-actions-right already carries
+   margin-left:auto, so this only needs its type treatment. */
+.pltt-modal-actions .pltt-form-status {
+	color: var(--pltt-text-subtle);
+	font-size: 12px;
+}
+
+@media screen and (max-width: 782px) {
+	.pltt-field-row-time .pltt-field-date,
+	.pltt-field-row-time .pltt-field-start,
+	.pltt-field-row-time .pltt-field-end,
+	.pltt-field-row-time .pltt-field-duration {
+		flex: 1 1 calc(50% - 12px);
+	}
+}

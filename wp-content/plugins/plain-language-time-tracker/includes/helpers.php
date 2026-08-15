@@ -1078,6 +1078,42 @@ function pltt_render_tag_badges( $tags ) {
 }
 
 /**
+ * Render the kebab that opens a row's action menu.
+ *
+ * Spec §6: one always-visible menu in the last column of every row, replacing
+ * WordPress's hover-revealed .row-actions. Hover actions are invisible until
+ * found, shift the row when they appear, and don't exist on touch.
+ *
+ * This renders only the trigger. The panel is a single page-wide element built
+ * by PlttRowMenu (assets/js/pltt-row-menu.js), which looks up an item builder
+ * by $type and hands it this button — so the builder reads whatever it needs
+ * out of $data.
+ *
+ * Three drawn dots rather than a glyph or a dashicon: at 3px they stay crisp,
+ * and they don't inherit the font quirks a "⋮" would.
+ *
+ * Requires the `pltt-row-menu` CSS + JS (enqueued on every PLTT screen).
+ *
+ * @param string $type  Row type — matches the type passed to PlttRowMenu.register().
+ * @param string $label Accessible name, e.g. "Actions for Updating the homepage".
+ * @param array  $data  Extra data- attributes, keyed without the prefix
+ *                      ( 'entry-id' => 12 renders data-entry-id="12" ).
+ */
+function pltt_render_row_menu_trigger( $type, $label, $data = array() ) {
+	$attrs = '';
+	foreach ( $data as $key => $value ) {
+		$attrs .= ' data-' . esc_attr( $key ) . '="' . esc_attr( $value ) . '"';
+	}
+
+	printf(
+		'<button type="button" class="pltt-row-menu-trigger" data-menu="%1$s" aria-expanded="false" aria-label="%2$s"%3$s><i></i><i></i><i></i></button>',
+		esc_attr( $type ),
+		esc_attr( $label ),
+		$attrs // phpcs:ignore WordPress.Security.EscapeOutput -- each key and value escaped above.
+	);
+}
+
+/**
  * Render an ⓘ that reveals a sentence on hover or focus.
  *
  * For things you read once and never again — how a filter is scoped, what will
@@ -1488,6 +1524,12 @@ function pltt_render_entry_table( $entries, $options = array() ) {
 	// of actions. Until a second concrete use exists, it stays billing-specific.
 	$billing_select = ! empty( $options['billing_select'] );
 
+	// Row action menu (spec §6) — a trailing kebab on every row, holding edit,
+	// tags, billable, "go to the day's log" and delete. Opt-in because the same
+	// renderer draws read-only tables (the billing manifest, a committed
+	// record's coverage) where acting on a row isn't offered.
+	$row_menu = ! empty( $options['row_menu'] );
+
 	// Coverage — an entry is "covered" when a committed bill record froze its ID
 	// into billing_record_entries. That is the ONLY source for billed state; the
 	// legacy per-entry `billed` flag was a manual tick nothing verified, and it
@@ -1570,6 +1612,9 @@ function pltt_render_entry_table( $entries, $options = array() ) {
 				<?php endif; ?>
 				<?php if ( $show_amount ) : ?>
 					<th class="pltt-amount-col"><?php esc_html_e( 'Amount', 'plain-language-time-tracker' ); ?></th>
+				<?php endif; ?>
+				<?php if ( $row_menu ) : ?>
+					<th class="pltt-rowmenu-col"><span class="screen-reader-text"><?php esc_html_e( 'Actions', 'plain-language-time-tracker' ); ?></span></th>
 				<?php endif; ?>
 			</tr>
 		</thead>
@@ -1743,6 +1788,32 @@ function pltt_render_entry_table( $entries, $options = array() ) {
 						}
 						?>
 						<td class="pltt-duration-cell pltt-amount-col"><?php echo $billable_amount > 0 ? esc_html( pltt_format_currency( $billable_amount ) ) : '<span class="pltt-empty">—</span>'; ?></td>
+					<?php endif; ?>
+					<?php if ( $row_menu ) : ?>
+						<td class="pltt-rowmenu-col">
+							<?php
+							// The builder decides which items apply from these: whether
+							// the per-entry billable flag is even in play for this
+							// project, and whether a committed record has frozen the
+							// entry (both of which take the billable item away).
+							//
+							// No day-log link is passed. Spec §6 lists "Go to [date]
+							// log" on this menu, but the day header's date is already
+							// that link a few rows up — see spec §7, which put it there.
+							pltt_render_row_menu_trigger(
+								'entry',
+								/* translators: %s: entry description. */
+								sprintf( __( 'Actions for %s', 'plain-language-time-tracker' ), $entry->description ),
+								array(
+									'entry-id'         => $entry_id_int,
+									'date'             => $entry->entry_date,
+									'billable'         => $is_billable ? '1' : '0',
+									'billable-applies' => pltt_billable_flag_applies( $project ) ? '1' : '0',
+									'covered'          => $is_covered ? '1' : '0',
+								)
+							);
+							?>
+						</td>
 					<?php endif; ?>
 				</tr>
 			<?php endforeach; ?>

@@ -114,8 +114,16 @@ const PLTT = {
 	showModal: function( modalId ) {
 		const modal = document.getElementById( modalId );
 		if ( modal ) {
-			// Store the element that had focus before modal opened
-			modal.dataset.previousFocus = document.activeElement ? document.activeElement.id || '' : '';
+			// Remember the element that had focus, as the element. This used to
+			// store its id, which meant focus only ever came back to triggers
+			// that happened to have one — a per-row kebab doesn't, and neither
+			// does most of what opens a modal.
+			modal._plttPreviousFocus = document.activeElement;
+
+			// Stack order, for the Escape handler below: modals can open over
+			// each other, and Escape should only close the one on top.
+			PLTT._modalOpenSeq = ( PLTT._modalOpenSeq || 0 ) + 1;
+			modal._plttOpenSeq = PLTT._modalOpenSeq;
 
 			modal.classList.remove( 'pltt-hidden' );
 
@@ -185,13 +193,13 @@ const PLTT = {
 		if ( modal ) {
 			modal.classList.add( 'pltt-hidden' );
 
-			// Return focus to element that had focus before modal opened
-			if ( modal.dataset.previousFocus ) {
-				const previousElement = document.getElementById( modal.dataset.previousFocus );
-				if ( previousElement ) {
-					previousElement.focus();
-				}
+			// Return focus to whatever opened it, as long as that element is
+			// still on the page — a saved row can be replaced out from under us.
+			const previousElement = modal._plttPreviousFocus;
+			if ( previousElement && previousElement.isConnected && previousElement.focus ) {
+				previousElement.focus();
 			}
+			modal._plttPreviousFocus = null;
 
 			// Clear inputs.
 			modal.querySelectorAll( 'input[type="text"]' ).forEach( input => {
@@ -281,6 +289,135 @@ const PLTT = {
 		url.searchParams.delete( 'pltt_error' );
 		url.searchParams.delete( 'pltt_error_message' );
 		window.history.replaceState( {}, '', url.toString() );
+	},
+
+	/**
+	 * Wire the shared "Add New Tag" modal (templates/partials/tag-modal.php) to a
+	 * screen's tag pickers, and return the opener to hand PlttTagPicker as its
+	 * onAddNew callback.
+	 *
+	 * Every screen enumerates its pickers differently — an array on the review
+	 * and Overview tables, a per-form-row WeakMap on the inline editor — so the
+	 * caller supplies getPickers rather than registering each one here. The new
+	 * tag is offered to all of them and auto-selected only in the one that
+	 * opened the modal.
+	 *
+	 * No-ops when the modal isn't on the page, so a screen can call this
+	 * unconditionally.
+	 *
+	 * Safe to call more than once per page, and the Overview does: the entries
+	 * table has a picker per row, and the edit modal has one of its own. Each
+	 * call adds a registration; the Create button is only ever bound once, or a
+	 * single click would create the tag as many times as there are callers.
+	 *
+	 * @param {Function} getPickers Returns the current array of PlttTagPicker instances.
+	 * @param {Function} onCreated  Optional; receives the new tag name after it saves.
+	 * @return {Function} Opener to pass as the picker's onAddNew callback.
+	 */
+	wireTagModal: function( getPickers, onCreated ) {
+		PLTT._tagModal = PLTT._tagModal || { registrations: [], activePicker: null, bound: false };
+		const state = PLTT._tagModal;
+		state.registrations.push( { getPickers: getPickers, onCreated: onCreated } );
+
+		const groupSelect = document.getElementById( 'pltt-new-tag-group-select' );
+		const groupNew = document.getElementById( 'pltt-new-tag-group-new' );
+
+		/**
+		 * The group as typed: the select's value, or the free-text box when
+		 * "+ New group…" is chosen. Empty string means ungrouped.
+		 *
+		 * @return {string} Group name.
+		 */
+		const readGroup = function() {
+			if ( ! groupSelect ) {
+				return '';
+			}
+			if ( '__new__' === groupSelect.value ) {
+				return groupNew ? groupNew.value.trim() : '';
+			}
+			return groupSelect.value;
+		};
+
+		const resetGroup = function() {
+			if ( groupSelect ) {
+				groupSelect.value = '';
+			}
+			if ( groupNew ) {
+				groupNew.value = '';
+				groupNew.classList.add( 'pltt-hidden' );
+			}
+		};
+
+		const open = function( picker ) {
+			state.activePicker = picker;
+			resetGroup();
+			PLTT.showModal( 'pltt-tag-modal' );
+		};
+
+		const saveBtn = document.getElementById( 'pltt-save-tag' );
+		if ( ! saveBtn || state.bound ) {
+			return open;
+		}
+		state.bound = true;
+
+		if ( groupSelect && groupNew ) {
+			groupSelect.addEventListener( 'change', function() {
+				const isNew = '__new__' === groupSelect.value;
+				groupNew.classList.toggle( 'pltt-hidden', ! isNew );
+				if ( isNew ) {
+					groupNew.focus();
+				}
+			} );
+		}
+
+		saveBtn.addEventListener( 'click', function() {
+			const nameInput = document.getElementById( 'pltt-new-tag-name' );
+			const name = nameInput.value.trim();
+
+			if ( ! name ) {
+				alert( 'Please enter a tag name.' );
+				nameInput.focus();
+				return;
+			}
+
+			// Picking "+ New group…" and typing nothing means ungrouped, not a
+			// group named "" — readGroup() already collapses both to ''.
+			const group = readGroup();
+
+			saveBtn.disabled = true;
+
+			PLTT.ajax( 'pltt_create_tag', { tag_name: name, group_name: group }, function( response ) {
+				saveBtn.disabled = false;
+
+				if ( ! response.success || ! response.data.tag ) {
+					alert( response.data || 'Error creating tag.' );
+					return;
+				}
+
+				const tag = response.data.tag;
+				// Trust the server's group, not the form's: it normalizes and
+				// truncates, so this is what the tag will report on reload.
+				const savedGroup = response.data.group || '';
+
+				// Offer the tag to every picker on the page, and select it only
+				// in the one that opened the modal.
+				state.registrations.forEach( function( reg ) {
+					reg.getPickers().forEach( function( picker ) {
+						picker.addTagOption( tag, picker === state.activePicker, savedGroup );
+					} );
+					if ( reg.onCreated ) {
+						reg.onCreated( tag, savedGroup );
+					}
+				} );
+
+				PLTT.hideModal( 'pltt-tag-modal' );
+				nameInput.value = '';
+				resetGroup();
+				state.activePicker = null;
+			} );
+		} );
+
+		return open;
 	}
 };
 
@@ -326,14 +463,28 @@ document.addEventListener( 'DOMContentLoaded', function() {
 		} );
 	} );
 
-	// Close modals on Escape key.
+	// Close the top modal on Escape — the top one only.
+	//
+	// Modals stack now: the edit-entry modal's Client and Project fields both
+	// open a quick-add over it. Closing every open modal would mean Escaping out
+	// of "Add client" also threw away the entry edit underneath, which is not
+	// what Escape is for. The last one opened is the one on top, so the last
+	// match in document order isn't reliable — track opens instead.
 	document.addEventListener( 'keydown', function( e ) {
-		if ( e.key === 'Escape' ) {
-			document.querySelectorAll( '.pltt-modal' ).forEach( function( modal ) {
-				if ( modal.id && !modal.classList.contains( 'pltt-hidden' ) ) {
-					PLTT.hideModal( modal.id );
-				}
-			} );
+		if ( e.key !== 'Escape' ) {
+			return;
 		}
+		const open = Array.from( document.querySelectorAll( '.pltt-modal' ) )
+			.filter( function( modal ) {
+				return modal.id && ! modal.classList.contains( 'pltt-hidden' );
+			} );
+		if ( ! open.length ) {
+			return;
+		}
+		// Highest _plttOpenSeq wins; showModal stamps it.
+		open.sort( function( a, b ) {
+			return ( a._plttOpenSeq || 0 ) - ( b._plttOpenSeq || 0 );
+		} );
+		PLTT.hideModal( open[ open.length - 1 ].id );
 	} );
 } );

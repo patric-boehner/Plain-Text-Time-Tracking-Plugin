@@ -99,6 +99,7 @@ if ( ! empty( $ungrouped_tags ) ) {
 						<tr>
 							<th><?php esc_html_e( 'Tag', 'plain-language-time-tracker' ); ?></th>
 							<th><?php esc_html_e( 'Entries', 'plain-language-time-tracker' ); ?></th>
+							<th class="pltt-rowmenu-col"><span class="screen-reader-text"><?php esc_html_e( 'Actions', 'plain-language-time-tracker' ); ?></span></th>
 						</tr>
 					</thead>
 					<tbody>
@@ -106,12 +107,18 @@ if ( ! empty( $ungrouped_tags ) ) {
 							<tr data-tag-id="<?php echo esc_attr( $tag->id ); ?>" data-tag-name="<?php echo esc_attr( $tag->name ); ?>" data-tag-group="<?php echo esc_attr( $tag->group_name ?? '' ); ?>" data-keywords="<?php echo esc_attr( wp_json_encode( $keywords_by_tag[ $tag->id ] ?? array() ) ); ?>">
 								<td>
 									<span class="pltt-badge pltt-badge-tag"><?php echo esc_html( ucfirst( $tag->name ) ); ?></span>
-									<div class="row-actions">
-										<span class="edit"><a href="#rename" class="pltt-rename-tag" role="button"><?php esc_html_e( 'Rename', 'plain-language-time-tracker' ); ?></a> | </span>
-										<span class="trash"><a href="#delete" class="pltt-delete-tag submitdelete" role="button"><?php esc_html_e( 'Delete', 'plain-language-time-tracker' ); ?></a></span>
-									</div>
 								</td>
 								<td><?php echo esc_html( (int) $tag->usage_count ); ?></td>
+								<td class="pltt-rowmenu-col">
+									<?php
+									pltt_render_row_menu_trigger(
+										'tag',
+										/* translators: %s: tag name. */
+										sprintf( __( 'Actions for %s', 'plain-language-time-tracker' ), $tag->name ),
+										array( 'tag-id' => $tag->id )
+									);
+									?>
+								</td>
 							</tr>
 						<?php endforeach; ?>
 					</tbody>
@@ -263,38 +270,59 @@ if ( ! empty( $ungrouped_tags ) ) {
 		PLTT.showModal('pltt-tag-modal');
 	});
 
-	// Rename Tag links (row-actions).
-	document.querySelectorAll('.pltt-rename-tag').forEach(function(link) {
-		link.addEventListener('click', function(e) {
-			e.preventDefault();
-			var row = this.closest('tr');
-			document.getElementById('pltt-tag-modal-title').textContent = '<?php echo esc_js( __( 'Rename Tag', 'plain-language-time-tracker' ) ); ?>';
-			document.getElementById('pltt-tag-id').value = row.dataset.tagId;
-			document.getElementById('pltt-tag-name').value = row.dataset.tagName;
-			applyGroupToModal(row.dataset.tagGroup || '');
-			var renameTagChips = getTagChips();
-			if (renameTagChips) {
-				var tagKeywords = [];
-				try { tagKeywords = JSON.parse(row.dataset.keywords || '[]'); } catch (err) { tagKeywords = []; }
-				renameTagChips.setExisting(tagKeywords);
-			}
-			document.getElementById('pltt-tag-form-action').value = 'pltt_rename_tag';
-			PLTT.showModal('pltt-tag-modal');
-		});
-	});
+	// Open the Rename dialog on a row.
+	function renameTag(row) {
+		document.getElementById('pltt-tag-modal-title').textContent = '<?php echo esc_js( __( 'Rename Tag', 'plain-language-time-tracker' ) ); ?>';
+		document.getElementById('pltt-tag-id').value = row.dataset.tagId;
+		document.getElementById('pltt-tag-name').value = row.dataset.tagName;
+		applyGroupToModal(row.dataset.tagGroup || '');
+		var renameTagChips = getTagChips();
+		if (renameTagChips) {
+			var tagKeywords = [];
+			try { tagKeywords = JSON.parse(row.dataset.keywords || '[]'); } catch (err) { tagKeywords = []; }
+			renameTagChips.setExisting(tagKeywords);
+		}
+		document.getElementById('pltt-tag-form-action').value = 'pltt_rename_tag';
+		PLTT.showModal('pltt-tag-modal');
+	}
 
-	// Delete Tag links (row-actions).
-	document.querySelectorAll('.pltt-delete-tag').forEach(function(link) {
-		link.addEventListener('click', function(e) {
-			e.preventDefault();
-			if (!confirm('<?php echo esc_js( __( 'Delete this tag? This cannot be undone.', 'plain-language-time-tracker' ) ); ?>')) {
-				return;
-			}
-			var tagId = this.closest('tr').dataset.tagId;
-			document.getElementById('pltt-delete-tag-id').value = tagId;
-			document.getElementById('pltt-delete-tag-form').submit();
+	function deleteTag(row) {
+		document.getElementById('pltt-delete-tag-id').value = row.dataset.tagId;
+		document.getElementById('pltt-delete-tag-form').submit();
+	}
+
+	// Row menu (spec §6). Edit opens the dialog that also holds the tag's group
+	// and keywords, so it keeps the ellipsis.
+	//
+	// Deferred: this inline script runs during body parse, and pltt-row-menu.js
+	// is enqueued in the footer, so PlttRowMenu doesn't exist yet.
+	function registerTagRowMenu() {
+		if (typeof PlttRowMenu === 'undefined') {
+			return;
+		}
+		PlttRowMenu.register('tag', function(trigger) {
+			var row = trigger.closest('tr');
+			return [
+				{
+					label: '<?php echo esc_js( __( 'Edit tag…', 'plain-language-time-tracker' ) ); ?>',
+					kind: 'primary',
+					onSelect: function() { renameTag(row); }
+				},
+				{ kind: 'separator' },
+				{
+					label: '<?php echo esc_js( __( 'Delete tag', 'plain-language-time-tracker' ) ); ?>',
+					kind: 'destructive',
+					confirm: '<?php echo esc_js( __( 'Delete this tag? This cannot be undone.', 'plain-language-time-tracker' ) ); ?>',
+					onSelect: function() { deleteTag(row); }
+				}
+			];
 		});
-	});
+	}
+	if (document.readyState !== 'loading') {
+		registerTagRowMenu();
+	} else {
+		document.addEventListener('DOMContentLoaded', registerTagRowMenu);
+	}
 
 	// Final safety sync before form submit (covers focus quirks).
 	document.getElementById('pltt-tag-form').addEventListener('submit', syncGroupValue);

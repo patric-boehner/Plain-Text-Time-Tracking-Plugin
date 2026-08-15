@@ -26,6 +26,7 @@ class PLTT_Ajax {
 		add_action( 'wp_ajax_pltt_delete_daily_log', array( __CLASS__, 'delete_daily_log' ) );
 
 		// Entry operations.
+		add_action( 'wp_ajax_pltt_get_entry', array( __CLASS__, 'get_entry' ) );
 		add_action( 'wp_ajax_pltt_delete_entry', array( __CLASS__, 'delete_entry' ) );
 		add_action( 'wp_ajax_pltt_update_entry_field', array( __CLASS__, 'update_entry_field' ) );
 		add_action( 'wp_ajax_pltt_save_entry', array( __CLASS__, 'save_entry' ) );
@@ -382,6 +383,83 @@ class PLTT_Ajax {
 	}
 
 	/**
+	 * Describe one entry for the edit modal and for repainting its row.
+	 *
+	 * The modal is a single element shared by every row on the page, so it can't
+	 * be pre-filled server-side the way the old per-row form was — it asks for
+	 * the entry when it opens. The same shape comes back from save_entry(), so
+	 * the JS reads one payload whether it's populating the form or repainting
+	 * the row afterwards.
+	 *
+	 * Tags come from the junction table, not the entries.tags column, matching
+	 * what pltt_render_entry_table() displays.
+	 *
+	 * @param object $entry Row from PLTT_Entries::get().
+	 * @return array Payload for the browser.
+	 */
+	private static function entry_payload( $entry ) {
+		$entry_id = (int) $entry->id;
+		$project  = ! empty( $entry->project_id ) ? PLTT_Projects::get( (int) $entry->project_id ) : null;
+
+		$tags_by_entry = PLTT_Tags::get_for_entries( array( $entry_id ) );
+		$tags          = $tags_by_entry[ $entry_id ] ?? array();
+
+		return array(
+			'id'               => $entry_id,
+			'entry_date'       => $entry->entry_date,
+			// The <input type="time"> controls are HH:MM; the column is HH:MM:SS.
+			'start_time'       => substr( (string) $entry->start_time, 0, 5 ),
+			'end_time'         => substr( (string) $entry->end_time, 0, 5 ),
+			// The Time cell as pltt_render_entry_table() writes it — 12-hour and
+			// localized, which the form's 24-hour values are not. Formatted here
+			// so a repainted cell can't read differently from a reloaded one.
+			'time_display'     => pltt_format_time( $entry->start_time )
+				. ( $entry->end_time ? ' - ' . pltt_format_time( $entry->end_time ) : '' ),
+			'duration_minutes' => (int) $entry->duration_minutes,
+			'description'      => $entry->description,
+			'client_id'        => (int) $entry->client_id,
+			'project_id'       => (int) $entry->project_id,
+			'tags'             => array_values( $tags ),
+			'billable'         => ! empty( $entry->billable ) ? 1 : 0,
+			// Whether the per-entry billable control applies at all — hidden for
+			// retainer / fixed-fee, which bill at the period level. Answered here
+			// so the modal can settle that field before it opens rather than
+			// after the projects request lands.
+			'billable_applies' => pltt_billable_flag_applies( $project ) ? 1 : 0,
+		);
+		// Deliberately not here: the client and project names, the billable
+		// amount, and whether a bill record covers the entry. Nothing reads them
+		// — a change to any of those reloads the page rather than repainting the
+		// row (see save_entry) — and the coverage check alone read every covered
+		// entry ID in the database to answer a question about one row.
+	}
+
+	/**
+	 * Fetch one entry for the edit modal.
+	 */
+	public static function get_entry() {
+		if ( ! self::verify_request() ) {
+			return;
+		}
+
+		$entry_id = isset( $_POST['entry_id'] ) ? absint( $_POST['entry_id'] ) : 0;
+
+		if ( empty( $entry_id ) ) {
+			wp_send_json_error( __( 'Invalid entry ID.', 'plain-language-time-tracker' ) );
+			return;
+		}
+
+		$entry = PLTT_Entries::get( $entry_id );
+
+		if ( ! $entry ) {
+			wp_send_json_error( __( 'Entry not found.', 'plain-language-time-tracker' ) );
+			return;
+		}
+
+		wp_send_json_success( array( 'entry' => self::entry_payload( $entry ) ) );
+	}
+
+	/**
 	 * Delete a time entry.
 	 */
 	public static function delete_entry() {
@@ -594,6 +672,10 @@ class PLTT_Ajax {
 		$tag_name = isset( $_POST['tag_name'] ) ? sanitize_text_field( wp_unslash( $_POST['tag_name'] ) ) : '';
 		$tag_name = strtolower( trim( $tag_name ) );
 
+		// Optional. PLTT_Tags::create() trims and caps this at 100 chars, and
+		// treats '' as ungrouped, so no length check is needed here.
+		$group_name = isset( $_POST['group_name'] ) ? sanitize_text_field( wp_unslash( $_POST['group_name'] ) ) : '';
+
 		if ( empty( $tag_name ) ) {
 			wp_send_json_error( __( 'Tag name is required.', 'plain-language-time-tracker' ) );
 			return;
@@ -612,10 +694,18 @@ class PLTT_Ajax {
 			return;
 		}
 
-		$result = PLTT_Tags::create( $tag_name );
+		$result = PLTT_Tags::create( $tag_name, $group_name );
 
 		if ( $result ) {
-			wp_send_json_success( array( 'tag' => $tag_name ) );
+			// Echo the stored group back (normalized/truncated by create()) so the
+			// picker files the tag under the same header a reload would give it.
+			$stored = PLTT_Tags::get_by_name( $tag_name );
+			wp_send_json_success(
+				array(
+					'tag'   => $tag_name,
+					'group' => ( $stored && ! empty( $stored->group_name ) ) ? $stored->group_name : '',
+				)
+			);
 		} else {
 			wp_send_json_error( __( 'Failed to create tag.', 'plain-language-time-tracker' ) );
 		}
@@ -734,17 +824,46 @@ class PLTT_Ajax {
 			return;
 		}
 
-		// Render the updated row as HTML so the JS can swap it in without a page reload.
 		$saved_entry = PLTT_Entries::get( $entry_id );
+
+		// Two callers, two row shapes. The Day view's compact row is 4-or-5
+		// columns from entries-editor.php, so it takes the server-rendered
+		// markup. The Overview's row is 8 columns from pltt_render_entry_table()
+		// and repaints itself from the payload instead — cheaper than teaching
+		// one renderer both shapes.
+		// The Day view's Billable column disappears on an all-retainer day, so the
+		// caller says whether its table has one. Absent (the Overview, which
+		// ignores row_html) it doesn't matter either way.
+		$show_billable_col = isset( $_POST['show_billable_col'] ) && '1' === (string) $_POST['show_billable_col'];
+
 		ob_start();
-		PLTT_Review::render_entry_row( $saved_entry );
+		PLTT_Review::render_entry_row( $saved_entry, $show_billable_col );
 		$row_html = ob_get_clean();
+
+		// Whether anything outside the row itself moved. Description, tags and a
+		// time shift that leaves the length alone only change what the row says,
+		// so the caller can repaint it in place.
+		//
+		// Everything else reaches past the row. Both screens group entries by date
+		// and print day totals; the Overview also filters by client, project and
+		// billing state and carries summary cards. Change any of those and the
+		// entry can end up in a list it no longer belongs to, under a total that
+		// no longer adds up. One reload is honest; five partial repaints are not.
+		$requires_reload = (
+			$existing->entry_date !== $saved_entry->entry_date
+			|| (int) $existing->client_id !== (int) $saved_entry->client_id
+			|| (int) $existing->project_id !== (int) $saved_entry->project_id
+			|| (int) $existing->billable !== (int) $saved_entry->billable
+			|| (int) $existing->duration_minutes !== (int) $saved_entry->duration_minutes
+		);
 
 		wp_send_json_success(
 			array(
-				'message'  => __( 'Saved.', 'plain-language-time-tracker' ),
-				'entry_id' => (int) $entry_id,
-				'row_html' => $row_html,
+				'message'         => __( 'Saved.', 'plain-language-time-tracker' ),
+				'entry_id'        => (int) $entry_id,
+				'row_html'        => $row_html,
+				'entry'           => self::entry_payload( $saved_entry ),
+				'requires_reload' => $requires_reload,
 			)
 		);
 	}

@@ -377,6 +377,25 @@ class PLTT_Admin {
 			true
 		);
 
+		// PlttRowMenu — global for the same reason as the tooltip above. Spec §6
+		// puts the row kebab on Entries, Clients, Projects, Billing history and
+		// Today, and pltt_render_row_menu_trigger() can be dropped into any table;
+		// a trigger rendering without its stylesheet is exactly the bug the
+		// tooltip note describes.
+		wp_enqueue_style(
+			'pltt-row-menu',
+			PLTT_PLUGIN_URL . 'assets/css/pltt-row-menu.css',
+			array( 'pltt-admin' ),
+			$version
+		);
+		wp_enqueue_script(
+			'pltt-row-menu',
+			PLTT_PLUGIN_URL . 'assets/js/pltt-row-menu.js',
+			array(),
+			$version,
+			true
+		);
+
 		// Shared JS utilities.
 		wp_enqueue_script(
 			'pltt-shared',
@@ -403,6 +422,10 @@ class PLTT_Admin {
 					'error'      => __( 'Error', 'plain-language-time-tracker' ),
 					'confirm'    => __( 'Are you sure?', 'plain-language-time-tracker' ),
 					'processing' => __( 'Processing...', 'plain-language-time-tracker' ),
+					// Label for the × shared.js injects into every modal. It has been
+					// reading this key all along and falling back to an untranslated
+					// hardcoded string, because nothing ever defined it.
+					'close'      => __( 'Close', 'plain-language-time-tracker' ),
 					// Status-column badges rebuilt client-side when the billable
 					// toggle flips. Must match pltt_render_entry_table()'s markup in
 					// includes/helpers.php — the two states a toggleable row can reach.
@@ -441,13 +464,38 @@ class PLTT_Admin {
 		// Page-specific assets.
 
 		// Shared project billing-type picker: the Projects-page modal and the
-		// entry-editor "Add project" quick-add (Today / review) both drive
-		// project-billing-fields.php with it. Strings come from plttData (pltt-shared).
-		if ( 'time-tracker_page_pltt-projects' === $hook || 'toplevel_page_pltt-time-tracker' === $hook ) {
+		// entry-editor "Add project" quick-add both drive project-billing-fields.php
+		// with it. Strings come from plttData (pltt-shared). The Overview is on this
+		// list because the edit modal opens there too, and its Project select offers
+		// the same "+ Add new project…".
+		if ( 'time-tracker_page_pltt-projects' === $hook
+			|| 'toplevel_page_pltt-time-tracker' === $hook
+			|| 'time-tracker_page_pltt-reports' === $hook ) {
 			wp_enqueue_script(
 				'pltt-project-type-picker',
 				PLTT_PLUGIN_URL . 'assets/js/project-type-picker.js',
 				array( 'pltt-shared' ),
+				$version,
+				true
+			);
+		}
+
+		// The shared "edit entry" modal (templates/partials/entry-edit-modal.php).
+		// Both screens that list recorded entries open it: the Overview's entries
+		// table and Today. The stylesheet also carries the form's layout, which
+		// used to live in review.css — Today's still-inline form reads it from here.
+		if ( 'toplevel_page_pltt-time-tracker' === $hook
+			|| 'time-tracker_page_pltt-reports' === $hook ) {
+			wp_enqueue_style(
+				'pltt-entry-editor',
+				PLTT_PLUGIN_URL . 'assets/css/entry-editor.css',
+				array( 'pltt-admin' ),
+				$version
+			);
+			wp_enqueue_script(
+				'pltt-entry-editor',
+				PLTT_PLUGIN_URL . 'assets/js/pltt-entry-editor.js',
+				array( 'pltt-shared', 'pltt-tag-picker' ),
 				$version,
 				true
 			);

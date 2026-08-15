@@ -124,43 +124,91 @@ if ( ! isset( $clients ) ) {
 		});
 	}
 
-	// Edit Project triggers — the row action on the list, the Settings button on
-	// project detail. Both read the project from the nearest [data-project-id]
-	// carrier, so neither screen needs its own copy of this.
+	// Open the Edit dialog for whichever project the given element sits inside.
+	// Everything is read from the nearest [data-project-id] carrier, so no screen
+	// needs its own copy of this — the Projects list reaches it through a row
+	// menu, project detail through its Settings button.
+	function openProjectEditor(from) {
+		var row = from.closest('[data-project-id]');
+		if (!row) return;
+		var isArchived = row.dataset.status === 'archived';
+		var isDeletable = row.dataset.entryCount === '0';
+		el('pltt-project-modal-title').textContent = '<?php echo esc_js( __( 'Edit Project', 'plain-language-time-tracker' ) ); ?>';
+		el('pltt-edit-project-id').value = row.dataset.projectId;
+		el('pltt-project-client').value = row.dataset.clientId;
+		el('pltt-project-name').value = row.dataset.name;
+		el('pltt-project-rate').value = row.dataset.rate || '';
+		el('pltt-project-recurring-period').value = row.dataset.recurringPeriod || '';
+		el('pltt-project-budget-hours').value = row.dataset.budgetHours || '';
+		el('pltt-project-budget-fee').value = row.dataset.budgetFee || '';
+		// Set the type (and its field UI) after the budget values are in place, so
+		// fixed-fee can infer hours-vs-fee mode from the populated inputs.
+		PlttProjectType.select(row.dataset.billingType || 'hourly', false);
+		el('pltt-project-non-billable').checked = row.dataset.billabilityDefault === '0';
+
+		el('pltt-project-status-group').classList.remove('pltt-hidden');
+		el('pltt-project-status').value = isArchived ? 'archived' : 'active';
+
+		var deleteBtn = el('pltt-delete-project-btn');
+		if (isDeletable) {
+			deleteBtn.classList.add('visible');
+		} else {
+			deleteBtn.classList.remove('visible');
+		}
+
+		el('pltt-project-form-action').value = 'pltt_update_project';
+		PLTT.showModal('pltt-project-modal');
+	}
+
+	// Project detail's Settings button still carries this class.
 	document.querySelectorAll('.pltt-edit-project').forEach(function(link) {
 		link.addEventListener('click', function(e) {
 			e.preventDefault();
-			var row = this.closest('[data-project-id]');
-			if (!row) return;
-			var isArchived = row.dataset.status === 'archived';
-			var isDeletable = row.dataset.entryCount === '0';
-			el('pltt-project-modal-title').textContent = '<?php echo esc_js( __( 'Edit Project', 'plain-language-time-tracker' ) ); ?>';
-			el('pltt-edit-project-id').value = row.dataset.projectId;
-			el('pltt-project-client').value = row.dataset.clientId;
-			el('pltt-project-name').value = row.dataset.name;
-			el('pltt-project-rate').value = row.dataset.rate || '';
-			el('pltt-project-recurring-period').value = row.dataset.recurringPeriod || '';
-			el('pltt-project-budget-hours').value = row.dataset.budgetHours || '';
-			el('pltt-project-budget-fee').value = row.dataset.budgetFee || '';
-			// Set the type (and its field UI) after the budget values are in place, so
-			// fixed-fee can infer hours-vs-fee mode from the populated inputs.
-			PlttProjectType.select(row.dataset.billingType || 'hourly', false);
-			el('pltt-project-non-billable').checked = row.dataset.billabilityDefault === '0';
-
-			el('pltt-project-status-group').classList.remove('pltt-hidden');
-			el('pltt-project-status').value = isArchived ? 'archived' : 'active';
-
-			var deleteBtn = el('pltt-delete-project-btn');
-			if (isDeletable) {
-				deleteBtn.classList.add('visible');
-			} else {
-				deleteBtn.classList.remove('visible');
-			}
-
-			el('pltt-project-form-action').value = 'pltt_update_project';
-			PLTT.showModal('pltt-project-modal');
+			openProjectEditor(this);
 		});
 	});
+
+	// Row menu on the Projects list (spec §6). One item: the project name is
+	// already the link to its detail page, and both Delete and Archive live
+	// inside the dialog this opens, where there's enough context to use them.
+	//
+	// Deferred: this inline script runs during body parse, and pltt-row-menu.js
+	// is enqueued in the footer, so PlttRowMenu doesn't exist yet.
+	function registerProjectRowMenu() {
+		if (typeof PlttRowMenu === 'undefined') {
+			return;
+		}
+		PlttRowMenu.register('project', function(trigger) {
+			var items = [];
+
+			// View sits above Edit here, against the usual edit-first order: a
+			// project's detail page is its report, and reading it is what you
+			// open this list to do. Editing one is the occasional errand.
+			//
+			// Absent on project detail, where the Settings button uses this same
+			// dialog and there's nowhere left to navigate to.
+			if (trigger.dataset.viewUrl) {
+				items.push({
+					label: '<?php echo esc_js( __( 'View project', 'plain-language-time-tracker' ) ); ?>',
+					kind: 'primary',
+					href: trigger.dataset.viewUrl
+				});
+			}
+
+			items.push({
+				label: '<?php echo esc_js( __( 'Edit project…', 'plain-language-time-tracker' ) ); ?>',
+				kind: items.length ? 'normal' : 'primary',
+				onSelect: function() { openProjectEditor(trigger); }
+			});
+
+			return items;
+		});
+	}
+	if (document.readyState !== 'loading') {
+		registerProjectRowMenu();
+	} else {
+		document.addEventListener('DOMContentLoaded', registerProjectRowMenu);
+	}
 
 	// Confirm archive when the project still has unbilled billable time.
 	// Returns true if the user confirms (or if no confirmation is needed).

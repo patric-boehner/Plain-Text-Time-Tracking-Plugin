@@ -90,6 +90,7 @@ if ( ! empty( $clients ) ) {
 					<th><?php esc_html_e( 'Name', 'plain-language-time-tracker' ); ?></th>
 					<th><?php esc_html_e( 'Rate', 'plain-language-time-tracker' ); ?></th>
 					<th><?php esc_html_e( 'Projects', 'plain-language-time-tracker' ); ?></th>
+					<th class="pltt-rowmenu-col"><span class="screen-reader-text"><?php esc_html_e( 'Actions', 'plain-language-time-tracker' ); ?></span></th>
 				</tr>
 			</thead>
 			<tbody id="pltt-clients-list">
@@ -118,17 +119,15 @@ if ( ! empty( $clients ) ) {
 					?>
 					<tr data-client-id="<?php echo esc_attr( $client->id ); ?>" data-name="<?php echo esc_attr( $client->name ); ?>" data-description="<?php echo esc_attr( $client->description ); ?>" data-rate="<?php echo esc_attr( $client->hourly_rate ?? '' ); ?>" data-projects-count="<?php echo esc_attr( $client_proj_count ); ?>" data-entry-count="<?php echo esc_attr( $client_entry_count ); ?>" data-aliases="<?php echo esc_attr( wp_json_encode( $aliases_by_client[ $client->id ] ?? array() ) ); ?>">
 						<td>
-							<strong><?php echo esc_html( $client->name ); ?></strong>
+							<?php
+							// Spec §6 rule 1: the name is the link. It goes where the
+							// trailing "View" used to — this client's entries — so the
+							// menu doesn't repeat it.
+							?>
+							<a class="pltt-row-link" href="<?php echo esc_url( $view_url ); ?>"><?php echo esc_html( $client->name ); ?></a>
 							<?php if ( $client->description ) : ?>
 								<br><small class="description"><?php echo esc_html( $client->description ); ?></small>
 							<?php endif; ?>
-							<div class="row-actions">
-								<span class="edit"><a href="#edit" class="pltt-edit-client" role="button"><?php esc_html_e( 'Edit', 'plain-language-time-tracker' ); ?></a> | </span>
-								<?php if ( $client_deletable ) : ?>
-									<span class="trash"><a href="#delete" class="pltt-delete-client submitdelete" role="button"><?php esc_html_e( 'Delete', 'plain-language-time-tracker' ); ?></a> | </span>
-								<?php endif; ?>
-								<span class="view"><a href="<?php echo esc_url( $view_url ); ?>"><?php esc_html_e( 'View', 'plain-language-time-tracker' ); ?></a></span>
-							</div>
 						</td>
 						<td><?php
 						if ( null !== $client->hourly_rate ) {
@@ -140,6 +139,27 @@ if ( ! empty( $clients ) ) {
 						}
 					?></td>
 						<td><?php echo esc_html( $client_proj_count ); ?></td>
+						<td class="pltt-rowmenu-col">
+							<?php
+							pltt_render_row_menu_trigger(
+								'client',
+								/* translators: %s: client name. */
+								sprintf( __( 'Actions for %s', 'plain-language-time-tracker' ), $client->name ),
+								array(
+									'client-id' => $client->id,
+									// A client with projects or entries behind it can't be
+									// deleted; the menu leaves the item out rather than
+									// offering an action that would be refused.
+									'deletable' => $client_deletable ? '1' : '0',
+									// Same destination the name links to. The menu repeats
+									// it deliberately — it's where you look for what can be
+									// done to a row, and an inventory with a gap in it
+									// sends you hunting for the rest.
+									'view-url'  => $view_url,
+								)
+							);
+							?>
+						</td>
 					</tr>
 				<?php endforeach; ?>
 			</tbody>
@@ -234,46 +254,77 @@ if ( ! empty( $clients ) ) {
 		PLTT.showModal('pltt-client-modal');
 	});
 
-	// Edit Client links (row-actions).
-	document.querySelectorAll('.pltt-edit-client').forEach(function(link) {
-		link.addEventListener('click', function(e) {
-			e.preventDefault();
-			var row = this.closest('tr');
-			var isDeletable = row.dataset.projectsCount === '0' && row.dataset.entryCount === '0';
-			document.getElementById('pltt-client-modal-title').textContent = '<?php echo esc_js( __( 'Edit Client', 'plain-language-time-tracker' ) ); ?>';
-			document.getElementById('pltt-edit-client-id').value = row.dataset.clientId;
-			document.getElementById('pltt-client-name').value = row.dataset.name;
-			document.getElementById('pltt-client-description').value = row.dataset.description || '';
-			document.getElementById('pltt-client-rate').value = row.dataset.rate || '';
-			var editClientChips = getClientChips();
-			if (editClientChips) {
-				var clientAliases = [];
-				try { clientAliases = JSON.parse(row.dataset.aliases || '[]'); } catch (err) { clientAliases = []; }
-				editClientChips.setExisting(clientAliases);
-			}
-			var deleteBtn = document.getElementById('pltt-delete-client-btn');
-			if (isDeletable) {
-				deleteBtn.classList.add('visible');
-			} else {
-				deleteBtn.classList.remove('visible');
-			}
-			document.getElementById('pltt-client-form-action').value = 'pltt_update_client';
-			PLTT.showModal('pltt-client-modal');
-		});
-	});
+	// Open the Edit dialog on a row.
+	function editClient(row) {
+		var isDeletable = row.dataset.projectsCount === '0' && row.dataset.entryCount === '0';
+		document.getElementById('pltt-client-modal-title').textContent = '<?php echo esc_js( __( 'Edit Client', 'plain-language-time-tracker' ) ); ?>';
+		document.getElementById('pltt-edit-client-id').value = row.dataset.clientId;
+		document.getElementById('pltt-client-name').value = row.dataset.name;
+		document.getElementById('pltt-client-description').value = row.dataset.description || '';
+		document.getElementById('pltt-client-rate').value = row.dataset.rate || '';
+		var editClientChips = getClientChips();
+		if (editClientChips) {
+			var clientAliases = [];
+			try { clientAliases = JSON.parse(row.dataset.aliases || '[]'); } catch (err) { clientAliases = []; }
+			editClientChips.setExisting(clientAliases);
+		}
+		var deleteBtn = document.getElementById('pltt-delete-client-btn');
+		if (isDeletable) {
+			deleteBtn.classList.add('visible');
+		} else {
+			deleteBtn.classList.remove('visible');
+		}
+		document.getElementById('pltt-client-form-action').value = 'pltt_update_client';
+		PLTT.showModal('pltt-client-modal');
+	}
 
-	// Delete Client links (row-actions).
-	document.querySelectorAll('.pltt-delete-client').forEach(function(link) {
-		link.addEventListener('click', function(e) {
-			e.preventDefault();
-			if (!confirm('<?php echo esc_js( __( 'Delete this client? This cannot be undone.', 'plain-language-time-tracker' ) ); ?>')) {
-				return;
+	function deleteClient(row) {
+		document.getElementById('pltt-delete-client-id').value = row.dataset.clientId;
+		document.getElementById('pltt-delete-client-form').submit();
+	}
+
+	// Row menu (spec §6). "View entries" isn't here — the client's name is that
+	// link. Delete only appears on a client nothing points at.
+	//
+	// Deferred: this inline script runs during body parse, and pltt-row-menu.js
+	// is enqueued in the footer, so PlttRowMenu doesn't exist yet.
+	function registerClientRowMenu() {
+		if (typeof PlttRowMenu === 'undefined') {
+			return;
+		}
+		PlttRowMenu.register('client', function(trigger) {
+			var row = trigger.closest('tr');
+			var items = [{
+				label: '<?php echo esc_js( __( 'Edit client…', 'plain-language-time-tracker' ) ); ?>',
+				kind: 'primary',
+				onSelect: function() { editClient(row); }
+			}];
+
+			if (trigger.dataset.viewUrl) {
+				items.push({
+					label: '<?php echo esc_js( __( 'View entries', 'plain-language-time-tracker' ) ); ?>',
+					href: trigger.dataset.viewUrl
+				});
 			}
-			var row = this.closest('tr');
-			document.getElementById('pltt-delete-client-id').value = row.dataset.clientId;
-			document.getElementById('pltt-delete-client-form').submit();
+
+			if (trigger.dataset.deletable === '1') {
+				items.push({ kind: 'separator' });
+				items.push({
+					label: '<?php echo esc_js( __( 'Delete client', 'plain-language-time-tracker' ) ); ?>',
+					kind: 'destructive',
+					confirm: '<?php echo esc_js( __( 'Delete this client? This cannot be undone.', 'plain-language-time-tracker' ) ); ?>',
+					onSelect: function() { deleteClient(row); }
+				});
+			}
+
+			return items;
 		});
-	});
+	}
+	if (document.readyState !== 'loading') {
+		registerClientRowMenu();
+	} else {
+		document.addEventListener('DOMContentLoaded', registerClientRowMenu);
+	}
 
 	// Client form submission.
 	document.getElementById('pltt-client-form').addEventListener('submit', function(e) {

@@ -1,12 +1,18 @@
 <?php
 /**
- * Editable entries list: compact rows + expandable per-row edit form.
+ * Recorded entries list: one compact row each, with a kebab holding the row's
+ * actions (spec §6).
+ *
+ * Editing happens in the shared modal (entry-edit-modal.php + pltt-entry-editor.js),
+ * opened from the kebab. This used to render a hidden edit form beneath every
+ * row and reveal it in place, reached through hover row-actions; both are gone.
  *
  * Shared by the review screen (editing-existing state) and the Daily Log
- * (Today) inline editor. Renders the `#pltt-entries-tbody` table that review.js
- * IIFE 2 binds to; the caller is responsible for the three create-modals
- * (entry-editor-modals.php), the `plttAllTags` / `plttTagGroups` globals, the
- * `#pltt-entry-date` hidden input, and any surrounding footer/back links.
+ * (Today). Renders the `#pltt-entries-tbody` table that review.js binds to; the
+ * caller is responsible for the edit modal and the three create-modals
+ * (entry-edit-modal.php, entry-editor-modals.php), the `plttAllTags` /
+ * `plttTagGroups` globals, the `#pltt-entry-date` hidden input, and any
+ * surrounding footer/back links.
  *
  * @package PlainLanguageTimeTracker
  *
@@ -35,8 +41,8 @@ $row_clients_cache  = PLTT_Clients::get_multiple( array_unique( $entry_client_id
 $row_projects_cache = PLTT_Projects::get_multiple( array_unique( $entry_project_ids ) );
 
 // Compact-row columns: Date/Time, Duration, Description, Tags (+ Billable when at
-// least one entry's project uses the per-entry flag — hourly). All-retainer/
-// fixed-fee lists drop the Billable column.
+// least one entry's project uses the per-entry flag — hourly), then the kebab.
+// All-retainer/fixed-fee lists drop the Billable column.
 $show_billable_col = false;
 foreach ( $entries as $e ) {
 	$p = ! empty( $e['project_id'] ) && isset( $row_projects_cache[ (int) $e['project_id'] ] ) ? $row_projects_cache[ (int) $e['project_id'] ] : null;
@@ -45,7 +51,6 @@ foreach ( $entries as $e ) {
 		break;
 	}
 }
-$colspan = $show_billable_col ? 5 : 4;
 ?>
 
 <table class="pltt-entries-table widefat">
@@ -58,6 +63,7 @@ $colspan = $show_billable_col ? 5 : 4;
 			<?php if ( $show_billable_col ) : ?>
 				<th class="pltt-col-billable"><?php esc_html_e( 'Billable', 'plain-language-time-tracker' ); ?></th>
 			<?php endif; ?>
+			<th class="pltt-rowmenu-col"><span class="screen-reader-text"><?php esc_html_e( 'Actions', 'plain-language-time-tracker' ); ?></span></th>
 		</tr>
 	</thead>
 	<tbody id="pltt-entries-tbody">
@@ -79,10 +85,6 @@ $colspan = $show_billable_col ? 5 : 4;
 							}
 							?>
 						</span>
-						<div class="row-actions">
-							<span class="edit"><a href="#edit" class="pltt-edit-entry" role="button"><?php esc_html_e( 'Edit', 'plain-language-time-tracker' ); ?></a> | </span>
-							<span class="trash"><a href="#delete" class="pltt-delete-entry submitdelete" role="button"><?php esc_html_e( 'Delete', 'plain-language-time-tracker' ); ?></a></span>
-						</div>
 					</div>
 				</td>
 				<td class="pltt-duration-cell">
@@ -121,13 +123,24 @@ $colspan = $show_billable_col ? 5 : 4;
 						<?php endif; ?>
 					</td>
 				<?php endif; ?>
+				<td class="pltt-rowmenu-col">
+					<?php
+					// No "Go to [date] log" here — this screen IS the day's log. A
+					// menu item pointing at the page you're on is noise.
+					pltt_render_row_menu_trigger(
+						'entry',
+						/* translators: %s: entry description. */
+						sprintf( __( 'Actions for %s', 'plain-language-time-tracker' ), $entry['description'] ?? '' ),
+						array(
+							'entry-id'         => $entry_id,
+							'date'             => $entry['entry_date'] ?? $date,
+							'billable'         => $is_billable ? '1' : '0',
+							'billable-applies' => pltt_billable_flag_applies( $project ) ? '1' : '0',
+						)
+					);
+					?>
+				</td>
 			</tr>
-			<?php
-			// Hidden form row directly beneath. Pre-populated with the entry's values.
-			$form_entry  = $entry;
-			$row_visible = false;
-			include __DIR__ . '/entry-form-row.php';
-			?>
 		<?php endforeach; ?>
 	</tbody>
 </table>

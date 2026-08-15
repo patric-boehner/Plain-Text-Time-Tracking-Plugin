@@ -121,6 +121,19 @@
 	letter-spacing: -0.12px;
 }
 
+/* A row's identifier, linked to whatever the row represents (spec §6 rule 1):
+   a client name, a project name, a log date, a bill record's invoiced date or
+   its project. Bold because it's the link — in a table of plain text it's the
+   one thing you can click through, and weight says so more quietly than colour
+   alone does at 13px.
+
+   Use this class, not a <strong> wrapper, so the treatment is defined once. It
+   is deliberately NOT a blanket rule on links inside tables: those also include
+   filter buttons and pagination, which are chrome, not identity. */
+.pltt-row-link {
+	font-weight: 600;
+}
+
 /* ============================================================
    LIGHT HEADER — for screens that are not a scope (Today, unfiltered
    Overview, lists). Three lines, no panel, no figures inside: what it is,

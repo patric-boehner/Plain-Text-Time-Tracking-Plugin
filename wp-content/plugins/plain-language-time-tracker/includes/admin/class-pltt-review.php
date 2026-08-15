@@ -159,23 +159,28 @@ class PLTT_Review {
 	}
 
 	/**
-	 * Render the compact display row + hidden form row for one saved entry.
+	 * Render one saved entry's row.
 	 *
-	 * Used by the pltt_save_entry AJAX endpoint to return updated row markup
-	 * after a per-row save so the JS can swap it into the list without a page
-	 * reload. The markup MUST match the layout produced by
-	 * templates/partials/entries-editor.php.
+	 * Used by the pltt_save_entry AJAX endpoint to return updated row markup so
+	 * the JS can swap it into the list without a page reload. The markup MUST
+	 * match the layout produced by templates/partials/entries-editor.php.
 	 *
-	 * @param object $entry Time-entry row from the DB.
+	 * Only the Day view uses this. The Overview's row is a different shape
+	 * (pltt_render_entry_table() in helpers.php) and repaints from the JSON
+	 * payload save_entry() sends alongside this.
+	 *
+	 * @param object $entry             Time-entry row from the DB.
+	 * @param bool   $show_billable_col Whether the table being written into has a
+	 *                                  Billable column. It drops out on an
+	 *                                  all-retainer day (entries-editor.php works
+	 *                                  it out per table), and a row that doesn't
+	 *                                  ask lands a cell wide.
 	 */
-	public static function render_entry_row( $entry ) {
-		$date = $entry->entry_date;
-
+	public static function render_entry_row( $entry, $show_billable_col = true ) {
 		// Re-fetch tags for the entry from the junction table.
 		$tags_by_entry = PLTT_Tags::get_for_entries( array( (int) $entry->id ) );
 		$entry_tags    = $tags_by_entry[ (int) $entry->id ] ?? array();
 
-		// Format into the shape entry-form-row.php expects (matches format_entries_for_review).
 		$formatted = array(
 			'id'               => (int) $entry->id,
 			'entry_date'       => $entry->entry_date,
@@ -190,16 +195,8 @@ class PLTT_Review {
 			'verified'         => (int) $entry->verified,
 		);
 
-		$clients = PLTT_Clients::get_all();
-
-		$projects_by_client = array();
-		if ( ! empty( $entry->client_id ) ) {
-			$extra = ! empty( $entry->project_id ) ? array( (int) $entry->client_id => array( (int) $entry->project_id ) ) : array();
-			$projects_by_client = PLTT_Projects::get_for_clients(
-				array( (int) $entry->client_id ),
-				$extra
-			);
-		}
+		$client  = ! empty( $formatted['client_id'] ) ? PLTT_Clients::get( $formatted['client_id'] ) : null;
+		$project = ! empty( $formatted['project_id'] ) ? PLTT_Projects::get( $formatted['project_id'] ) : null;
 
 		$is_billable = ! empty( $formatted['billable'] );
 		?>
@@ -216,10 +213,6 @@ class PLTT_Review {
 						}
 						?>
 					</span>
-					<div class="row-actions">
-						<span class="edit"><a href="#edit" class="pltt-edit-entry" role="button"><?php esc_html_e( 'Edit', 'plain-language-time-tracker' ); ?></a> | </span>
-						<span class="trash"><a href="#delete" class="pltt-delete-entry submitdelete" role="button"><?php esc_html_e( 'Delete', 'plain-language-time-tracker' ); ?></a></span>
-					</div>
 				</div>
 			</td>
 			<td class="pltt-duration-cell">
@@ -228,9 +221,7 @@ class PLTT_Review {
 			<td class="pltt-entry-desc-cell">
 				<span class="pltt-entry-desc-text"><?php echo esc_html( $formatted['description'] ); ?></span>
 				<?php
-				$client  = ! empty( $formatted['client_id'] ) ? PLTT_Clients::get( $formatted['client_id'] ) : null;
-				$project = ! empty( $formatted['project_id'] ) ? PLTT_Projects::get( $formatted['project_id'] ) : null;
-				$meta    = array();
+				$meta = array();
 				if ( $client ) {
 					$meta[] = '<span class="pltt-entry-client">' . esc_html( $client->name ) . '</span>';
 				}
@@ -249,19 +240,32 @@ class PLTT_Review {
 					<?php pltt_render_tag_badges( $entry_tags ); ?>
 				</div>
 			</td>
-			<td class="pltt-billable-indicator">
-				<span class="pltt-billable-symbol <?php echo $is_billable ? 'is-billable' : 'not-billable'; ?>"
-					aria-label="<?php echo $is_billable ? esc_attr__( 'Billable', 'plain-language-time-tracker' ) : esc_attr__( 'Not billable', 'plain-language-time-tracker' ); ?>"
-					title="<?php echo $is_billable ? esc_attr__( 'Billable', 'plain-language-time-tracker' ) : esc_attr__( 'Not billable', 'plain-language-time-tracker' ); ?>">$</span>
+			<?php if ( $show_billable_col ) : ?>
+				<td class="pltt-billable-indicator">
+					<?php if ( pltt_billable_flag_applies( $project ) ) : ?>
+						<span class="pltt-billable-symbol <?php echo $is_billable ? 'is-billable' : 'not-billable'; ?>"
+							aria-label="<?php echo $is_billable ? esc_attr__( 'Billable', 'plain-language-time-tracker' ) : esc_attr__( 'Not billable', 'plain-language-time-tracker' ); ?>"
+							title="<?php echo $is_billable ? esc_attr__( 'Billable', 'plain-language-time-tracker' ) : esc_attr__( 'Not billable', 'plain-language-time-tracker' ); ?>">$</span>
+					<?php endif; ?>
+				</td>
+			<?php endif; ?>
+			<td class="pltt-rowmenu-col">
+				<?php
+				pltt_render_row_menu_trigger(
+					'entry',
+					/* translators: %s: entry description. */
+					sprintf( __( 'Actions for %s', 'plain-language-time-tracker' ), $formatted['description'] ),
+					array(
+						'entry-id'         => $formatted['id'],
+						'date'             => $formatted['entry_date'],
+						'billable'         => $is_billable ? '1' : '0',
+						'billable-applies' => pltt_billable_flag_applies( $project ) ? '1' : '0',
+					)
+				);
+				?>
 			</td>
 		</tr>
 		<?php
-		// Hidden form row beneath the compact row.
-		$form_entry  = $formatted;
-		$mode        = 'edit';
-		$row_visible = false;
-		$colspan     = 5;
-		include PLTT_PLUGIN_DIR . 'templates/partials/entry-form-row.php';
 	}
 
 	/**
