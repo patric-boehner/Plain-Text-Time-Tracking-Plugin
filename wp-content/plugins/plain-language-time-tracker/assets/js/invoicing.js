@@ -15,14 +15,18 @@
 
 	// Activate where there's something to drive: a commit form (the detailed-view
 	// scope panel), a copy dialog (the Billing ledger's "View line items"), or a
-	// record Delete button (either history table — those carry neither of the
-	// other two). The handlers are all delegated and target-checked, so binding is
+	// record's row menu (either history table — those carry neither of the other
+	// two). The handlers are all delegated and target-checked, so binding is
 	// otherwise inert.
 	if ( ! document.querySelector( '.pltt-billing-form' )
 		&& ! document.querySelector( '[data-lineitems-dialog]' )
-		&& ! document.querySelector( '.pltt-bill-record-delete' ) ) {
+		&& ! document.querySelector( '.pltt-row-menu-trigger[data-menu="bill-record"]' ) ) {
 		return;
 	}
+
+	// One delete at a time. The menu closes on select, so there's no button left
+	// to disable — this is the re-entry guard in its place.
+	let deletingRecord = false;
 
 	function formatCurrency( n ) {
 		return '$' + Number( n ).toLocaleString( 'en-US', {
@@ -364,31 +368,20 @@
 	} );
 
 	// --- Delete a committed record (row-actions in both history tables) ---
-	// The one way to undo a bill. Confirms first, because it hands the covered
-	// time back to Unbilled. On success the page reloads so the summary cards and
-	// the outstanding queue re-reflect the returned time.
+	// The one way to undo a bill. On success the page reloads so the summary
+	// cards and the outstanding queue re-reflect the returned time.
 	//
-	// The trigger is an <a href="#delete"> to match the plugin's row-actions markup,
-	// so preventDefault is required and `disabled` is unavailable — aria-disabled
-	// plus a re-entry guard stands in for it.
-	document.addEventListener( 'click', function ( e ) {
-		const link = e.target.closest( '.pltt-bill-record-delete' );
-		if ( ! link ) {
+	// The row menu confirms before calling this (spec §6: destructive items
+	// always confirm), using the sentence the row carries in data-confirm — it
+	// names the client, the amount and what goes back to Unbilled.
+	function deleteBillingRecord( recordId, trigger ) {
+		if ( ! recordId || deletingRecord ) {
 			return;
 		}
-
-		e.preventDefault();
-
-		if ( 'true' === link.getAttribute( 'aria-disabled' ) ) {
-			return;
+		deletingRecord = true;
+		if ( trigger ) {
+			trigger.setAttribute( 'aria-disabled', 'true' );
 		}
-
-		const recordId = link.dataset.recordId;
-		if ( ! recordId || ! window.confirm( link.dataset.confirm || '' ) ) {
-			return;
-		}
-
-		link.setAttribute( 'aria-disabled', 'true' );
 
 		PLTT.ajax( 'pltt_delete_billing_record', { record_id: recordId }, function ( response ) {
 			if ( response && response.success ) {
@@ -396,11 +389,39 @@
 				return;
 			}
 
-			link.removeAttribute( 'aria-disabled' );
+			deletingRecord = false;
+			if ( trigger ) {
+				trigger.removeAttribute( 'aria-disabled' );
+			}
 			const msg = response && response.data && response.data.message
 				? response.data.message
 				: ( response && typeof response.data === 'string' ? response.data : plttData.i18n.error );
 			window.alert( msg );
 		} );
-	} );
+	}
+
+	// Row menu on both history tables (spec §6). "View record" repeats the date
+	// link in the row, on purpose: the menu lists everything the row can do
+	// rather than assuming you noticed the date was clickable.
+	if ( typeof PlttRowMenu !== 'undefined' ) {
+		PlttRowMenu.register( 'bill-record', function ( trigger ) {
+			const items = [];
+
+			if ( trigger.dataset.viewUrl ) {
+				items.push( { label: 'View record', href: trigger.dataset.viewUrl } );
+				items.push( { kind: 'separator' } );
+			}
+
+			items.push( {
+				label: 'Delete record',
+				kind: 'destructive',
+				confirm: trigger.dataset.confirm || plttData.i18n.confirm,
+				onSelect: function () {
+					deleteBillingRecord( trigger.dataset.recordId, trigger );
+				},
+			} );
+
+			return items;
+		} );
+	}
 }() );

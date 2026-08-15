@@ -433,13 +433,29 @@
 		/**
 		 * Initialize inline tag pickers on all .pltt-tag-input-wrap elements in the report table.
 		 */
+		var tagSuggestions = ( typeof plttAllTags !== 'undefined' ) ? plttAllTags : [];
+		var reportTagPickers = [];
+
+		// Same "+ Add new tag…" path as the Review and Today pickers, via the
+		// shared modal (templates/partials/tag-modal.php, included by reports.php).
+		var openTagModal = PLTT.wireTagModal(
+			function() {
+				return reportTagPickers;
+			},
+			function( tag ) {
+				if ( tagSuggestions.indexOf( tag ) === -1 ) {
+					tagSuggestions.push( tag );
+				}
+			}
+		);
+
 		document.querySelectorAll( '#pltt-report-content .pltt-tag-input-wrap' ).forEach( function( wrap ) {
 			var entryId = wrap.dataset.entryId;
 
-			new PlttTagPicker(
+			reportTagPickers.push( new PlttTagPicker(
 				wrap,
-				( typeof plttAllTags !== 'undefined' ) ? plttAllTags : [],
-				null,
+				tagSuggestions,
+				openTagModal,
 				function( selectedTags, csvValue ) {
 					// onClose: save tags via AJAX.
 					PLTT.ajax(
@@ -454,7 +470,143 @@
 					);
 				},
 				( typeof plttTagGroups !== 'undefined' ) ? plttTagGroups : {}
-			);
+			) );
+		} );
+
+		/**
+		 * Repaint a row after the edit modal saves it.
+		 *
+		 * Only the fields that change what the row *says* are repainted. Anything
+		 * that changes where the row belongs — a different date, client, project
+		 * or billing state — comes back flagged, because this is a filtered,
+		 * date-grouped list and the entry may have just left it.
+		 */
+		document.addEventListener( 'pltt:entry-saved', function( e ) {
+			if ( e.detail.requiresReload ) {
+				window.location.reload();
+				return;
+			}
+
+			var entry = e.detail.entry;
+			var row = document.querySelector( '#pltt-report-content tr[data-entry-id="' + entry.id + '"]' );
+			if ( ! row ) {
+				return;
+			}
+
+			var desc = row.querySelector( '.pltt-entry-desc-text' );
+			if ( desc ) {
+				desc.textContent = entry.description;
+			}
+
+			var timeCell = row.querySelector( '.pltt-time-cell' );
+			if ( timeCell ) {
+				timeCell.textContent = entry.time_display;
+			}
+
+			// Not .pltt-amount-col — the Amount cell carries the duration class too.
+			var durationCell = row.querySelector( '.pltt-duration-cell:not(.pltt-amount-col)' );
+			if ( durationCell ) {
+				durationCell.textContent = PLTT.formatDuration( entry.duration_minutes );
+			}
+
+			// The tag cell holds a live picker, so it's re-pointed rather than
+			// overwritten.
+			var wrap = row.querySelector( '.pltt-tag-input-wrap' );
+			if ( wrap ) {
+				reportTagPickers.forEach( function( picker ) {
+					if ( picker.container === wrap ) {
+						picker.setTags( entry.tags );
+					}
+				} );
+			}
+		} );
+	} )();
+
+	/**
+	 * Row action menu for entry rows (spec §6).
+	 *
+	 * Outside the inline-edit IIFE above, which bails when the tag picker isn't
+	 * loaded — the menu has to work regardless.
+	 *
+	 * Item order is fixed across the app: primary edit, then navigation, then
+	 * contextual actions, then destructive below a divider.
+	 */
+	( function() {
+		if ( typeof PlttRowMenu === 'undefined' ) {
+			return;
+		}
+
+		var i18n = ( typeof plttData !== 'undefined' && plttData.i18n ) || {};
+
+		PlttRowMenu.register( 'entry', function( trigger ) {
+			var d = trigger.dataset;
+			var entryId = d.entryId;
+			var items = [];
+			var hasEditor = ( typeof PlttEntryEditor !== 'undefined' );
+
+			// Spec §6 also lists "Change tags…", but it opened the same modal on
+			// the same entry — the tag field is right there in it. The tag cell
+			// in the row is directly clickable too.
+			if ( hasEditor ) {
+				// The builder runs as the menu opens, which is the moment worth
+				// spending on fetching the entry — see PlttEntryEditor.prefetch.
+				PlttEntryEditor.prefetch( entryId );
+				items.push( {
+					label: 'Edit entry…',
+					kind: 'primary',
+					onSelect: function() {
+						PlttEntryEditor.open( entryId );
+					},
+				} );
+			}
+
+			// Only offered where the flag means something: hourly work that no
+			// committed bill record has frozen. The item drives the row's own $
+			// toggle rather than repeating its save-and-repaint — one path, so
+			// the two can't drift.
+			if ( d.billableApplies === '1' && d.covered !== '1' ) {
+				items.push( {
+					label: d.billable === '1' ? 'Mark not billable' : 'Mark billable',
+					onSelect: function( t ) {
+						var row = t.closest( 'tr' );
+						var toggle = row && row.querySelector( '.pltt-billable-symbol.pltt-inline-toggle' );
+						if ( toggle ) {
+							toggle.click();
+						}
+					},
+				} );
+			}
+
+			// No "Go to [date] log" item. Spec §7 wanted two routes to the day;
+			// in practice the day header's date is already that link, sitting a
+			// few rows above every menu that would repeat it.
+
+			// Destructive always sits below a divider — but never as the first
+			// thing in the panel.
+			if ( items.length ) {
+				items.push( { kind: 'separator' } );
+			}
+
+			items.push( {
+				label: 'Delete entry',
+				kind: 'destructive',
+				confirm: i18n.confirm || 'Are you sure?',
+				onSelect: function() {
+					PLTT.ajax( 'pltt_delete_entry', { entry_id: entryId }, function( response ) {
+						if ( ! response.success ) {
+							window.alert( response.data || i18n.error );
+							return;
+						}
+						// Reload rather than lift the row out: the day total, the
+						// entry count, the billable cards and the pagination all
+						// move when an entry goes, and repainting five things to
+						// avoid one reload is a poor trade.
+						window.location.reload();
+					} );
+				},
+			} );
+
+			return items;
 		} );
 	} )();
 } )();

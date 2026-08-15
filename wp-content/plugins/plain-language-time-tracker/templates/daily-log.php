@@ -227,8 +227,8 @@ $return_to     = $return_to_raw ? wp_validate_redirect( $return_to_raw, '' ) : '
 					</span>
 				</div>
 				<?php
-				// Inline editable list (compact rows + expandable edit form) — wired by
-				// review.js IIFE 2, the same editor the review screen uses.
+				// Recorded entries, one row each, with a kebab holding the row's
+				// actions. Editing opens the shared modal below.
 				include PLTT_PLUGIN_DIR . 'templates/partials/entries-editor.php';
 				?>
 			</div>
@@ -248,6 +248,14 @@ $return_to     = $return_to_raw ? wp_validate_redirect( $return_to_raw, '' ) : '
 		);
 
 		include PLTT_PLUGIN_DIR . 'templates/partials/entry-editor-modals.php';
+
+		// The edit modal a row's kebab opens — only where there are recorded rows
+		// to open it from. Leaving it off the post-parse screen also keeps its
+		// controller from binding the same quick-add buttons review.js binds
+		// there, which would create each client or project twice.
+		if ( ! $is_post_parse ) {
+			include PLTT_PLUGIN_DIR . 'templates/partials/entry-edit-modal.php';
+		}
 		?>
 	<?php endif; ?>
 	<?php // Notice params are stripped from the URL by PLTT.cleanNoticeParams() in shared.js. ?>

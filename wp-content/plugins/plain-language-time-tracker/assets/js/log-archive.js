@@ -14,35 +14,28 @@
 	// picker now serves this screen and the retainer project period filter.
 
 	/**
-	 * Delete log button handler (event delegation).
+	 * How bad is deleting this one? A log that produced entries takes them with
+	 * it, so the confirmation says how many rather than asking in the abstract.
+	 *
+	 * @param {HTMLElement} row The log's <tr>.
+	 * @return {string} Confirmation text.
 	 */
-	document.addEventListener( 'click', function( e ) {
-		const deleteLink = e.target.closest( '.pltt-delete-log' );
-		if ( ! deleteLink ) {
-			return;
-		}
-
-		e.preventDefault();
-
-		const row = deleteLink.closest( 'tr' );
-		if ( ! row ) {
-			return;
-		}
-
-		const logDate = row.dataset.logDate;
+	function deleteConfirmMessage( row ) {
 		const entryCount = parseInt( row.dataset.entryCount, 10 ) || 0;
-
-		// Build confirmation message.
-		let message = plttData.i18n.confirm;
 		if ( entryCount > 0 ) {
-			message = 'Delete this log and ' + entryCount + ' associated time ' + ( entryCount === 1 ? 'entry' : 'entries' ) + '? This cannot be undone.';
-		} else {
-			message = 'Delete this log? This cannot be undone.';
+			return 'Delete this log and ' + entryCount + ' associated time ' +
+				( entryCount === 1 ? 'entry' : 'entries' ) + '? This cannot be undone.';
 		}
+		return 'Delete this log? This cannot be undone.';
+	}
 
-		if ( ! confirm( message ) ) {
-			return;
-		}
+	/**
+	 * Drop a log and its entries, then take its row out of the table.
+	 *
+	 * @param {HTMLElement} row The log's <tr>.
+	 */
+	function deleteLog( row ) {
+		const logDate = row.dataset.logDate;
 
 		row.classList.add( 'pltt-deleting' );
 
@@ -77,6 +70,30 @@
 				alert( response.data || plttData.i18n.error );
 			}
 		} );
-	} );
+	}
+
+	// Row menu (spec §6).
+	if ( typeof PlttRowMenu !== 'undefined' ) {
+		PlttRowMenu.register( 'daily-log', function( trigger ) {
+			const row = trigger.closest( 'tr' );
+			const items = [];
+
+			if ( trigger.dataset.viewUrl ) {
+				items.push( { label: 'Open log', href: trigger.dataset.viewUrl } );
+				items.push( { kind: 'separator' } );
+			}
+
+			items.push( {
+				label: 'Delete log',
+				kind: 'destructive',
+				confirm: deleteConfirmMessage( row ),
+				onSelect: function() {
+					deleteLog( row );
+				},
+			} );
+
+			return items;
+		} );
+	}
 
 } )();

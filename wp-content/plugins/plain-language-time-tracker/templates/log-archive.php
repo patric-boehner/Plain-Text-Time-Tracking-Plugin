@@ -159,23 +159,15 @@ if ( ! defined( 'ABSPATH' ) ) {
 								<th><?php esc_html_e( 'Entries', 'plain-language-time-tracker' ); ?></th>
 								<th><?php esc_html_e( 'Hours', 'plain-language-time-tracker' ); ?></th>
 								<th><?php esc_html_e( 'Status', 'plain-language-time-tracker' ); ?></th>
+								<th class="pltt-rowmenu-col"><span class="screen-reader-text"><?php esc_html_e( 'Actions', 'plain-language-time-tracker' ); ?></span></th>
 							</tr>
 						</thead>
 						<tbody>
 							<?php foreach ( $week_logs as $log ) : ?>
 								<tr data-log-date="<?php echo esc_attr( $log->log_date ); ?>" data-entry-count="<?php echo esc_attr( $log->entry_count ); ?>">
 									<td>
-										<a href="<?php echo esc_url( pltt_get_admin_url( 'daily-log', array( 'date' => $log->log_date ) ) ); ?>">
-											<strong><?php echo esc_html( pltt_format_date( $log->log_date, 'D, M j, Y' ) ); ?></strong>
-										</a>
-										<div class="row-actions">
-											<a href="<?php echo esc_url( pltt_get_admin_url( 'daily-log', array( 'date' => $log->log_date ) ) ); ?>">
-												<?php esc_html_e( 'View', 'plain-language-time-tracker' ); ?>
-											</a>
-											| <a href="#" class="pltt-delete-log submitdelete" role="button">
-												<?php esc_html_e( 'Delete', 'plain-language-time-tracker' ); ?>
-											</a>
-										</div>
+										<a class="pltt-row-link" href="<?php echo esc_url( pltt_get_admin_url( 'daily-log', array( 'date' => $log->log_date ) ) ); ?>"><?php echo esc_html( pltt_format_date( $log->log_date, 'D, M j, Y' ) ); ?></a>
+										<?php // "View" is gone — the date above is already that link (spec §6 rule 1). ?>
 									</td>
 									<td class="pltt-log-preview">
 										<?php
@@ -189,10 +181,13 @@ if ( ! defined( 'ABSPATH' ) ) {
 										?>
 									</td>
 									<td>
+										<?php
+										// A count, not a destination. The date links to this day and so does
+										// the row menu's "Open log"; a third route, hung on a number, only
+										// raises the question of where a number could take you.
+										?>
 										<?php if ( (int) $log->entry_count > 0 ) : ?>
-											<a href="<?php echo esc_url( pltt_get_admin_url( 'daily-log', array( 'date' => $log->log_date ) ) ); ?>#pltt-entries">
-												<?php echo esc_html( $log->entry_count ); ?>
-											</a>
+											<?php echo esc_html( $log->entry_count ); ?>
 										<?php else : ?>
 											<span class="pltt-empty">0</span>
 										<?php endif; ?>
@@ -212,6 +207,23 @@ if ( ! defined( 'ABSPATH' ) ) {
 										<?php else : ?>
 											<span class="pltt-badge pltt-badge-warning"><?php esc_html_e( 'Not processed', 'plain-language-time-tracker' ); ?></span>
 										<?php endif; ?>
+									</td>
+									<td class="pltt-rowmenu-col">
+										<?php
+										// "Open log" repeats the date link above it, on purpose:
+										// the menu is where you look for what can be done to
+										// a row, so it lists everything rather than assuming
+										// you noticed the date was clickable.
+										pltt_render_row_menu_trigger(
+											'daily-log',
+											/* translators: %s: log date. */
+											sprintf( __( 'Actions for the %s log', 'plain-language-time-tracker' ), pltt_format_date( $log->log_date, 'M j, Y' ) ),
+											array(
+												'log-date' => $log->log_date,
+												'view-url' => pltt_get_admin_url( 'daily-log', array( 'date' => $log->log_date ) ),
+											)
+										);
+										?>
 									</td>
 								</tr>
 							<?php endforeach; // week_logs ?>

@@ -42,6 +42,7 @@ foreach ( $billing_history as $rec ) {
 			<th><?php esc_html_e( 'Work covered', 'plain-language-time-tracker' ); ?></th>
 			<th class="pltt-amount-col"><?php esc_html_e( 'Amount', 'plain-language-time-tracker' ); ?></th>
 			<th class="pltt-amount-col"><?php esc_html_e( 'Absorbed', 'plain-language-time-tracker' ); ?></th>
+			<th class="pltt-rowmenu-col"><span class="screen-reader-text"><?php esc_html_e( 'Actions', 'plain-language-time-tracker' ); ?></span></th>
 		</tr>
 	</thead>
 	<tbody>
@@ -73,21 +74,16 @@ foreach ( $billing_history as $rec ) {
 			<?php $view_url = pltt_billing_record_view_url( $rec, $rv['entries'] ); ?>
 			<tr>
 				<td class="pltt-time-cell">
-					<?php echo esc_html( $rv['billed_on'] ); ?>
+					<?php
+					// The date is the link, not #23 — see billing-history.php, which
+					// this table mirrors. Unlinked when the project is gone.
+					?>
+					<?php if ( '' !== $view_url ) : ?>
+						<a class="pltt-row-link" href="<?php echo esc_url( $view_url ); ?>"><?php echo esc_html( $rv['billed_on'] ); ?></a>
+					<?php else : ?>
+						<?php echo esc_html( $rv['billed_on'] ); ?>
+					<?php endif; ?>
 					<span class="pltt-bill-record-id">#<?php echo (int) $rec->id; ?></span>
-					<div class="row-actions">
-						<?php // View is dropped when the project is gone — the link has nowhere to land. ?>
-						<?php if ( '' !== $view_url ) : ?>
-							<span class="view"><a href="<?php echo esc_url( $view_url ); ?>"><?php esc_html_e( 'View record', 'plain-language-time-tracker' ); ?></a> | </span>
-						<?php endif; ?>
-						<?php // Undo a bill: drops the record + its coverage, un-billing the time. ?>
-						<span class="trash">
-							<a href="#delete" role="button"
-								class="pltt-bill-record-delete submitdelete"
-								data-record-id="<?php echo (int) $rec->id; ?>"
-								data-confirm="<?php echo esc_attr( pltt_billing_record_delete_confirm( $rec, $rv ) ); ?>"><?php esc_html_e( 'Delete', 'plain-language-time-tracker' ); ?></a>
-						</span>
-					</div>
 				</td>
 				<td>
 					<span class="pltt-badge <?php echo esc_attr( pltt_billing_type_badge_class( $rec->billing_type ) ); ?>"><?php echo esc_html( $type_lbl ); ?></span>
@@ -95,6 +91,23 @@ foreach ( $billing_history as $rec ) {
 				<td class="pltt-bill-record-covers"><?php echo esc_html( $covers ); ?></td>
 				<td class="pltt-amount-col"><?php echo esc_html( pltt_format_currency( $rv['amount'] ) ); ?></td>
 				<td class="pltt-amount-col"><?php echo $rv['absorbed'] > 0.0 ? esc_html( pltt_format_currency( $rv['absorbed'] ) ) : '<span class="pltt-empty">&mdash;</span>'; ?></td>
+				<td class="pltt-rowmenu-col">
+					<?php
+					pltt_render_row_menu_trigger(
+						'bill-record',
+						/* translators: %d: bill record number. */
+						sprintf( __( 'Actions for record #%d', 'plain-language-time-tracker' ), (int) $rec->id ),
+						array(
+							'record-id' => (int) $rec->id,
+							'confirm'   => pltt_billing_record_delete_confirm( $rec, $rv ),
+							// Same destination the date links to, repeated so the menu
+							// lists everything the row can do. Empty when the project is
+							// gone and the line items have nowhere to open.
+							'view-url'  => $view_url,
+						)
+					);
+					?>
+				</td>
 			</tr>
 		<?php endforeach; ?>
 	</tbody>

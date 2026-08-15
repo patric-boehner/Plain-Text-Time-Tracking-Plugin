@@ -135,13 +135,20 @@ var PlttTagPicker = ( function() {
 	/**
 	 * Append a single tag checkbox row to a container.
 	 *
-	 * @param {HTMLElement} target Container to append into.
-	 * @param {string}      tag    Tag name.
+	 * @param {HTMLElement} target  Container to append into.
+	 * @param {string}      tag     Tag name.
+	 * @param {string}      section Header this row sits under, so search
+	 *                              filtering can hide a header once every row
+	 *                              beneath it is filtered out. Omit for rows
+	 *                              that have no header (the ungrouped tail).
 	 */
-	PlttTagPicker.prototype._renderCheckboxItem = function( target, tag ) {
+	PlttTagPicker.prototype._renderCheckboxItem = function( target, tag, section ) {
 		var self = this;
 		var label = document.createElement( 'label' );
 		label.className = 'pltt-tag-checkbox-item';
+		if ( section ) {
+			label.dataset.section = section;
+		}
 
 		var checkbox = document.createElement( 'input' );
 		checkbox.type = 'checkbox';
@@ -160,18 +167,42 @@ var PlttTagPicker = ( function() {
 	};
 
 	/**
-	 * Render the checkbox list from allTags. When tagGroups is non-empty,
-	 * render labeled sections per group with ungrouped tags at the bottom.
+	 * Render the checkbox list. Tags already on the entry come first under a
+	 * "Selected" header, so unticking one never means scrolling to find it.
+	 * They are moved there, not copied — no tag renders twice. The rest follow,
+	 * in labeled sections per group when tagGroups is non-empty.
+	 *
+	 * Only called when the dropdown opens, so ticking a box mid-session doesn't
+	 * shuffle the list out from under the pointer.
 	 */
 	PlttTagPicker.prototype._renderCheckboxes = function() {
 		var self = this;
 		this.checkboxList.innerHTML = '';
 
-		if ( this.allTags.length === 0 ) {
-			var empty = document.createElement( 'div' );
-			empty.className = 'pltt-tag-empty';
-			empty.textContent = 'No tags available';
-			this.checkboxList.appendChild( empty );
+		if ( this.selectedTags.length > 0 ) {
+			var selectedHeader = document.createElement( 'div' );
+			selectedHeader.className = 'pltt-tag-group-header';
+			selectedHeader.textContent = 'Selected';
+			selectedHeader.dataset.section = '__selected';
+			this.checkboxList.appendChild( selectedHeader );
+
+			// Selection order, matching the pills outside the dropdown.
+			this.selectedTags.forEach( function( tag ) {
+				self._renderCheckboxItem( self.checkboxList, tag, '__selected' );
+			} );
+		}
+
+		var remaining = this.allTags.filter( function( tag ) {
+			return self.selectedTags.indexOf( tag ) === -1;
+		} );
+
+		if ( remaining.length === 0 ) {
+			if ( this.selectedTags.length === 0 ) {
+				var empty = document.createElement( 'div' );
+				empty.className = 'pltt-tag-empty';
+				empty.textContent = 'No tags available';
+				this.checkboxList.appendChild( empty );
+			}
 		} else {
 			var hasGroups = this.tagGroups && Object.keys( this.tagGroups ).length > 0;
 
@@ -179,7 +210,7 @@ var PlttTagPicker = ( function() {
 				// Group tags by their group_name, with ungrouped collected separately.
 				var byGroup = {};
 				var ungrouped = [];
-				this.allTags.forEach( function( tag ) {
+				remaining.forEach( function( tag ) {
 					var g = self.tagGroups[ tag ];
 					if ( g ) {
 						if ( ! byGroup[ g ] ) {
@@ -199,14 +230,14 @@ var PlttTagPicker = ( function() {
 					var header = document.createElement( 'div' );
 					header.className = 'pltt-tag-group-header';
 					header.textContent = g;
-					header.dataset.groupName = g;
+					header.dataset.section = g;
 					self.checkboxList.appendChild( header );
 
 					byGroup[ g ].sort( function( a, b ) {
 						return a.localeCompare( b );
 					} );
 					byGroup[ g ].forEach( function( tag ) {
-						self._renderCheckboxItem( self.checkboxList, tag );
+						self._renderCheckboxItem( self.checkboxList, tag, g );
 					} );
 				} );
 
@@ -219,16 +250,13 @@ var PlttTagPicker = ( function() {
 					} );
 				}
 			} else {
-				// No groups: keep the legacy "selected first, then alphabetical" sort.
-				var sorted = this.allTags.slice().sort( function( a, b ) {
-					var aSelected = self.selectedTags.indexOf( a ) !== -1;
-					var bSelected = self.selectedTags.indexOf( b ) !== -1;
-					if ( aSelected && ! bSelected ) return -1;
-					if ( ! aSelected && bSelected ) return 1;
+				// No groups: the "Selected" header above now does the lifting the
+				// old selected-first sort used to, so this is plain alphabetical.
+				remaining.sort( function( a, b ) {
 					return a.localeCompare( b );
 				} );
 
-				sorted.forEach( function( tag ) {
+				remaining.forEach( function( tag ) {
 					self._renderCheckboxItem( self.checkboxList, tag );
 				} );
 			}
@@ -256,10 +284,15 @@ var PlttTagPicker = ( function() {
 	 *
 	 * @param {string}  tagName    The normalized tag name to add.
 	 * @param {boolean} autoSelect Whether to auto-select the tag after adding.
+	 * @param {string}  groupName  Optional group, so the tag files itself under
+	 *                             the right header instead of the unlabeled tail.
 	 */
-	PlttTagPicker.prototype.addTagOption = function( tagName, autoSelect ) {
+	PlttTagPicker.prototype.addTagOption = function( tagName, autoSelect, groupName ) {
 		if ( this.allTags.indexOf( tagName ) === -1 ) {
 			this.allTags.push( tagName );
+		}
+		if ( groupName ) {
+			this.tagGroups[ tagName ] = groupName;
 		}
 		if ( autoSelect && this.selectedTags.indexOf( tagName ) === -1 ) {
 			this.selectedTags.push( tagName );
@@ -273,6 +306,35 @@ var PlttTagPicker = ( function() {
 			this._renderCheckboxes();
 			this._filterCheckboxes();
 		}
+	};
+
+	/**
+	 * Replace the current selection.
+	 *
+	 * The edit modal is one element shared by every row on the page, so its
+	 * picker gets re-pointed at a different entry's tags each time it opens.
+	 *
+	 * Nothing watches the hidden input, so writing to it directly leaves the
+	 * pills and checkboxes showing the previous entry's tags — this is the way
+	 * in from outside.
+	 *
+	 * @param {string|Array} tags Comma-separated names or an array. Empty clears.
+	 */
+	PlttTagPicker.prototype.setTags = function( tags ) {
+		var self = this;
+		var list = Array.isArray( tags ) ? tags : String( tags || '' ).split( ',' );
+
+		this.selectedTags = [];
+		list.forEach( function( tag ) {
+			tag = self._normalize( tag );
+			if ( tag && self.selectedTags.indexOf( tag ) === -1 ) {
+				self.selectedTags.push( tag );
+			}
+		} );
+
+		this._sync();
+		this._renderPills();
+		this._updateCheckboxStates();
 	};
 
 	/**
@@ -426,17 +488,16 @@ var PlttTagPicker = ( function() {
 			}
 		} );
 
-		// Hide group headers whose following section has zero visible items.
+		// Hide any header whose rows are all filtered out. Matched by section
+		// rather than by walking siblings: the last header on the list has no
+		// following header to stop the walk, so it would count the ungrouped
+		// tail as its own.
+		var items = this.checkboxList.querySelectorAll( '.pltt-tag-checkbox-item' );
 		this.checkboxList.querySelectorAll( '.pltt-tag-group-header' ).forEach( function( header ) {
-			var visible = 0;
-			var sibling = header.nextElementSibling;
-			while ( sibling && ! sibling.classList.contains( 'pltt-tag-group-header' ) ) {
-				if ( sibling.classList.contains( 'pltt-tag-checkbox-item' ) && sibling.style.display !== 'none' ) {
-					visible++;
-				}
-				sibling = sibling.nextElementSibling;
-			}
-			header.style.display = visible > 0 ? '' : 'none';
+			var visible = Array.prototype.some.call( items, function( item ) {
+				return item.dataset.section === header.dataset.section && item.style.display !== 'none';
+			} );
+			header.style.display = visible ? '' : 'none';
 		} );
 	};
 

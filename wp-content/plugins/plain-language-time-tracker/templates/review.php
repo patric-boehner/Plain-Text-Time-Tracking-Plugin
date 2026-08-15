@@ -106,3 +106,13 @@ foreach ( $entries as $entry ) {
 <?php wp_add_inline_script( 'pltt-review', 'var plttAllTags = ' . wp_json_encode( $all_tags, JSON_HEX_TAG | JSON_HEX_AMP ) . ';var plttTagGroups = ' . wp_json_encode( PLTT_Tags::get_name_to_group_map(), JSON_HEX_TAG | JSON_HEX_AMP ) . ';', 'before' ); ?>
 
 <?php include PLTT_PLUGIN_DIR . 'templates/partials/entry-editor-modals.php'; ?>
+
+<?php
+// The edit modal a row's kebab opens — only where there are recorded rows to
+// open it from. Leaving it off the post-parse screen also keeps its controller
+// from binding the same quick-add buttons review.js binds there, which would
+// create each client or project twice.
+if ( ! $is_post_parse ) {
+	include PLTT_PLUGIN_DIR . 'templates/partials/entry-edit-modal.php';
+}
+?>

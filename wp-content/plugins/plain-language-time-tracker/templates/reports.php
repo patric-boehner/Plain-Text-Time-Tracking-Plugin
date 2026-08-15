@@ -766,7 +766,7 @@ $tab_base_url = add_query_arg( $filter_params, admin_url( 'admin.php' ) );
 							<tr<?php echo $is_archived_row ? ' class="pltt-row-archived"' : ''; ?>>
 								<td class="pltt-entry-desc-cell">
 									<?php if ( ! empty( $row->project_name ) ) : ?>
-										<a href="<?php echo esc_url( $detail_url ); ?>"><span class="pltt-entry-desc-text"><?php echo esc_html( $row->project_name ); ?></span></a>
+										<a class="pltt-row-link" href="<?php echo esc_url( $detail_url ); ?>"><span class="pltt-entry-desc-text"><?php echo esc_html( $row->project_name ); ?></span></a>
 									<?php else : ?>
 										<a href="<?php echo esc_url( $detail_url ); ?>"><span class="pltt-empty">—</span></a>
 									<?php endif; ?>
@@ -986,6 +986,10 @@ $tab_base_url = add_query_arg( $filter_params, admin_url( 'admin.php' ) );
 							'all_tags'           => $all_tags,
 							// Same column set on every day table so they line up.
 							'force_billable_col' => $show_billable_col_all,
+							// The row kebab (spec §6). This is the screen's only route
+							// to editing an entry — the day header's Edit button was
+							// removed and the row menu is what replaced it.
+							'row_menu'           => true,
 						);
 						if ( $is_single_project_view ) {
 							// Covered mode: tint record-covered rows + mark them with the
@@ -1033,3 +1037,15 @@ $tab_base_url = add_query_arg( $filter_params, admin_url( 'admin.php' ) );
 
 	</div>
 </div>
+
+<?php
+// The edit modal a row's kebab opens, plus the three quick-add modals its
+// Client / Project / Tags fields reach for. tag-modal.php arrives inside
+// entry-editor-modals.php, which is also what puts it behind the entries
+// table's own "+ Add new tag…" links.
+//
+// Included unconditionally so no link can ever open a modal that isn't on the
+// page; on the summary view, which has no rows and no pickers, it's inert markup.
+include PLTT_PLUGIN_DIR . 'templates/partials/entry-editor-modals.php';
+include PLTT_PLUGIN_DIR . 'templates/partials/entry-edit-modal.php';
+?>

@@ -7,8 +7,8 @@
  *             still happen inside the detailed entries view; this page lists no
  *             entries, just who owes you.
  *   history — the frozen ledger of committed records: filtered (date / client /
- *             type), paginated, with range-scoped summary cards. "View record"
- *             reopens the copyable line items; no sent/paid tracking.
+ *             type), paginated, with range-scoped summary cards. The record
+ *             number reopens the copyable line items; no sent/paid tracking.
  *
  * Rendered by PLTT_Admin::render_invoicing_page(). Vars in scope:
  *   always  — $view ('ready' | 'history')
