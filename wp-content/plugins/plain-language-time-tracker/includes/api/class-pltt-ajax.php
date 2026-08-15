@@ -958,9 +958,22 @@ class PLTT_Ajax {
 			return;
 		}
 
+		// Where to go next. The line items now live inside the Record-bill modal,
+		// so committing would otherwise close the only copy of the invoice text.
+		// Hand back the new record's own view URL — the same landing the "View
+		// record" links use, whose bar reopens that text read-only. Empty if the
+		// record can't be re-read; billing-select.js falls back to leaving billing
+		// mode on the current view.
+		$record   = PLTT_Billing_Records::get( (int) $result );
+		$view_url = $record
+			? pltt_billing_record_view_url( $record, PLTT_Billing_Record_Entries::get_entries_for_record( (int) $result ) )
+			: '';
+
 		wp_send_json_success(
 			array(
-				'message' => __( 'Billing recorded.', 'plain-language-time-tracker' ),
+				'message'   => __( 'Billing recorded.', 'plain-language-time-tracker' ),
+				'record_id' => (int) $result,
+				'view_url'  => $view_url,
 			)
 		);
 	}

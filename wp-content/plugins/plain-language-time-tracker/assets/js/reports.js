@@ -423,7 +423,10 @@
 					detail: {
 						entryId:  row ? row.getAttribute( 'data-entry-id' ) : '',
 						billable: isBillable,
-						amount:   newAmount
+						amount:   newAmount,
+						// The rebuilt checkbox carries this so the Record-bill modal's
+						// duration keeps matching its count and its amount.
+						minutes:  minutes
 					}
 				} ) );
 			}

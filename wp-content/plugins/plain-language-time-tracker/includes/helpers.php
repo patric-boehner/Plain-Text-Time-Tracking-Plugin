@@ -1666,9 +1666,11 @@ function pltt_render_entry_table( $entries, $options = array() ) {
 						?>
 						<td class="pltt-bill-select-col">
 							<?php if ( $sel_eligible ) : ?>
+								<?php // data-minutes rides along so the Record-bill modal can state the selection's duration, not just its worth. ?>
 								<input type="checkbox" class="pltt-bill-select" checked
 									data-entry-id="<?php echo esc_attr( $entry_id_int ); ?>"
 									data-amount="<?php echo esc_attr( number_format( $sel_amount, 2, '.', '' ) ); ?>"
+									data-minutes="<?php echo esc_attr( (int) $entry->duration_minutes ); ?>"
 									aria-label="<?php esc_attr_e( 'Include this entry in the bill', 'plain-language-time-tracker' ); ?>">
 							<?php else : ?>
 								<span class="pltt-bill-select-na" title="<?php echo esc_attr( $sel_reason ); ?>" aria-label="<?php echo esc_attr( $sel_reason ); ?>">&mdash;</span>
@@ -3444,6 +3446,12 @@ function pltt_build_billing_record_view( $record ) {
 	return array(
 		'uid'           => (int) $record->id,
 		'label'         => $label,
+		// Split out as well as combined: the record dialog opens with the project
+		// name and its type badge on one line and the client on the facts line
+		// below, the same shape the Record-bill modal uses.
+		'project_name'  => $project_name,
+		'client_name'   => $client_name,
+		'billing_type'  => $proj ? pltt_get_billing_type( $proj ) : '',
 		'entries'       => $entries,
 		'period'        => $period,
 		'billed_on'     => $billed_on,
