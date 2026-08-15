@@ -664,7 +664,106 @@
 	cursor: pointer;
 }
 
-/* ---- Copy line items dialog ---- */
+/* ==========================================================================
+   Record-bill modal (ui/pltt-billing-entries.html §04), and the read-only
+   "View record" dialog, which is laid out to match it.
+   Header names the act; the project + one muted facts line open the body; the
+   amount states the gap it opens; the invoice text sits in its own panel.
+   ========================================================================== */
+.pltt-billsel-ident {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	flex-wrap: wrap;
+	font-size: 15px;
+	font-weight: 600;
+	color: var(--pltt-text-dark);
+}
+
+.pltt-billsel-meta {
+	margin: 2px 0 20px;
+	color: var(--pltt-text-muted);
+	font-size: 13px;
+}
+
+/* Amount box and the gap it opens, on one line — the consequence of typing a
+   lower number reads right where you type it. */
+.pltt-billsel-amount-line {
+	display: flex;
+	align-items: center;
+	gap: 13px;
+	flex-wrap: wrap;
+}
+
+/* The adornment wrap is display:flex with no width of its own, so it would
+   stretch across the row. Sized to the figures it holds. */
+.pltt-billsel-amount-wrap {
+	flex: 0 0 150px;
+}
+
+.pltt-billsel-amount-wrap .pltt-billsel-amount {
+	padding: 6px 10px;
+	font-weight: 600;
+	background: var(--pltt-bg-white);
+}
+
+.pltt-billsel-gap {
+	color: var(--pltt-text-muted);
+	font-size: 13px;
+}
+
+/* Invoice text: header strip over the text, one bordered block. */
+.pltt-billsel-invoice {
+	border: 1px solid var(--pltt-border);
+	border-radius: 4px;
+	overflow: hidden;
+}
+
+.pltt-billsel-invoice .pltt-billcopy-head {
+	margin: 0;
+	padding: 10px 14px;
+	background: var(--pltt-bg-subtle, #fafafb);
+	border-bottom: 1px solid var(--pltt-border);
+	justify-content: flex-start;
+}
+
+.pltt-billsel-invoice-spacer {
+	flex: 1;
+}
+
+/* The text reads as the panel's body, not as a form field sitting inside one.
+   White, not the grey WP paints on readonly fields — this is text to read and
+   copy, and the grey made the panel look disabled. */
+.pltt-billsel-invoice .pltt-billcopy-text {
+	display: block;
+	border: 0;
+	border-radius: 0;
+	padding: 14px;
+	box-shadow: none;
+	resize: vertical;
+	line-height: 1.85;
+	background: var(--pltt-bg-white);
+	color: var(--pltt-text-subtle);
+}
+
+.pltt-billsel-invoice .pltt-billcopy-text:focus {
+	box-shadow: none;
+	outline: 2px solid var(--pltt-primary);
+	outline-offset: -2px;
+}
+
+/* The invoice text describes the whole scope, so it goes stale the moment a row
+   is unticked. The modal's explanatory hints are gone; this one stays because it
+   changes what you should paste, so it's warning-toned rather than a grey aside. */
+.pltt-billsel-lineitems-stale {
+	margin: 8px 0 0;
+	font-size: 13px;
+	font-weight: 500;
+	color: var(--pltt-warning-text);
+}
+
+/* ---- Line-items controls: the Record-bill modal's invoice panel and the
+   read-only "View record" dialog both render this markup ---- */
 .pltt-billcopy-dialog {
 	position: relative;
 	width: min(600px, calc(100vw - 40px));
@@ -713,35 +812,16 @@
 	border-top: 1px solid var(--pltt-border-light);
 }
 
-/* ---- Record-detail dialog (entry manifest + copyable line items) ---- */
-.pltt-record-dialog {
-	width: min(680px, calc(100vw - 40px));
-}
-
-.pltt-record-meta {
-	margin: 0 0 16px;
-}
-
-.pltt-record-subhead {
-	margin: 18px 0 8px;
-	font-size: 12px;
+/* ---- Record-detail dialog ----
+   Same layout as the Record-bill modal above, so it borrows .pltt-billsel-ident,
+   -meta, -amount-line, -gap and -invoice wholesale and needs almost nothing of
+   its own. .pltt-record-dialog's width override is gone with the entry manifest
+   it was widened for — the record's entries are already on screen behind it.
+   .pltt-record-meta / -subhead / -manifest went the same way. */
+.pltt-record-amount {
+	font-size: 18px;
 	font-weight: 600;
-	text-transform: uppercase;
-	letter-spacing: 0.04em;
-	color: var(--pltt-text-muted, #646970);
-}
-
-/* Manifest can get long — cap it and let it scroll inside the dialog. */
-.pltt-record-manifest {
-	max-height: 260px;
-	overflow-y: auto;
-	border: 1px solid var(--pltt-border-light);
-	border-radius: 3px;
-}
-
-.pltt-record-manifest table {
-	margin: 0;
-	border: 0;
+	color: var(--pltt-text-dark);
 }
 
 @media screen and (max-width: 782px) {

@@ -433,6 +433,11 @@ class PLTT_Admin {
 					'statusUnbilledTitle'     => __( 'Chargeable — not on a bill record yet', 'plain-language-time-tracker' ),
 					'statusNotCharged'        => __( 'Not charged', 'plain-language-time-tracker' ),
 					'statusNotChargedTitle'   => __( 'Billable was switched off for this entry', 'plain-language-time-tracker' ),
+					// The gap between what the work came to and what you're
+					// charging, named beside the amount box in the Record-bill
+					// modal. Only one of the two ever shows at a time.
+					'youWouldAbsorb'          => __( 'you would absorb', 'plain-language-time-tracker' ),
+					'roundedUpBy'             => __( 'rounded up by', 'plain-language-time-tracker' ),
 				),
 				// Strings for the shared project billing-type picker
 				// (assets/js/project-type-picker.js), used by the Projects modal

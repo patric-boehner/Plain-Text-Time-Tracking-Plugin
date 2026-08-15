@@ -1,25 +1,31 @@
 /**
- * Billing queue — inline entry selection + two-modal commit.
+ * Billing queue — inline entry selection + commit, plus the shared line-items
+ * behaviour every billing surface reuses.
  *
  * Each scope row expands to show its entries. Hourly scopes get checkboxes:
  * ticking/unticking recomputes the row's "Selected (N) $X" line live and syncs
- * the Record-bill modal's amount. Two buttons sit under the selection:
- *   - "Line items…"  → a copy-only dialog (default / structured + AI prompt).
- *   - "Record bill →" → the commit modal (amount + description), which posts
- *     pltt_commit_billing with the row's unchecked entries as excluded_entry_ids.
- * On success the settled scope is removed and totals re-tally in place.
+ * the Record-bill modal's amount, which posts pltt_commit_billing with the row's
+ * unchecked entries as excluded_entry_ids. On success the settled scope is
+ * removed and totals re-tally in place.
+ *
+ * The .pltt-billcopy-* handlers below (swap the source, copy to clipboard) are
+ * delegated, so they serve every place that renders that markup: the detailed
+ * view's Record-bill modal and the "View record" dialog on both history tables.
  * Depends on PLTT.ajax / plttData from shared.js.
  */
 ( function () {
 	'use strict';
 
 	// Activate where there's something to drive: a commit form (the detailed-view
-	// scope panel), a copy dialog (the Billing ledger's "View line items"), or a
-	// record's row menu (either history table — those carry neither of the other
-	// two). The handlers are all delegated and target-checked, so binding is
-	// otherwise inert.
+	// scope panel), a dialog opener, a line-items source picker, or a record's row
+	// menu (either history table — those carry none of the others). The picker
+	// check is what keeps the detailed view's Record-bill modal working: its line
+	// items are rendered inline now, so there's no [data-lineitems-dialog] button
+	// on that screen to trip the earlier checks. The handlers are all delegated and
+	// target-checked, so binding is otherwise inert.
 	if ( ! document.querySelector( '.pltt-billing-form' )
 		&& ! document.querySelector( '[data-lineitems-dialog]' )
+		&& ! document.querySelector( '.pltt-billcopy-mode' )
 		&& ! document.querySelector( '.pltt-row-menu-trigger[data-menu="bill-record"]' ) ) {
 		return;
 	}

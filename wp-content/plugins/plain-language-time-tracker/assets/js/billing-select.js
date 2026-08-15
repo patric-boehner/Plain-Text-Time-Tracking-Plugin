@@ -4,7 +4,9 @@
  * The entry table renders an "Include in bill" select row (.pltt-bill-select).
  * This tallies the current selection into a docked bar, opens the Record-bill
  * modal on demand, and commits the checked entries as included_entry_ids via
- * pltt_commit_billing. Selection lives on the entries; the modal is commit-only.
+ * pltt_commit_billing. Selection lives on the entries; the modal carries the
+ * amount, the invoice date and the copyable line items (invoicing.js drives the
+ * .pltt-billcopy-* controls inside it). Committing lands on the new record.
  *
  * Depends on PLTT.ajax / plttData from shared.js.
  */
@@ -22,6 +24,11 @@
 	// per-entry selection, and the commit bills the period overage as a whole.
 	const isConfirm = bar.hasAttribute( 'data-confirm' );
 
+	// What the work came to, which the "you would absorb" readout measures the
+	// typed amount against. Fixed for a retainer (it bills its period whole);
+	// retallied from the ticked rows on every change for hourly.
+	let calcTotal = parseFloat( form.dataset.calculated ) || 0;
+
 	function formatCurrency( n ) {
 		return '$' + Number( n ).toLocaleString( 'en-US', {
 			minimumFractionDigits: 2,
@@ -37,6 +44,12 @@
 		let total = 0;
 		boxes.forEach( function ( c ) { total += parseFloat( c.dataset.amount ) || 0; } );
 		return Math.round( total * 100 ) / 100;
+	}
+
+	function selectionMinutes( boxes ) {
+		let mins = 0;
+		boxes.forEach( function ( c ) { mins += parseInt( c.dataset.minutes, 10 ) || 0; } );
+		return mins;
 	}
 
 	// Reflect the current selection into the bar (count + total, visibility).
@@ -69,22 +82,63 @@
 		}
 		const boxes = selected();
 		const total = selectionTotal( boxes );
+		calcTotal = total;
 		dialog.querySelectorAll( '.pltt-billsel-count' ).forEach( function ( el ) { el.textContent = String( boxes.length ); } );
 		dialog.querySelectorAll( '.pltt-billsel-calc' ).forEach( function ( el ) { el.textContent = formatCurrency( total ); } );
+		// Duration of what's ticked, beside the count it belongs to. Formatted by
+		// the shared helper so it matches pltt_format_duration() everywhere else.
+		const dur = dialog.querySelector( '.pltt-billsel-duration' );
+		if ( dur ) {
+			dur.textContent = PLTT.formatDuration( selectionMinutes( boxes ) );
+		}
 		// No ceiling — trim down to absorb, or raise for a rounded-up invoice.
 		const amount = form.querySelector( '.pltt-billsel-amount' );
 		if ( amount ) {
 			amount.value = total.toFixed( 2 );
 		}
+		// The invoice text is built server-side from the whole scope, so it keeps
+		// describing rows you unticked. Say so when the two diverge rather than let
+		// the modal show a live count beside prose that contradicts it.
+		const stale = dialog.querySelector( '.pltt-billsel-lineitems-stale' );
+		if ( stale ) {
+			const all = document.querySelectorAll( '.pltt-bill-select' ).length;
+			stale.hidden = boxes.length >= all;
+		}
 		refreshSubmitLabel();
 	}
 
+	/**
+	 * The submit button's amount, plus the gap between what the work came to and
+	 * what you're charging. Lower is absorption (you eat the difference); higher is
+	 * a rounded-up invoice. Equal says nothing — there's no gap to name.
+	 */
 	function refreshSubmitLabel() {
 		const amount = form.querySelector( '.pltt-billsel-amount' );
 		const label = form.querySelector( '.pltt-billsel-submit-amt' );
-		if ( amount && label ) {
-			const n = parseFloat( amount.value );
-			label.textContent = formatCurrency( Number.isFinite( n ) ? n : 0 );
+		if ( ! amount ) {
+			return;
+		}
+		// A plain text field now (matching project setup's adorned currency inputs),
+		// so strip anything that isn't part of the number before reading it — a
+		// pasted "$1,234.56" would otherwise parse as 1.
+		const n = parseFloat( String( amount.value ).replace( /[^0-9.-]/g, '' ) );
+		const billed = Number.isFinite( n ) ? n : 0;
+		if ( label ) {
+			label.textContent = formatCurrency( billed );
+		}
+
+		const note = form.querySelector( '.pltt-billsel-gap-note' );
+		if ( ! note ) {
+			return;
+		}
+		const gap = Math.round( ( calcTotal - billed ) * 100 ) / 100;
+		const i18n = plttData.i18n || {};
+		if ( gap > 0 ) {
+			note.textContent = '· ' + ( i18n.youWouldAbsorb || 'you would absorb' ) + ' ' + formatCurrency( gap );
+		} else if ( gap < 0 ) {
+			note.textContent = '· ' + ( i18n.roundedUpBy || 'rounded up by' ) + ' ' + formatCurrency( -gap );
+		} else {
+			note.textContent = '';
 		}
 	}
 
@@ -212,6 +266,11 @@
 		// Invoice date: blank falls back to today server-side.
 		const markedAt = form.querySelector( 'input[name="marked_at"]' );
 
+		// Normalise the amount before posting. The field is plain text, so a typed
+		// or pasted "$1,234.56" would reach PHP intact and cast to 1.00 — a bill
+		// silently short by three orders of magnitude.
+		const rawAmount = parseFloat( String( form.querySelector( 'input[name="billed_amount"]' ).value ).replace( /[^0-9.-]/g, '' ) );
+
 		PLTT.ajax(
 			'pltt_commit_billing',
 			{
@@ -220,7 +279,7 @@
 				period: form.querySelector( 'input[name="period"]' ).value,
 				date_from: form.querySelector( 'input[name="date_from"]' ).value,
 				date_to: form.querySelector( 'input[name="date_to"]' ).value,
-				billed_amount: form.querySelector( 'input[name="billed_amount"]' ).value,
+				billed_amount: ( Number.isFinite( rawAmount ) ? rawAmount : 0 ).toFixed( 2 ),
 				marked_at: markedAt ? markedAt.value : '',
 				included_entry_ids: included,
 				description: form.querySelector( '[name="description"]' ).value,
@@ -228,9 +287,15 @@
 			function ( response ) {
 				if ( response && response.success ) {
 					dialog.close();
-					// Exit billing mode: drop the bill flag so the select column goes
-					// away and the just-billed entries show as covered in the normal view.
-					window.location.href = exitBillingUrl();
+					// Land on the record just written, whose bar reopens the invoice
+					// line items read-only. The line items are inside this modal now,
+					// so closing it without that hop would take the invoice text off
+					// screen with no way back short of hunting the billing history.
+					// Falls back to simply leaving billing mode — the bill flag drops,
+					// the select column goes away and the just-billed entries show as
+					// covered — if the server couldn't name the record.
+					const viewUrl = response.data && response.data.view_url;
+					window.location.href = viewUrl ? viewUrl : exitBillingUrl();
 					return;
 				}
 				buttons.forEach( function ( b ) { b.disabled = false; } );
@@ -260,8 +325,10 @@
 		}
 		if ( d.billable ) {
 			const amt = ( Number( d.amount ) || 0 ).toFixed( 2 );
+			const mins = parseInt( d.minutes, 10 ) || 0;
 			cell.innerHTML = '<input type="checkbox" class="pltt-bill-select" checked'
 				+ ' data-entry-id="' + d.entryId + '" data-amount="' + amt + '"'
+				+ ' data-minutes="' + mins + '"'
 				+ ' aria-label="' + ( ( plttData.i18n && plttData.i18n.includeInBill ) || 'Include this entry in the bill' ) + '">';
 		} else {
 			const na = ( plttData.i18n && plttData.i18n.nonBillable ) || 'Non-billable';
