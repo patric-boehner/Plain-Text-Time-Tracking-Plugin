@@ -111,10 +111,32 @@ class PLTT_Admin {
 		// History — the log archive / month browser, its own destination again
 		// (slug kept as pltt-log-archive). It sits right after Today because it's
 		// the "look back at past days" companion to the day view.
+		// The menu label carries WordPress's own count bubble (the one Plugins and
+		// Comments use) for past days left unprocessed. Only the menu title gets
+		// the markup: the page title stays plain, and the hook suffix comes from
+		// the parent title + slug, so enqueue_assets() is unaffected.
+		$history_label = __( 'History', 'plain-language-time-tracker' );
+		$unprocessed   = pltt_user_can_access()
+			? PLTT_Daily_Log::count_unprocessed_before( pltt_get_current_date() )
+			: 0;
+		if ( $unprocessed > 0 ) {
+			$history_label .= sprintf(
+				' <span class="awaiting-mod count-%1$d"><span class="pending-count" aria-hidden="true">%1$d</span><span class="screen-reader-text">%2$s</span></span>',
+				$unprocessed,
+				esc_html(
+					sprintf(
+						/* translators: %d: number of days */
+						_n( '%d day not processed', '%d days not processed', $unprocessed, 'plain-language-time-tracker' ),
+						$unprocessed
+					)
+				)
+			);
+		}
+
 		add_submenu_page(
 			'pltt-time-tracker',
 			__( 'History', 'plain-language-time-tracker' ),
-			__( 'History', 'plain-language-time-tracker' ),
+			$history_label,
 			'manage_options',
 			'pltt-log-archive',
 			array( __CLASS__, 'render_history_page' )
