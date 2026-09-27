@@ -139,10 +139,69 @@
 }
 
 @media screen and (max-width: 782px) {
+	/* ── Shell: less frame on a phone ──
+	   25px of padding (plus the header/footer bands that match it) spent 90px of
+	   a 375px screen on margins. Scoped to this modal: the billing dialogs carry
+	   their own copies of those bands. */
+	/* border-box: the padding sits inside the width, so the box leaves a 10px
+	   gap either side instead of running 12px past the screen edge. */
+	#pltt-entry-edit-modal .pltt-modal-content {
+		box-sizing: border-box;
+		width: calc(100vw - 20px);
+		padding: 16px;
+	}
+
+	#pltt-entry-edit-modal .pltt-modal-content > h3 {
+		margin: -16px -16px 16px;
+		padding: 12px 48px 12px 16px;
+	}
+
+	#pltt-entry-edit-modal .pltt-modal-actions {
+		margin: 16px -16px -16px;
+		padding: 12px 16px;
+	}
+
+	/* Cancel / Save split the footer, like the other phone button rows. */
+	#pltt-entry-edit-modal .pltt-modal-actions-right {
+		flex: 1 1 auto;
+	}
+
+	#pltt-entry-edit-modal .pltt-modal-actions-right .button {
+		flex: 1 1 0;
+		text-align: center;
+	}
+
+	/* ── Fields ── Date/Start/End/Duration two by two; every control fills its
+	   field (date and time inputs otherwise keep their intrinsic width). */
 	.pltt-field-row-time .pltt-field-date,
 	.pltt-field-row-time .pltt-field-start,
 	.pltt-field-row-time .pltt-field-end,
 	.pltt-field-row-time .pltt-field-duration {
 		flex: 1 1 calc(50% - 12px);
+		max-width: none;
+		min-width: 0;
+	}
+
+	.pltt-entry-form .pltt-field input[type="date"],
+	.pltt-entry-form .pltt-field input[type="time"],
+	.pltt-entry-form .pltt-field input[type="number"],
+	.pltt-entry-form .pltt-field select {
+		width: 100%;
+	}
+
+	/* Client and Project a full line each; Tags and Billable share the last. */
+	.pltt-field-row-assignment .pltt-field-client,
+	.pltt-field-row-assignment .pltt-field-project {
+		flex: 1 1 100%;
+		min-width: 0;
+	}
+
+	.pltt-field-row-assignment .pltt-field-tags {
+		flex: 1 1 0;
+		min-width: 0;
+	}
+
+	.pltt-entry-form .pltt-tag-input-wrap {
+		max-width: none;
 	}
 }

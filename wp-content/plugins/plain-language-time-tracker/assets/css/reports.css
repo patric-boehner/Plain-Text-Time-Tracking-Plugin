@@ -287,10 +287,6 @@
 /* ---------- Reports content responsive ---------- */
 
 @media screen and (max-width: 782px) {
-	.pltt-report-content {
-		padding: 15px;
-	}
-
 	.pltt-report-content table {
 		display: block;
 		overflow-x: auto;

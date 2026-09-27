@@ -121,6 +121,7 @@
 /* Wrapper: pill + standalone Today button side by side in the header */
 .pltt-daily-log-nav {
 	display: flex;
+	flex-wrap: wrap;
 	align-items: center;
 	gap: 8px;
 }
@@ -153,9 +154,18 @@
 
 /* Responsive */
 @media screen and (max-width: 782px) {
+	/* Less frame on a phone: 20px of box padding plus 15px of textarea padding
+	   spent 70px of a ~350px width on margins. Height is set by
+	   fillCaptureSpace() in daily-log.js while the day is being captured. */
+	.pltt-log-container {
+		padding: 12px;
+	}
+
 	.pltt-log-textarea {
 		min-height: 250px;
-		font-size: 16px; /* Prevent zoom on iOS */
+		padding: 8px;
+		font-size: 14px;
+		line-height: 1.6;
 	}
 
 	.pltt-log-footer {
@@ -163,7 +173,31 @@
 		align-items: stretch;
 	}
 
+	/* Buttons share one row and split its width (bigger tap targets); if the
+	   labels don't fit side by side, each takes a full line. */
 	.pltt-log-actions {
-		justify-content: space-between;
+		flex-wrap: wrap;
+		row-gap: 8px;
+	}
+
+	.pltt-log-actions .button {
+		flex: 1 1 auto;
+		text-align: center;
+	}
+
+	/* The save status reserves 130px beside the buttons on desktop so they don't
+	   shift as it changes — here that invisible width is what pushed the buttons
+	   off-screen. It gets its own line under them instead (below, so "Saving…"
+	   appearing never moves a button you're about to tap), and no line at all
+	   while it's empty. */
+	.pltt-save-indicator {
+		flex: 0 0 100%;
+		min-width: 0;
+		order: 1;
+		white-space: normal;
+	}
+
+	.pltt-save-indicator:empty {
+		display: none;
 	}
 }

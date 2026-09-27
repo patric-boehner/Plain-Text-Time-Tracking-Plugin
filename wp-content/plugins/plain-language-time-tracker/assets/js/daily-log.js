@@ -317,6 +317,46 @@
 		}
 	} );
 
+	/**
+	 * On a phone, while the day is still being captured (not processed), size the
+	 * log box so it and the footer under it fill the screen below the header —
+	 * the page opens as one full writing surface with Save/Process in reach.
+	 *
+	 * Measured rather than set in CSS because the header's height varies ("Today"
+	 * vs a wrapped weekday date, the date nav wrapping or not). Recomputed only
+	 * when the width changes: a phone keyboard opening shrinks the height, and
+	 * resizing the box then would shift the text under the cursor.
+	 */
+	const narrowScreen = window.matchMedia( '(max-width: 782px)' );
+	const logContainer = textarea.closest( '.pltt-log-container' );
+	const pageGap      = 20; // Space left under the box, matching .pltt-wrap's bottom margin.
+	const minHeight    = 250; // Mirrors the CSS floor in daily-log.css.
+
+	function fillCaptureSpace() {
+		if ( ! logContainer || logContainer.classList.contains( 'pltt-log-processed' ) ) {
+			return;
+		}
+		if ( ! narrowScreen.matches ) {
+			textarea.style.height = ''; // Desktop keeps its CSS min-height.
+			return;
+		}
+		const top   = textarea.getBoundingClientRect().top + window.scrollY;
+		const below = logContainer.getBoundingClientRect().bottom - textarea.getBoundingClientRect().bottom;
+		const fill  = window.innerHeight - top - below - pageGap;
+
+		textarea.style.height = Math.max( minHeight, Math.floor( fill ) ) + 'px';
+	}
+
+	let lastWidth = window.innerWidth;
+	window.addEventListener( 'resize', function() {
+		if ( window.innerWidth === lastWidth ) {
+			return;
+		}
+		lastWidth = window.innerWidth;
+		fillCaptureSpace();
+	} );
+	fillCaptureSpace();
+
 	// Focus textarea on load.
 	textarea.focus();
 } )();
