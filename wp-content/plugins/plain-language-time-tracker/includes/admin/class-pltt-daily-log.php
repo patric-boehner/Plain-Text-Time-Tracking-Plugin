@@ -235,6 +235,30 @@ class PLTT_Daily_Log {
 	}
 
 	/**
+	 * Count past days whose log was written but never processed.
+	 *
+	 * Drives the History menu bubble. Matches History's "Not processed" badge
+	 * (the same `processed` flag), minus two cases that aren't waiting on anyone:
+	 * today, which is still being captured (every save resets the flag), and
+	 * blank logs.
+	 *
+	 * @param string $before_date Only count days before this date (Y-m-d).
+	 * @return int Number of days.
+	 */
+	public static function count_unprocessed_before( $before_date ) {
+		global $wpdb;
+		$table = PLTT_Database::get_table_name( 'daily_logs' );
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+		return (int) $wpdb->get_var(
+			$wpdb->prepare(
+				"SELECT COUNT(*) FROM {$table} WHERE processed = 0 AND TRIM(content) <> '' AND log_date < %s",
+				$before_date
+			)
+		);
+	}
+
+	/**
 	 * Get distinct months that have daily logs.
 	 *
 	 * @return array Array of month strings in YYYY-MM format.
