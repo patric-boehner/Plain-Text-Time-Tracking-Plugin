@@ -1,0 +1,604 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>PLTT — Tables on a phone</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;450;500;600&family=IBM+Plex+Mono:wght@400;450;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --blue:#2271b1; --blue-dk:#135e96; --blue-bg:#eaf2fa;
+    --ink:#16191d; --ink-2:#4b5158; --ink-3:#787c82;
+    --line:#dcdcde; --line-2:#ececed; --paper:#fff; --bg:#f0f0f1;
+    --ready:#00844a; --ready-bg:#e8f5ed;
+    --wait:#8a5d00; --wait-bg:#fbf3e3;
+    --done:#4b5158; --done-bg:#eeeff0;
+    --purple:#5b41c9; --purple-bg:#efecfb;
+    --monthly:#0c5a86; --monthly-bg:#e4f0f7;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:#e6e6e8;font:14px/1.6 "IBM Plex Sans",system-ui,sans-serif;color:var(--ink);-webkit-font-smoothing:antialiased}
+  .wrap{max-width:1240px;margin:0 auto;padding:34px 24px 90px}
+  .mono{font-family:"IBM Plex Mono",monospace;font-variant-numeric:tabular-nums;letter-spacing:-.1px}
+
+  /* ── Document chrome (same as the other ui/ mockups) ── */
+  .doc{background:var(--ink);color:#fff;padding:32px 36px;border-radius:5px}
+  .doc h1{margin:0 0 10px;font-size:23px;font-weight:600;letter-spacing:-.3px}
+  .doc p{margin:0 0 10px;color:#c3c4c7;max-width:78ch;line-height:1.7}
+  .doc p:last-child{margin:0}
+  .doc b{color:#fff;font-weight:500}
+  .doc ol{margin:0 0 12px;padding-left:20px;color:#c3c4c7;max-width:78ch;line-height:1.7}
+  .doc ol b{color:#fff}
+
+  .sec{margin-top:46px}
+  .sec-head{padding-bottom:12px;border-bottom:2px solid var(--ink);margin-bottom:20px;display:flex;align-items:baseline;gap:13px;flex-wrap:wrap}
+  .sec-num{font:500 12px/1 "IBM Plex Mono",monospace;color:var(--ink-3);letter-spacing:.6px}
+  .sec-head h2{margin:0;font-size:18px;font-weight:600;letter-spacing:-.2px}
+  .sec-head .say{margin-left:auto;font-size:13px;color:var(--ink-2)}
+
+  .stage{display:flex;flex-wrap:wrap;gap:34px;align-items:flex-start}
+  .stage > div:not(.notes){flex:0 0 377px}
+  .notes{flex:1 1 300px;max-width:62ch;color:var(--ink-2);line-height:1.75}
+  .notes h3{margin:0 0 6px;font-size:14px;font-weight:600;color:var(--ink)}
+  .notes p{margin:0 0 14px}
+  .notes ul{margin:0 0 14px;padding-left:18px}
+  .notes li{margin-bottom:4px}
+  .notes code{font:12.5px "IBM Plex Mono",monospace;background:#dfe0e2;padding:1px 5px;border-radius:3px;color:var(--ink)}
+  .notes .ask{border-left:3px solid var(--wait);background:var(--wait-bg);padding:10px 14px;color:var(--wait);border-radius:0 3px 3px 0}
+  .notes .ask b{color:var(--ink)}
+  .notes .decided{border-left:3px solid var(--ready);background:var(--ready-bg);padding:10px 14px;color:#0b5a36;border-radius:0 3px 3px 0}
+  .notes .decided b{color:var(--ink)}
+
+  /* ── Phone frame: 375px, the WP admin grey, 10px gutters like the real screen ── */
+  .phone{flex:0 0 auto;width:377px;border:1px solid #b9bbbe;border-radius:6px;overflow:hidden;background:var(--bg)}
+  .phone-bar{background:#1d2327;color:#9ea3a8;font:11px/1 "IBM Plex Mono",monospace;padding:9px 12px;display:flex;justify-content:space-between}
+  .phone-bar b{color:#f0f0f1;font-weight:500}
+  .phone-body{padding:14px 10px 18px;max-height:640px;overflow:auto}
+  .phone.before .phone-bar{background:#6b2121}
+  .cap{font-size:12px;color:var(--ink-3);margin:8px 2px 0}
+
+  /* ── Shared pieces as they look in the plugin ── */
+  .card{background:var(--paper);border:1px solid var(--line);border-radius:4px;overflow:hidden;margin-bottom:14px}
+  .card-head{display:flex;align-items:baseline;gap:8px;padding:12px 14px;border-bottom:1px solid var(--line);font-size:13.5px}
+  .card-head b{color:var(--blue);font-weight:600}
+  .card-head .fig{margin-left:auto;font-size:12px;color:var(--ink-2)}
+  .pltt-badge{display:inline-block;padding:1px 8px;border-radius:3px;font-size:11.5px;line-height:19px;white-space:nowrap;font-weight:500}
+  .b-hourly{background:var(--ready-bg);color:var(--ready)}
+  .b-monthly{background:var(--monthly-bg);color:var(--monthly)}
+  .b-fixed{background:var(--purple-bg);color:var(--purple)}
+  .b-internal{background:#eeeff0;color:var(--ink-2)}
+  .b-billed{background:var(--blue-bg);color:var(--blue-dk)}
+  .b-unbilled{background:var(--wait-bg);color:var(--wait)}
+  .b-processed{background:var(--ready-bg);color:var(--ready)}
+  .b-waiting{background:var(--wait-bg);color:var(--wait)}
+  .tag{display:inline-block;background:#f0f0f1;border:1px solid var(--line);border-radius:10px;padding:0 8px;font-size:11.5px;line-height:18px;color:var(--ink-2);margin:0 4px 0 0}
+  .dollar{color:var(--blue);font-weight:700}
+  .dollar.off{color:#c3c4c7}
+  .pltt-empty{color:#c3c4c7}
+  .kebab{border:0;background:none;width:30px;height:30px;border-radius:4px;color:var(--ink-3);font-size:18px;line-height:30px;padding:0;cursor:pointer}
+  .rowlink{color:var(--blue);font-weight:600;text-decoration:none}
+  .muted{color:var(--ink-3)}
+  .over{color:var(--wait)}
+  .btn{display:inline-block;border:1px solid var(--blue);background:#fff;color:var(--blue);padding:4px 12px;border-radius:3px;font-size:13px;white-space:nowrap}
+  .btn.p{background:var(--blue);color:#fff}
+
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th{text-align:left;font-weight:400;color:var(--ink-2);font-size:12.5px;padding:10px 12px;border-bottom:1px solid var(--line);white-space:nowrap}
+  td{padding:12px;border-bottom:1px solid var(--line-2);vertical-align:top}
+  tr:last-child td{border-bottom:0}
+
+  /* ── BEFORE: what the phone gets today — the desktop table, scrolling sideways ── */
+  .before .scroll{overflow-x:auto}
+  .before table{min-width:640px}
+  .before td{white-space:normal}
+
+  /* ════════════════════════════════════════════════════════════════════════
+     AFTER: the proposal. Everything below is scoped to .m (standing in for
+     @media screen and (max-width: 782px)) and hangs off the classes the
+     plugin's tables already carry. The pattern is the same for every table:
+
+       - the header row goes (the cells now say what they are)
+       - each <tr> becomes a small CSS grid with named areas
+       - line 1: what the row IS (its link) … ⋮ menu, always top-right
+       - under it: the facts, figures right-aligned in mono
+       - a cell holding only "—" disappears instead of printing a dash
+     ════════════════════════════════════════════════════════════════════════ */
+  .m table,.m tbody,.m tr,.m td{display:block}
+  .m thead{display:none}
+  .m tr{display:grid;column-gap:10px;row-gap:3px;padding:12px 14px;border-bottom:1px solid var(--line-2);align-items:baseline}
+  .m tr:last-child{border-bottom:0}
+  .m td{padding:0;border:0;min-width:0}
+  .m td:has(> .pltt-empty:only-child){display:none}
+  .m .pltt-rowmenu-col{align-self:start;margin:-6px -8px 0 0}
+  .m [data-label]::before{content:attr(data-label) " ";color:var(--ink-3);font-family:"IBM Plex Sans",sans-serif;letter-spacing:0}
+
+  /* 01 · Entries (Overview) — one entry = one block.
+     A wrapping flex row, not a grid: this row has the most optional cells
+     ($, status, amount, tags), and in a grid an absent cell leaves a hole
+     where its column was. In flex the rest simply close up. Two zero-height
+     pseudo-elements with a 100% basis force the line breaks; `order` sets
+     the reading order, which matches the DOM except that ⋮ joins line 1. */
+  .m .entries tr{display:flex;flex-wrap:wrap;align-items:baseline;column-gap:10px;row-gap:0}
+  .m .entries tr::before,.m .entries tr::after{content:"";flex-basis:100%;height:0}
+  .m .entries .pltt-entry-desc-cell{order:1;flex:1 1 0}
+  .m .entries .pltt-rowmenu-col{order:2}
+  .m .entries tr::before{order:3}
+  .m .entries .pltt-time-cell{order:4;margin-top:6px}
+  .m .entries .pltt-duration-cell:not(.pltt-amount-col){order:5;margin-top:6px;font-weight:600}
+  .m .entries .pltt-billable-indicator{order:6;margin-top:6px}
+  .m .entries .pltt-amount-col{order:7;margin-top:6px;margin-left:auto}
+  /* With a $ showing, it takes the push to the right and the amount follows it. */
+  .m .entries .pltt-billable-indicator:not(:has(> .pltt-empty:only-child)){margin-left:auto}
+  .m .entries .pltt-billable-indicator:not(:has(> .pltt-empty:only-child)) ~ .pltt-amount-col{margin-left:0}
+  .m .entries tr::after{order:8}
+  .m .entries .pltt-status-col{order:9;margin-top:6px}
+  .m .entries .pltt-tag-cell{order:10;margin-top:6px}
+  /* Decided: tags and billable are display-only on a phone — edit through ⋮. */
+  .m .entries .pltt-tag-cell,.m .entries .pltt-billable-indicator{pointer-events:none}
+  /* Covered by a bill record: the row tint + 3px left edge it has on desktop. */
+  .entries tr.covered{background:#f3f8fc}
+  .entries tr.covered > td:first-child{box-shadow:inset 3px 0 0 var(--blue)}
+  .m .entries tr.covered{box-shadow:inset 3px 0 0 var(--blue)}
+  .m .entries tr.covered > td:first-child{box-shadow:none}
+  .pltt-entry-desc-text{font-weight:600;color:var(--ink)}
+  .pltt-entry-meta{color:var(--ink-3);font-size:12.5px;margin-top:1px}
+
+  /* Today's table: date/time lead, so the time line comes first-ish too. */
+  .m .today tr{grid-template-columns:auto 1fr auto;
+    grid-template-areas:
+      "desc desc menu"
+      "when .    dur"
+      "tags tags tags"}
+  .m .today .c-desc{grid-area:desc}
+  .m .today .c-when{grid-area:when;margin-top:5px}
+  .m .today .c-dur{grid-area:dur;margin-top:5px;font-weight:600;text-align:right}
+  .m .today .c-tags{grid-area:tags;margin-top:5px}
+  .m .today .pltt-rowmenu-col{grid-area:menu}
+  .m .today .c-when .date{display:none} /* the page is one day; the date adds nothing */
+
+  /* 02 · Summary — project, type, hours, budget, amount */
+  .m .summary tr{grid-template-columns:1fr auto;
+    grid-template-areas:
+      "proj   type"
+      "hours  amt"
+      "budget budget"}
+  .m .summary .c-proj{grid-area:proj}
+  .m .summary .c-type{grid-area:type}
+  .m .summary .c-hours{grid-area:hours;margin-top:5px;font-weight:600}
+  .m .summary .c-amt{grid-area:amt;margin-top:5px;text-align:right}
+  .m .summary .c-budget{grid-area:budget;font-size:12.5px}
+
+  /* 03 · History — one day's log */
+  .m .history tr{grid-template-columns:1fr auto auto;
+    grid-template-areas:
+      "date stat menu"
+      "prev prev prev"
+      "figs figs figs"}
+  .m .history .c-date{grid-area:date}
+  .m .history .c-stat{grid-area:stat}
+  .m .history .c-prev{grid-area:prev;color:var(--ink-2);font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px}
+  .m .history .c-ent,.m .history .c-hrs{display:none}
+  .m .history .c-figs{display:block;grid-area:figs;font-size:12.5px;color:var(--ink-2)}
+  .history .c-figs{display:none}
+  .m .history .pltt-rowmenu-col{grid-area:menu}
+
+  /* 04 · Billing: ready to bill */
+  .m .ready tr{grid-template-columns:1fr auto;
+    grid-template-areas:
+      "proj   amt"
+      "client client"
+      "cov    bill"}
+  .m .ready .c-client{grid-area:client;color:var(--ink-3);font-size:12.5px}
+  .m .ready .c-type{display:none}
+  .m .ready .c-client .pltt-badge{display:inline-block}
+  .ready .c-client .pltt-badge{display:none}
+  .m .ready .c-proj{grid-area:proj}
+  .m .ready .c-amt{grid-area:amt;text-align:right;font-weight:600}
+  .m .ready .c-cov{grid-area:cov;font-size:12.5px;color:var(--ink-2);margin-top:6px}
+  .m .ready .c-bill{grid-area:bill;margin-top:4px}
+
+  /* 04b · Billed history (Billing → Billed history, and Project Detail) */
+  .m .billed tr{grid-template-columns:1fr auto auto;
+    grid-template-areas:
+      "inv  amt  menu"
+      "work work work"
+      "abs  abs  abs"}
+  .m .billed .c-inv{grid-area:inv}
+  .m .billed .c-amt{grid-area:amt;text-align:right;font-weight:600}
+  .m .billed .c-type{display:none}
+  .m .billed .c-work{grid-area:work;font-size:12.5px;color:var(--ink-2);margin-top:3px}
+  .m .billed .c-work .pltt-badge{display:inline-block;margin-right:6px}
+  .billed .c-work .pltt-badge{display:none}
+  .m .billed .c-abs{grid-area:abs;font-size:12.5px}
+  .m .billed .pltt-rowmenu-col{grid-area:menu}
+
+  /* 05 · Lists: Clients, Projects, Tags */
+  .m .clients tr{grid-template-columns:1fr auto;
+    grid-template-areas:
+      "name menu"
+      "meta meta"}
+  .m .clients .c-name{grid-area:name}
+  .m .clients .c-rate,.m .clients .c-count{display:none}
+  .m .clients .c-meta{display:block;grid-area:meta;font-size:12.5px;color:var(--ink-2)}
+  .clients .c-meta{display:none}
+  .m .clients .pltt-rowmenu-col{grid-area:menu}
+
+  .m .projects tr{grid-template-columns:1fr auto auto;
+    grid-template-areas:
+      "name type menu"
+      "meta meta meta"}
+  .m .projects .c-name{grid-area:name}
+  .m .projects .c-type{grid-area:type}
+  .m .projects .c-client,.m .projects .c-rate,.m .projects .c-budget,.m .projects .c-bill{display:none}
+  .m .projects .c-meta{display:block;grid-area:meta;font-size:12.5px;color:var(--ink-2)}
+  .projects .c-meta{display:none}
+  .m .projects .pltt-rowmenu-col{grid-area:menu}
+  /* A value never splits across lines ("3 hrs / mo"); the line breaks between facts instead. */
+  .c-meta .mono{white-space:nowrap}
+
+  .m .tags tr{grid-template-columns:1fr auto auto;grid-template-areas:"name count menu";align-items:center}
+  .m .tags .c-name{grid-area:name}
+  .m .tags .c-count{grid-area:count;color:var(--ink-2);font-size:12.5px}
+  .m .tags .pltt-rowmenu-col{grid-area:menu;margin:0 -8px 0 0}
+</style>
+
+<div class="wrap">
+
+<div class="doc">
+  <h1>Tables on a phone</h1>
+  <p>Today every table keeps its desktop columns on a phone and scrolls sideways. On Entries that puts the <b>⋮ menu</b>, the only way into the edit modal, off the right edge until you swipe the table across.</p>
+  <p>The proposal is one pattern for every table:</p>
+  <ol>
+    <li><b>Each row becomes a small block.</b> Line 1 says what the row is (its link) with the <b>⋮ menu top-right</b>, where your thumb finds it on every screen.</li>
+    <li><b>The facts go underneath,</b> with the figures right-aligned in mono as on desktop.</li>
+    <li><b>The column headings go.</b> Each cell has to say what it is on its own, so "33m" and "$50.00" stay bare, but a bare "1" or "0.68" gets a word next to it.</li>
+    <li><b>A cell that only holds "—" disappears</b> instead of printing a dash on its own line.</li>
+  </ol>
+  <p>Each "after" frame below is built from the table's real markup and class names, restyled with CSS alone (the <code style="color:#fff">.m</code> rules at the top of this file stand in for the 782px breakpoint). Desktop doesn't change. Where a table needs a small template change, its notes say so.</p>
+</div>
+
+<!-- ═════════════════════════════════════════════════════════════════════ 01 -->
+<section class="sec">
+  <div class="sec-head"><span class="sec-num">01</span><h2>Entries — Overview</h2><span class="say">8 columns: Description · Tags · Time · Duration · Billable · Status · Amount · ⋮</span></div>
+  <div class="stage">
+
+    <div>
+      <div class="phone before">
+        <div class="phone-bar"><b>Today</b><span>375px · scrolls sideways</span></div>
+        <div class="phone-body">
+          <div class="card">
+            <div class="card-head"><b>July 31</b> Friday <span class="fig mono">6h 46m · $158.33</span></div>
+            <div class="scroll">
+              <table>
+                <thead><tr><th>Description</th><th>Tags</th><th>Time</th><th>Duration</th><th>Billable</th><th>Status</th><th>Amount</th><th></th></tr></thead>
+                <tbody>
+                  <tr><td><span class="pltt-entry-desc-text">Starting updates for care plan clients.</span><div class="pltt-entry-meta">Democrats of Rossmor · Website Care Plan Time</div></td><td><span class="tag">support</span></td><td class="mono">9:20am – 9:53am</td><td class="mono"><b>33m</b></td><td><span class="pltt-empty">—</span></td><td><span class="pltt-empty">—</span></td><td><span class="pltt-empty">—</span></td><td><button class="kebab">⋮</button></td></tr>
+                  <tr><td><span class="pltt-entry-desc-text">Fix checkout form validation</span><div class="pltt-entry-meta">Aspen San Juan Expeditions · General Website Support 2026</div></td><td><span class="tag">bugfix</span></td><td class="mono">1:05pm – 2:10pm</td><td class="mono"><b>1h 5m</b></td><td><span class="dollar">$</span></td><td><span class="pltt-badge b-unbilled">Unbilled</span></td><td class="mono">$38.34</td><td><button class="kebab">⋮</button></td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+      <p class="cap">The description column squeezes to ~10 lines; Amount and ⋮ are off-screen.</p>
+    </div>
+
+    <div>
+      <div class="phone m">
+        <div class="phone-bar"><b>Proposed</b><span>375px</span></div>
+        <div class="phone-body">
+          <div class="card">
+            <div class="card-head"><b>July 31</b> Friday <span class="fig mono">6h 46m · $158.33</span></div>
+            <table class="entries">
+              <thead><tr><th>Description</th><th>Tags</th><th>Time</th><th>Duration</th><th>Billable</th><th>Status</th><th>Amount</th><th></th></tr></thead>
+              <tbody>
+                <tr>
+                  <td class="pltt-entry-desc-cell"><span class="pltt-entry-desc-text">Starting updates for care plan clients.</span><div class="pltt-entry-meta">Democrats of Rossmor · Website Care Plan Time</div></td>
+                  <td class="pltt-tag-cell"><span class="tag">support</span></td>
+                  <td class="pltt-time-cell mono">9:20am – 9:53am</td>
+                  <td class="pltt-duration-cell mono">33m</td>
+                  <td class="pltt-billable-indicator"><span class="pltt-empty">—</span></td>
+                  <td class="pltt-status-col"><span class="pltt-empty">—</span></td>
+                  <td class="pltt-duration-cell pltt-amount-col mono"><span class="pltt-empty">—</span></td>
+                  <td class="pltt-rowmenu-col"><button class="kebab">⋮</button></td>
+                </tr>
+                <tr>
+                  <td class="pltt-entry-desc-cell"><span class="pltt-entry-desc-text">Fix checkout form validation</span><div class="pltt-entry-meta">Aspen San Juan Expeditions · General Website Support 2026</div></td>
+                  <td class="pltt-tag-cell"><span class="tag">bugfix</span><span class="tag">forms</span></td>
+                  <td class="pltt-time-cell mono">1:05pm – 2:10pm</td>
+                  <td class="pltt-duration-cell mono">1h 5m</td>
+                  <td class="pltt-billable-indicator"><span class="dollar">$</span></td>
+                  <td class="pltt-status-col"><span class="pltt-badge b-unbilled">Unbilled</span></td>
+                  <td class="pltt-duration-cell pltt-amount-col mono">$38.34</td>
+                  <td class="pltt-rowmenu-col"><button class="kebab">⋮</button></td>
+                </tr>
+                <tr class="covered">
+                  <td class="pltt-entry-desc-cell"><span class="pltt-entry-desc-text">Plugin updates and uptime check</span><div class="pltt-entry-meta">Behind The Scenes Adventures · Care Plan 2026</div></td>
+                  <td class="pltt-tag-cell"><span class="pltt-empty">—</span></td>
+                  <td class="pltt-time-cell mono">3:00pm – 3:45pm</td>
+                  <td class="pltt-duration-cell mono">45m</td>
+                  <td class="pltt-billable-indicator"><span class="dollar">$</span></td>
+                  <td class="pltt-status-col"><span class="pltt-badge b-billed">Billed</span></td>
+                  <td class="pltt-duration-cell pltt-amount-col mono">$67.50</td>
+                  <td class="pltt-rowmenu-col"><button class="kebab">⋮</button></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+      <p class="cap">Retainer row (top): no $, status or amount, so those lines simply aren't there.</p>
+    </div>
+
+    <div class="notes">
+      <h3>What goes where</h3>
+      <ul>
+        <li><b>Line 1:</b> the description, with the client · project under it (already one cell today), and the ⋮ menu top-right.</li>
+        <li><b>Line 2:</b> the time range and duration on the left; the billable $ and amount on the right.</li>
+        <li><b>Line 3:</b> the status badge, then the tags.</li>
+      </ul>
+      <h3>Kept from desktop</h3>
+      <p>A covered (billed) row keeps its blue tint and 3px left edge. The badge sits on line 3 instead of in its own column.</p>
+      <h3>Template change</h3>
+      <p>None. The cells already carry <code>pltt-entry-desc-cell</code>, <code>pltt-time-cell</code>, <code>pltt-status-col</code>, <code>pltt-amount-col</code> and <code>pltt-rowmenu-col</code>. The one catch is that the duration and amount cells share <code>pltt-duration-cell</code>, so the CSS tells them apart with <code>:not(.pltt-amount-col)</code>.</p>
+      <p class="decided"><b>Decided:</b> on a phone, tags and the billable $ are display-only; both are edited through the ⋮ → Edit modal. On desktop they stay editable in place. In CSS that's <code>pointer-events: none</code> on the tag and billable cells inside the breakpoint, so the inline tag picker and the $ toggle never open on a phone.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ═════════════════════════════════════════════════════════════════════ 01b -->
+<section class="sec">
+  <div class="sec-head"><span class="sec-num">01b</span><h2>Entries — Today</h2><span class="say">5 columns: Date / Time · Duration · Description · Tags · ⋮</span></div>
+  <div class="stage">
+    <div>
+      <div class="phone m">
+        <div class="phone-bar"><b>Proposed</b><span>375px</span></div>
+        <div class="phone-body">
+          <div class="card">
+            <table class="today">
+              <thead><tr><th>Date / Time</th><th>Duration</th><th>Description</th><th>Tags</th><th></th></tr></thead>
+              <tbody>
+                <tr>
+                  <td class="c-when mono"><span class="date">Aug 1, 2026 </span>10:28am – 11:09am</td>
+                  <td class="c-dur mono">41m</td>
+                  <td class="c-desc"><span class="pltt-entry-desc-text">Setting up DVOS staging on Flywheel for migrating the site.</span><div class="pltt-entry-meta">Diablo View Orchid Society · Website Hack Cleanup</div></td>
+                  <td class="c-tags"><span class="tag">migrating</span><span class="tag">staging setup</span></td>
+                  <td class="pltt-rowmenu-col"><button class="kebab">⋮</button></td>
+                </tr>
+                <tr>
+                  <td class="c-when mono"><span class="date">Aug 1, 2026 </span>11:09am – 12:00pm</td>
+                  <td class="c-dur mono">51m</td>
+                  <td class="c-desc"><span class="pltt-entry-desc-text">DNS cutover and SSL check</span><div class="pltt-entry-meta">Diablo View Orchid Society · Website Hack Cleanup</div></td>
+                  <td class="c-tags"><span class="pltt-empty">—</span></td>
+                  <td class="pltt-rowmenu-col"><button class="kebab">⋮</button></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="notes">
+      <h3>Same block as the Overview</h3>
+      <p>An entry reads the same on both screens: description and client · project on top, the time underneath, tags last. Only the figures differ, because Today has no billing columns.</p>
+      <p>The description moves up to line 1 even though Date / Time is the first column on desktop. The grid places cells by name, not by their order in the markup.</p>
+      <h3>Dropped on a phone</h3>
+      <p>The date. Every row on Today is the same day, and the header already says which.</p>
+      <h3>Template change</h3>
+      <p>Small. These cells have no classes today, so each needs one (for example <code>pltt-when-cell</code>), and the date needs a span of its own so it can be hidden.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ═════════════════════════════════════════════════════════════════════ 02 -->
+<section class="sec">
+  <div class="sec-head"><span class="sec-num">02</span><h2>Summary</h2><span class="say">5 columns: Project · Type · Hours · Budget · Amount</span></div>
+  <div class="stage">
+    <div>
+      <div class="phone before">
+        <div class="phone-bar"><b>Today</b><span>375px · scrolls sideways</span></div>
+        <div class="phone-body">
+          <div class="card">
+            <div class="scroll">
+              <table>
+                <thead><tr><th>Project</th><th>Type</th><th>Hours</th><th>Budget</th><th>Amount</th></tr></thead>
+                <tbody>
+                  <tr><td><a class="rowlink">Accessibility Remediation</a><div class="muted">Postie</div></td><td><span class="pltt-badge b-fixed">Fixed Budget</span></td><td class="mono"><b>13h 7m</b></td><td class="over">7h 27m over · 119%</td><td><span class="pltt-empty">—</span></td></tr>
+                  <tr><td><a class="rowlink">General Support 2026</a><div class="muted">Paula Levine</div></td><td><span class="pltt-badge b-hourly">Hourly</span></td><td class="mono"><b>8m</b></td><td><span class="pltt-empty">—</span></td><td class="mono">$4.67</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div>
+      <div class="phone m">
+        <div class="phone-bar"><b>Proposed</b><span>375px</span></div>
+        <div class="phone-body">
+          <div class="card">
+            <table class="summary">
+              <thead><tr><th>Project</th><th>Type</th><th>Hours</th><th>Budget</th><th>Amount</th></tr></thead>
+              <tbody>
+                <tr><td class="c-proj"><a class="rowlink">Accessibility Remediation</a><div class="muted" style="font-size:12.5px">Postie</div></td><td class="c-type"><span class="pltt-badge b-fixed">Fixed Budget</span></td><td class="c-hours mono">13h 7m</td><td class="c-budget over">7h 27m over · 119%</td><td class="c-amt mono"><span class="pltt-empty">—</span></td></tr>
+                <tr><td class="c-proj"><a class="rowlink">Content Plan Time</a><div class="muted" style="font-size:12.5px">S3NSE</div></td><td class="c-type"><span class="pltt-badge b-monthly">Monthly retainer</span></td><td class="c-hours mono">30m</td><td class="c-budget muted">30m of 3h</td><td class="c-amt mono"><span class="pltt-empty">—</span></td></tr>
+                <tr><td class="c-proj"><a class="rowlink">General Support 2026</a><div class="muted" style="font-size:12.5px">Paula Levine</div></td><td class="c-type"><span class="pltt-badge b-hourly">Hourly</span></td><td class="c-hours mono">8m</td><td class="c-budget"><span class="pltt-empty">—</span></td><td class="c-amt mono">$4.67</td></tr>
+                <tr><td class="c-proj"><a class="rowlink">Business Development</a><div class="muted" style="font-size:12.5px">Internal</div></td><td class="c-type"><span class="pltt-badge b-internal">Internal</span></td><td class="c-hours mono">14h 19m</td><td class="c-budget"><span class="pltt-empty">—</span></td><td class="c-amt mono"><span class="pltt-empty">—</span></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="notes">
+      <h3>What goes where</h3>
+      <ul>
+        <li><b>Line 1:</b> project (with client under it) on the left, type badge on the right.</li>
+        <li><b>Line 2:</b> hours on the left, amount on the right.</li>
+        <li><b>Line 3:</b> the budget state, amber when over, only when the project has one.</li>
+      </ul>
+      <p>No ⋮ here: the project name is the link, same as desktop.</p>
+      <h3>Template change</h3>
+      <p>The cells need classes (<code>c-hours</code>, <code>c-budget</code> and so on) so the grid can place them. The content stays the same.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ═════════════════════════════════════════════════════════════════════ 03 -->
+<section class="sec">
+  <div class="sec-head"><span class="sec-num">03</span><h2>History</h2><span class="say">6 columns: Date · Preview · Entries · Hours · Status · ⋮</span></div>
+  <div class="stage">
+    <div>
+      <div class="phone m">
+        <div class="phone-bar"><b>Proposed</b><span>375px</span></div>
+        <div class="phone-body">
+          <div class="card">
+            <div class="card-head" style="color:var(--ink)"><span style="font-weight:600">Week of Jul 27–Aug 2, 2026</span><span class="fig mono">2 days · 1h 32m</span></div>
+            <table class="history">
+              <thead><tr><th>Date</th><th>Preview</th><th>Entries</th><th>Hours</th><th>Status</th><th></th></tr></thead>
+              <tbody>
+                <tr><td class="c-date"><a class="rowlink">Sat, Aug 1</a></td><td class="c-prev mono">@10:28am - Setting up DVOS staging on Flywheel for migrating the site. @11:09am - DNS cutover</td><td class="c-ent">2</td><td class="c-hrs">1.53</td><td class="c-stat"><span class="pltt-badge b-processed">Processed</span></td><td class="c-figs mono">2 entries · 1h 32m</td><td class="pltt-rowmenu-col"><button class="kebab">⋮</button></td></tr>
+                <tr><td class="c-date"><a class="rowlink">Thu, Jul 30</a></td><td class="c-prev mono">@9:05am - Inbox and scheduling @9:40am - done</td><td class="c-ent">0</td><td class="c-hrs">0</td><td class="c-stat"><span class="pltt-badge b-waiting">Not processed</span></td><td class="c-figs mono">Not processed yet</td><td class="pltt-rowmenu-col"><button class="kebab">⋮</button></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="notes">
+      <h3>What goes where</h3>
+      <ul>
+        <li><b>Line 1:</b> the date (the link), the status badge beside it, then ⋮.</li>
+        <li><b>Line 2:</b> the log preview, cut to one line.</li>
+        <li><b>Line 3:</b> "2 entries · 1h 32m".</li>
+      </ul>
+      <h3>Why line 3 needs its own text</h3>
+      <p>Entries and Hours are bare numbers today ("2", "1.53"), which only make sense under their headings. With the headings gone they're merged into one phrase, and hours are shown as <span class="mono">1h 32m</span> to match the week header above them instead of a decimal.</p>
+      <h3>Template change</h3>
+      <p>One extra cell carrying that phrase, hidden on desktop. The alternative is <code>data-label</code> attributes, which print "Entries 2 · Hours 1.53": it works, but it reads like a form.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ═════════════════════════════════════════════════════════════════════ 04 -->
+<section class="sec">
+  <div class="sec-head"><span class="sec-num">04</span><h2>Billing</h2><span class="say">Ready to bill: Client · Project · Type · Covered · Amount · Bill — Billed history: Invoiced · Type · Work covered · Amount · Absorbed · ⋮</span></div>
+  <div class="stage">
+    <div>
+      <div class="phone m">
+        <div class="phone-bar"><b>Ready to bill</b><span>375px</span></div>
+        <div class="phone-body">
+          <div class="card">
+            <table class="ready">
+              <thead><tr><th>Client</th><th>Project</th><th>Type</th><th>Covered</th><th>Amount</th><th></th></tr></thead>
+              <tbody>
+                <tr><td class="c-client">Aspen San Juan Expeditions · <span class="pltt-badge b-hourly">Hourly</span></td><td class="c-proj"><a class="rowlink">General Website Support 2026</a></td><td class="c-type"><span class="pltt-badge b-hourly">Hourly</span></td><td class="c-cov mono">Jul 24 – Jul 31, 2026 · 4 entries</td><td class="c-amt mono">$38.34</td><td class="c-bill"><span class="btn p">Bill</span></td></tr>
+                <tr><td class="c-client">Democrats of Rossmor · <span class="pltt-badge b-monthly">Monthly retainer</span></td><td class="c-proj"><a class="rowlink">Website Care Plan Time</a></td><td class="c-type"><span class="pltt-badge b-monthly">Monthly retainer</span></td><td class="c-cov mono">July 2026 · 8h 12m over</td><td class="c-amt mono">$738.00</td><td class="c-bill"><span class="btn p">Bill</span></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div>
+      <div class="phone m">
+        <div class="phone-bar"><b>Billed history</b><span>375px</span></div>
+        <div class="phone-body">
+          <div class="card">
+            <table class="billed">
+              <thead><tr><th>Invoiced</th><th>Type</th><th>Work covered</th><th>Amount</th><th>Absorbed</th><th></th></tr></thead>
+              <tbody>
+                <tr><td class="c-inv"><a class="rowlink">Jun 30, 2026</a> <span class="muted mono">#18</span></td><td class="c-type"><span class="pltt-badge b-monthly">Overage</span></td><td class="c-work mono"><span class="pltt-badge b-monthly">Overage</span>June 2026 · 6h 28m over</td><td class="c-amt mono">$320.40</td><td class="c-abs mono" data-label="Absorbed">$261.60</td><td class="pltt-rowmenu-col"><button class="kebab">⋮</button></td></tr>
+                <tr><td class="c-inv"><a class="rowlink">Jun 12, 2026</a> <span class="muted mono">#17</span></td><td class="c-type"><span class="pltt-badge b-hourly">Hourly</span></td><td class="c-work mono"><span class="pltt-badge b-hourly">Hourly</span>May 1 – May 31 · 11 entries</td><td class="c-amt mono">$412.50</td><td class="c-abs mono"><span class="pltt-empty">—</span></td><td class="pltt-rowmenu-col"><button class="kebab">⋮</button></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="notes">
+      <h3>Ready to bill</h3>
+      <ul>
+        <li><b>Line 1:</b> project and amount, the two things that decide whether you bill it.</li>
+        <li><b>Line 2:</b> client · type badge. The Type column folds in here.</li>
+        <li><b>Line 3:</b> what the amount covers, with the Bill button beside it.</li>
+      </ul>
+      <h3>Billed history</h3>
+      <p>Invoice date and amount on line 1, what the bill covered under it, and "Absorbed $261.60" on its own line when there is any. Absorbed is the one figure that keeps a word in front of it (<code>data-label</code>), because a second dollar amount beside the invoice total is ambiguous without one.</p>
+      <p>The same table sits on Project Detail, so it gets this for free.</p>
+      <h3>Template change</h3>
+      <p>Cell classes. The type badge is also printed a second time inside the client/work cell so it can move there on a phone; the desktop CSS hides that copy.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ═════════════════════════════════════════════════════════════════════ 05 -->
+<section class="sec">
+  <div class="sec-head"><span class="sec-num">05</span><h2>Clients, Projects, Tags</h2><span class="say">Lists: the name, a line of facts, ⋮</span></div>
+  <div class="stage">
+    <div>
+      <div class="phone m">
+        <div class="phone-bar"><b>Clients · Projects · Tags</b><span>375px</span></div>
+        <div class="phone-body">
+          <div class="card">
+            <table class="clients">
+              <thead><tr><th>Name</th><th>Rate</th><th>Projects</th><th></th></tr></thead>
+              <tbody>
+                <tr><td class="c-name"><a class="rowlink">Aspen &amp; San Juan Expeditions</a></td><td class="c-rate">$100.00 / default</td><td class="c-count">1</td><td class="c-meta mono">$100.00/hr (default) · 1 project</td><td class="pltt-rowmenu-col"><button class="kebab">⋮</button></td></tr>
+                <tr><td class="c-name"><a class="rowlink">Behind The Scenes Adventures</a></td><td class="c-rate">$100.00 / default</td><td class="c-count">4</td><td class="c-meta mono">$100.00/hr (default) · 4 projects</td><td class="pltt-rowmenu-col"><button class="kebab">⋮</button></td></tr>
+                <tr><td class="c-name"><a class="rowlink">Capital Advantage</a></td><td class="c-rate">$90.00</td><td class="c-count">1</td><td class="c-meta mono">$90.00/hr · 1 project</td><td class="pltt-rowmenu-col"><button class="kebab">⋮</button></td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="card">
+            <table class="projects">
+              <thead><tr><th>Name</th><th>Client</th><th>Type</th><th>Rate</th><th>Budget</th><th>Billable</th><th></th></tr></thead>
+              <tbody>
+                <tr><td class="c-name"><a class="rowlink">General Support 2026</a></td><td class="c-client">Paula Levine</td><td class="c-type"><span class="pltt-badge b-hourly">Hourly</span></td><td class="c-rate">$35.00 / client</td><td class="c-budget">—</td><td class="c-bill">$</td><td class="c-meta">Paula Levine · <span class="mono">$35.00/hr</span> · <span class="dollar">$</span> billable</td><td class="pltt-rowmenu-col"><button class="kebab">⋮</button></td></tr>
+                <tr><td class="c-name"><a class="rowlink">Website Care Plan Time</a></td><td class="c-client">Democrats of Rossmor</td><td class="c-type"><span class="pltt-badge b-monthly">Monthly retainer</span></td><td class="c-rate">$90.00 / client</td><td class="c-budget">3 hrs / mo</td><td class="c-bill">—</td><td class="c-meta">Democrats of Rossmor · <span class="mono">$90.00/hr</span> · Budget <span class="mono">3 hrs / mo</span></td><td class="pltt-rowmenu-col"><button class="kebab">⋮</button></td></tr>
+                <tr><td class="c-name"><a class="rowlink">Accessibility Remediation</a></td><td class="c-client">Postie</td><td class="c-type"><span class="pltt-badge b-fixed">Fixed Budget</span></td><td class="c-rate">$90.00 / client</td><td class="c-budget">$3,500.00</td><td class="c-bill">—</td><td class="c-meta">Postie · <span class="mono">$90.00/hr</span> · Budget <span class="mono">$3,500.00</span></td><td class="pltt-rowmenu-col"><button class="kebab">⋮</button></td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="card">
+            <table class="tags">
+              <thead><tr><th>Tag</th><th>Entries</th><th></th></tr></thead>
+              <tbody>
+                <tr><td class="c-name"><a class="rowlink">bugfix</a></td><td class="c-count mono">48 entries</td><td class="pltt-rowmenu-col"><button class="kebab">⋮</button></td></tr>
+                <tr><td class="c-name"><a class="rowlink">support</a></td><td class="c-count mono">212 entries</td><td class="pltt-rowmenu-col"><button class="kebab">⋮</button></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="notes">
+      <h3>One line of facts under the name</h3>
+      <ul>
+        <li><b>Clients:</b> "$100.00/hr (default) · 4 projects". The bare project count gets its noun.</li>
+        <li><b>Projects:</b> the type badge stays on line 1 beside the name, because it's the first thing you scan for. Client, rate, billable and (when there is one) budget fold into one line under it.</li>
+        <li><b>Tags:</b> already narrow, so it stays one line: name, count, ⋮.</li>
+      </ul>
+      <h3>Template change</h3>
+      <p>Clients and Projects each need the one extra "facts" cell, hidden on desktop, like History's. Tags only needs "entries" after the count.</p>
+      <p class="decided"><b>Decided:</b> the budget joins a project's facts line only when the project has one, labelled "Budget" in the same wording as the desktop column (<span class="mono">3 hrs / mo</span>, <span class="mono">$3,500.00</span>, <span class="mono">40 hrs</span>). The label matters because a fixed fee otherwise sits next to the hourly rate as a second bare dollar figure.</p>
+    </div>
+  </div>
+</section>
+
+<section class="sec">
+  <div class="sec-head"><span class="sec-num">06</span><h2>Not covered here</h2></div>
+  <div class="notes" style="max-width:90ch">
+    <ul>
+      <li><b>The post-process review table on Today</b> ("Review parsed entries"). It has per-row selects for client and project, so it's a form, not a list, and probably wants the edit-modal layout per row instead. Worth its own mockup.</li>
+      <li><b>Billing's grouped ready cards and the bill modal's entry checklist.</b> Not tables in the same sense; they need checking at phone width separately.</li>
+    </ul>
+  </div>
+</section>
+
+</div>

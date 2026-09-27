@@ -53,7 +53,7 @@ foreach ( $entries as $e ) {
 }
 ?>
 
-<table class="pltt-entries-table widefat">
+<table class="pltt-entries-table widefat pltt-stack pltt-stack-entries">
 	<thead>
 		<tr>
 			<th class="pltt-col-time"><?php esc_html_e( 'Date / Time', 'plain-language-time-tracker' ); ?></th>

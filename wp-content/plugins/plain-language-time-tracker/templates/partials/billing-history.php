@@ -160,7 +160,7 @@ $card_label = static function ( $base, $phrase ) {
 		);
 	}
 	?>
-	<table class="widefat striped pltt-bill-records-table">
+	<table class="widefat striped pltt-bill-records-table pltt-stack pltt-stack-records">
 		<thead>
 			<tr>
 				<?php // "Invoiced" vs "Work covered": one date column and one period
@@ -224,14 +224,14 @@ $card_label = static function ( $base, $phrase ) {
 						<?php endif; ?>
 						<span class="pltt-bill-record-id">#<?php echo (int) $rec->id; ?></span>
 					</td>
-					<td>
+					<td class="pltt-bill-client">
 						<?php
 						echo '' !== $row['client_name']
 							? esc_html( $row['client_name'] )
 							: '<span class="pltt-empty">&mdash;</span>';
 						?>
 					</td>
-					<td>
+					<td class="pltt-bill-project">
 						<?php
 						$project_url = add_query_arg(
 							array(
@@ -245,12 +245,12 @@ $card_label = static function ( $base, $phrase ) {
 						?>
 						<a class="pltt-row-link" href="<?php echo esc_url( $project_url ); ?>"><?php echo esc_html( $row['project_name'] ); ?></a>
 					</td>
-					<td>
+					<td class="pltt-bill-type">
 						<span class="pltt-badge <?php echo esc_attr( pltt_billing_type_badge_class( $rec->billing_type ) ); ?>"><?php echo esc_html( $type_lbl ); ?></span>
 					</td>
 					<td class="pltt-bill-record-covers"><?php echo esc_html( $covers ); ?></td>
-					<td class="pltt-amount-col"><?php echo esc_html( pltt_format_currency( $rv['amount'] ) ); ?></td>
-					<td class="pltt-amount-col"><?php echo $rv['absorbed'] > 0.0 ? esc_html( pltt_format_currency( $rv['absorbed'] ) ) : '<span class="pltt-empty">&mdash;</span>'; ?></td>
+					<td class="pltt-amount-col pltt-bill-rec-amount"><?php echo esc_html( pltt_format_currency( $rv['amount'] ) ); ?></td>
+					<td class="pltt-amount-col pltt-bill-rec-absorbed"><?php echo $rv['absorbed'] > 0.0 ? '<span class="pltt-stack-only">' . esc_html__( 'Absorbed', 'plain-language-time-tracker' ) . ' </span>' . esc_html( pltt_format_currency( $rv['absorbed'] ) ) : '<span class="pltt-empty">&mdash;</span>'; ?></td>
 					<td class="pltt-rowmenu-col">
 						<?php
 						// Undoing a bill drops the record and its coverage, which puts

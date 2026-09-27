@@ -94,7 +94,7 @@ if ( ! empty( $ungrouped_tags ) ) {
 				<div class="pltt-tag-group-header-row">
 					<span class="pltt-tag-group-title"><?php echo esc_html( $section['label'] ); ?></span>
 				</div>
-				<table class="widefat">
+				<table class="widefat pltt-stack pltt-stack-tags">
 					<thead>
 						<tr>
 							<th><?php esc_html_e( 'Tag', 'plain-language-time-tracker' ); ?></th>
@@ -108,7 +108,7 @@ if ( ! empty( $ungrouped_tags ) ) {
 								<td>
 									<span class="pltt-badge pltt-badge-tag"><?php echo esc_html( ucfirst( $tag->name ) ); ?></span>
 								</td>
-								<td><?php echo esc_html( (int) $tag->usage_count ); ?></td>
+								<td class="pltt-tag-count-cell"><?php echo esc_html( (int) $tag->usage_count ); ?><span class="pltt-stack-only"> <?php echo esc_html( _n( 'entry', 'entries', (int) $tag->usage_count, 'plain-language-time-tracker' ) ); ?></span></td>
 								<td class="pltt-rowmenu-col">
 									<?php
 									pltt_render_row_menu_trigger(

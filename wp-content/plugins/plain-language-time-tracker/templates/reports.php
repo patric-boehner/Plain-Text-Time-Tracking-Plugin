@@ -733,7 +733,7 @@ $tab_base_url = add_query_arg( $filter_params, admin_url( 'admin.php' ) );
 		<?php if ( 'summary' === $view ) : ?>
 
 			<?php if ( ! empty( $summary ) ) : ?>
-				<table class="widefat pltt-summary-table">
+				<table class="widefat pltt-summary-table pltt-stack pltt-stack-summary">
 					<thead>
 						<tr>
 							<th><?php esc_html_e( 'Project', 'plain-language-time-tracker' ); ?></th>
@@ -779,7 +779,7 @@ $tab_base_url = add_query_arg( $filter_params, admin_url( 'admin.php' ) );
 										</div>
 									<?php endif; ?>
 								</td>
-								<td>
+								<td class="pltt-type-cell">
 									<?php pltt_render_billing_type_badge( $billing_type ); ?>
 								</td>
 								<?php
@@ -794,7 +794,7 @@ $tab_base_url = add_query_arg( $filter_params, admin_url( 'admin.php' ) );
 									$sa_used_mins = (float) $alloc_stats[ $row->project_id ]->total_minutes;
 								}
 								?>
-								<td class="pltt-duration-cell" title="<?php echo esc_attr( pltt_format_hours( $row->total_minutes ) . ' ' . __( 'hrs', 'plain-language-time-tracker' ) ); ?>">
+								<td class="pltt-duration-cell pltt-hours-cell" title="<?php echo esc_attr( pltt_format_hours( $row->total_minutes ) . ' ' . __( 'hrs', 'plain-language-time-tracker' ) ); ?>">
 									<?php echo esc_html( pltt_format_duration( $row->total_minutes ) ); ?>
 								</td>
 								<td class="pltt-duration-cell pltt-budget-col">
@@ -820,7 +820,7 @@ $tab_base_url = add_query_arg( $filter_params, admin_url( 'admin.php' ) );
 										<span class="pltt-empty">—</span>
 									<?php endif; ?>
 								</td>
-								<td class="pltt-duration-cell"><?php echo (float) $row->billable_amount > 0 ? esc_html( pltt_format_currency( $row->billable_amount ) ) : '<span class="pltt-empty">—</span>'; ?></td>
+								<td class="pltt-duration-cell pltt-amount-col"><?php echo (float) $row->billable_amount > 0 ? esc_html( pltt_format_currency( $row->billable_amount ) ) : '<span class="pltt-empty">—</span>'; ?></td>
 								</tr>
 						<?php endforeach; ?>
 					</tbody>

@@ -34,7 +34,7 @@ foreach ( $billing_history as $rec ) {
 	);
 }
 ?>
-<table class="widefat striped pltt-billing-history-table">
+<table class="widefat striped pltt-billing-history-table pltt-stack pltt-stack-records">
 	<thead>
 		<tr>
 			<th><?php esc_html_e( 'Invoiced', 'plain-language-time-tracker' ); ?></th>
@@ -85,12 +85,12 @@ foreach ( $billing_history as $rec ) {
 					<?php endif; ?>
 					<span class="pltt-bill-record-id">#<?php echo (int) $rec->id; ?></span>
 				</td>
-				<td>
+				<td class="pltt-bill-type">
 					<span class="pltt-badge <?php echo esc_attr( pltt_billing_type_badge_class( $rec->billing_type ) ); ?>"><?php echo esc_html( $type_lbl ); ?></span>
 				</td>
 				<td class="pltt-bill-record-covers"><?php echo esc_html( $covers ); ?></td>
-				<td class="pltt-amount-col"><?php echo esc_html( pltt_format_currency( $rv['amount'] ) ); ?></td>
-				<td class="pltt-amount-col"><?php echo $rv['absorbed'] > 0.0 ? esc_html( pltt_format_currency( $rv['absorbed'] ) ) : '<span class="pltt-empty">&mdash;</span>'; ?></td>
+				<td class="pltt-amount-col pltt-bill-rec-amount"><?php echo esc_html( pltt_format_currency( $rv['amount'] ) ); ?></td>
+				<td class="pltt-amount-col pltt-bill-rec-absorbed"><?php echo $rv['absorbed'] > 0.0 ? '<span class="pltt-stack-only">' . esc_html__( 'Absorbed', 'plain-language-time-tracker' ) . ' </span>' . esc_html( pltt_format_currency( $rv['absorbed'] ) ) : '<span class="pltt-empty">&mdash;</span>'; ?></td>
 				<td class="pltt-rowmenu-col">
 					<?php
 					pltt_render_row_menu_trigger(

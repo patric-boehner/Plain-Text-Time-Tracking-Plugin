@@ -1,0 +1,501 @@
+/**
+ * Tables on a phone — each row becomes a small block.
+ *
+ * Mockup and reasoning: ui/pltt-mobile-tables.html.
+ *
+ * Opt-in: a table carries .pltt-stack plus one .pltt-stack-{kind} class that
+ * says how its cells are arranged. Desktop is untouched; everything below the
+ * first rule lives inside the 782px breakpoint.
+ *
+ * The pattern, the same on every table:
+ *   - the heading row goes, so each cell has to say what it is on its own
+ *   - line 1 is what the row IS (its link), with the ⋮ menu top-right
+ *   - the facts go underneath, figures on the right
+ *   - a cell holding only "—" (.pltt-empty) disappears instead of taking a line
+ *
+ * How: each <tr> is a wrapping flex row. `order` sets the reading order, and the
+ * row's ::before / ::after are zero-height, full-width flex items that force the
+ * line breaks (a cell with flex-basis: 100% takes a line of its own too). Flex
+ * rather than grid because most rows have optional cells — a grid leaves a hole
+ * where an absent cell's column was, flex just closes up.
+ *
+ * Screen-reader note: turning table parts into blocks drops their table
+ * semantics in some browsers. Each cell's text still reads in order, and the
+ * phone-only words below (.pltt-stack-only) supply what the headings did.
+ *
+ * Loaded on every plugin page (see PLTT_Admin::enqueue_assets), like the row
+ * menu, because the tables it styles are spread across most screens.
+ */
+
+/* Words that only make sense once the headings are gone ("2 entries",
+   "Budget 3 hrs / mo"), and desktop-only text they replace. */
+.pltt-stack-only {
+	display: none;
+}
+
+@media screen and (max-width: 782px) {
+
+	.pltt-stack-only {
+		display: inline;
+	}
+
+	.pltt-stack-hide {
+		display: none;
+	}
+
+	/* ── Base ─────────────────────────────────────────────────────────── */
+
+	table.pltt-stack,
+	table.pltt-stack > tbody {
+		display: block;
+		width: 100%;
+	}
+
+	table.pltt-stack > thead {
+		display: none;
+	}
+
+	table.pltt-stack > tbody > tr {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: baseline;
+		column-gap: 10px;
+		padding: 20px 14px;
+		border-bottom: 1px solid var(--pltt-border-light);
+	}
+
+	table.pltt-stack > tbody > tr:last-child {
+		border-bottom: 0;
+	}
+
+	table.pltt-stack > tbody > tr::before,
+	table.pltt-stack > tbody > tr::after {
+		content: "";
+		flex-basis: 100%;
+		height: 0;
+	}
+
+	/* The desktop column widths, alignment and wrapping come from positional
+	   selectors up to four classes deep (reports.css). One reset here is
+	   sturdier than out-ranking each of them, and it only exists at this
+	   breakpoint. */
+	table.pltt-stack > tbody > tr > td {
+		display: block;
+		padding: 0;
+		border: 0;
+		min-width: 0;
+		width: auto !important;
+		max-width: none !important;
+		text-align: left !important;
+		white-space: normal !important;
+		overflow: visible !important;
+	}
+
+	/* A cell holding only "—" says nothing a missing line doesn't. */
+	table.pltt-stack > tbody > tr > td:has(> .pltt-empty:only-child) {
+		display: none;
+	}
+
+	/* ⋮ sits top-right; the negative margin lines its dots up with the row's
+	   padding instead of the button's own. */
+	table.pltt-stack > tbody > tr > td.pltt-rowmenu-col {
+		align-self: flex-start;
+		margin: -6px -8px -6px 0;
+	}
+
+	/* Facts joined into a phrase: "$100.00 / default · 4 projects". The "· "
+	   is on the cell itself, not a span inside it, so a cell hidden for
+	   holding only "—" takes its separator with it. The negative margin trades
+	   the flex gap for the separator's own spacing. */
+	.pltt-stack-history > tbody > tr > td.pltt-log-hours-cell::before,
+	.pltt-stack-records > tbody > tr > td.pltt-bill-client::before,
+	.pltt-stack-clients > tbody > tr > td.pltt-client-count-cell::before,
+	.pltt-stack-projects > tbody > tr > td.pltt-project-rate-cell::before,
+	.pltt-stack-projects > tbody > tr > td.pltt-project-budget-cell::before,
+	.pltt-stack-projects > tbody > tr > td.pltt-col-billable::before {
+		content: "· ";
+		color: var(--pltt-text-muted);
+	}
+
+	/* ── Entries: Overview (pltt_render_entry_table) and Today ────────────
+	   Line 1: description, client · project under it … ⋮
+	   Line 2: time  duration ……………… $  amount
+	   Line 3: status badge, tags                                            */
+
+	.pltt-stack-entries > tbody > tr > td.pltt-bill-select-col {
+		order: 1;
+	}
+
+	.pltt-stack-entries > tbody > tr > td.pltt-entry-desc-cell {
+		order: 2;
+		flex: 1 1 0;
+	}
+
+	.pltt-stack-entries > tbody > tr > td.pltt-rowmenu-col {
+		order: 3;
+	}
+
+	.pltt-stack-entries > tbody > tr::before {
+		order: 4;
+	}
+
+	.pltt-stack-entries > tbody > tr > td.pltt-time-cell {
+		order: 5;
+		margin-top: 6px;
+	}
+
+	.pltt-stack-entries > tbody > tr > td.pltt-duration-cell:not(.pltt-amount-col) {
+		order: 6;
+		margin-top: 6px;
+		font-weight: 600;
+	}
+
+	.pltt-stack-entries > tbody > tr > td.pltt-billable-indicator {
+		order: 7;
+		margin-top: 6px;
+	}
+
+	.pltt-stack-entries > tbody > tr > td.pltt-amount-col {
+		order: 8;
+		margin-top: 6px;
+		margin-left: auto;
+	}
+
+	/* With a $ showing, the $ takes the push to the right and the amount
+	   follows it; without one, the amount takes it. */
+	.pltt-stack-entries > tbody > tr > td.pltt-billable-indicator:has(.pltt-billable-symbol) {
+		margin-left: auto;
+	}
+
+	.pltt-stack-entries > tbody > tr > td.pltt-billable-indicator:has(.pltt-billable-symbol) ~ td.pltt-amount-col {
+		margin-left: 0;
+	}
+
+	/* Today prints an empty Billable cell (no dash) for non-hourly work. */
+	.pltt-stack-entries > tbody > tr > td.pltt-billable-indicator:not(:has(*)) {
+		display: none;
+	}
+
+	.pltt-stack-entries > tbody > tr::after {
+		order: 9;
+	}
+
+	.pltt-stack-entries > tbody > tr > td.pltt-status-col {
+		order: 10;
+		margin-top: 6px;
+	}
+
+	.pltt-stack-entries > tbody > tr > td.pltt-tag-cell {
+		order: 11;
+		margin-top: 6px;
+	}
+
+	/* Tags and billable are display-only on a phone: they're edited through
+	   ⋮ → Edit, so the inline picker and the $ toggle never open here. With
+	   nothing to tap, an untagged entry shows no tag line at all rather than
+	   the picker's "Add Tags" button. */
+	.pltt-stack-entries .pltt-tag-cell,
+	.pltt-stack-entries .pltt-billable-indicator {
+		pointer-events: none;
+	}
+
+	.pltt-stack-entries > tbody > tr > td.pltt-tag-cell:not(:has(.pltt-badge)) {
+		display: none;
+	}
+
+	/* Today: every row is the same day, and the header already says which. */
+	.pltt-stack-entries .pltt-date-text,
+	.pltt-stack-entries .pltt-time-separator {
+		display: none;
+	}
+
+	/* A covered (billed) row keeps its 3px blue left edge, moved from the
+	   first cell to the row now that the first cell no longer spans it. */
+	.pltt-date-group table.pltt-stack-entries > tbody > tr.pltt-row-covered {
+		box-shadow: inset 3px 0 0 var(--pltt-primary);
+	}
+
+	.pltt-date-group table.pltt-stack-entries > tbody > tr.pltt-row-covered > td:first-child {
+		box-shadow: none;
+	}
+
+	/* ── Summary ──────────────────────────────────────────────────────────
+	   Line 1: project (client under it) … type badge
+	   Line 2: hours ……………………………………………… amount
+	   Line 3: budget bar, only when the project has one                     */
+
+	.pltt-stack-summary > tbody > tr > td.pltt-entry-desc-cell {
+		order: 1;
+		flex: 1 1 0;
+	}
+
+	.pltt-stack-summary > tbody > tr > td.pltt-type-cell {
+		order: 2;
+	}
+
+	.pltt-stack-summary > tbody > tr::before {
+		order: 3;
+	}
+
+	.pltt-stack-summary > tbody > tr > td.pltt-hours-cell {
+		order: 4;
+		margin-top: 6px;
+		font-weight: 600;
+	}
+
+	.pltt-stack-summary > tbody > tr > td.pltt-amount-col {
+		order: 5;
+		margin-top: 6px;
+		margin-left: auto;
+	}
+
+	.pltt-stack-summary > tbody > tr::after {
+		order: 6;
+	}
+
+	.pltt-stack-summary > tbody > tr > td.pltt-budget-col {
+		order: 7;
+		flex-basis: 100%;
+		margin-top: 6px;
+	}
+
+	/* ── History ──────────────────────────────────────────────────────────
+	   Line 1: date … status badge  ⋮
+	   Line 2: the log's opening words, one line
+	   Line 3: "2 entries · 1h 32m"                                          */
+
+	.pltt-stack-history > tbody > tr > td.pltt-log-date-cell {
+		order: 1;
+		flex: 1 1 auto;
+	}
+
+	.pltt-stack-history > tbody > tr > td.pltt-log-status-cell {
+		order: 2;
+	}
+
+	.pltt-stack-history > tbody > tr > td.pltt-rowmenu-col {
+		order: 3;
+	}
+
+	.pltt-stack-history > tbody > tr::before {
+		order: 4;
+	}
+
+	.pltt-stack-history > tbody > tr > td.pltt-log-preview {
+		order: 5;
+		flex-basis: 100%;
+		margin-top: 4px;
+		color: var(--pltt-text-muted);
+		font-size: 12.5px;
+		overflow: hidden !important;
+		text-overflow: ellipsis;
+		white-space: nowrap !important;
+	}
+
+	.pltt-stack-history > tbody > tr > td.pltt-log-entries-cell {
+		order: 6;
+		margin-top: 4px;
+	}
+
+	.pltt-stack-history > tbody > tr > td.pltt-log-hours-cell {
+		order: 7;
+		margin-top: 4px;
+		margin-left: -6px; /* the phrase's own "· " spacing replaces the gap */
+	}
+
+	/* ── Billing: Ready to bill ───────────────────────────────────────────
+	   Line 1: project ……………………………………… amount
+	   Line 2: client  type badge
+	   Line 3: what it covers ………………………………… Bill                      */
+
+	.pltt-stack-ready > tbody > tr > td.pltt-bill-ready-proj {
+		order: 1;
+		flex: 1 1 0;
+		font-weight: 600;
+	}
+
+	.pltt-stack-ready > tbody > tr > td.pltt-amount-col {
+		order: 2;
+		font-weight: 600;
+	}
+
+	.pltt-stack-ready > tbody > tr::before {
+		order: 3;
+	}
+
+	.pltt-stack-ready > tbody > tr > td.pltt-bill-ready-client {
+		order: 4;
+		margin-top: 2px;
+		color: var(--pltt-text-muted);
+	}
+
+	.pltt-stack-ready > tbody > tr > td.pltt-bill-ready-type {
+		order: 5;
+		margin-top: 2px;
+	}
+
+	.pltt-stack-ready > tbody > tr::after {
+		order: 6;
+	}
+
+	.pltt-stack-ready > tbody > tr > td.pltt-bill-ready-covered {
+		order: 7;
+		flex: 1 1 0;
+		margin-top: 6px;
+	}
+
+	.pltt-stack-ready > tbody > tr > td.pltt-bill-ready-action {
+		order: 8;
+		margin-top: 6px;
+	}
+
+	/* ── Billed history: Billing page and Project Detail ──────────────────
+	   Line 1: invoice date #id ……………………… amount  ⋮
+	   Line 2: project · client          (Billing page only)
+	   Line 3: type badge  what the bill covered
+	   Line 4: Absorbed $x, only when something was absorbed                  */
+
+	.pltt-stack-records > tbody > tr > td.pltt-time-cell {
+		order: 1;
+		flex: 1 1 auto;
+	}
+
+	.pltt-stack-records > tbody > tr > td.pltt-bill-rec-amount {
+		order: 2;
+		font-weight: 600;
+	}
+
+	.pltt-stack-records > tbody > tr > td.pltt-rowmenu-col {
+		order: 3;
+	}
+
+	.pltt-stack-records > tbody > tr::before {
+		order: 4;
+	}
+
+	.pltt-stack-records > tbody > tr > td.pltt-bill-project {
+		order: 5;
+		margin-top: 2px;
+	}
+
+	.pltt-stack-records > tbody > tr > td.pltt-bill-client {
+		order: 6;
+		margin-top: 2px;
+		margin-left: -6px;
+		color: var(--pltt-text-muted);
+	}
+
+	.pltt-stack-records > tbody > tr::after {
+		order: 7;
+	}
+
+	.pltt-stack-records > tbody > tr > td.pltt-bill-type {
+		order: 8;
+		margin-top: 6px;
+	}
+
+	.pltt-stack-records > tbody > tr > td.pltt-bill-record-covers {
+		order: 9;
+		flex: 1 1 0;
+		margin-top: 6px;
+	}
+
+	.pltt-stack-records > tbody > tr > td.pltt-bill-rec-absorbed {
+		order: 10;
+		flex-basis: 100%;
+		margin-top: 4px;
+		color: var(--pltt-text-muted);
+	}
+
+	/* ── Clients ──────────────────────────────────────────────────────────
+	   Line 1: name (description under it) … ⋮
+	   Line 2: "$100.00 / default · 4 projects"                              */
+
+	.pltt-stack-clients > tbody > tr > td.pltt-client-name-cell {
+		order: 1;
+		flex: 1 1 0;
+	}
+
+	.pltt-stack-clients > tbody > tr > td.pltt-rowmenu-col {
+		order: 2;
+	}
+
+	.pltt-stack-clients > tbody > tr::before {
+		order: 3;
+	}
+
+	.pltt-stack-clients > tbody > tr > td.pltt-client-rate-cell,
+	.pltt-stack-clients > tbody > tr > td.pltt-client-count-cell {
+		order: 4;
+		margin-top: 3px;
+		color: var(--pltt-text-muted);
+	}
+
+	.pltt-stack-clients > tbody > tr > td.pltt-client-count-cell {
+		order: 5;
+		margin-left: -6px;
+	}
+
+	/* ── Projects ─────────────────────────────────────────────────────────
+	   Line 1: name … type badge  ⋮
+	   Line 2: "client · $35.00 / client · Budget 3 hrs / mo · $ billable"
+	   (a fact appears only when the project has it)                         */
+
+	.pltt-stack-projects > tbody > tr > td.pltt-project-name-cell {
+		order: 1;
+		flex: 1 1 0;
+	}
+
+	.pltt-stack-projects > tbody > tr > td.pltt-project-type-cell {
+		order: 2;
+	}
+
+	.pltt-stack-projects > tbody > tr > td.pltt-rowmenu-col {
+		order: 3;
+	}
+
+	.pltt-stack-projects > tbody > tr::before {
+		order: 4;
+	}
+
+	.pltt-stack-projects > tbody > tr > td.pltt-project-client-cell,
+	.pltt-stack-projects > tbody > tr > td.pltt-project-rate-cell,
+	.pltt-stack-projects > tbody > tr > td.pltt-project-budget-cell,
+	.pltt-stack-projects > tbody > tr > td.pltt-col-billable {
+		order: 5;
+		margin-top: 3px;
+		color: var(--pltt-text-muted);
+	}
+
+	.pltt-stack-projects > tbody > tr > td.pltt-project-rate-cell,
+	.pltt-stack-projects > tbody > tr > td.pltt-project-budget-cell,
+	.pltt-stack-projects > tbody > tr > td.pltt-col-billable {
+		margin-left: -6px;
+	}
+
+	/* A value never splits across lines ("3 hrs / mo"); the line breaks
+	   between facts instead. */
+	.pltt-stack-projects > tbody > tr > td.pltt-project-rate-cell,
+	.pltt-stack-projects > tbody > tr > td.pltt-project-budget-cell {
+		white-space: nowrap !important;
+	}
+
+	/* ── Tags: already narrow — one line of name, count, ⋮ ─────────────── */
+
+	.pltt-stack-tags > tbody > tr {
+		align-items: center;
+	}
+
+	.pltt-stack-tags > tbody > tr > td:first-child {
+		flex: 1 1 0;
+	}
+
+	.pltt-stack-tags > tbody > tr > td.pltt-tag-count-cell {
+		color: var(--pltt-text-muted);
+	}
+
+	.pltt-stack-tags > tbody > tr > td.pltt-rowmenu-col {
+		align-self: center;
+		margin-top: -6px;
+	}
+}

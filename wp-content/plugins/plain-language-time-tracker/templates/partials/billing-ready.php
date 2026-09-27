@@ -65,7 +65,7 @@ $q_clients = isset( $queue['clients'] ) ? $queue['clients'] : array();
 	);
 	?>
 <?php else : ?>
-	<table class="widefat striped pltt-bill-ready-table">
+	<table class="widefat striped pltt-bill-ready-table pltt-stack pltt-stack-ready">
 		<thead>
 			<tr>
 				<th><?php esc_html_e( 'Client', 'plain-language-time-tracker' ); ?></th>
@@ -122,9 +122,9 @@ $q_clients = isset( $queue['clients'] ) ? $queue['clients'] : array();
 					);
 					?>
 					<tr class="pltt-bill-ready-row"<?php echo $row_id ? ' id="' . esc_attr( $row_id ) . '"' : ''; ?>>
-						<td><?php echo esc_html( $client_name ); ?></td>
+						<td class="pltt-bill-ready-client"><?php echo esc_html( $client_name ); ?></td>
 						<td class="pltt-bill-ready-proj"><?php echo esc_html( $proj->name ); ?></td>
-						<td>
+						<td class="pltt-bill-ready-type">
 							<span class="pltt-badge <?php echo esc_attr( pltt_billing_type_badge_class( $scope['billing_type'] ) ); ?>"><?php echo esc_html( $v['type_label'] ); ?></span>
 						</td>
 						<td class="pltt-bill-ready-covered">
