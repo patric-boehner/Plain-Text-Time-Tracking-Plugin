@@ -194,7 +194,7 @@ if ( ! empty( $projects ) ) {
 				<div class="pltt-project-group-header">
 					<span class="pltt-project-group-title"><?php echo esc_html( $group['label'] ); ?></span>
 				</div>
-				<table class="widefat">
+				<table class="widefat pltt-stack pltt-stack-projects">
 					<thead>
 						<tr>
 							<th><?php esc_html_e( 'Name', 'plain-language-time-tracker' ); ?></th>
@@ -225,7 +225,7 @@ if ( ! empty( $projects ) ) {
 						$view_url = PLTT_Project_Detail::get_url( $project->id );
 						?>
 						<tr<?php echo $row_class ? ' class="' . esc_attr( $row_class ) . '"' : ''; ?> data-project-id="<?php echo esc_attr( $project->id ); ?>" data-unbilled-minutes="<?php echo esc_attr( $project_unbilled_minutes ); ?>" data-name="<?php echo esc_attr( $project->name ); ?>" data-client-id="<?php echo esc_attr( $project->client_id ); ?>" data-status="<?php echo esc_attr( $project->status ); ?>" data-rate="<?php echo esc_attr( $project->hourly_rate ?? '' ); ?>" data-billability-default="<?php echo esc_attr( $project->billability_default ?? '1' ); ?>" data-recurring-period="<?php echo esc_attr( $project->recurring_period ?? '' ); ?>" data-billing-type="<?php echo esc_attr( $billing_type ); ?>" data-budget-hours="<?php echo esc_attr( $project->budget_hours ?? '' ); ?>" data-budget-fee="<?php echo esc_attr( $project->budget_fee ?? '' ); ?>" data-entry-count="<?php echo esc_attr( $project_entry_count ); ?>">
-							<td>
+							<td class="pltt-project-name-cell">
 								<a class="pltt-row-link" href="<?php echo esc_url( $view_url ); ?>"><?php echo esc_html( $project->name ); ?></a>
 								<?php if ( 'archived' === $project->status ) : ?>
 									<span class="pltt-badge pltt-badge-archived"><?php esc_html_e( 'Archived', 'plain-language-time-tracker' ); ?></span>
@@ -243,13 +243,13 @@ if ( ! empty( $projects ) ) {
 								// riskier way, one click from a list with no context.
 								?>
 							</td>
-							<td>
+							<td class="pltt-project-client-cell">
 								<?php echo $project_client ? esc_html( $project_client->name ) : '—'; ?>
 							</td>
-							<td>
+							<td class="pltt-project-type-cell">
 								<?php pltt_render_billing_type_badge( $billing_type ); ?>
 							</td>
-							<td><?php
+							<td class="pltt-project-rate-cell"><?php
 								if ( 'none' === $billing_type ) {
 									echo '<span class="pltt-empty">—</span>';
 								} elseif ( null !== $project->hourly_rate ) {
@@ -262,22 +262,30 @@ if ( ! empty( $projects ) ) {
 									echo '<span class="pltt-empty">—</span>';
 								}
 							?></td>
-							<td><?php
+							<td class="pltt-project-budget-cell"><?php
+								// "Budget" is phone-only: under the desktop heading the figure explains itself,
+								// but on a phone a fixed fee would sit beside the hourly rate as a second
+								// bare dollar figure. Printed only when there is a budget.
+								$budget_label = '<span class="pltt-stack-only">' . esc_html__( 'Budget', 'plain-language-time-tracker' ) . ' </span>';
 								$period_abbr = array( 'weekly' => 'wk', 'monthly' => 'mo', 'quarterly' => 'qtr', 'yearly' => 'yr' );
 								if ( 'recurring' === $billing_type && ! empty( $project->budget_hours ) ) {
 									$abbr = $period_abbr[ $project->recurring_period ] ?? $project->recurring_period;
-									echo esc_html( number_format( (float) $project->budget_hours, 0 ) . ' hrs / ' . $abbr );
+									echo $budget_label . esc_html( number_format( (float) $project->budget_hours, 0 ) . ' hrs / ' . $abbr ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- $budget_label is escaped above.
 								} elseif ( 'fixed' === $billing_type && ! empty( $project->budget_fee ) ) {
-									echo esc_html( pltt_format_currency( $project->budget_fee ) );
+									echo $budget_label . esc_html( pltt_format_currency( $project->budget_fee ) ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- $budget_label is escaped above.
 								} elseif ( 'fixed' === $billing_type && ! empty( $project->budget_hours ) ) {
-									echo esc_html( number_format( (float) $project->budget_hours, 0 ) . ' hrs' );
+									echo $budget_label . esc_html( number_format( (float) $project->budget_hours, 0 ) . ' hrs' ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- $budget_label is escaped above.
 								} else {
 									echo '<span class="pltt-empty">—</span>';
 								}
 							?></td>
 							<td class="pltt-col-billable">
-								<?php if ( pltt_billable_flag_applies( $project ) ) : ?>
-									<span class="pltt-billable-symbol <?php echo (int) ( $project->billability_default ?? 1 ) === 1 ? 'is-billable' : 'not-billable'; ?>">$</span>
+								<?php if ( pltt_billable_flag_applies( $project ) ) :
+									$pltt_billable_default = (int) ( $project->billability_default ?? 1 ) === 1;
+									?>
+									<span class="pltt-billable-symbol <?php echo $pltt_billable_default ? 'is-billable' : 'not-billable'; ?>">$</span>
+									<?php // Phone-only: a lone "$" on the facts line needs its word. ?>
+									<span class="pltt-stack-only"><?php echo $pltt_billable_default ? esc_html__( 'billable', 'plain-language-time-tracker' ) : esc_html__( 'not billable', 'plain-language-time-tracker' ); ?></span>
 								<?php else : ?>
 									<span class="pltt-empty">—</span>
 								<?php endif; ?>

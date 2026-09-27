@@ -418,6 +418,17 @@ class PLTT_Admin {
 			true
 		);
 
+		// Tables on a phone — every list and entry table stacks its rows into
+		// blocks below 782px. Global for the same reason as the row menu: the
+		// tables it styles sit on nearly every screen. CSS only; tables opt in
+		// with .pltt-stack.
+		wp_enqueue_style(
+			'pltt-table-stack',
+			PLTT_PLUGIN_URL . 'assets/css/pltt-table-stack.css',
+			array( 'pltt-admin' ),
+			$version
+		);
+
 		// Shared JS utilities.
 		wp_enqueue_script(
 			'pltt-shared',

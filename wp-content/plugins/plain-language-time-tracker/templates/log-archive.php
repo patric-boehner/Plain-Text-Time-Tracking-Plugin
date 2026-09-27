@@ -151,7 +151,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 							<?php endif; ?>
 						</span>
 					</div>
-					<table class="widefat">
+					<table class="widefat pltt-stack pltt-stack-history">
 						<thead>
 							<tr>
 								<th><?php esc_html_e( 'Date', 'plain-language-time-tracker' ); ?></th>
@@ -165,7 +165,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 						<tbody>
 							<?php foreach ( $week_logs as $log ) : ?>
 								<tr data-log-date="<?php echo esc_attr( $log->log_date ); ?>" data-entry-count="<?php echo esc_attr( $log->entry_count ); ?>">
-									<td>
+									<td class="pltt-log-date-cell">
 										<a class="pltt-row-link" href="<?php echo esc_url( pltt_get_admin_url( 'daily-log', array( 'date' => $log->log_date ) ) ); ?>"><?php echo esc_html( pltt_format_date( $log->log_date, 'D, M j, Y' ) ); ?></a>
 										<?php // "View" is gone — the date above is already that link (spec §6 rule 1). ?>
 									</td>
@@ -180,28 +180,34 @@ if ( ! defined( 'ABSPATH' ) ) {
 										}
 										?>
 									</td>
-									<td>
+									<td class="pltt-log-entries-cell">
 										<?php
 										// A count, not a destination. The date links to this day and so does
 										// the row menu's "Open log"; a third route, hung on a number, only
 										// raises the question of where a number could take you.
+										//
+										// On a phone the column heading is gone, so the count carries its
+										// noun ("2 entries") — see pltt-table-stack.css.
 										?>
 										<?php if ( (int) $log->entry_count > 0 ) : ?>
-											<?php echo esc_html( $log->entry_count ); ?>
+											<?php echo esc_html( $log->entry_count ); ?><span class="pltt-stack-only"> <?php echo esc_html( _n( 'entry', 'entries', (int) $log->entry_count, 'plain-language-time-tracker' ) ); ?></span>
 										<?php else : ?>
 											<span class="pltt-empty">0</span>
 										<?php endif; ?>
 									</td>
-									<td class="pltt-duration-cell">
+									<td class="pltt-duration-cell pltt-log-hours-cell">
 										<?php
+										// Decimal hours under the desktop heading; on a phone, "1h 32m" to
+										// match the week header above the table.
 										if ( (int) $log->total_minutes > 0 ) {
-											echo esc_html( pltt_format_hours( $log->total_minutes ) );
+											echo '<span class="pltt-stack-hide">' . esc_html( pltt_format_hours( $log->total_minutes ) ) . '</span>';
+											echo '<span class="pltt-stack-only">' . esc_html( pltt_format_duration( $log->total_minutes ) ) . '</span>';
 										} else {
 											echo '<span class="pltt-empty">—</span>';
 										}
 										?>
 									</td>
-									<td>
+									<td class="pltt-log-status-cell">
 										<?php if ( $log->processed ) : ?>
 											<span class="pltt-badge pltt-badge-success"><?php esc_html_e( 'Processed', 'plain-language-time-tracker' ); ?></span>
 										<?php else : ?>

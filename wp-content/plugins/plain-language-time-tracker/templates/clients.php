@@ -84,7 +84,7 @@ if ( ! empty( $clients ) ) {
 		);
 		?>
 	<?php else : ?>
-		<table class="widefat">
+		<table class="widefat pltt-stack pltt-stack-clients">
 			<thead>
 				<tr>
 					<th><?php esc_html_e( 'Name', 'plain-language-time-tracker' ); ?></th>
@@ -118,7 +118,7 @@ if ( ! empty( $clients ) ) {
 					$view_url = add_query_arg( $view_args, admin_url( 'admin.php' ) );
 					?>
 					<tr data-client-id="<?php echo esc_attr( $client->id ); ?>" data-name="<?php echo esc_attr( $client->name ); ?>" data-description="<?php echo esc_attr( $client->description ); ?>" data-rate="<?php echo esc_attr( $client->hourly_rate ?? '' ); ?>" data-projects-count="<?php echo esc_attr( $client_proj_count ); ?>" data-entry-count="<?php echo esc_attr( $client_entry_count ); ?>" data-aliases="<?php echo esc_attr( wp_json_encode( $aliases_by_client[ $client->id ] ?? array() ) ); ?>">
-						<td>
+						<td class="pltt-client-name-cell">
 							<?php
 							// Spec §6 rule 1: the name is the link. It goes where the
 							// trailing "View" used to — this client's entries — so the
@@ -129,7 +129,7 @@ if ( ! empty( $clients ) ) {
 								<br><small class="description"><?php echo esc_html( $client->description ); ?></small>
 							<?php endif; ?>
 						</td>
-						<td><?php
+						<td class="pltt-client-rate-cell"><?php
 						if ( null !== $client->hourly_rate ) {
 							echo esc_html( pltt_format_currency( $client->hourly_rate ) );
 						} elseif ( defined( 'PLTT_DEFAULT_HOURLY_RATE' ) ) {
@@ -138,7 +138,8 @@ if ( ! empty( $clients ) ) {
 							echo '<span class="pltt-empty">—</span>';
 						}
 					?></td>
-						<td><?php echo esc_html( $client_proj_count ); ?></td>
+						<?php // On a phone the heading is gone, so the count carries its noun ("4 projects"). ?>
+						<td class="pltt-client-count-cell"><?php echo esc_html( $client_proj_count ); ?><span class="pltt-stack-only"> <?php echo esc_html( _n( 'project', 'projects', $client_proj_count, 'plain-language-time-tracker' ) ); ?></span></td>
 						<td class="pltt-rowmenu-col">
 							<?php
 							pltt_render_row_menu_trigger(

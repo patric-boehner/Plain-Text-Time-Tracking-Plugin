@@ -1594,7 +1594,8 @@ function pltt_render_entry_table( $entries, $options = array() ) {
 	}
 
 	?>
-	<table class="widefat<?php echo esc_attr( $table_class ); ?>">
+	<?php // pltt-stack: rows become blocks on a phone (assets/css/pltt-table-stack.css). ?>
+	<table class="widefat pltt-stack pltt-stack-entries<?php echo esc_attr( $table_class ); ?>">
 		<thead>
 			<tr>
 				<?php if ( $billing_select ) : ?>
