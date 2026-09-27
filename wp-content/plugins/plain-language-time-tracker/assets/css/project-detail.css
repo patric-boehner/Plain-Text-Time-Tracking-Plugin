@@ -35,16 +35,13 @@
 	padding: 0;
 }
 
-/* Back sits in the header grid's first (1fr) column, where the title normally is
-   — this screen's H1 is screen-reader-only, so that column is otherwise empty.
-   justify-self keeps it hard left instead of stretching across the column. */
-.pltt-detail-header .pltt-header-back {
-	justify-self: start;
-}
+/* Back sits where the title normally is — this screen's H1 is screen-reader-only
+   (absolutely positioned, so not a flex item) — and the header's space-between
+   keeps it hard left with the actions on the right. */
 
-/* Notices sit on their own row beneath the title (WP keeps them near the H1). */
+/* Notices sit on their own row beneath the title (WP keeps them near the H1).
+   The full-width row comes from the shared `.pltt-header > .notice` rule. */
 .pltt-detail-header .notice {
-	grid-column: 1 / -1;
 	margin: var(--pltt-pd-space-xs) 0 0;
 }
 

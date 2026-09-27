@@ -161,9 +161,9 @@ function pltt_validate_date( $date ) {
  * against the title. Call this immediately after the header block closes and
  * notices land below the whole header at full width, stacking in normal flow.
  *
- * Screens whose H1 is a direct child of the .pltt-header grid don't need it —
- * the notice becomes a grid cell there and the `.pltt-header .notice` rule in
- * admin.css already spans it. Core styles .wp-header-end hidden with no height.
+ * Screens whose H1 is a direct child of .pltt-header don't need it — the
+ * notice becomes a header child there and the `.pltt-header > .notice` rule in
+ * admin.css gives it a full-width line of its own. Core styles .wp-header-end hidden with no height.
  */
 function pltt_header_end() {
 	echo '<hr class="wp-header-end">';

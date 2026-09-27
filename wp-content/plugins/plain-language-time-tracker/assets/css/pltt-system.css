@@ -142,8 +142,8 @@
 .pltt-light-header {
 	margin: 0 0 20px;
 }
-/* When it sits in the existing .pltt-header grid it's just the first cell — the
-   grid already owns the bottom spacing, so drop the block's own margin. */
+/* When it sits in .pltt-header it's just the title slot — the header already
+   owns the bottom spacing, so drop the block's own margin. */
 .pltt-header > .pltt-light-header {
 	margin-bottom: 0;
 }

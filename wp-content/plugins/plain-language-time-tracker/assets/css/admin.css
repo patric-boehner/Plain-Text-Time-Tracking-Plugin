@@ -82,12 +82,40 @@
 	margin: 20px 20px 20px 0;
 }
 
+/* Title on the left, the screen's controls (date nav, view toggle, Add button)
+   on the right. A wrapping flex row rather than a grid so it's responsive with
+   no breakpoint: the controls sit beside the title while both fit and drop to
+   their own line, left-aligned, the moment they don't. A two-column grid never
+   collapses — at phone width the controls kept their column and crushed the
+   title into a sliver. */
 .pltt-header {
-	display: grid;
-	grid-template-columns: 1fr auto;
+	display: flex;
+	flex-wrap: wrap;
+	justify-content: space-between;
 	align-items: center;
 	margin-bottom: 20px;
 	gap: 15px;
+}
+
+/* The title block takes whatever the controls leave, and may shrink below its
+   text width (min-width: 0) so a long date wraps instead of overflowing. */
+.pltt-header > :first-child {
+	flex: 1 1 auto;
+	min-width: 0;
+}
+
+/* The controls never shrink — they wrap as a unit instead. */
+.pltt-header > :not(:first-child) {
+	flex: 0 0 auto;
+	max-width: 100%;
+}
+
+/* The date nav stays on the right at every width. space-between alone would
+   send it to the left edge once it wraps under the title; the auto margin holds
+   it right on its own line too. Scoped to the group holding the date nav, so
+   Project Detail's Back button keeps the left. */
+.pltt-header > :has(.pltt-date-nav) {
+	margin-left: auto;
 }
 
 .pltt-header h1 {
@@ -440,16 +468,21 @@
 	margin: 0.5em 0;
 }
 
-/* Date nav stays in row 1, column 2 */
-.pltt-date-nav {
-	grid-row: 1;
-	grid-column: 2;
-}
-
-/* Notices inside grid header containers go to row 2, spanning both columns */
-.pltt-header .notice {
-	grid-row: 2;
-	grid-column: 1 / -1;
+/* Notices inside the header take a full-width line of their own below the title
+   and controls. This is the job the header used to do as a grid: with no
+   .wp-header-end marker, WordPress moves every notice (ours, core's update nags,
+   other plugins') to just after the first H1 — on Clients, Projects and Tags
+   that's a direct child of this row. order: 99 puts it below the controls even
+   though it lands between them in the markup. div.updated / div.error are the
+   legacy classes core's mover also picks up. */
+.pltt-header > .notice,
+.pltt-header > div.updated,
+.pltt-header > div.error {
+	/* border-box: a 100% basis plus the notice's own padding (38px extra on a
+	   dismissible one) would otherwise overflow the row. */
+	box-sizing: border-box;
+	flex: 0 0 100%;
+	order: 99;
 }
 
 /* Modals */
@@ -464,9 +497,19 @@
 	display: flex;
 	align-items: center;
 	justify-content: center;
+	/* A modal taller than the screen (the entry form on a phone) scrolls inside
+	   the overlay rather than running off the top and bottom. The overlay scrolls,
+	   not the content box, so dropdowns inside the modal (the tag picker) are
+	   never clipped by it. */
+	overflow-y: auto;
+	padding: 10px 0;
+	box-sizing: border-box;
 }
 
 .pltt-modal-content {
+	/* auto margins centre it like align-items does, but when it's taller than
+	   the overlay it starts at the top instead of being cut off above. */
+	margin: auto;
 	position: relative;
 	background: var(--pltt-bg-white);
 	padding: 25px;
@@ -697,8 +740,11 @@
 }
 
 /* Date navigator widget — replaces the old separate preset/from/to filter row */
+/* Wraps so a reset link ("This Month", "Today") drops below the pill on a
+   narrow screen instead of pushing it off the edge. */
 .pltt-date-nav-row {
 	display: flex;
+	flex-wrap: wrap;
 	justify-content: flex-end;
 	align-items: center;
 	gap: 8px;
@@ -1001,13 +1047,28 @@ fieldset.pltt-date-nav-custom-inputs input[type="date"] {
 
 /* Responsive */
 @media screen and (max-width: 782px) {
-	.pltt-header {
-		flex-direction: column;
-		align-items: flex-start;
+	/* One column: the title slot takes the whole first line, so the controls
+	   (date nav, Add buttons) always sit under it rather than beside it only when
+	   the title happens to be short. On Project Detail the H1 is
+	   screen-reader-only and the Back button holds the title slot, hence the
+	   second selector. The date nav still keeps to the right (margin-left: auto
+	   above). */
+	.pltt-header:not(:has(> .pltt-view-toggle)) > :first-child,
+	.pltt-header:not(:has(> .pltt-view-toggle)) > .screen-reader-text:first-child + * {
+		flex-basis: 100%;
 	}
 
-	.pltt-date-nav {
-		flex-wrap: wrap;
+	/* Except beside a view toggle (Summary · Entries, Ready to bill · Billed
+	   history): that stays two columns. A zero basis lets the title give way and
+	   wrap its text instead of pushing the toggle onto a line of its own. */
+	.pltt-header:has(> .pltt-view-toggle) > :first-child {
+		flex-basis: 0;
+	}
+
+	/* The pill (‹ label ›) stays one piece: the label gives up its 200px floor
+	   rather than pushing an arrow onto a line of its own. */
+	.pltt-date-nav-label {
+		min-width: 0;
 	}
 
 	.pltt-summary-cards {
@@ -1042,6 +1103,20 @@ fieldset.pltt-date-nav-custom-inputs input[type="date"] {
 
 	.pltt-filter-input-wrap select {
 		flex: 1;
+	}
+
+	/* Once the filters stack, each field runs the full width. The extra
+	   .pltt-filter-row outranks the desktop 160–220px width cap in reports.css,
+	   which loads after this sheet. */
+	.pltt-report-filters .pltt-filter-row .pltt-filter-group select {
+		max-width: none;
+		min-width: 0;
+	}
+
+	/* Apply / Clear split the row, like the Today footer's buttons. */
+	.pltt-filter-actions .button {
+		flex: 1 1 0;
+		text-align: center;
 	}
 }
 
