@@ -169,27 +169,37 @@
 	-webkit-overflow-scrolling: touch;
 }
 
-.pltt-where-table {
+/* The panel is the frame; the table's own (WordPress sets it on table.widefat,
+   which outranks a bare class) would draw a second line just inside it. */
+.pltt-where-section table.pltt-where-table {
 	width: 100%;
 	border: 0;
 	box-shadow: none;
 	border-collapse: collapse;
 }
 
+/* Type, padding and heading weight come from the standard table styles every
+   other table here uses (.widefat + admin.css); this sheet only sets what is
+   particular to a grid of figures: right alignment and no wrapping. */
 .pltt-where-table th,
 .pltt-where-table td {
-	padding: 10px 14px;
 	text-align: right;
 	white-space: nowrap;
 	vertical-align: middle;
-	border-top: 1px solid var(--pltt-border-light);
 }
 
-.pltt-where-table thead th {
-	font-size: 12px;
-	font-weight: 600;
-	color: var(--pltt-text-muted);
-	border-top: 0;
+/* Figures in the regular face with tabular numerals, the same as the duration
+   and amount cells in the other tables — mono is for header meta lines, not
+   table bodies. */
+.pltt-where-cell,
+.pltt-where-all-figure,
+.pltt-where-share,
+.pltt-where-table tfoot td {
+	font-variant-numeric: tabular-nums;
+}
+
+.pltt-where-table tbody tr + tr > * {
+	border-top: 1px solid var(--pltt-border-light);
 }
 
 .pltt-where-table thead th abbr[title] {
@@ -225,14 +235,31 @@
 	background: var(--pltt-bg-subtle);
 }
 
-.pltt-where-group th {
+/* Cells shaded by hours on one whole-table scale (alpha set per cell in
+   --pltt-cell-a by the template; linear in minutes, capped at .55, floored at
+   .06, zero cells unset). The Total row and the All time column stay plain:
+   they are sums, not cells on the scale. */
+.pltt-where-shaded tbody td.pltt-where-cell[style] {
+	background: rgba(42, 120, 214, var(--pltt-cell-a, 0));
+}
+
+/* The current month keeps the same neutral tint as the other grid; a shaded
+   cell paints its blue over it, an empty cell shows the tint through. */
+.pltt-where-shaded tbody td.pltt-where-cell.is-current[style] {
+	background: rgba(42, 120, 214, var(--pltt-cell-a, 0));
+}
+
+/* Group rows take the group band's treatment (.pltt-tag-group-header-row and
+   kin in admin.css): the title type on white with a rule above — the same
+   band Tags and Projects put over each of their tables, here as a row because
+   the columns have to stay aligned across groups. */
+.pltt-where-table .pltt-where-group th {
 	text-align: left;
-	font-size: 11px;
+	font-size: 14px;
 	font-weight: 600;
-	letter-spacing: 0.04em;
-	text-transform: uppercase;
-	color: var(--pltt-text-muted);
-	background: var(--pltt-bg-subtle);
+	color: var(--pltt-text-dark);
+	background: var(--pltt-bg-white);
+	border-top: 1px solid var(--pltt-border);
 }
 
 .pltt-where-untagged .pltt-where-tag,
@@ -241,25 +268,35 @@
 	font-weight: 500;
 }
 
-.pltt-where-table tfoot th,
-.pltt-where-table tfoot td {
+/* WordPress left-aligns footer cells with a more specific rule (.widefat tfoot
+   td), so the Total row says right explicitly to line up under the rows. */
+.pltt-where-section table.pltt-where-table tfoot th,
+.pltt-where-section table.pltt-where-table tfoot td {
 	border-top: 1px solid var(--pltt-border);
 	font-weight: 600;
+	font-size: 13px; /* WordPress sets footer cells at 14px; the Total row is a row. */
+	text-align: right;
+}
+
+.pltt-where-section table.pltt-where-table tfoot th.pltt-where-tag {
+	text-align: left;
 }
 
 /* All time: the figure in a fixed-width slot, then its share of the project.
    Two slots, both right-aligned, so the column reads as two aligned columns of
    numbers — "2h" and "15h 47m" end at the same x, "4%" and "34%" too. 7ch fits
-   "99h 59m" in the mono face. (A share bar sat here first; the percentage says
+   "99h 59m" at tabular widths. (A share bar sat here first; the percentage says
    the same thing more precisely in less space.) */
 .pltt-where-table .pltt-where-all {
-	text-align: left;
+	text-align: right;
+	border-left: 1px solid var(--pltt-border);
 }
 
 .pltt-where-all-figure {
 	display: inline-block;
 	min-width: 7ch;
 	text-align: right;
+	font-weight: 600; /* The row's total — the figure the row is read for. */
 }
 
 .pltt-where-share {
@@ -279,6 +316,10 @@
 	.pltt-where-table th,
 	.pltt-where-table td {
 		padding: 8px 10px;
+	}
+
+	.pltt-where-table .pltt-where-group th {
+		font-size: 13px;
 	}
 
 	.pltt-where-period,

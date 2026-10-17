@@ -98,14 +98,15 @@ class PLTT_Project_Report {
 	}
 
 	/**
-	 * "Where the time went": minutes per tag across the most recent periods.
+	 * "Where the time went": minutes per tag across a run of periods.
 	 *
-	 * Columns are the project's own billing periods for a retainer (a monthly
-	 * care plan reads month by month) and calendar months for everything else.
-	 * Six at most, ending at the lens-selected period — or, with no lens, at
-	 * today's period for an active project, so a month with nothing logged yet
-	 * still shows as the tinted column rather than vanishing. Entries outside
-	 * the columns still count in the all-time total.
+	 * Columns are the calendar year of the selected period (the lens month for
+	 * a retainer in period scope; otherwise the latest active year), with
+	 * leading and trailing empty months dropped and a skipped month mid-span
+	 * kept as an empty column so the gap shows. Cells are shaded on one
+	 * whole-table scale; the current month is tinted. A weekly retainer keeps a
+	 * trailing window instead — see where_plan(). Entries outside the columns
+	 * still count in the all-time total.
 	 *
 	 * Rows are grouped by tag group only when the project's tags span more than
 	 * one — with every tag in "Activity" there is nothing to separate. Untagged
@@ -117,20 +118,22 @@ class PLTT_Project_Report {
 	 * @param object|null $stats      Lifetime stats (first/last entry dates).
 	 * @return array|null {
 	 *     @type array  $periods            [ { key, from, to, label, full_label, is_current } ], oldest first.
-	 *     @type string $period_range       Human span of the columns, for the panel header.
+	 *     @type string $period_range       Human span for the panel header.
 	 *     @type array  $groups             [ { label, rows: [ { tag_id, name, cells[], all_minutes, share, url } ] } ].
 	 *     @type array  $untagged           One row in the same shape, or null.
 	 *     @type int    $total_minutes      All-time project minutes (each entry counted once).
 	 *     @type int[]  $period_totals      Per-column minutes, each entry counted once.
 	 *     @type bool   $has_multi_tag      Whether any entry carries more than one tag.
 	 *     @type bool   $show_group_headers Whether to print a header row per group.
+	 *     @type int    $max_cell           Largest data cell, the shading scale's top.
 	 * } Null when there is nothing to show.
 	 */
 	private static function build_where( $project_id, $project, $window, $stats ) {
-		$periods = self::where_periods( $project, $window, $stats );
-		if ( empty( $periods ) ) {
+		$plan = self::where_plan( $project, $window, $stats );
+		if ( empty( $plan['periods'] ) ) {
 			return null;
 		}
+		$periods = $plan['periods'];
 
 		$buckets = array();
 		foreach ( $periods as $p ) {
@@ -140,11 +143,46 @@ class PLTT_Project_Report {
 			);
 		}
 		$data  = PLTT_Entries::get_tag_minutes_by_bucket( (int) $project_id, $buckets );
-		$ncols = count( $periods );
 		$total = (int) array_sum( $data['totals'] );
 		if ( $total <= 0 ) {
 			return null;
 		}
+
+		// Year scope: drop empty months at either end. A SELECTED month stays even
+		// when empty (it is what the page is about); today's month in Full scope
+		// does not get that protection, or an idle month would drag every empty
+		// month before it in as a fake gap. A month between two active months
+		// always stays — that gap is information.
+		$keep = array_keys( $periods );
+		if ( ! empty( $plan['year_scope'] ) ) {
+			$protect  = ! empty( $plan['keep_current'] );
+			$is_empty = static function ( $i ) use ( $data, $periods, $protect ) {
+				return empty( $data['totals'][ $i ] ) && ! ( $protect && ! empty( $periods[ $i ]['is_current'] ) );
+			};
+			while ( $keep && $is_empty( $keep[0] ) ) {
+				array_shift( $keep );
+			}
+			while ( $keep && $is_empty( $keep[ count( $keep ) - 1 ] ) ) {
+				array_pop( $keep );
+			}
+			if ( empty( $keep ) ) {
+				return null;
+			}
+			// No column carries today's month (Full scope, idle month): tint the
+			// latest one instead, so every view has a current column.
+			$has_current = false;
+			foreach ( $keep as $i ) {
+				$has_current = $has_current || ! empty( $periods[ $i ]['is_current'] );
+			}
+			if ( ! $has_current ) {
+				foreach ( $periods as &$p ) {
+					$p['is_current'] = false;
+				}
+				unset( $p );
+				$periods[ $keep[ count( $keep ) - 1 ] ]['is_current'] = true;
+			}
+		}
+		$ncols = count( $keep );
 
 		$meta = array();
 		foreach ( (array) PLTT_Tags::get_all() as $tag ) {
@@ -154,6 +192,7 @@ class PLTT_Project_Report {
 		$by_group = array();
 		$untagged = null;
 		$row_sum  = 0;
+		$max_cell = 0;
 		foreach ( $data['cells'] as $tag_id => $bucket_minutes ) {
 			$all = (int) array_sum( $bucket_minutes );
 			if ( $all <= 0 ) {
@@ -165,8 +204,9 @@ class PLTT_Project_Report {
 			}
 
 			$cells = array();
-			for ( $i = 0; $i < $ncols; $i++ ) {
-				$cells[ $i ] = isset( $bucket_minutes[ $i ] ) ? (int) $bucket_minutes[ $i ] : 0;
+			foreach ( $keep as $col => $i ) {
+				$cells[ $col ] = isset( $bucket_minutes[ $i ] ) ? (int) $bucket_minutes[ $i ] : 0;
+				$max_cell      = max( $max_cell, $cells[ $col ] );
 			}
 			$row = array(
 				'tag_id'      => $tag_id,
@@ -223,20 +263,29 @@ class PLTT_Project_Report {
 			);
 		}
 
+		$kept_periods  = array();
 		$period_totals = array();
-		for ( $i = 0; $i < $ncols; $i++ ) {
-			$period_totals[ $i ] = isset( $data['totals'][ $i ] ) ? (int) $data['totals'][ $i ] : 0;
+		foreach ( $keep as $col => $i ) {
+			$kept_periods[ $col ]  = $periods[ $i ];
+			$period_totals[ $col ] = isset( $data['totals'][ $i ] ) ? (int) $data['totals'][ $i ] : 0;
 		}
 
+		// Header: the lens period when one is selected (the table shows its
+		// year, but the panel is about that month); otherwise the columns' span.
+		$period_range = ! empty( $window['is_period'] ) && ! empty( $window['period_label'] )
+			? $window['period_label']
+			: pltt_format_date_range( $kept_periods[0]['from'], $kept_periods[ $ncols - 1 ]['to'] );
+
 		return array(
-			'periods'            => $periods,
-			'period_range'       => pltt_format_date_range( $periods[0]['from'], $periods[ $ncols - 1 ]['to'] ),
+			'periods'            => $kept_periods,
+			'period_range'       => $period_range,
 			'groups'             => $groups,
 			'untagged'           => $untagged,
 			'total_minutes'      => $total,
 			'period_totals'      => $period_totals,
 			'has_multi_tag'      => $row_sum > $total,
 			'show_group_headers' => count( $groups ) > 1,
+			'max_cell'           => $max_cell,
 		);
 	}
 
@@ -272,26 +321,38 @@ class PLTT_Project_Report {
 	}
 
 	/**
-	 * The grid's columns: up to $count consecutive periods, oldest first.
+	 * The grid's candidate columns and how to treat them.
 	 *
-	 * Unit: the lens unit for a retainer, calendar months otherwise. The last
-	 * column is the lens-selected period when one is set; otherwise today's
-	 * period while the project is active, and the last entry's period once it
-	 * is archived. Walks back from there until $count columns or the period
-	 * holding the first entry, whichever comes first — a two-month-old project
-	 * gets two columns, not four dashes.
+	 * Month or quarter unit (every type; months for anything that isn't a
+	 * retainer): every period of the calendar year that holds the lens period —
+	 * or, with no lens, the latest active year — with `year_scope` set so
+	 * build_where() trims the empty ends. The current column is the lens
+	 * period, else today's period when it falls in that year.
+	 *
+	 * Weekly unit only (a year would be 52 columns): up to $count consecutive
+	 * periods ending at the lens period, else at today's period while the
+	 * project is active and at the last entry's period once archived. Walks
+	 * back until $count columns or the period holding the first entry.
 	 *
 	 * @param object      $project Project row.
 	 * @param array|null  $window  Active period window.
 	 * @param object|null $stats   Lifetime stats.
-	 * @param int         $count   Maximum number of columns.
-	 * @return array [ { key, from, to, label, full_label, is_current } ].
+	 * @param int         $count   Trailing-window size (weekly unit).
+	 * @return array{ periods: array, year_scope: bool, keep_current: bool }
+	 *               periods: [ { key, from, to, label, full_label, is_current } ], oldest first;
+	 *               keep_current: whether the current column survives trimming when empty
+	 *               (true only when a period is selected on the lens).
 	 */
-	private static function where_periods( $project, $window, $stats, $count = 6 ) {
+	private static function where_plan( $project, $window, $stats, $count = 6 ) {
+		$none  = array(
+			'periods'      => array(),
+			'year_scope'   => false,
+			'keep_current' => false,
+		);
 		$first = $stats->first_entry_date ?? '';
 		$last  = $stats->last_entry_date ?? '';
 		if ( ! $first || ! $last ) {
-			return array();
+			return $none;
 		}
 
 		$is_recurring = ( 'recurring' === pltt_get_billing_type( $project ) );
@@ -299,6 +360,30 @@ class PLTT_Project_Report {
 		$tz           = wp_timezone();
 		$today        = current_time( 'Y-m-d' );
 		$is_lens      = ! empty( $window['is_period'] ) && ! empty( $window['anchor'] );
+		$today_key    = pltt_period_start( new DateTimeImmutable( $today, $tz ), $unit )->format( 'Y-m-d' );
+		// Year scope for every type; only a weekly unit (52 columns a year) keeps
+		// the trailing window. Began as retainers-only per the redesign handoff;
+		// Patrick extended it to all types once he saw it (2026-10-17).
+		$year_scope   = in_array( $unit, array( 'month', 'quarter' ), true );
+
+		if ( $year_scope ) {
+			$year_of = $is_lens ? $window['anchor'] : $last;
+			$year    = (int) ( new DateTimeImmutable( $year_of, $tz ) )->format( 'Y' );
+			$cursor  = new DateTimeImmutable( sprintf( '%04d-01-01', $year ), $tz );
+			$stop    = new DateTimeImmutable( sprintf( '%04d-12-31', $year ), $tz );
+			$current = $is_lens ? pltt_period_start( new DateTimeImmutable( $window['anchor'], $tz ), $unit )->format( 'Y-m-d' ) : $today_key;
+
+			$starts = array();
+			while ( $cursor <= $stop ) {
+				$starts[] = $cursor;
+				$cursor   = pltt_period_end( $cursor, $unit )->modify( '+1 day' );
+			}
+			return array(
+				'periods'      => self::describe_periods( $starts, $unit, $current ),
+				'year_scope'   => true,
+				'keep_current' => $is_lens,
+			);
+		}
 
 		if ( $is_lens ) {
 			$end_date = $window['anchor'];
@@ -313,11 +398,7 @@ class PLTT_Project_Report {
 		if ( $end < $floor ) {
 			$end = $floor;
 		}
-
-		// The tinted column: the lens period, or today's when there is no lens.
-		$current_key = $is_lens
-			? $end->format( 'Y-m-d' )
-			: pltt_period_start( new DateTimeImmutable( $today, $tz ), $unit )->format( 'Y-m-d' );
+		$current = $is_lens ? $end->format( 'Y-m-d' ) : $today_key;
 
 		$starts = array();
 		$cursor = $end;
@@ -325,9 +406,30 @@ class PLTT_Project_Report {
 			$starts[] = $cursor;
 			$cursor   = pltt_period_start( $cursor->modify( '-1 day' ), $unit );
 		}
-		$starts = array_reverse( $starts );
 
-		$end_year = $end->format( 'Y' );
+		return array(
+			'periods'      => self::describe_periods( array_reverse( $starts ), $unit, $current ),
+			'year_scope'   => false,
+			'keep_current' => false,
+		);
+	}
+
+	/**
+	 * Column records for a list of period starts (oldest first).
+	 *
+	 * Short labels drop the year except where a column's year differs from the
+	 * last column's ("Nov '25" beside "Jan").
+	 *
+	 * @param DateTimeImmutable[] $starts      Period starts, oldest first.
+	 * @param string              $unit        'week' | 'month' | 'quarter' | 'year'.
+	 * @param string              $current_key Y-m-d start of the column to mark current.
+	 * @return array [ { key, from, to, label, full_label, is_current } ].
+	 */
+	private static function describe_periods( array $starts, $unit, $current_key ) {
+		if ( empty( $starts ) ) {
+			return array();
+		}
+		$end_year = end( $starts )->format( 'Y' );
 		$periods  = array();
 		foreach ( $starts as $start ) {
 			$key       = $start->format( 'Y-m-d' );
@@ -340,7 +442,6 @@ class PLTT_Project_Report {
 				'is_current' => ( $key === $current_key ),
 			);
 		}
-
 		return $periods;
 	}
 
