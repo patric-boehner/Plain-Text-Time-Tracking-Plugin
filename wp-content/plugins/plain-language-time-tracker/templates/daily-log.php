@@ -15,9 +15,12 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 $content       = $log ? $log->content : '';
 $is_processed  = $log && $log->processed;
-// A processed day opens locked: the log reads as text, the rows show no menu,
-// and one "Edit day" button unlocks both in place. The just-processed confirm
-// state is the exception — you're mid-commit there. Per visit, not remembered.
+// A processed day opens with the log locked: the same text, rendered as text
+// on the page (selectable, URLs clickable) with the textarea hidden behind it,
+// and one "Edit" button swaps the textarea back in place. The entry rows are
+// not part of the lock — editing an entry already goes through a modal. The
+// just-processed confirm state is the exception — you're mid-commit there.
+// Per visit, not remembered.
 $is_locked     = $is_processed && empty( $is_post_parse );
 $previous_date = PLTT_Daily_Log::get_previous_date( $date );
 $next_date     = PLTT_Daily_Log::get_next_date( $date );
@@ -136,6 +139,25 @@ $return_to     = $return_to_raw ? wp_validate_redirect( $return_to_raw, '' ) : '
 	<?php endif; ?>
 
 	<div class="pltt-log-container <?php echo $is_processed ? 'pltt-log-processed' : ''; ?>">
+		<?php if ( $is_locked ) : ?>
+			<?php
+			// The log as text. Escaped first, then URLs and emails turned into
+			// links (the notes often hold a URL to come back to), opening in a
+			// new tab so the day stays put. Only <a> with those attributes survives.
+			$pltt_log_read = links_add_target( make_clickable( esc_html( $content ) ), '_blank' );
+			$pltt_log_read = wp_kses(
+				$pltt_log_read,
+				array(
+					'a' => array(
+						'href'   => array(),
+						'rel'    => array(),
+						'target' => array(),
+					),
+				)
+			);
+			?>
+			<pre id="pltt-log-readonly" class="pltt-log-textarea pltt-log-readonly"><?php echo $pltt_log_read; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped above, then kses'd to <a> only. ?></pre>
+		<?php endif; ?>
 		<textarea
 			id="pltt-log-textarea"
 			class="pltt-log-textarea"
@@ -154,7 +176,7 @@ $return_to     = $return_to_raw ? wp_validate_redirect( $return_to_raw, '' ) : '
 			<div class="pltt-log-actions">
 				<span id="pltt-save-indicator" class="pltt-save-indicator"></span>
 				<?php if ( $is_locked ) : ?>
-					<!-- Locked: the one control. Unlocks the log and the rows in place (daily-log.js). -->
+					<!-- Locked: the one control. Unlocks the log in place (daily-log.js). -->
 					<button type="button" id="pltt-edit-day-btn" class="button button-secondary">
 						<?php esc_html_e( 'Edit', 'plain-language-time-tracker' ); ?>
 					</button>
