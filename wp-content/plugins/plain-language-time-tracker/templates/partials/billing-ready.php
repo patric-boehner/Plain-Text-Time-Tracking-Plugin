@@ -65,7 +65,7 @@ $q_clients = isset( $queue['clients'] ) ? $queue['clients'] : array();
 	);
 	?>
 <?php else : ?>
-	<table class="widefat striped pltt-bill-ready-table pltt-stack pltt-stack-ready">
+	<table class="widefat pltt-bill-ready-table pltt-stack pltt-stack-ready">
 		<thead>
 			<tr>
 				<th><?php esc_html_e( 'Client', 'plain-language-time-tracker' ); ?></th>

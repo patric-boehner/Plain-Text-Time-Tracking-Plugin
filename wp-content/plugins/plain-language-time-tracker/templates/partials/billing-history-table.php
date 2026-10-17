@@ -34,7 +34,7 @@ foreach ( $billing_history as $rec ) {
 	);
 }
 ?>
-<table class="widefat striped pltt-billing-history-table pltt-stack pltt-stack-records">
+<table class="widefat pltt-billing-history-table pltt-stack pltt-stack-records">
 	<thead>
 		<tr>
 			<th><?php esc_html_e( 'Invoiced', 'plain-language-time-tracker' ); ?></th>
