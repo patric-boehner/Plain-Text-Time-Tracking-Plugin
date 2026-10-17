@@ -903,14 +903,23 @@
 	font-variant-numeric: tabular-nums;
 	white-space: nowrap;
 }
+/* The row's one action. It used to sit in a 1%-wide column a few pixels off
+   the amount and read as an afterthought; room on both sides and weight make
+   it the action. */
 .pltt-bill-ready-table .pltt-bill-ready-action {
 	text-align: right;
 	white-space: nowrap;
-	width: 1%;
+	padding-left: 28px;
+	padding-right: 20px;
 }
 .pltt-bill-ready-link {
 	white-space: nowrap;
 	text-decoration: none;
+	font-weight: 600;
+}
+.pltt-bill-ready-link:hover,
+.pltt-bill-ready-link:focus-visible {
+	text-decoration: underline;
 }
 /* Anchor jump from the Insights backlog notice clears the admin bar. */
 .pltt-bill-ready-row {

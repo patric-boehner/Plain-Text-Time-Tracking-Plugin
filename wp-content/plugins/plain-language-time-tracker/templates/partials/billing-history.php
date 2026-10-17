@@ -160,7 +160,7 @@ $card_label = static function ( $base, $phrase ) {
 		);
 	}
 	?>
-	<table class="widefat striped pltt-bill-records-table pltt-stack pltt-stack-records">
+	<table class="widefat pltt-bill-records-table pltt-stack pltt-stack-records">
 		<thead>
 			<tr>
 				<?php // "Invoiced" vs "Work covered": one date column and one period
