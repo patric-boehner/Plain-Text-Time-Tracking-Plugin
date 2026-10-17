@@ -36,6 +36,23 @@ if ( empty( $where ) || empty( $where['periods'] ) ) {
 
 $where_periods = $where['periods'];
 $where_ncols   = count( $where_periods ) + 2;
+$where_max     = max( 1, (int) ( $where['max_cell'] ?? 0 ) );
+
+/**
+ * Cell background alpha on the whole-table scale: linear in minutes, capped at
+ * 0.55 so the text stays readable, floored at 0.06 so a small value is still
+ * visibly shaded. Zero gets no shading at all (returns '').
+ *
+ * @param int $minutes Cell minutes.
+ * @return string Inline style attribute, or ''.
+ */
+$pltt_where_shade = static function ( $minutes ) use ( $where_max ) {
+	if ( $minutes <= 0 ) {
+		return '';
+	}
+	$alpha = max( 0.06, round( ( $minutes / $where_max ) * 0.55, 3 ) );
+	return ' style="--pltt-cell-a: ' . esc_attr( $alpha ) . '"';
+};
 
 /**
  * One body row. A closure so the tagged rows and the Untagged row share it.
@@ -43,7 +60,7 @@ $where_ncols   = count( $where_periods ) + 2;
  * @param array  $row         { name, cells[], all_minutes, share }.
  * @param string $extra_class Extra class on the <tr>.
  */
-$pltt_where_row = static function ( $row, $extra_class = '' ) use ( $where_periods ) {
+$pltt_where_row = static function ( $row, $extra_class = '' ) use ( $where_periods, $pltt_where_shade ) {
 	$pct      = (int) round( $row['share'] * 100 );
 	$all_text = pltt_format_duration( (int) $row['all_minutes'] );
 	?>
@@ -57,7 +74,7 @@ $pltt_where_row = static function ( $row, $extra_class = '' ) use ( $where_perio
 		</th>
 		<?php foreach ( $where_periods as $i => $p ) : ?>
 			<?php $minutes = isset( $row['cells'][ $i ] ) ? (int) $row['cells'][ $i ] : 0; ?>
-			<td class="pltt-where-cell pltt-measured<?php echo ! empty( $p['is_current'] ) ? ' is-current' : ''; ?>">
+			<td class="pltt-where-cell<?php echo ! empty( $p['is_current'] ) ? ' is-current' : ''; ?>"<?php echo $pltt_where_shade( $minutes ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped in the closure. ?>>
 				<?php if ( $minutes > 0 ) : ?>
 					<?php echo esc_html( pltt_format_duration( $minutes ) ); ?>
 				<?php else : ?>
@@ -70,13 +87,13 @@ $pltt_where_row = static function ( $row, $extra_class = '' ) use ( $where_perio
 			// The figure in a fixed-width slot, then its share of all time. Two
 			// aligned columns of numbers; a bar was tried here and said less.
 			?>
-			<span class="pltt-measured pltt-where-all-figure"><?php echo esc_html( $all_text ); ?></span><span class="pltt-measured pltt-where-share"><?php echo esc_html( $pct . '%' ); ?></span>
+			<span class="pltt-where-all-figure"><?php echo esc_html( $all_text ); ?></span><span class="pltt-where-share"><?php echo esc_html( $pct . '%' ); ?></span>
 		</td>
 	</tr>
 	<?php
 };
 ?>
-<details class="pltt-where-section">
+<details class="pltt-where-section pltt-where-shaded">
 	<summary class="pltt-panel-header pltt-where-summary">
 		<h2 id="pltt-where-title" class="pltt-panel-title">
 			<?php esc_html_e( 'Where the time went', 'plain-language-time-tracker' ); ?>
@@ -85,7 +102,7 @@ $pltt_where_row = static function ( $row, $extra_class = '' ) use ( $where_perio
 	</summary>
 	<div class="pltt-panel-body pltt-where-body">
 		<div class="pltt-where-scroll">
-			<table class="pltt-where-table">
+			<table class="widefat pltt-where-table">
 				<thead>
 					<tr>
 						<th scope="col" class="pltt-where-tag"><?php esc_html_e( 'Tag', 'plain-language-time-tracker' ); ?></th>
@@ -129,7 +146,7 @@ $pltt_where_row = static function ( $row, $extra_class = '' ) use ( $where_perio
 						<th scope="row" class="pltt-where-tag"><?php esc_html_e( 'Total', 'plain-language-time-tracker' ); ?></th>
 						<?php foreach ( $where_periods as $i => $p ) : ?>
 							<?php $minutes = isset( $where['period_totals'][ $i ] ) ? (int) $where['period_totals'][ $i ] : 0; ?>
-							<td class="pltt-where-cell pltt-measured<?php echo ! empty( $p['is_current'] ) ? ' is-current' : ''; ?>">
+							<td class="pltt-where-cell<?php echo ! empty( $p['is_current'] ) ? ' is-current' : ''; ?>">
 								<?php if ( $minutes > 0 ) : ?>
 									<?php echo esc_html( pltt_format_duration( $minutes ) ); ?>
 								<?php else : ?>
@@ -137,7 +154,8 @@ $pltt_where_row = static function ( $row, $extra_class = '' ) use ( $where_perio
 								<?php endif; ?>
 							</td>
 						<?php endforeach; ?>
-						<td class="pltt-where-all"><span class="pltt-measured pltt-where-all-figure"><?php echo esc_html( pltt_format_duration( (int) $where['total_minutes'] ) ); ?></span></td>
+						<?php // An empty share slot keeps the total under the rows' figures, not under their percentages. ?>
+						<td class="pltt-where-all"><span class="pltt-where-all-figure"><?php echo esc_html( pltt_format_duration( (int) $where['total_minutes'] ) ); ?></span><span class="pltt-where-share" aria-hidden="true"></span></td>
 					</tr>
 				</tfoot>
 			</table>
