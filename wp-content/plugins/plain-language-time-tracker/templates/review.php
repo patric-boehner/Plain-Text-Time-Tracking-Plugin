@@ -60,13 +60,14 @@ foreach ( $entries as $entry ) {
 				<div class="card-label"><?php esc_html_e( 'Entries', 'plain-language-time-tracker' ); ?></div>
 				<div class="card-value" data-card="entry-count"><?php echo esc_html( count( $entries ) ); ?></div>
 			</div>
+			<?php // Durations read as "6h 15m" like every other card; the decimal is the hover hint. ?>
 			<div class="card">
 				<div class="card-label"><?php esc_html_e( 'Total Hours', 'plain-language-time-tracker' ); ?></div>
-				<div class="card-value" data-card="hours"><?php echo esc_html( pltt_format_hours( $total_minutes ) ); ?></div>
+				<div class="card-value" data-card="hours" <?php echo pltt_decimal_hint_attrs( (int) $total_minutes ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>><?php echo esc_html( pltt_format_duration( (int) $total_minutes ) ); ?></div>
 			</div>
 			<div class="card">
 				<div class="card-label"><?php esc_html_e( 'Billable Hours', 'plain-language-time-tracker' ); ?></div>
-				<div class="card-value"><?php echo esc_html( pltt_format_hours( $summary['billable_minutes'] ) ); ?></div>
+				<div class="card-value" <?php echo pltt_decimal_hint_attrs( (int) $summary['billable_minutes'] ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>><?php echo esc_html( pltt_format_duration( (int) $summary['billable_minutes'] ) ); ?></div>
 			</div>
 			<?php if ( (float) $summary['billable_amount'] > 0 ) : ?>
 				<div class="card">

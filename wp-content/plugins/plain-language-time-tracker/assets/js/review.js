@@ -740,7 +740,9 @@
 
 		const hoursEl = document.querySelector( '[data-card="hours"]' );
 		if ( hoursEl ) {
-			hoursEl.textContent = PLTT.formatHours( totalMinutes );
+			hoursEl.textContent = PLTT.formatDuration( totalMinutes );
+			// Keep the decimal-hours hover hint in step with the figure.
+			hoursEl.setAttribute( 'data-tip-rows', JSON.stringify( [ [ '', '= ' + PLTT.formatHours( totalMinutes ) + ' h' ] ] ) );
 		}
 	}
 
