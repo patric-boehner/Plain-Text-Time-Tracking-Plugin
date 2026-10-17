@@ -39,6 +39,10 @@ class PLTT_Form_Handlers {
 		add_action( 'admin_post_pltt_create_tag', array( __CLASS__, 'handle_create_tag' ) );
 		add_action( 'admin_post_pltt_rename_tag', array( __CLASS__, 'handle_rename_tag' ) );
 		add_action( 'admin_post_pltt_delete_tag', array( __CLASS__, 'handle_delete_tag' ) );
+
+		// Settings: the weekly digest.
+		add_action( 'admin_post_pltt_save_digest_settings', array( __CLASS__, 'handle_save_digest_settings' ) );
+		add_action( 'admin_post_pltt_send_digest_test', array( __CLASS__, 'handle_send_digest_test' ) );
 	}
 
 	/**
@@ -539,5 +543,42 @@ class PLTT_Form_Handlers {
 		exit;
 	}
 
-}
+	/**
+	 * Save the weekly digest settings.
+	 */
+	public static function handle_save_digest_settings() {
+		self::guard( 'pltt_save_digest_settings' );
 
+		// phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- each field is sanitized below / in save_settings().
+		$raw = isset( $_POST['pltt_digest'] ) && is_array( $_POST['pltt_digest'] ) ? wp_unslash( $_POST['pltt_digest'] ) : array();
+
+		$recipient = isset( $raw['recipient'] ) ? trim( sanitize_text_field( $raw['recipient'] ) ) : '';
+		if ( '' !== $recipient && ! is_email( $recipient ) ) {
+			self::redirect_back( array( 'pltt_error' => 'digest_invalid_email' ) );
+		}
+
+		PLTT_Digest::save_settings(
+			array(
+				'enabled'   => ! empty( $raw['enabled'] ),
+				'weekday'   => isset( $raw['weekday'] ) ? (int) $raw['weekday'] : 1,
+				'recipient' => $recipient,
+			)
+		);
+
+		self::redirect_back( array( 'pltt_message' => 'digest_saved' ) );
+	}
+
+	/**
+	 * Send the digest now, to confirm delivery works.
+	 */
+	public static function handle_send_digest_test() {
+		self::guard( 'pltt_send_digest_test' );
+
+		$result = PLTT_Digest::send( true );
+		if ( true === $result ) {
+			self::redirect_back( array( 'pltt_message' => 'digest_sent' ) );
+		}
+		// Code only — never a WP_Error message in a redirect URL.
+		self::redirect_back( array( 'pltt_error' => 'digest_send_failed' ) );
+	}
+}

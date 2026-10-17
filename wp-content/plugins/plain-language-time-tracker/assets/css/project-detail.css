@@ -102,3 +102,191 @@
    which can say when it went. See ui/pltt-budget-on-chart.html and the
    .pltt-chart-cross / .pltt-chart-seg-within rules in pltt-chart.css. */
 
+/* "Where the time went" — tags × recent periods ---------------------------
+   Same frame as the volume chart above it (.pltt-chart-section in
+   pltt-chart.css); body padding zeroed so the table welds to the frame. On a
+   phone it scrolls sideways with the tag column pinned. The stacked-table
+   pattern (pltt-table-stack.css) is deliberately NOT used: a six-column matrix
+   of bare durations turns into prose with no column names. */
+.pltt-where-section {
+	background: var(--pltt-bg-white);
+	border: 1px solid var(--pltt-border);
+	border-radius: 4px;
+	margin: 0 0 20px;
+}
+
+.pltt-where-body {
+	padding: 0;
+}
+
+/* The panel header doubles as the disclosure control. Closed by default: the
+   page states what is here in one line until the breakdown is wanted. The
+   native marker is replaced by a chevron at the far end so the title keeps
+   the same left edge as the chart header above it. */
+.pltt-where-summary {
+	cursor: pointer;
+	list-style: none;
+	user-select: none;
+}
+
+.pltt-where-summary::-webkit-details-marker {
+	display: none;
+}
+
+.pltt-where-summary::after {
+	content: "";
+	flex: 0 0 auto;
+	margin-left: auto;
+	width: 8px;
+	height: 8px;
+	border-right: 2px solid var(--pltt-text-muted);
+	border-bottom: 2px solid var(--pltt-text-muted);
+	transform: translateY(-3px) rotate(45deg);
+	transition: transform 0.15s ease;
+}
+
+.pltt-where-section[open] > .pltt-where-summary::after {
+	transform: translateY(1px) rotate(-135deg);
+}
+
+.pltt-where-summary:hover .pltt-panel-title {
+	color: var(--pltt-primary);
+}
+
+.pltt-where-summary:focus-visible {
+	outline: 2px solid var(--pltt-primary);
+	outline-offset: -2px;
+}
+
+/* Closed, the header is the whole panel; drop its rule so it doesn't draw a
+   line under nothing. */
+.pltt-where-section:not([open]) > .pltt-where-summary {
+	border-bottom: 0;
+}
+
+.pltt-where-scroll {
+	overflow-x: auto;
+	-webkit-overflow-scrolling: touch;
+}
+
+.pltt-where-table {
+	width: 100%;
+	border: 0;
+	box-shadow: none;
+	border-collapse: collapse;
+}
+
+.pltt-where-table th,
+.pltt-where-table td {
+	padding: 10px 14px;
+	text-align: right;
+	white-space: nowrap;
+	vertical-align: middle;
+	border-top: 1px solid var(--pltt-border-light);
+}
+
+.pltt-where-table thead th {
+	font-size: 12px;
+	font-weight: 600;
+	color: var(--pltt-text-muted);
+	border-top: 0;
+}
+
+.pltt-where-table thead th abbr[title] {
+	text-decoration: none;
+	border-bottom: 0;
+	cursor: default;
+}
+
+/* The tag column stays put while the periods scroll beneath it. */
+.pltt-where-table .pltt-where-tag {
+	position: sticky;
+	left: 0;
+	z-index: 1;
+	text-align: left;
+	font-weight: 600;
+	color: var(--pltt-text-dark);
+	background: var(--pltt-bg-white);
+}
+
+/* Row links read as names, not hyperlinks, the way the other tables' do;
+   the underline arrives on hover (same convention as .pltt-lk). */
+.pltt-where-table .pltt-row-link {
+	text-decoration: none;
+}
+
+.pltt-where-table .pltt-row-link:hover,
+.pltt-where-table .pltt-row-link:focus-visible {
+	text-decoration: underline;
+}
+
+/* The period you're looking at — a neutral tint, not a state colour. */
+.pltt-where-table .is-current {
+	background: var(--pltt-bg-subtle);
+}
+
+.pltt-where-group th {
+	text-align: left;
+	font-size: 11px;
+	font-weight: 600;
+	letter-spacing: 0.04em;
+	text-transform: uppercase;
+	color: var(--pltt-text-muted);
+	background: var(--pltt-bg-subtle);
+}
+
+.pltt-where-untagged .pltt-where-tag,
+.pltt-where-untagged .pltt-where-tag .pltt-row-link {
+	font-style: italic;
+	font-weight: 500;
+}
+
+.pltt-where-table tfoot th,
+.pltt-where-table tfoot td {
+	border-top: 1px solid var(--pltt-border);
+	font-weight: 600;
+}
+
+/* All time: the figure in a fixed-width slot, then its share of the project.
+   Two slots, both right-aligned, so the column reads as two aligned columns of
+   numbers — "2h" and "15h 47m" end at the same x, "4%" and "34%" too. 7ch fits
+   "99h 59m" in the mono face. (A share bar sat here first; the percentage says
+   the same thing more precisely in less space.) */
+.pltt-where-table .pltt-where-all {
+	text-align: left;
+}
+
+.pltt-where-all-figure {
+	display: inline-block;
+	min-width: 7ch;
+	text-align: right;
+}
+
+.pltt-where-share {
+	display: inline-block;
+	min-width: 4ch;
+	margin-left: 12px;
+	text-align: right;
+	font-size: 12px;
+	color: var(--pltt-text-muted);
+}
+
+@media screen and (max-width: 782px) {
+	.pltt-where-table {
+		font-size: 12px;
+	}
+
+	.pltt-where-table th,
+	.pltt-where-table td {
+		padding: 8px 10px;
+	}
+
+	.pltt-where-period,
+	.pltt-where-cell {
+		min-width: 58px;
+	}
+
+	.pltt-where-share {
+		margin-left: 8px;
+	}
+}

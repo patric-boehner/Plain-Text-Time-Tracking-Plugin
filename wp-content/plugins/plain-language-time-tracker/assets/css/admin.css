@@ -368,27 +368,11 @@
 	font-weight: 600;
 }
 
+/* The bar itself is the shared .pltt-meter component (pltt-system.css); this
+   modifier only places it between the cell's lines. */
 .pltt-alloc-bar-wrap {
-	display: flex;
-	width: 100%;
-	max-width: 120px;
-	height: 5px;
-	background: var(--pltt-bg-hover);
-	border-radius: 2px;
 	margin: 3px 0 2px;
-	overflow: hidden;
 }
-
-/* Filled bar segments. Within-budget is blue (client work, regardless of type);
-   overage portion (when bar exceeds 100%) sits on top in a lighter blue. */
-.pltt-alloc-seg {
-	display: block;
-	height: 100%;
-}
-
-.pltt-alloc-seg-within { background: var(--pltt-primary); } /* blue: any client work */
-.pltt-alloc-seg-over   { background: var(--pltt-primary-light); } /* light blue: overage portion */
-.pltt-alloc-seg-billed { background: var(--pltt-success); } /* green: overage settled by a billing record */
 
 .pltt-alloc-label {
 	font-size: 12px;

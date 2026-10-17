@@ -3,15 +3,17 @@
  * Project Report — read-only aggregations for the Report tab.
  *
  * Pure data layer: turns a project's stats into the stat cards, the volume
- * ("Hours by …") chart, and the budget marks drawn on that chart. No output, no
- * per-entry queries in loops. Consumed by templates/partials/project-detail-report.php.
+ * ("Hours by …") chart, the budget marks drawn on that chart, and the "Where
+ * the time went" tag grid. No output, no per-entry queries in loops. Consumed
+ * by templates/partials/project-detail-report.php.
  *
  * The "Budget consumed" meter panel was removed 2026-08-13 in favour of those
  * marks — see build_budget() and ui/pltt-budget-on-chart.html.
  *
- * The per-tag "Where the time went" bars and the "Activity over time" swimlane
- * (and all their entry/tag grouping + timeline-axis machinery) were removed
- * 2026-07-18 — see docs/removed-project-report-sections.md to rebuild them.
+ * The original per-tag "Where the time went" bars and the "Activity over time"
+ * swimlane were removed 2026-07-18 (docs/removed-project-report-sections.md).
+ * The grid that replaced the bars on 2026-10-17 is built by build_where(): one
+ * SQL aggregation, not the old per-entry accumulate loop.
  *
  * @package PlainLanguageTimeTracker
  */
@@ -41,13 +43,14 @@ class PLTT_Project_Report {
 	 *     @type array  $budget      Budget marks for the chart: { cross, alloc } (or null).
 	 *     @type array  $cards       Stat-card figures.
 	 *     @type array  $chart       Volume ("Hours by …") chart data (or null).
+	 *     @type array  $where       "Where the time went" grid data (or null) — see build_where().
 	 *     @type array  $window      Active period-lens window (or null).
 	 * }
 	 *
 	 * Note: this used to also return `groupings` / `timeline_groupings` /
-	 * `default_group` / `axis` / `budget_line` for the "Where the time went" bars
-	 * and "Activity over time" swimlane. Both sections were removed 2026-07-18 —
-	 * see docs/removed-project-report-sections.md to rebuild them.
+	 * `default_group` / `axis` / `budget_line` for the original "Where the time
+	 * went" bars and the "Activity over time" swimlane (removed 2026-07-18, see
+	 * docs/removed-project-report-sections.md). `where` is the bars' successor.
 	 */
 	public static function build( $project_id, $project, $client = null, $stats = null, $window = null, $windowed_stats = null ) {
 		if ( null === $stats ) {
@@ -89,8 +92,256 @@ class PLTT_Project_Report {
 			'budget'      => self::build_budget( $project, $stats, $rate, $window, $chart ),
 			'cards'       => self::build_cards( $project, $card_stats, $rate, $window, $stats ),
 			'chart'       => $chart,
+			'where'       => self::build_where( $project_id, $project, $window, $stats ),
 			'window'      => is_array( $window ) ? $window : null,
 		);
+	}
+
+	/**
+	 * "Where the time went": minutes per tag across the most recent periods.
+	 *
+	 * Columns are the project's own billing periods for a retainer (a monthly
+	 * care plan reads month by month) and calendar months for everything else.
+	 * Six at most, ending at the lens-selected period — or, with no lens, at
+	 * today's period for an active project, so a month with nothing logged yet
+	 * still shows as the tinted column rather than vanishing. Entries outside
+	 * the columns still count in the all-time total.
+	 *
+	 * Rows are grouped by tag group only when the project's tags span more than
+	 * one — with every tag in "Activity" there is nothing to separate. Untagged
+	 * time is one last row, and only when there is any.
+	 *
+	 * @param int         $project_id Project ID.
+	 * @param object      $project    Project row.
+	 * @param array|null  $window     Active period window (recurring period lens).
+	 * @param object|null $stats      Lifetime stats (first/last entry dates).
+	 * @return array|null {
+	 *     @type array  $periods            [ { key, from, to, label, full_label, is_current } ], oldest first.
+	 *     @type string $period_range       Human span of the columns, for the panel header.
+	 *     @type array  $groups             [ { label, rows: [ { tag_id, name, cells[], all_minutes, share, url } ] } ].
+	 *     @type array  $untagged           One row in the same shape, or null.
+	 *     @type int    $total_minutes      All-time project minutes (each entry counted once).
+	 *     @type int[]  $period_totals      Per-column minutes, each entry counted once.
+	 *     @type bool   $has_multi_tag      Whether any entry carries more than one tag.
+	 *     @type bool   $show_group_headers Whether to print a header row per group.
+	 * } Null when there is nothing to show.
+	 */
+	private static function build_where( $project_id, $project, $window, $stats ) {
+		$periods = self::where_periods( $project, $window, $stats );
+		if ( empty( $periods ) ) {
+			return null;
+		}
+
+		$buckets = array();
+		foreach ( $periods as $p ) {
+			$buckets[] = array(
+				'from' => $p['from'],
+				'to'   => $p['to'],
+			);
+		}
+		$data  = PLTT_Entries::get_tag_minutes_by_bucket( (int) $project_id, $buckets );
+		$ncols = count( $periods );
+		$total = (int) array_sum( $data['totals'] );
+		if ( $total <= 0 ) {
+			return null;
+		}
+
+		$meta = array();
+		foreach ( (array) PLTT_Tags::get_all() as $tag ) {
+			$meta[ (int) $tag->id ] = $tag;
+		}
+
+		$by_group = array();
+		$untagged = null;
+		$row_sum  = 0;
+		foreach ( $data['cells'] as $tag_id => $bucket_minutes ) {
+			$all = (int) array_sum( $bucket_minutes );
+			if ( $all <= 0 ) {
+				continue;
+			}
+			// A tag deleted between the two queries; nothing to name it by.
+			if ( 0 !== $tag_id && ! isset( $meta[ $tag_id ] ) ) {
+				continue;
+			}
+
+			$cells = array();
+			for ( $i = 0; $i < $ncols; $i++ ) {
+				$cells[ $i ] = isset( $bucket_minutes[ $i ] ) ? (int) $bucket_minutes[ $i ] : 0;
+			}
+			$row = array(
+				'tag_id'      => $tag_id,
+				'name'        => ( 0 === $tag_id ) ? __( 'Untagged', 'plain-language-time-tracker' ) : $meta[ $tag_id ]->name,
+				'cells'       => $cells,
+				'all_minutes' => $all,
+				'share'       => $all / $total,
+				// The row's identifier links to its records: Overview's Entries
+				// view scoped to this project + this tag over the project's whole
+				// span, which is the set the All-time figure counts.
+				'url'         => self::tag_entries_url( $project, $stats, ( 0 === $tag_id ) ? 'without_tag' : $meta[ $tag_id ]->name ),
+			);
+			$row_sum += $all;
+
+			if ( 0 === $tag_id ) {
+				$untagged = $row;
+				continue;
+			}
+			$group                = isset( $meta[ $tag_id ]->group_name ) ? (string) $meta[ $tag_id ]->group_name : '';
+			$by_group[ $group ][] = $row;
+		}
+		if ( empty( $by_group ) && null === $untagged ) {
+			return null;
+		}
+
+		// Groups in the Tags page's order, ungrouped last.
+		$ordered = array();
+		foreach ( PLTT_Tags::get_all_groups() as $g ) {
+			if ( isset( $by_group[ $g ] ) ) {
+				$ordered[ $g ] = $by_group[ $g ];
+			}
+		}
+		foreach ( $by_group as $g => $rows ) {
+			if ( '' !== $g && ! isset( $ordered[ $g ] ) ) {
+				$ordered[ $g ] = $rows;
+			}
+		}
+		if ( isset( $by_group[''] ) ) {
+			$ordered[''] = $by_group[''];
+		}
+
+		$groups = array();
+		foreach ( $ordered as $g => $rows ) {
+			usort(
+				$rows,
+				static function ( $a, $b ) {
+					$by_minutes = $b['all_minutes'] <=> $a['all_minutes'];
+					return $by_minutes ?: strcasecmp( $a['name'], $b['name'] );
+				}
+			);
+			$groups[] = array(
+				'label' => ( '' === $g ) ? __( 'Ungrouped', 'plain-language-time-tracker' ) : $g,
+				'rows'  => $rows,
+			);
+		}
+
+		$period_totals = array();
+		for ( $i = 0; $i < $ncols; $i++ ) {
+			$period_totals[ $i ] = isset( $data['totals'][ $i ] ) ? (int) $data['totals'][ $i ] : 0;
+		}
+
+		return array(
+			'periods'            => $periods,
+			'period_range'       => pltt_format_date_range( $periods[0]['from'], $periods[ $ncols - 1 ]['to'] ),
+			'groups'             => $groups,
+			'untagged'           => $untagged,
+			'total_minutes'      => $total,
+			'period_totals'      => $period_totals,
+			'has_multi_tag'      => $row_sum > $total,
+			'show_group_headers' => count( $groups ) > 1,
+		);
+	}
+
+	/**
+	 * Overview's Entries view, scoped to one project and one tag, project-lifetime.
+	 *
+	 * Same shape as unbilled_entries_url(): the range ends today so an archived
+	 * project's span still covers its last entry, and Overview derives the
+	 * client from the project when only the project is given.
+	 *
+	 * @param object      $project Project row.
+	 * @param object|null $stats   Lifetime stats (first entry date).
+	 * @param string      $tag     Tag name, or 'without_tag' for untagged entries.
+	 * @return string
+	 */
+	private static function tag_entries_url( $project, $stats, $tag ) {
+		$today = pltt_get_current_date();
+		$from  = ! empty( $stats->first_entry_date ) ? $stats->first_entry_date : $today;
+		$to    = ( ! empty( $stats->last_entry_date ) && $stats->last_entry_date > $today ) ? $stats->last_entry_date : $today;
+
+		return add_query_arg(
+			array(
+				'page'       => 'pltt-reports',
+				'view'       => 'detailed',
+				'client_id'  => (int) $project->client_id,
+				'project_id' => (int) $project->id,
+				'tag'        => $tag,
+				'from'       => $from,
+				'to'         => $to,
+			),
+			admin_url( 'admin.php' )
+		);
+	}
+
+	/**
+	 * The grid's columns: up to $count consecutive periods, oldest first.
+	 *
+	 * Unit: the lens unit for a retainer, calendar months otherwise. The last
+	 * column is the lens-selected period when one is set; otherwise today's
+	 * period while the project is active, and the last entry's period once it
+	 * is archived. Walks back from there until $count columns or the period
+	 * holding the first entry, whichever comes first — a two-month-old project
+	 * gets two columns, not four dashes.
+	 *
+	 * @param object      $project Project row.
+	 * @param array|null  $window  Active period window.
+	 * @param object|null $stats   Lifetime stats.
+	 * @param int         $count   Maximum number of columns.
+	 * @return array [ { key, from, to, label, full_label, is_current } ].
+	 */
+	private static function where_periods( $project, $window, $stats, $count = 6 ) {
+		$first = $stats->first_entry_date ?? '';
+		$last  = $stats->last_entry_date ?? '';
+		if ( ! $first || ! $last ) {
+			return array();
+		}
+
+		$is_recurring = ( 'recurring' === pltt_get_billing_type( $project ) );
+		$unit         = ( $is_recurring && ! empty( $window['unit'] ) ) ? $window['unit'] : 'month';
+		$tz           = wp_timezone();
+		$today        = current_time( 'Y-m-d' );
+		$is_lens      = ! empty( $window['is_period'] ) && ! empty( $window['anchor'] );
+
+		if ( $is_lens ) {
+			$end_date = $window['anchor'];
+		} elseif ( 'archived' !== ( $project->status ?? 'active' ) ) {
+			$end_date = $today;
+		} else {
+			$end_date = $last;
+		}
+
+		$end   = pltt_period_start( new DateTimeImmutable( $end_date, $tz ), $unit );
+		$floor = pltt_period_start( new DateTimeImmutable( $first, $tz ), $unit );
+		if ( $end < $floor ) {
+			$end = $floor;
+		}
+
+		// The tinted column: the lens period, or today's when there is no lens.
+		$current_key = $is_lens
+			? $end->format( 'Y-m-d' )
+			: pltt_period_start( new DateTimeImmutable( $today, $tz ), $unit )->format( 'Y-m-d' );
+
+		$starts = array();
+		$cursor = $end;
+		while ( count( $starts ) < $count && $cursor >= $floor ) {
+			$starts[] = $cursor;
+			$cursor   = pltt_period_start( $cursor->modify( '-1 day' ), $unit );
+		}
+		$starts = array_reverse( $starts );
+
+		$end_year = $end->format( 'Y' );
+		$periods  = array();
+		foreach ( $starts as $start ) {
+			$key       = $start->format( 'Y-m-d' );
+			$periods[] = array(
+				'key'        => $key,
+				'from'       => $key,
+				'to'         => pltt_period_end( $start, $unit )->format( 'Y-m-d' ),
+				'label'      => pltt_period_short_label( $start, $unit, $start->format( 'Y' ) !== $end_year ),
+				'full_label' => pltt_period_label( $start, $unit ),
+				'is_current' => ( $key === $current_key ),
+			);
+		}
+
+		return $periods;
 	}
 
 	/**
