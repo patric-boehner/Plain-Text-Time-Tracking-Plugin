@@ -46,7 +46,7 @@ class PLTT_Project_Detail {
 		$client       = ! empty( $project->client_id ) ? PLTT_Clients::get( (int) $project->client_id ) : null;
 
 		// Period lens (recurring projects only): scope + period drive the cards,
-		// the "Where the time went" bars, and the volume chart. Read-only GET nav,
+		// the volume chart, and the "Where the time went" grid. Read-only GET nav,
 		// no nonce — mirrors the Reports date nav.
 		// phpcs:disable WordPress.Security.NonceVerification.Recommended
 		$req_scope  = isset( $_GET['chart_scope'] ) ? sanitize_key( wp_unslash( $_GET['chart_scope'] ) ) : '';

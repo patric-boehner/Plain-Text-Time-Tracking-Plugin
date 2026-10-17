@@ -3,7 +3,7 @@
  * Plugin Name: Plain Language Time Tracker
  * Plugin URI: https://github.com/patrickb/plain-language-time-tracker
  * Description: Capture first, categorize later. Interstitial journaling and time tracking in one plain-text log — jot timestamped notes between tasks, then process them into structured time entries. Everything you wrote around the timestamps stays as a journal.
- * Version: 1.9.87
+ * Version: 1.9.88
  * Author: Patrick Boehner
  * Text Domain: plain-language-time-tracker
  * Domain Path: /languages
@@ -20,7 +20,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 // Plugin constants.
-define( 'PLTT_VERSION', '1.9.87' );
+define( 'PLTT_VERSION', '1.9.88' );
 define( 'PLTT_PLUGIN_FILE', __FILE__ );
 define( 'PLTT_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'PLTT_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
@@ -56,6 +56,9 @@ function pltt_load_dependencies() {
 	// Billing engine (read model).
 	require_once PLTT_PLUGIN_DIR . 'includes/class-pltt-billing.php';
 
+	// Weekly balance digest (settings + WP-Cron + email).
+	require_once PLTT_PLUGIN_DIR . 'includes/class-pltt-digest.php';
+
 	// Parser.
 	require_once PLTT_PLUGIN_DIR . 'includes/parser/class-pltt-time-parser.php';
 
@@ -81,8 +84,23 @@ function pltt_activate() {
 	pltt_load_dependencies();
 	PLTT_Database::create_tables();
 	add_option( 'pltt_version', PLTT_VERSION );
-	add_option( 'pltt_db_version', PLTT_Database::DB_VERSION );}
+	add_option( 'pltt_db_version', PLTT_Database::DB_VERSION );
+
+	// Re-arm the weekly digest if it was on when the plugin was deactivated.
+	// A no-op while the digest is off.
+	PLTT_Digest::schedule();
+}
 register_activation_hook( __FILE__, 'pltt_activate' );
+
+/**
+ * Plugin deactivation: drop the digest's cron event so WP-Cron never fires a
+ * hook with no callback behind it.
+ */
+function pltt_deactivate() {
+	pltt_load_dependencies();
+	PLTT_Digest::unschedule();
+}
+register_deactivation_hook( __FILE__, 'pltt_deactivate' );
 
 /**
  * Initialize the plugin.
@@ -92,6 +110,10 @@ function pltt_init() {
 
 	// Check for database updates.
 	PLTT_Database::maybe_upgrade();
+
+	// The digest's cron callback. Outside the is_admin() gate on purpose: the
+	// request WP-Cron runs in is not an admin request.
+	PLTT_Digest::init();
 
 	// Initialize admin.
 	if ( is_admin() ) {

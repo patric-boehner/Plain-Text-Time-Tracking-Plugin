@@ -851,11 +851,40 @@ function pltt_period_label( DateTimeImmutable $start, $unit ) {
 }
 
 /**
+ * Short column-heading label for a period that starts at $start.
+ *
+ * Built for a row of six adjacent periods, where pltt_period_label()'s full
+ * form ("September 2026") would be wider than the figures beneath it. The
+ * year is added only when the caller says the column's year differs from its
+ * neighbours' ("Nov '25" beside "Jan"); quarters always carry it because
+ * "Q2" alone could be any year.
+ *
+ * @param DateTimeImmutable $start     Period start.
+ * @param string            $unit      'week' | 'month' | 'quarter' | 'year'.
+ * @param bool              $show_year Whether to append the two-digit year.
+ * @return string e.g. "Sep", "Sep '25", "Jun 9", "Q2 '26", "2026".
+ */
+function pltt_period_short_label( DateTimeImmutable $start, $unit, $show_year = false ) {
+	switch ( $unit ) {
+		case 'week':
+			return $start->format( $show_year ? "M j 'y" : 'M j' );
+		case 'quarter':
+			$q = (int) ( floor( ( (int) $start->format( 'n' ) - 1 ) / 3 ) + 1 );
+			return sprintf( "Q%d '%s", $q, $start->format( 'y' ) );
+		case 'year':
+			return $start->format( 'Y' );
+		case 'month':
+		default:
+			return $start->format( $show_year ? "M 'y" : 'M' );
+	}
+}
+
+/**
  * Resolve the active period window for the Project Detail report.
  *
  * Recurring projects get a steppable per-period lens — the stat cards, the
- * "Where the time went" bars, and the volume chart all reflect the chosen
- * window, while the swimlane stays the full lifetime arc. Every other billing
+ * volume chart, and the "Where the time went" grid all reflect the chosen
+ * window. Every other billing
  * type stays on the full lifetime span with no control. Scope/period are driven
  * by the chart_scope ('full'|'period') and chart_period (Y-m-d anchor) query
  * args; anything out of range is clamped to the project's active span.
@@ -3826,11 +3855,26 @@ function pltt_consumption_status( $date ) {
 		);
 	}
 
-	// Most urgent first: anything at or past its ceiling (worst overrun leading,
-	// as a share of the ceiling so a 3-hour retainer at double isn't buried under
-	// a 40-hour budget a nudge over), then whatever has least left to spend.
+	return pltt_sort_consumption_rows( $status );
+}
+
+/**
+ * Order consumption rows most urgent first.
+ *
+ * Anything at or past its ceiling leads (worst overrun first, as a share of
+ * the ceiling so a 3-hour retainer at double isn't buried under a 40-hour
+ * budget a nudge over), then whatever has least left to spend. Shared by the
+ * post-save notice and the weekly digest email so both read in the same order.
+ *
+ * Reads only `state` ('under' or anything else), `consumption` and
+ * `remaining_minutes` from each row.
+ *
+ * @param array $rows Rows shaped like pltt_consumption_status() output.
+ * @return array The same rows, sorted.
+ */
+function pltt_sort_consumption_rows( array $rows ) {
 	usort(
-		$status,
+		$rows,
 		function ( $a, $b ) {
 			$over_a = 'under' !== $a['state'];
 			$over_b = 'under' !== $b['state'];
@@ -3847,7 +3891,7 @@ function pltt_consumption_status( $date ) {
 		}
 	);
 
-	return $status;
+	return $rows;
 }
 
 /**
@@ -4586,6 +4630,31 @@ function pltt_compute_overage_threshold( $project, $filter_args ) {
 }
 
 /**
+ * Render a meter: a track with one or more filled segments, left to right.
+ *
+ * The shared primitive behind the Overview Budget column and the project
+ * page's share-of-time bars — see .pltt-meter in pltt-system.css. Hidden from
+ * assistive tech on purpose: every caller puts the figure it draws in text
+ * beside it, and a bar with no text would only read as "image".
+ *
+ * @param array  $segments List of { pct: float, kind: 'within'|'over'|'billed' }.
+ *                         Percentages are of the track; the caller keeps them
+ *                         summing to 100 or less.
+ * @param string $class    Extra class(es) on the track for the caller's placement rules.
+ * @return void
+ */
+function pltt_render_meter( array $segments, $class = '' ) {
+	$kinds = array( 'within', 'over', 'billed' );
+	echo '<span class="pltt-meter' . ( '' !== $class ? ' ' . esc_attr( $class ) : '' ) . '" aria-hidden="true">';
+	foreach ( $segments as $seg ) {
+		$kind = ( isset( $seg['kind'] ) && in_array( $seg['kind'], $kinds, true ) ) ? $seg['kind'] : 'within';
+		$pct  = max( 0, min( 100, (float) ( $seg['pct'] ?? 0 ) ) );
+		echo '<span class="pltt-meter-seg pltt-meter-seg-' . esc_attr( $kind ) . '" style="width:' . esc_attr( $pct ) . '%"></span>';
+	}
+	echo '</span>';
+}
+
+/**
  * Render the allocation bar HTML for a project.
  *
  * Outputs a progress bar showing how much of the budget/allocation has been used.
@@ -4649,14 +4718,22 @@ function pltt_render_allocation_bar( $alloc_mins, $budget_hours, $billing_type, 
 		data-tip-color="none"
 		data-tip-rows='<?php echo esc_attr( wp_json_encode( $alloc_rows ) ); ?>'
 	>
-		<div class="pltt-alloc-bar-wrap<?php echo $is_over ? ' pltt-alloc-over' : ''; ?>">
-			<span class="pltt-alloc-seg pltt-alloc-seg-within"
-				  style="width:<?php echo esc_attr( $within_seg_pct ); ?>%"></span>
-			<?php if ( $is_over ) : ?>
-				<span class="pltt-alloc-seg <?php echo $is_billed ? 'pltt-alloc-seg-billed' : 'pltt-alloc-seg-over'; ?>"
-					  style="width:<?php echo esc_attr( $over_seg_pct ); ?>%"></span>
-			<?php endif; ?>
-		</div>
+		<?php
+		// The bar is the shared meter component; the wrap class only places it.
+		$meter_segments = array(
+			array(
+				'pct'  => $within_seg_pct,
+				'kind' => 'within',
+			),
+		);
+		if ( $is_over ) {
+			$meter_segments[] = array(
+				'pct'  => $over_seg_pct,
+				'kind' => $is_billed ? 'billed' : 'over',
+			);
+		}
+		pltt_render_meter( $meter_segments, 'pltt-alloc-bar-wrap' . ( $is_over ? ' pltt-alloc-over' : '' ) );
+		?>
 		<span class="pltt-alloc-label<?php echo $is_over ? ' pltt-alloc-over' : ''; ?><?php echo $is_billed ? ' pltt-alloc-billed' : ''; ?>">
 			<?php echo esc_html( $label ); ?>
 		</span>

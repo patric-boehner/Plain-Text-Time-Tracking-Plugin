@@ -107,6 +107,35 @@
 }
 
 /* ============================================================
+   METER — a short proportional bar: a track with one or more filled
+   segments, drawn left to right. The one primitive wherever a figure wants
+   a bar beside it — today the Budget column on Overview (allocation used,
+   with an overage segment past the limit). Rendered by pltt_render_meter().
+
+   The component owns the track and the fills. WHERE it sits — margins,
+   inline vs block, a narrower width — is the caller's modifier class
+   (.pltt-alloc-bar-wrap), never a second copy of these rules.
+   ============================================================ */
+.pltt-meter {
+	display: flex;
+	width: 100%;
+	max-width: 120px;
+	height: 5px;
+	background: var(--pltt-bg-hover);
+	border-radius: 2px;
+	overflow: hidden;
+}
+
+.pltt-meter-seg {
+	display: block;
+	height: 100%;
+}
+
+.pltt-meter-seg-within { background: var(--pltt-primary); }       /* blue: client work, any type */
+.pltt-meter-seg-over   { background: var(--pltt-primary-light); } /* light blue: the portion past the limit */
+.pltt-meter-seg-billed { background: var(--pltt-success); }       /* green: overage settled by a billing record */
+
+/* ============================================================
    TYPE — a real scale, plus the mono utility.
    System sans is set looser than the mockups' IBM Plex, so negative
    letter-spacing on large text is roughly half what the specimen shows.

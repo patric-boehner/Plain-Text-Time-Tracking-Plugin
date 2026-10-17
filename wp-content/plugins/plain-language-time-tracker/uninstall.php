@@ -26,6 +26,11 @@ delete_option( 'pltt_db_version' );
 // Delete plugin options not covered by drop_tables().
 delete_option( 'pltt_custom_tags' ); // May already be gone from 1.8.1 migration.
 
+// Weekly digest: its settings, its last-sent stamp, and its cron event.
+delete_option( 'pltt_digest_settings' );
+delete_option( 'pltt_digest_last_sent' );
+wp_clear_scheduled_hook( 'pltt_weekly_digest' );
+
 // Delete any transients written by the helpers.
 delete_transient( 'pltt_tags_list' );
 delete_transient( 'pltt_clients_list' );

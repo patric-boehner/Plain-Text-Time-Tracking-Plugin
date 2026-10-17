@@ -3,6 +3,8 @@
 **Removed:** 2026-07-18 · plugin 1.9.35 · **last commit that still contains them: `1fb2a9c`**
 **Reason:** On the project page these two sections felt like too much and weren't earning their space (Patrick's call). The type-aware hero, stat cards, the period lens, the **volume "Hours by …" chart**, and Billing history all stayed. Everything below is preserved so both sections can be rebuilt as they were.
 
+> **2026-10-17:** the bars have a successor. `PLTT_Project_Report::build_where()` + `templates/partials/project-where-grid.php` render a **tags × recent-periods table** (six columns ending at the lens period, an all-time share meter, group header rows only when a project's tags span more than one group) in the same slot. It is one SQL aggregation (`PLTT_Entries::get_tag_minutes_by_bucket()`), not the per-entry accumulate loop described below — nothing from `1fb2a9c` was restored. The swimlane stays removed.
+
 > **Later:** the hero — the "Budget consumed" meter — came out too, on 2026-08-13 (plugin 1.9.71, last commit containing it: see `templates/partials/project-report-hero.php` in history). Its job moved onto the volume chart as a crossing rule, an allocation line, and a one-line pace sentence: `PLTT_Project_Report::build_budget()` and `ui/pltt-budget-on-chart.html`. The budget-crossing calculation described below was the ancestor of that crossing rule.
 
 To see the exact prior code: `git show 1fb2a9c:templates/partials/project-detail-report.php` and `git show 1fb2a9c:includes/admin/class-pltt-project-report.php` (plus `assets/css/project-detail.css`, `assets/js/project-detail.js`).

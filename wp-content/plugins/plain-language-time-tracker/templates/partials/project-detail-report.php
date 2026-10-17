@@ -7,9 +7,10 @@
  * cards and the volume chart to the chosen window. Every other billing type
  * stays on the full lifetime span with no control.
  *
- * The per-tag "Where the time went" bars and the "Activity over time" swimlane
- * were removed 2026-07-18 — see docs/removed-project-report-sections.md for the
- * design + how to rebuild them.
+ * Below the chart, the "Where the time went" grid (partials/project-where-grid.php)
+ * breaks the time down by tag across recent periods. It replaced the original
+ * per-tag bars; those and the "Activity over time" swimlane were removed
+ * 2026-07-18 — see docs/removed-project-report-sections.md.
  *
  * Expects $report (from PLTT_Project_Report::build()) and $project in scope.
  *
@@ -206,7 +207,7 @@ endif;
 // The period lens used to sit here, beneath the cards. It moved to the header's
 // action group (templates/partials/project-period-lens.php) so the date control
 // is in the same place as on every other screen. It still drives the cards, the
-// volume chart, and the "Where the time went" bars.
+// volume chart, and the "Where the time went" grid.
 ?>
 
 <?php
@@ -230,9 +231,12 @@ endif;
 ?>
 
 <?php
-// "Where the time went" bars + "Activity over time" swimlane were removed here
-// on 2026-07-18 (they felt like too much on the project page). The volume chart
-// above stays. Rebuild notes: docs/removed-project-report-sections.md.
+// "Where the time went" — minutes per tag across the last six periods, with an
+// all-time share. Follows the lens like the chart above. The original per-tag
+// bars + the "Activity over time" swimlane were removed here on 2026-07-18
+// (docs/removed-project-report-sections.md); this grid replaced the bars on
+// 2026-10-17, built by PLTT_Project_Report::build_where().
+include PLTT_PLUGIN_DIR . 'templates/partials/project-where-grid.php';
 ?>
 
 <?php

@@ -900,6 +900,89 @@ class PLTT_Entries {
 	}
 
 	/**
+	 * Minutes per tag, split into date buckets — feeds the project page's
+	 * "Where the time went" grid.
+	 *
+	 * One row per (tag, bucket). An entry carrying several tags counts its full
+	 * duration under each of them: when a session was both content and support,
+	 * "how much was content work?" is honestly answered by the whole session.
+	 * The caller compares the per-tag sum against `totals` (which counts every
+	 * entry once) to know whether that happened. Untagged time comes back under
+	 * tag_id 0. Time outside every bucket lands in bucket -1, so an all-time
+	 * column needs no second query.
+	 *
+	 * Unverified entries are counted, the same as get_stats() and the
+	 * consumption figures — the All column has to agree with the stat cards.
+	 *
+	 * @param int   $project_id Project ID.
+	 * @param array $buckets    List of { from: Y-m-d, to: Y-m-d } (inclusive).
+	 *                          The list index becomes the bucket key.
+	 * @return array{ cells: array<int, array<int,int>>, totals: array<int,int> }
+	 *               cells[tag_id][bucket] = minutes; totals[bucket] = minutes.
+	 */
+	public static function get_tag_minutes_by_bucket( $project_id, array $buckets ) {
+		global $wpdb;
+		$entries_table = PLTT_Database::get_table_name( 'time_entries' );
+		$tags_table    = PLTT_Database::get_table_name( 'entry_tags' );
+
+		// One CASE maps each entry to its column. With no buckets at all every
+		// entry is "outside", which keeps the SQL valid instead of `CASE END`.
+		$case    = '-1';
+		$prepare = array();
+		if ( ! empty( $buckets ) ) {
+			$case = 'CASE';
+			foreach ( array_values( $buckets ) as $i => $bucket ) {
+				$case     .= ' WHEN e.entry_date BETWEEN %s AND %s THEN ' . (int) $i;
+				$prepare[] = $bucket['from'];
+				$prepare[] = $bucket['to'];
+			}
+			$case .= ' ELSE -1 END';
+		}
+
+		$common    = self::build_filter_clauses( array( 'project_id' => (int) $project_id ), 'e.', 'e' );
+		$where_sql = implode( ' AND ', $common['where'] );
+
+		$cells = array();
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+		$rows = $wpdb->get_results(
+			$wpdb->prepare(
+				"SELECT COALESCE(et.tag_id, 0) AS tag_id,
+					{$case} AS bucket,
+					COALESCE(SUM(e.duration_minutes), 0) AS minutes
+				FROM {$entries_table} e
+				LEFT JOIN {$tags_table} et ON et.entry_id = e.id
+				WHERE {$where_sql}
+				GROUP BY tag_id, bucket",
+				array_merge( $prepare, $common['prepare'] )
+			)
+		);
+		foreach ( (array) $rows as $row ) {
+			$cells[ (int) $row->tag_id ][ (int) $row->bucket ] = (int) $row->minutes;
+		}
+
+		$totals = array();
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+		$rows = $wpdb->get_results(
+			$wpdb->prepare(
+				"SELECT {$case} AS bucket,
+					COALESCE(SUM(e.duration_minutes), 0) AS minutes
+				FROM {$entries_table} e
+				WHERE {$where_sql}
+				GROUP BY bucket",
+				array_merge( $prepare, $common['prepare'] )
+			)
+		);
+		foreach ( (array) $rows as $row ) {
+			$totals[ (int) $row->bucket ] = (int) $row->minutes;
+		}
+
+		return array(
+			'cells'  => $cells,
+			'totals' => $totals,
+		);
+	}
+
+	/**
 	 * Build shared WHERE clause array for common entry filters.
 	 *
 	 * Centralises the client, project, tag, billable, and billed filter
