@@ -15,6 +15,10 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 $content       = $log ? $log->content : '';
 $is_processed  = $log && $log->processed;
+// A processed day opens locked: the log reads as text, the rows show no menu,
+// and one "Edit day" button unlocks both in place. The just-processed confirm
+// state is the exception — you're mid-commit there. Per visit, not remembered.
+$is_locked     = $is_processed && empty( $is_post_parse );
 $previous_date = PLTT_Daily_Log::get_previous_date( $date );
 $next_date     = PLTT_Daily_Log::get_next_date( $date );
 $today         = pltt_get_current_date();
@@ -39,7 +43,7 @@ $return_to_raw = isset( $_GET['return_to'] ) ? esc_url_raw( wp_unslash( $_GET['r
 $return_to     = $return_to_raw ? wp_validate_redirect( $return_to_raw, '' ) : '';
 ?>
 
-<div class="wrap pltt-wrap">
+<div class="wrap pltt-wrap<?php echo $is_locked ? ' pltt-day-locked' : ''; ?>">
 	<div class="pltt-header">
 		<?php
 		// Light header — Today is a day, not a scope with terms: three lines, no
@@ -135,6 +139,7 @@ $return_to     = $return_to_raw ? wp_validate_redirect( $return_to_raw, '' ) : '
 		<textarea
 			id="pltt-log-textarea"
 			class="pltt-log-textarea"
+			<?php echo $is_locked ? 'readonly tabindex="-1"' : ''; ?>
 			placeholder="<?php esc_attr_e( "Type @ to insert the current time...\n\nExample:\n@9:15am - Email catchup\n@10:30am - Client meeting\n@12:00pm - done", 'plain-language-time-tracker' ); ?>"
 		><?php echo esc_textarea( $content ); ?></textarea>
 
@@ -148,6 +153,12 @@ $return_to     = $return_to_raw ? wp_validate_redirect( $return_to_raw, '' ) : '
 
 			<div class="pltt-log-actions">
 				<span id="pltt-save-indicator" class="pltt-save-indicator"></span>
+				<?php if ( $is_locked ) : ?>
+					<!-- Locked: the one control. Unlocks the log and the rows in place (daily-log.js). -->
+					<button type="button" id="pltt-edit-day-btn" class="button button-secondary">
+						<?php esc_html_e( 'Edit', 'plain-language-time-tracker' ); ?>
+					</button>
+				<?php endif; ?>
 				<?php if ( $is_processed ) : ?>
 					<!-- Primary: Update Notes (preserves processed state) -->
 					<button type="button" id="pltt-update-notes-btn" class="button button-primary button-large">
