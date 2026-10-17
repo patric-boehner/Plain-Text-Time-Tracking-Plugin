@@ -179,15 +179,19 @@ $return_to     = $return_to_raw ? wp_validate_redirect( $return_to_raw, '' ) : '
 		</div>
 	<?php elseif ( $has_entries ) : ?>
 		<div class="pltt-existing-entries" id="pltt-entries">
-			<?php // Pared day summary (matches Reports): hours, billable hours, amount. ?>
+			<?php
+			// Pared day summary (matches Reports): hours, billable hours, amount.
+			// Durations read as "6h 15m" like every other card; the decimal is the
+			// hint, the same way Overview does it.
+			?>
 			<div class="pltt-summary-cards pltt-numbar">
 				<div class="card">
 					<div class="card-label"><?php esc_html_e( 'Total Hours', 'plain-language-time-tracker' ); ?></div>
-					<div class="card-value"><?php echo esc_html( pltt_format_hours( $total_minutes ) ); ?></div>
+					<div class="card-value" <?php echo pltt_decimal_hint_attrs( (int) $total_minutes ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>><?php echo esc_html( pltt_format_duration( (int) $total_minutes ) ); ?></div>
 				</div>
 				<div class="card">
 					<div class="card-label"><?php esc_html_e( 'Billable Hours', 'plain-language-time-tracker' ); ?></div>
-					<div class="card-value"><?php echo esc_html( pltt_format_hours( $summary['billable_minutes'] ) ); ?></div>
+					<div class="card-value" <?php echo pltt_decimal_hint_attrs( (int) $summary['billable_minutes'] ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>><?php echo esc_html( pltt_format_duration( (int) $summary['billable_minutes'] ) ); ?></div>
 				</div>
 				<?php if ( (float) $summary['billable_amount'] > 0 ) : ?>
 					<div class="card">
