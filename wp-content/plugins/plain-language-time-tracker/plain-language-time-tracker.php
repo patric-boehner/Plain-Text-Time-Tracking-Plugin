@@ -35,6 +35,25 @@ define( 'PLTT_AUTOSAVE_DEBOUNCE_MS', 1500 );
 define( 'PLTT_DEFAULT_HOURLY_RATE', 100.00 );
 define( 'PLTT_ALLOWED_RECURRING_PERIODS', array( '', 'weekly', 'monthly', 'quarterly', 'yearly' ) );
 
+// Weekly balance digest — one email a week saying where every retainer and
+// fixed budget stands: Monday at 7, to the site admin, unless changed here.
+// Configured here, like everything else, rather than on a settings page; the
+// schedule follows these on the next admin page load, so editing them is all
+// it takes. Each can also be set earlier in wp-config.php to differ between
+// sites.
+if ( ! defined( 'PLTT_DIGEST_ENABLED' ) ) {
+	define( 'PLTT_DIGEST_ENABLED', true );
+}
+if ( ! defined( 'PLTT_DIGEST_WEEKDAY' ) ) {
+	define( 'PLTT_DIGEST_WEEKDAY', 1 ); // 0 = Sunday … 6 = Saturday.
+}
+if ( ! defined( 'PLTT_DIGEST_HOUR' ) ) {
+	define( 'PLTT_DIGEST_HOUR', 7 ); // Site time, 24-hour clock.
+}
+if ( ! defined( 'PLTT_DIGEST_RECIPIENT' ) ) {
+	define( 'PLTT_DIGEST_RECIPIENT', '' ); // Blank = the site admin email.
+}
+
 /**
  * Load plugin dependencies.
  */
@@ -56,7 +75,7 @@ function pltt_load_dependencies() {
 	// Billing engine (read model).
 	require_once PLTT_PLUGIN_DIR . 'includes/class-pltt-billing.php';
 
-	// Weekly balance digest (settings + WP-Cron + email).
+	// Weekly balance digest (WP-Cron + email; configured by the constants above).
 	require_once PLTT_PLUGIN_DIR . 'includes/class-pltt-digest.php';
 
 	// Parser.
@@ -86,8 +105,7 @@ function pltt_activate() {
 	add_option( 'pltt_version', PLTT_VERSION );
 	add_option( 'pltt_db_version', PLTT_Database::DB_VERSION );
 
-	// Re-arm the weekly digest if it was on when the plugin was deactivated.
-	// A no-op while the digest is off.
+	// Arm the weekly digest if PLTT_DIGEST_ENABLED is on. A no-op while it's off.
 	PLTT_Digest::schedule();
 }
 register_activation_hook( __FILE__, 'pltt_activate' );
