@@ -26,8 +26,8 @@ delete_option( 'pltt_db_version' );
 // Delete plugin options not covered by drop_tables().
 delete_option( 'pltt_custom_tags' ); // May already be gone from 1.8.1 migration.
 
-// Weekly digest: its settings, its last-sent stamp, and its cron event.
-delete_option( 'pltt_digest_settings' );
+// Weekly digest: its schedule fingerprint, its last-sent stamp, and its cron event.
+delete_option( 'pltt_digest_schedule' );
 delete_option( 'pltt_digest_last_sent' );
 wp_clear_scheduled_hook( 'pltt_weekly_digest' );
 

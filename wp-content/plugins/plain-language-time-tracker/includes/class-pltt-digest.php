@@ -11,6 +11,11 @@
  * crossings. A fixed schedule also needs no de-duplication state — nothing has
  * to remember what was already sent.
  *
+ * Configured by constants in plain-language-time-tracker.php (PLTT_DIGEST_*),
+ * not a settings page — the plugin keeps its defaults in code. The cron event
+ * follows the constants: schedule() is re-run whenever their fingerprint
+ * changes, so editing the file is all it takes.
+ *
  * Runs on WP-Cron, which fires on page loads: on a site nobody visits it sends
  * on the first load after the scheduled time, never before it.
  *
@@ -28,52 +33,40 @@ if ( ! defined( 'ABSPATH' ) ) {
 class PLTT_Digest {
 
 	const HOOK             = 'pltt_weekly_digest';
-	const OPTION           = 'pltt_digest_settings';
 	const LAST_SENT_OPTION = 'pltt_digest_last_sent';
-	const SEND_HOUR        = 7;
+	const SIGNATURE_OPTION = 'pltt_digest_schedule';
 
 	/**
-	 * Hook the cron callback. Must run on every request, not only in wp-admin —
-	 * the cron request that sends the email is not an admin request.
+	 * Hook the cron callback, and keep the event in step with the constants.
+	 *
+	 * The callback must be hooked on every request, not only in wp-admin — the
+	 * cron request that sends the email is not an admin request. The sync runs
+	 * on admin page loads only: a cheap option read, and the one time anyone is
+	 * around to have just edited the constants.
 	 */
 	public static function init() {
 		add_action( self::HOOK, array( __CLASS__, 'run_scheduled' ) );
+		add_action( 'admin_init', array( __CLASS__, 'maybe_sync_schedule' ) );
 	}
 
 	/**
-	 * Default settings: off, Monday, the site admin's address.
+	 * The settings, read from the PLTT_DIGEST_* constants and clamped.
 	 *
-	 * @return array{ enabled: bool, weekday: int, recipient: string }
+	 * @return array{ enabled: bool, weekday: int, hour: int, recipient: string }
 	 */
-	public static function defaults() {
+	public static function get_settings() {
+		$recipient = defined( 'PLTT_DIGEST_RECIPIENT' ) ? sanitize_email( (string) PLTT_DIGEST_RECIPIENT ) : '';
+
 		return array(
-			'enabled'   => false,
-			'weekday'   => 1,
-			'recipient' => '',
+			'enabled'   => defined( 'PLTT_DIGEST_ENABLED' ) && (bool) PLTT_DIGEST_ENABLED,
+			'weekday'   => min( 6, max( 0, defined( 'PLTT_DIGEST_WEEKDAY' ) ? (int) PLTT_DIGEST_WEEKDAY : 1 ) ),
+			'hour'      => min( 23, max( 0, defined( 'PLTT_DIGEST_HOUR' ) ? (int) PLTT_DIGEST_HOUR : 7 ) ),
+			'recipient' => $recipient,
 		);
 	}
 
 	/**
-	 * Saved settings merged over the defaults and clamped to valid values.
-	 *
-	 * `recipient` stays '' when the user left it blank, so the default keeps
-	 * following admin_email if that ever changes.
-	 *
-	 * @return array{ enabled: bool, weekday: int, recipient: string }
-	 */
-	public static function get_settings() {
-		$saved    = get_option( self::OPTION, array() );
-		$settings = wp_parse_args( is_array( $saved ) ? $saved : array(), self::defaults() );
-
-		$settings['enabled']   = ! empty( $settings['enabled'] );
-		$settings['weekday']   = min( 6, max( 0, (int) $settings['weekday'] ) );
-		$settings['recipient'] = is_string( $settings['recipient'] ) ? $settings['recipient'] : '';
-
-		return $settings;
-	}
-
-	/**
-	 * Where the email goes.
+	 * Where the email goes: the constant, else the site admin's address.
 	 *
 	 * @return string
 	 */
@@ -83,37 +76,46 @@ class PLTT_Digest {
 	}
 
 	/**
-	 * Sanitize and store settings from the form, then re-arm the schedule.
+	 * Fingerprint of everything that shapes the event. When it changes — the
+	 * constants were edited — the event is rebuilt.
 	 *
-	 * @param array $raw Submitted fields (enabled, weekday, recipient).
-	 * @return array The stored settings.
+	 * @return string
 	 */
-	public static function save_settings( array $raw ) {
-		$settings = array(
-			'enabled'   => ! empty( $raw['enabled'] ),
-			'weekday'   => min( 6, max( 0, isset( $raw['weekday'] ) ? (int) $raw['weekday'] : 1 ) ),
-			'recipient' => isset( $raw['recipient'] ) ? sanitize_email( $raw['recipient'] ) : '',
-		);
-
-		update_option( self::OPTION, $settings );
-		self::schedule();
-
-		return $settings;
+	private static function signature() {
+		$s = self::get_settings();
+		return ( $s['enabled'] ? '1' : '0' ) . ':' . $s['weekday'] . ':' . $s['hour'] . ':' . get_option( 'timezone_string', '' ) . ':' . get_option( 'gmt_offset', '' );
 	}
 
 	/**
-	 * (Re)create the weekly event from the current settings. A no-op while the
-	 * digest is off, so it is safe to call from activation.
+	 * Rebuild the event if the constants changed since it was last built, or
+	 * if it has gone missing while enabled (a restored database, a cleared
+	 * cron table).
+	 */
+	public static function maybe_sync_schedule() {
+		$settings = self::get_settings();
+		$current  = self::signature();
+		$stored   = (string) get_option( self::SIGNATURE_OPTION, '' );
+		$armed    = (bool) wp_next_scheduled( self::HOOK );
+
+		if ( $current !== $stored || ( $settings['enabled'] && ! $armed ) || ( ! $settings['enabled'] && $armed ) ) {
+			self::schedule();
+		}
+	}
+
+	/**
+	 * (Re)create the weekly event from the constants. A no-op while the digest
+	 * is off, so it is safe to call from activation.
 	 */
 	public static function schedule() {
 		self::unschedule();
 
 		$settings = self::get_settings();
+		update_option( self::SIGNATURE_OPTION, self::signature(), false );
 		if ( ! $settings['enabled'] ) {
 			return;
 		}
 
-		wp_schedule_event( self::next_run( $settings['weekday'] ), 'weekly', self::HOOK );
+		wp_schedule_event( self::next_run( $settings['weekday'], $settings['hour'] ), 'weekly', self::HOOK );
 	}
 
 	/**
@@ -133,7 +135,7 @@ class PLTT_Digest {
 	 * @param int $hour    Hour of the day, 0–23.
 	 * @return int
 	 */
-	public static function next_run( $weekday, $hour = self::SEND_HOUR ) {
+	public static function next_run( $weekday, $hour = 7 ) {
 		$now       = new DateTimeImmutable( 'now', wp_timezone() );
 		$candidate = $now->setTime( (int) $hour, 0, 0 );
 		$shift     = ( (int) $weekday - (int) $now->format( 'w' ) + 7 ) % 7;
@@ -315,8 +317,7 @@ class PLTT_Digest {
 		$lines[] = __( 'Retainers show the current period; fixed budgets show the whole project.', 'plain-language-time-tracker' );
 		/* translators: %s: URL of the Projects screen */
 		$lines[] = sprintf( __( 'Projects: %s', 'plain-language-time-tracker' ), admin_url( 'admin.php?page=pltt-projects' ) );
-		/* translators: %s: URL of the Settings screen */
-		$lines[] = sprintf( __( 'Turn this email off: %s', 'plain-language-time-tracker' ), admin_url( 'admin.php?page=pltt-settings' ) );
+		$lines[] = __( 'To stop these, set PLTT_DIGEST_ENABLED to false in plain-language-time-tracker.php.', 'plain-language-time-tracker' );
 
 		return implode( "\n", $lines );
 	}
@@ -558,7 +559,7 @@ class PLTT_Digest {
 			. esc_html__( 'Retainers show the current period; fixed budgets show the whole project.', 'plain-language-time-tracker' ) . '<br>'
 			. '<a href="' . esc_url( admin_url( 'admin.php?page=pltt-projects' ) ) . '" style="color:' . $muted . ';">' . esc_html__( 'Projects', 'plain-language-time-tracker' ) . '</a>'
 			. ' &middot; '
-			. '<a href="' . esc_url( admin_url( 'admin.php?page=pltt-settings' ) ) . '" style="color:' . $muted . ';">' . esc_html__( 'Turn this email off', 'plain-language-time-tracker' ) . '</a>'
+			. esc_html__( 'To stop these, set PLTT_DIGEST_ENABLED to false in plain-language-time-tracker.php.', 'plain-language-time-tracker' )
 			. '</div></td></tr>'
 			. '</table></td></tr></table></body></html>';
 	}

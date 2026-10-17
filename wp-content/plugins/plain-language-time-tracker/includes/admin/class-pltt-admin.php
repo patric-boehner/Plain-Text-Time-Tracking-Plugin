@@ -191,16 +191,6 @@ class PLTT_Admin {
 			'pltt-tags',
 			array( __CLASS__, 'render_tags_page' )
 		);
-
-		// Settings (the weekly digest email).
-		add_submenu_page(
-			'pltt-time-tracker',
-			__( 'Settings', 'plain-language-time-tracker' ),
-			__( 'Settings', 'plain-language-time-tracker' ),
-			'manage_options',
-			'pltt-settings',
-			array( __CLASS__, 'render_settings_page' )
-		);
 	}
 
 	/**
@@ -351,23 +341,6 @@ class PLTT_Admin {
 	}
 
 	/**
-	 * Render the Settings page.
-	 */
-	public static function render_settings_page() {
-		self::require_access();
-
-		// Self-heal: a restored database or a cleared cron table can leave the
-		// digest switched on with no event behind it. Cheap, and only runs when
-		// someone opens this page.
-		$digest_settings = PLTT_Digest::get_settings();
-		if ( $digest_settings['enabled'] && ! wp_next_scheduled( PLTT_Digest::HOOK ) ) {
-			PLTT_Digest::schedule();
-		}
-
-		include PLTT_PLUGIN_DIR . 'templates/settings.php';
-	}
-
-	/**
 	 * Enqueue admin assets.
 	 *
 	 * @param string $hook Current admin page hook.
@@ -382,7 +355,6 @@ class PLTT_Admin {
 			'time-tracker_page_pltt-clients',
 			'time-tracker_page_pltt-projects',
 			'time-tracker_page_pltt-tags',
-			'time-tracker_page_pltt-settings',
 		);
 
 		if ( ! in_array( $hook, $plugin_pages, true ) ) {
