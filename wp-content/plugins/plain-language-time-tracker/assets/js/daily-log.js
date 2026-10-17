@@ -362,36 +362,27 @@
 	fillCaptureSpace();
 
 	/**
-	 * Locked day (processed, not mid-confirm). The page opens read-only: the log
-	 * is sized to its text instead of a writing box, and the editing chrome is
-	 * hidden by .pltt-day-locked (daily-log.css). "Edit day" lifts the lock in
-	 * place — no reload — and the page is then exactly the processed-day editor
-	 * it always was. The lock is per visit: navigating back relocks.
+	 * Locked day (processed, not mid-confirm). The log opens as text on the page
+	 * (the <pre> the template renders, selectable, URLs clickable) with the
+	 * textarea hidden behind it and its editing chrome hidden by
+	 * .pltt-day-locked (daily-log.css). "Edit" swaps the textarea back in place
+	 * — no reload — and the log is then exactly the processed-day editor it
+	 * always was. The entry rows and their menus are untouched by the lock. Per
+	 * visit: navigating back relocks.
 	 */
 	const wrap       = textarea.closest( '.pltt-wrap' );
 	const editDayBtn = document.getElementById( 'pltt-edit-day-btn' );
+	const readonlyEl = document.getElementById( 'pltt-log-readonly' );
 	const isLocked   = !! ( wrap && wrap.classList.contains( 'pltt-day-locked' ) );
-
-	function sizeLockedLog() {
-		textarea.style.height = 'auto';
-		textarea.style.height = Math.max( 120, textarea.scrollHeight + 2 ) + 'px';
-	}
-
-	if ( isLocked ) {
-		sizeLockedLog();
-		window.addEventListener( 'resize', function() {
-			if ( wrap.classList.contains( 'pltt-day-locked' ) ) {
-				sizeLockedLog();
-			}
-		} );
-	}
 
 	if ( editDayBtn && wrap ) {
 		editDayBtn.addEventListener( 'click', function() {
 			wrap.classList.remove( 'pltt-day-locked' );
-			textarea.readOnly     = false;
+			if ( readonlyEl ) {
+				readonlyEl.remove();
+			}
+			textarea.readOnly = false;
 			textarea.removeAttribute( 'tabindex' ); // Back in the tab order.
-			textarea.style.height = ''; // Back to the CSS min-height for a processed day.
 			// Gone, not hidden: WordPress's .button display rule outranks [hidden].
 			editDayBtn.remove();
 			// Caret at the end: the usual place to add to a day's notes.
