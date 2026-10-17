@@ -28,6 +28,36 @@
 	min-height: 40vh;
 }
 
+/* Locked day (processed, opened to read): the log is text, not a writing box.
+   Height comes from the text (daily-log.js sizes it); no resize grip; and the
+   editing chrome — hint, save status, Update Notes / Process Entries, the row
+   menus — is out of the way until "Edit day" lifts the lock. */
+.pltt-day-locked .pltt-log-textarea {
+	min-height: 0;
+	resize: none;
+	overflow: hidden;
+	/* Reads like text, behaves like text: no I-beam, no caret on tap. Pointer
+	   input passes through to the page, so wheel and touch still scroll it. */
+	pointer-events: none;
+	cursor: default;
+	/* WordPress greys out read-only fields, which reads as "disabled". This is
+	   text to read, on the same white card as before. */
+	background: transparent;
+	color: var(--pltt-text-dark);
+}
+
+.pltt-day-locked .pltt-log-hint,
+.pltt-day-locked .pltt-save-indicator,
+.pltt-day-locked #pltt-update-notes-btn,
+.pltt-day-locked #pltt-process-btn,
+.pltt-day-locked .pltt-row-menu-trigger {
+	display: none;
+}
+
+.pltt-day-locked .pltt-log-footer {
+	justify-content: flex-end;
+}
+
 .pltt-log-textarea:focus-visible {
 	outline: 2px solid var(--pltt-primary);
 	outline-offset: -2px;

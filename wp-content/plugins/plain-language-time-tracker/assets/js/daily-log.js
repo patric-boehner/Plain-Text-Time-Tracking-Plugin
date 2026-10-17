@@ -79,6 +79,10 @@
 	 * Handle keydown for @ shortcut.
 	 */
 	textarea.addEventListener( 'keydown', function( e ) {
+		// A locked day's textarea can still take focus; it must not take a timestamp.
+		if ( textarea.readOnly ) {
+			return;
+		}
 		// Check for @ key (Shift+2 on US keyboard, or direct @ on others).
 		if ( e.key === '@' ) {
 			e.preventDefault();
@@ -357,6 +361,49 @@
 	} );
 	fillCaptureSpace();
 
-	// Focus textarea on load.
-	textarea.focus();
+	/**
+	 * Locked day (processed, not mid-confirm). The page opens read-only: the log
+	 * is sized to its text instead of a writing box, and the editing chrome is
+	 * hidden by .pltt-day-locked (daily-log.css). "Edit day" lifts the lock in
+	 * place — no reload — and the page is then exactly the processed-day editor
+	 * it always was. The lock is per visit: navigating back relocks.
+	 */
+	const wrap       = textarea.closest( '.pltt-wrap' );
+	const editDayBtn = document.getElementById( 'pltt-edit-day-btn' );
+	const isLocked   = !! ( wrap && wrap.classList.contains( 'pltt-day-locked' ) );
+
+	function sizeLockedLog() {
+		textarea.style.height = 'auto';
+		textarea.style.height = Math.max( 120, textarea.scrollHeight + 2 ) + 'px';
+	}
+
+	if ( isLocked ) {
+		sizeLockedLog();
+		window.addEventListener( 'resize', function() {
+			if ( wrap.classList.contains( 'pltt-day-locked' ) ) {
+				sizeLockedLog();
+			}
+		} );
+	}
+
+	if ( editDayBtn && wrap ) {
+		editDayBtn.addEventListener( 'click', function() {
+			wrap.classList.remove( 'pltt-day-locked' );
+			textarea.readOnly     = false;
+			textarea.removeAttribute( 'tabindex' ); // Back in the tab order.
+			textarea.style.height = ''; // Back to the CSS min-height for a processed day.
+			// Gone, not hidden: WordPress's .button display rule outranks [hidden].
+			editDayBtn.remove();
+			// Caret at the end: the usual place to add to a day's notes.
+			const end = textarea.value.length;
+			textarea.focus();
+			textarea.setSelectionRange( end, end );
+		} );
+	}
+
+	// Focus textarea on load — unless the day is locked, where focus would only
+	// put a caret in text that can't be typed into.
+	if ( ! isLocked ) {
+		textarea.focus();
+	}
 } )();
