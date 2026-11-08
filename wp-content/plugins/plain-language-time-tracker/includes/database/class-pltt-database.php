@@ -20,7 +20,7 @@ class PLTT_Database {
 	 *
 	 * @var string
 	 */
-	const DB_VERSION = '1.9.9';
+	const DB_VERSION = '1.9.10';
 
 	/**
 	 * Get the full table name with WordPress prefix.
@@ -172,6 +172,7 @@ class PLTT_Database {
 			billable_rate decimal(10,2) DEFAULT NULL COMMENT 'Hourly rate at time of verification',
 			billable_amount decimal(10,2) DEFAULT NULL COMMENT 'Calculated billable amount (locked at verification)',
 			billed tinyint(1) NOT NULL DEFAULT 0,
+			time_type varchar(20) NOT NULL DEFAULT 'project' COMMENT 'project = counts toward the client; internal = own time on the project',
 			created_at datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
 			updated_at datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
 			PRIMARY KEY (id),
@@ -182,6 +183,7 @@ class PLTT_Database {
 			KEY date_client (entry_date, client_id),
 			KEY billable (billable),
 			KEY billed (billed),
+			KEY time_type (time_type),
 			KEY verified_billable (verified, billable)
 		) {$charset_collate};";
 		dbDelta( $sql_entries );
@@ -548,6 +550,59 @@ class PLTT_Database {
 		// — see pltt_clamp_billable() — so this repair should not be needed twice.
 		if ( version_compare( $from_version, '1.9.9', '<' ) ) {
 			if ( false === self::migrate_to_1_9_9() ) {
+				return false;
+			}
+		}
+
+		if ( version_compare( $from_version, '1.9.10', '<' ) ) {
+			if ( false === self::migrate_to_1_9_10() ) {
+				return false;
+			}
+		}
+
+		return true;
+	}
+
+	/**
+	 * 1.9.10 migration: the per-entry time type.
+	 *
+	 * `time_entries.time_type` says whether an entry counts toward the client
+	 * ('project', the default) or is the user's own time spent on a client's
+	 * project ('internal' — rework, learning, tooling, talk about the account).
+	 * Internal entries stay on their client and project but are left out of
+	 * every figure that turns time into money or measures it against a budget.
+	 *
+	 * Idempotent on purpose: the column is added only if missing. The plugin's
+	 * tables may be copied between installs without the options table, so this
+	 * can run a second time against a table that already carries the column.
+	 *
+	 * Backfill: every entry on the internal client is internal by definition.
+	 *
+	 * @return bool False on DB failure (caller aborts the version bump).
+	 */
+	private static function migrate_to_1_9_10() {
+		global $wpdb;
+
+		$entries_table = self::get_table_name( 'time_entries' );
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+		$has_column = $wpdb->get_var( $wpdb->prepare( "SHOW COLUMNS FROM {$entries_table} LIKE %s", 'time_type' ) );
+		if ( ! $has_column ) {
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.SchemaChange
+			$added = $wpdb->query( "ALTER TABLE {$entries_table} ADD COLUMN time_type varchar(20) NOT NULL DEFAULT 'project' AFTER billable_amount, ADD INDEX time_type (time_type)" );
+			if ( false === $added ) {
+				return false;
+			}
+		}
+
+		$internal_client_id = pltt_get_internal_client_id();
+		if ( $internal_client_id > 0 ) {
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+			$updated = $wpdb->query( $wpdb->prepare(
+				"UPDATE {$entries_table} SET time_type = 'internal' WHERE client_id = %d AND time_type <> 'internal'",
+				$internal_client_id
+			) );
+			if ( false === $updated ) {
 				return false;
 			}
 		}

@@ -86,6 +86,23 @@
 	flex: 0 0 auto;
 }
 
+/* Description takes the line; the Type pill sits at its right end, bottom-
+ * aligned with the input by the row's align-items. On a phone the row wraps
+ * and the pill drops under the description on its own line. */
+.pltt-field-row-description .pltt-field-description {
+	flex: 1 1 240px;
+	min-width: 0;
+}
+
+.pltt-field-row-description .pltt-field-time-type {
+	flex: 0 0 auto;
+}
+
+/* Match the pill's box to the text input's height so the two read as one row. */
+.pltt-field-row-description .pltt-type-toggle {
+	min-height: 30px;
+}
+
 .pltt-field-row-assignment select {
 	width: 100%;
 }

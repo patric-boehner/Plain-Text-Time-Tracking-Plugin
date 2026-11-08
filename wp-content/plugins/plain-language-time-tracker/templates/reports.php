@@ -788,10 +788,11 @@ $tab_base_url = add_query_arg( $filter_params, admin_url( 'admin.php' ) );
 								$has_alloc       = $has_hours_alloc || $has_fee_alloc;
 								if ( $has_hours_alloc ) {
 									$sa_budget_hours = (float) $row->budget_hours;
-									// Allocation bar tracks consumption (all client work) regardless of billing type.
-									// Under the new billable model, within-allocation retainer time is non-billable,
-									// so counting only billable_minutes would under-report retainer consumption.
-									$sa_used_mins = (float) $alloc_stats[ $row->project_id ]->total_minutes;
+									// Allocation bar tracks consumption: project time of every billing
+									// type (within-allocation retainer time is non-billable, so counting
+									// only billable_minutes would under-report it). Internal time on
+									// the project is the user's own and does not consume the allocation.
+									$sa_used_mins = (float) ( $alloc_stats[ $row->project_id ]->project_minutes ?? $alloc_stats[ $row->project_id ]->total_minutes );
 								}
 								?>
 								<td class="pltt-duration-cell pltt-hours-cell" title="<?php echo esc_attr( pltt_format_hours( $row->total_minutes ) . ' ' . __( 'hrs', 'plain-language-time-tracker' ) ); ?>">
@@ -803,7 +804,7 @@ $tab_base_url = add_query_arg( $filter_params, admin_url( 'admin.php' ) );
 									elseif ( $has_fee_alloc ) :
 										$fee_rate            = pltt_resolve_billable_rate( (int) $row->client_id, (int) $row->project_id );
 										$budget_hrs_from_fee = $fee_rate > 0 ? ( (float) $row->budget_fee / $fee_rate ) : 0;
-										$fee_used_mins       = (float) $alloc_stats[ $row->project_id ]->total_minutes;
+										$fee_used_mins       = (float) ( $alloc_stats[ $row->project_id ]->project_minutes ?? $alloc_stats[ $row->project_id ]->total_minutes );
 										pltt_render_allocation_bar(
 											$fee_used_mins,
 											$budget_hrs_from_fee,
@@ -862,12 +863,13 @@ $tab_base_url = add_query_arg( $filter_params, admin_url( 'admin.php' ) );
 				}
 				$day_clients = PLTT_Clients::get_multiple( array_unique( $day_client_ids ) );
 
+				// The per-entry "Internal" column shows when any entry on the page
+				// is on a client other than the internal one; pinned across every
+				// day table so they line up.
 				$show_billable_col_all = false;
+				$overview_internal_id  = pltt_get_internal_client_id();
 				foreach ( $entries as $entry ) {
-					$ep = ! empty( $entry->project_id ) && isset( $billable_projects[ (int) $entry->project_id ] )
-						? $billable_projects[ (int) $entry->project_id ]
-						: null;
-					if ( pltt_billable_flag_applies( $ep ) ) {
+					if ( (int) $entry->client_id !== $overview_internal_id ) {
 						$show_billable_col_all = true;
 						break;
 					}

@@ -88,7 +88,7 @@ if ( $rc['untagged'] > 0 ) {
 				<th class="pltt-col-client"><?php esc_html_e( 'Client', 'plain-language-time-tracker' ); ?></th>
 				<th class="pltt-col-project"><?php esc_html_e( 'Project', 'plain-language-time-tracker' ); ?></th>
 				<th class="pltt-col-tags"><?php esc_html_e( 'Tags', 'plain-language-time-tracker' ); ?></th>
-				<th class="pltt-col-billable"><?php esc_html_e( 'Billable', 'plain-language-time-tracker' ); ?></th>
+				<th class="pltt-col-type"><?php esc_html_e( 'Type', 'plain-language-time-tracker' ); ?> <?php pltt_render_time_type_note(); ?></th>
 			</tr>
 		</thead>
 		<tbody>
@@ -106,6 +106,10 @@ if ( $rc['untagged'] > 0 ) {
 				if ( $has_warning ) {
 					$row_classes[] = 'pltt-entry-row-warning';
 				}
+				// The row's time type. On the internal client there is nothing to
+				// decide (every entry is internal), so the control stays hidden.
+				$row_is_internal  = ( 'internal' === ( $entry['time_type'] ?? 'project' ) );
+				$row_type_applies = ( (int) $predicted_client !== pltt_get_internal_client_id() );
 
 				$warning_tooltip = '';
 				if ( $has_warning ) {
@@ -262,15 +266,20 @@ if ( $rc['untagged'] > 0 ) {
 							>
 						</div>
 					</td>
-					<td class="pltt-col-billable pltt-billable-indicator">
-						<span class="pltt-billable-symbol <?php echo ! empty( $entry['billable'] ) ? 'is-billable' : 'not-billable'; ?><?php echo $row_flag_applies ? '' : ' pltt-hidden'; ?>">$</span>
-						<input
-							type="checkbox"
-							name="entries[<?php echo esc_attr( $index ); ?>][billable]"
-							class="pltt-billable<?php echo $row_flag_applies ? '' : ' pltt-hidden'; ?>"
-							value="1"
-							<?php checked( ! empty( $entry['billable'] ) ); ?>
-						>
+					<td class="pltt-col-type pltt-type-cell">
+						<span class="pltt-type-toggle<?php echo $row_type_applies ? '' : ' pltt-hidden'; ?>">
+							<input
+								type="checkbox"
+								name="entries[<?php echo esc_attr( $index ); ?>][time_type]"
+								class="pltt-time-type"
+								value="internal"
+								tabindex="-1"
+								aria-hidden="true"
+								<?php checked( $row_is_internal ); ?>
+							>
+							<?php pltt_render_time_type_pill( $row_is_internal ? 'internal' : 'project', array( 'button' => true ) ); ?>
+						</span>
+						<span class="pltt-empty pltt-type-empty<?php echo $row_type_applies ? ' pltt-hidden' : ''; ?>" aria-label="<?php esc_attr_e( 'Not applicable — internal client', 'plain-language-time-tracker' ); ?>">&mdash;</span>
 					</td>
 				</tr>
 			<?php endforeach; ?>

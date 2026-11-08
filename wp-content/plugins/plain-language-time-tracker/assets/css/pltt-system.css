@@ -470,3 +470,59 @@
 		border-right: 0;
 	}
 }
+
+/* ============================================================
+   TYPE PILLS — the per-entry time type, "Project" or "Internal", in the same
+   shape as the model badges above: a word in a quiet categorical colour,
+   neither louder than the other. Internal shares its grey with the Internal
+   model badge, so one colour means "your own time" everywhere. Project is a
+   plain outline. On editing surfaces the pill is a <button> (.pltt-type-pill)
+   that the screen's script flips; on read-only ones it is a <span>.
+   ============================================================ */
+.pltt-badge.pltt-badge-type-project {
+	background: transparent;
+	color: var(--pltt-ink-2);
+	box-shadow: inset 0 0 0 1px var(--pltt-rule);
+}
+.pltt-badge.pltt-badge-type-internal {
+	background: var(--pltt-c-own-bg);
+	color: var(--pltt-c-own);
+}
+
+/* The button form: no button chrome — .pltt-badge supplies the shape. On the
+   Overview the button also carries .pltt-inline-toggle, whose reset in
+   reports.css zeroes the padding and sets a 15px bold glyph face (it was
+   written for the old $); two-class specificity puts the badge shape back. */
+.pltt-type-pill,
+.pltt-type-pill.pltt-inline-toggle {
+	border: 0;
+	padding: 3px 8px;
+	border-radius: 3px;
+	cursor: pointer;
+	font-family: inherit;
+	font-size: 13px;
+	font-weight: 500;
+	line-height: 1.5;
+}
+.pltt-type-pill:focus-visible {
+	outline: 2px solid var(--pltt-blue);
+	outline-offset: 1px;
+}
+
+/* Pill + its hidden checkbox (finalize table, edit modal). The box stays in
+   the document so the form submits it; the pill is what you see and click. */
+.pltt-type-toggle {
+	display: inline-flex;
+	align-items: center;
+	position: relative;
+	vertical-align: middle;
+}
+.pltt-type-toggle input {
+	position: absolute;
+	opacity: 0;
+	width: 1px;
+	height: 1px;
+	margin: 0;
+	pointer-events: none;
+}
+

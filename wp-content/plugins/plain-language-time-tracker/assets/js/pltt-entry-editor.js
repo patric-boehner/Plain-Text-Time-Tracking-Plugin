@@ -77,37 +77,43 @@
 		}
 	}
 
-	// ── Billable ─────────────────────────────────────────────────────────
+	// ── Time type ──────────────────────────────────────────────
 
 	/**
-	 * Match the $ button to its hidden checkbox.
+	 * Show or hide the Internal field by the selected client.
+	 *
+	 * On the internal client every entry is internal by definition, so the
+	 * field is hidden and cleared — the server resolves the type from the
+	 * client regardless; this only keeps the form from showing a choice that
+	 * isn't one. Billable is no longer a field here: it derives from the type
+	 * and the project on the server.
 	 */
-	function syncBillableButton() {
-		var checked = !! ( els.billable && els.billable.checked );
-		if ( ! els.billableBtn ) {
-			return;
+	function applyTypeVisibility() {
+		var opt = els.client ? els.client.options[ els.client.selectedIndex ] : null;
+		var hide = !! ( opt && opt.dataset.isInternal === '1' );
+
+		if ( hide && els.timeType ) {
+			els.timeType.checked = false;
+			syncTypePill();
 		}
-		els.billableBtn.classList.toggle( 'is-billable', checked );
-		els.billableBtn.classList.toggle( 'not-billable', ! checked );
-		els.billableBtn.setAttribute( 'aria-pressed', checked ? 'true' : 'false' );
+		if ( els.typeField ) {
+			els.typeField.classList.toggle( 'pltt-hidden', hide );
+		}
 	}
 
 	/**
-	 * Retainer and fixed-fee projects bill at the period level, so the
-	 * per-entry control doesn't apply. Hide it AND force it off — hiding alone
-	 * leaves a checked box that still posts.
+	 * Match the Type pill to its hidden checkbox: word, class and data-value.
 	 */
-	function applyBillableVisibility() {
-		var opt = els.project ? els.project.options[ els.project.selectedIndex ] : null;
-		var hide = !! ( opt && opt.dataset.billableFlag === '0' );
-
-		if ( hide && els.billable ) {
-			els.billable.checked = false;
-			syncBillableButton();
+	function syncTypePill() {
+		if ( ! els.typePill ) {
+			return;
 		}
-		if ( els.billableField ) {
-			els.billableField.classList.toggle( 'pltt-hidden', hide );
-		}
+		var isInternal = !! ( els.timeType && els.timeType.checked );
+		var i18n = ( typeof plttData !== 'undefined' && plttData.i18n ) || {};
+		els.typePill.classList.toggle( 'pltt-badge-type-internal', isInternal );
+		els.typePill.classList.toggle( 'pltt-badge-type-project', ! isInternal );
+		els.typePill.dataset.value = isInternal ? 'internal' : 'project';
+		els.typePill.textContent = isInternal ? ( i18n.typeInternal || 'Internal' ) : ( i18n.typeProject || 'Project' );
 	}
 
 	// ── Projects ─────────────────────────────────────────────────────────
@@ -128,7 +134,7 @@
 		if ( ! clientId || clientId === 'new' ) {
 			els.project.innerHTML = '<option value="">Select project...</option>' +
 				'<option value="new">+ Add new project...</option>';
-			applyBillableVisibility();
+			applyTypeVisibility();
 			return;
 		}
 
@@ -137,7 +143,7 @@
 			{ client_id: clientId, current_project_id: keepId },
 			function( response ) {
 				if ( ! response.success ) {
-					applyBillableVisibility();
+					applyTypeVisibility();
 					return;
 				}
 
@@ -163,7 +169,7 @@
 					els.project.value = String( keepId );
 				}
 				els.project.dataset.currentProjectId = keepId ? String( keepId ) : '';
-				applyBillableVisibility();
+				applyTypeVisibility();
 			}
 		);
 	}
@@ -216,15 +222,15 @@
 		els.end.value = entry.end_time || '';
 		els.duration.value = entry.duration_minutes || '';
 		els.client.value = entry.client_id ? String( entry.client_id ) : '';
-		els.billable.checked = !! entry.billable;
-		syncBillableButton();
+		els.timeType.checked = ( entry.time_type === 'internal' );
+		syncTypePill();
 
-		// Settle the Billable field here, from the payload, rather than leaving it
-		// to applyBillableVisibility() after the projects request comes back —
-		// that lands once the modal is already on screen, so the field visibly
-		// appeared or vanished a moment after opening. The server has already
-		// worked out whether the per-entry flag applies to this entry's project.
-		els.billableField.classList.toggle( 'pltt-hidden', ! entry.billable_applies );
+		// Settle the Internal field here, from the payload, rather than leaving it
+		// to applyTypeVisibility() after the projects request comes back — that
+		// lands once the modal is already on screen, so the field visibly appeared
+		// or vanished a moment after opening. The server has already said whether
+		// the type is a decision on this entry (it isn't on the internal client).
+		els.typeField.classList.toggle( 'pltt-hidden', ! entry.type_applies );
 
 		ensureTagPicker();
 		if ( tagPicker ) {
@@ -326,12 +332,13 @@
 			client_id: els.client.value,
 			project_id: els.project.value,
 			tags: els.tags.value,
-			billable: els.billable.checked ? 1 : 0,
+			time_type: els.timeType && els.timeType.checked ? 'internal' : 'project',
 			// Only the Day view uses the server-rendered row that comes back, and
-			// its Billable column drops out on an all-retainer day. Telling the
-			// server which shape to write keeps the replacement row the same width
-			// as the table it lands in.
-			show_billable_col: document.querySelector( '.pltt-entries-table .pltt-col-billable' ) ? 1 : 0,
+			// its Internal column drops out on an all-internal-client day. Telling
+			// the server which shape to write keeps the replacement row the same
+			// width as the table it lands in. (The parameter keeps its historical
+			// name — the column once held the billable flag.)
+			show_billable_col: document.querySelector( '.pltt-entries-table .pltt-col-type' ) ? 1 : 0,
 		};
 		// "new" is a menu item, not a selection — it opens a modal.
 		if ( payload.client_id === 'new' ) {
@@ -425,12 +432,8 @@
 					PLTT.showModal( 'pltt-client-modal' );
 					return;
 				}
-				// Internal work is never chargeable.
-				var opt = els.client.options[ els.client.selectedIndex ];
-				if ( opt && opt.dataset.isInternal === '1' ) {
-					els.billable.checked = false;
-					syncBillableButton();
-				}
+				// On the internal client there is nothing to decide about the type.
+				applyTypeVisibility();
 				loadProjects( 0 );
 				return;
 			}
@@ -450,21 +453,16 @@
 					return;
 				}
 
-				// A project's type carries a default answer to "is this billable".
-				var popt = els.project.options[ els.project.selectedIndex ];
-				if ( popt && popt.value && popt.dataset.billabilityDefault !== undefined ) {
-					els.billable.checked = popt.dataset.billabilityDefault === '1';
-					syncBillableButton();
-				}
-				applyBillableVisibility();
+				// Nothing to settle on a project change: the time type is a fact about
+				// the entry, not the project, and billable derives from both server-side.
 			}
 		} );
 
 		form.addEventListener( 'click', function( e ) {
-			if ( e.target.closest( '.pltt-form-billable-btn' ) ) {
+			if ( e.target.closest( '.pltt-form-type-pill' ) ) {
 				e.preventDefault();
-				els.billable.checked = ! els.billable.checked;
-				syncBillableButton();
+				els.timeType.checked = ! els.timeType.checked;
+				syncTypePill();
 			}
 		} );
 
@@ -611,9 +609,9 @@
 			client: qs( '.pltt-form-client' ),
 			project: qs( '.pltt-form-project' ),
 			tags: qs( '.pltt-form-tags' ),
-			billable: qs( '.pltt-form-billable' ),
-			billableBtn: qs( '.pltt-form-billable-btn' ),
-			billableField: qs( '.pltt-field-billable' ),
+			timeType: qs( '.pltt-form-time-type' ),
+			typePill: qs( '.pltt-form-type-pill' ),
+			typeField: qs( '.pltt-field-time-type' ),
 			error: qs( '.pltt-entry-form-error' ),
 			// Status and Save live in the modal's action band, outside .pltt-entry-form.
 			status: modal.querySelector( '.pltt-form-status' ),

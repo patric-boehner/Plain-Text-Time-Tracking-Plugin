@@ -263,28 +263,31 @@
 		 *
 		 * @param {Object} opts
 		 *   selector  - CSS selector for the toggle button (matched via .closest).
-		 *   field     - server field name ('billable' or 'tags').
+		 *   field     - server field name ('time_type' or 'tags').
+		 *   values    - { on, off } the server values the two states send
+		 *               (default '1' / '0').
 		 *   classes   - { on, off } classes to toggle on the button.
 		 *   labels    - { on, off } accessible label strings.
 		 *   apply     - fn( btn, row, isOn ) - extra UI changes when state flips on/off.
 		 *   onSuccess - fn( btn, row, data ) - optional, called after server confirms.
 		 */
 		function bindInlineToggle( opts ) {
+			var values = opts.values || { on: '1', off: '0' };
 			document.addEventListener( 'click', function( e ) {
 				var btn = e.target.closest( opts.selector );
 				if ( ! btn ) {
 					return;
 				}
 
-				var currentOn = btn.dataset.value === '1';
-				var newValue  = currentOn ? '0' : '1';
+				var currentOn = btn.dataset.value === values.on;
+				var newValue  = currentOn ? values.off : values.on;
 				var isOn      = ! currentOn;
 				var row       = btn.closest( 'tr' );
 
 				function setVisual( on ) {
 					btn.classList.toggle( opts.classes.on,  on );
 					btn.classList.toggle( opts.classes.off, ! on );
-					btn.dataset.value = on ? '1' : '0';
+					btn.dataset.value = on ? values.on : values.off;
 					var label = on ? opts.labels.on : opts.labels.off;
 					btn.setAttribute( 'aria-label', label );
 					btn.setAttribute( 'title', label );
@@ -381,28 +384,42 @@
 			}
 		}
 
-		// Billable toggle. Billed state is not a per-entry field any more — it
-		// comes from bill-record coverage — so there is nothing to cascade into.
+		// Time-type toggle: "Internal" on = the user's own time on this project.
+		// Billable is derived from it on the server (internal is never billable;
+		// project time follows the project), so the Amount cell, the Status badge
+		// and the cards all take their new values from the response rather than
+		// guessing. Billed state is not a per-entry field — it comes from
+		// bill-record coverage — so there is nothing to cascade into.
+		var typeI18n = ( typeof plttData !== 'undefined' && plttData.i18n ) || {};
 		bindInlineToggle( {
-			selector: '.pltt-billable-symbol.pltt-inline-toggle',
-			field:    'billable',
-			classes:  { on: 'is-billable', off: 'not-billable' },
+			selector: '.pltt-type-pill.pltt-inline-toggle',
+			field:    'time_type',
+			values:   { on: 'internal', off: 'project' },
+			classes:  { on: 'pltt-badge-type-internal', off: 'pltt-badge-type-project' },
 			labels:   {
-				on:  'Billable — click to toggle',
-				off: 'Not billable — click to toggle'
+				on:  typeI18n.typeInternalTitle || 'Internal — your own time on this project. Click to count it as project work.',
+				off: typeI18n.typeProjectTitle  || 'Project work — counts toward the client. Click to mark it internal.'
 			},
-			// Runs on the optimistic flip and again on rollback, so a failed save
-			// puts the badge back where it was.
+			// Runs on the optimistic flip and again on rollback: the pill's word
+			// follows the toggle; the Status badge waits for the server's billable.
 			apply: function( btn, row, on ) {
-				setStatusBadge( row, on );
+				btn.textContent = on ? ( typeI18n.typeInternal || 'Internal' ) : ( typeI18n.typeProject || 'Project' );
 			},
 			onSuccess: function( btn, row, data ) {
+				// Read the row's old state before anything repaints it.
+				var amountCell  = row && row.querySelector( '.pltt-amount-col' );
+				var oldAmount   = amountCell ? parseAmount( amountCell.textContent ) : 0;
+				var wasBillable = row ? !! row.querySelector( '.pltt-status-col .pltt-badge-success' ) : oldAmount > 0;
+				var isBillable  = !! ( data && parseInt( data.billable, 10 ) === 1 );
+				var newAmount   = data ? parseFloat( data.billable_amount ) || 0 : 0;
+				var minutes     = parseInt( btn.dataset.minutes, 10 ) || 0;
+
+				if ( btn.dataset.billableApplies === '1' ) {
+					setStatusBadge( row, isBillable );
+				}
+
 				// Update the Amount cell with the server-calculated value, then push
 				// the deltas to the summary stat cards so they update without a refresh.
-				var amountCell = row && row.querySelector( '.pltt-amount-col' );
-				var newAmount  = data ? parseFloat( data.billable_amount ) || 0 : 0;
-				var oldAmount  = amountCell ? parseAmount( amountCell.textContent ) : 0;
-
 				if ( amountCell ) {
 					if ( newAmount > 0 ) {
 						amountCell.textContent = '$' + newAmount.toLocaleString( 'en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 } );
@@ -411,10 +428,10 @@
 					}
 				}
 
-				// btn.dataset.value already reflects the new (post-toggle) state.
-				var isBillable = btn.dataset.value === '1';
-				var minutes    = parseInt( btn.dataset.minutes, 10 ) || 0;
-				updateBillableCards( isBillable ? minutes : -minutes, newAmount - oldAmount );
+				// The billable cards move only when billability actually changed.
+				if ( isBillable !== wasBillable ) {
+					updateBillableCards( isBillable ? minutes : -minutes, newAmount - oldAmount );
+				}
 				updateDayTotal( row, newAmount - oldAmount );
 
 				// Let the billing select row react: a newly-billable row becomes a
@@ -563,16 +580,19 @@
 				} );
 			}
 
-			// Only offered where the flag means something: hourly work that no
-			// committed bill record has frozen. The item drives the row's own $
-			// toggle rather than repeating its save-and-repaint — one path, so
-			// the two can't drift.
-			if ( d.billableApplies === '1' && d.covered !== '1' ) {
+			// The entry's time type — offered on every client but the internal
+			// one, and only while no committed bill record has frozen the entry.
+			// The item drives the row's own Internal toggle rather than repeating
+			// its save-and-repaint — one path, so the two can't drift.
+			if ( d.typeApplies === '1' && d.covered !== '1' ) {
+				var menuI18n = ( typeof plttData !== 'undefined' && plttData.i18n ) || {};
 				items.push( {
-					label: d.billable === '1' ? 'Mark not billable' : 'Mark billable',
+					label: d.timeType === 'internal'
+						? ( menuI18n.typeMarkProject || 'Mark as project work' )
+						: ( menuI18n.typeMarkInternal || 'Mark as internal' ),
 					onSelect: function( t ) {
 						var row = t.closest( 'tr' );
-						var toggle = row && row.querySelector( '.pltt-billable-symbol.pltt-inline-toggle' );
+						var toggle = row && row.querySelector( '.pltt-type-pill.pltt-inline-toggle' );
 						if ( toggle ) {
 							toggle.click();
 						}

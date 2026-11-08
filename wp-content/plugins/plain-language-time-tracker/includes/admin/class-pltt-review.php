@@ -170,11 +170,13 @@ class PLTT_Review {
 	 * payload save_entry() sends alongside this.
 	 *
 	 * @param object $entry             Time-entry row from the DB.
-	 * @param bool   $show_billable_col Whether the table being written into has a
-	 *                                  Billable column. It drops out on an
-	 *                                  all-retainer day (entries-editor.php works
-	 *                                  it out per table), and a row that doesn't
-	 *                                  ask lands a cell wide.
+	 * @param bool   $show_billable_col Whether the table being written into has
+	 *                                  the per-entry "Internal" column. It drops
+	 *                                  out when every entry is on the internal
+	 *                                  client (entries-editor.php works it out
+	 *                                  per table), and a row that doesn't ask
+	 *                                  lands a cell wide. The name is historical:
+	 *                                  the column used to hold the billable flag.
 	 */
 	public static function render_entry_row( $entry, $show_billable_col = true ) {
 		// Re-fetch tags for the entry from the junction table.
@@ -193,12 +195,14 @@ class PLTT_Review {
 			'tags'             => implode( ',', $entry_tags ),
 			'billable'         => (int) $entry->billable,
 			'verified'         => (int) $entry->verified,
+			'time_type'        => $entry->time_type ?? 'project',
 		);
 
 		$client  = ! empty( $formatted['client_id'] ) ? PLTT_Clients::get( $formatted['client_id'] ) : null;
 		$project = ! empty( $formatted['project_id'] ) ? PLTT_Projects::get( $formatted['project_id'] ) : null;
 
-		$is_billable = ! empty( $formatted['billable'] );
+		$is_internal  = ( 'internal' === $formatted['time_type'] );
+		$type_applies = ( $formatted['client_id'] !== pltt_get_internal_client_id() );
 		?>
 		<tr class="pltt-entry-row pltt-entry-compact" data-entry-id="<?php echo esc_attr( $formatted['id'] ); ?>">
 			<td class="pltt-time-cell">
@@ -241,11 +245,11 @@ class PLTT_Review {
 				</div>
 			</td>
 			<?php if ( $show_billable_col ) : ?>
-				<td class="pltt-billable-indicator">
-					<?php if ( pltt_billable_flag_applies( $project ) ) : ?>
-						<span class="pltt-billable-symbol <?php echo $is_billable ? 'is-billable' : 'not-billable'; ?>"
-							aria-label="<?php echo $is_billable ? esc_attr__( 'Billable', 'plain-language-time-tracker' ) : esc_attr__( 'Not billable', 'plain-language-time-tracker' ); ?>"
-							title="<?php echo $is_billable ? esc_attr__( 'Billable', 'plain-language-time-tracker' ) : esc_attr__( 'Not billable', 'plain-language-time-tracker' ); ?>">$</span>
+				<td class="pltt-type-cell">
+					<?php if ( $type_applies ) : ?>
+						<?php pltt_render_time_type_pill( $is_internal ? 'internal' : 'project' ); ?>
+					<?php else : ?>
+						<span class="pltt-empty" aria-label="<?php esc_attr_e( 'Not applicable — internal client', 'plain-language-time-tracker' ); ?>">&mdash;</span>
 					<?php endif; ?>
 				</td>
 			<?php endif; ?>
@@ -256,10 +260,10 @@ class PLTT_Review {
 					/* translators: %s: entry description. */
 					sprintf( __( 'Actions for %s', 'plain-language-time-tracker' ), $formatted['description'] ),
 					array(
-						'entry-id'         => $formatted['id'],
-						'date'             => $formatted['entry_date'],
-						'billable'         => $is_billable ? '1' : '0',
-						'billable-applies' => pltt_billable_flag_applies( $project ) ? '1' : '0',
+						'entry-id'     => $formatted['id'],
+						'date'         => $formatted['entry_date'],
+						'time-type'    => $formatted['time_type'],
+						'type-applies' => $type_applies ? '1' : '0',
 					)
 				);
 				?>
@@ -379,6 +383,7 @@ class PLTT_Review {
 				'verified'             => $entry->verified,
 				'billable'             => $entry->billable,
 				'billable_amount'      => $billable_amount,
+				'time_type'            => $entry->time_type ?? 'project',
 			);
 		}
 
@@ -470,18 +475,30 @@ class PLTT_Review {
 
 			// Update all editable fields from the review screen.
 			// Mark as verified when saved from review screen.
+			$row_client_id  = ! empty( $entry_data['client_id'] ) ? absint( $entry_data['client_id'] ) : 0;
+			$row_project_id = ! empty( $entry_data['project_id'] ) ? absint( $entry_data['project_id'] ) : 0;
+
+			// Time type from the row's "Internal" box; the internal client outranks it.
+			$row_time_type = pltt_resolve_time_type( $entry_data['time_type'] ?? 'project', $row_client_id );
+
+			// Billable derives from the type and the project — there is no billable
+			// control on this screen any more. One exception: a verified entry saved
+			// again with the same project and type keeps the billable value it had,
+			// so a legacy hourly row that was switched off by hand stays off instead
+			// of quietly becoming chargeable on an unrelated edit.
+			$keep_billable = (
+				! empty( $original->verified )
+				&& (int) $original->project_id === $row_project_id
+				&& ( $original->time_type ?? 'project' ) === $row_time_type
+			) ? $original->billable : null;
+
 			$data = array(
 				'description' => sanitize_textarea_field( $entry_data['description'] ?? '' ),
-				'client_id'   => ! empty( $entry_data['client_id'] ) ? absint( $entry_data['client_id'] ) : null,
-				'project_id'  => ! empty( $entry_data['project_id'] ) ? absint( $entry_data['project_id'] ) : null,
+				'client_id'   => $row_client_id > 0 ? $row_client_id : null,
+				'project_id'  => $row_project_id > 0 ? $row_project_id : null,
 				'tags'        => sanitize_text_field( $entry_data['tags'] ?? '' ),
-				// Clamped to the project type: a hidden checkbox on a retainer/fixed row
-				// still submits, and this path used to take it verbatim.
-				'billable'    => pltt_clamp_billable(
-					! empty( $entry_data['billable'] ),
-					! empty( $entry_data['project_id'] ) ? absint( $entry_data['project_id'] ) : 0,
-					$projects_cache
-				),
+				'time_type'   => $row_time_type,
+				'billable'    => pltt_derive_billable( $row_time_type, $row_project_id, $projects_cache, $keep_billable ),
 				'verified'    => 1,
 			);
 

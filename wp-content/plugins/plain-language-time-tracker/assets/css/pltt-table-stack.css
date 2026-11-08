@@ -150,7 +150,8 @@
 		font-weight: 600;
 	}
 
-	.pltt-stack-entries > tbody > tr > td.pltt-billable-indicator {
+	.pltt-stack-entries > tbody > tr > td.pltt-billable-indicator,
+	.pltt-stack-entries > tbody > tr > td.pltt-type-cell {
 		order: 7;
 		margin-top: 6px;
 	}
@@ -176,6 +177,21 @@
 		display: none;
 	}
 
+	/* The Internal cell: an Internal pill or badge takes the push to the right
+	   and the amount follows it; an empty cell (project time) disappears, so a
+	   stacked row only mentions the type when there is one to mention. */
+	.pltt-stack-entries > tbody > tr > td.pltt-type-cell:has(.pltt-badge) {
+		margin-left: auto;
+	}
+
+	.pltt-stack-entries > tbody > tr > td.pltt-type-cell:has(.pltt-badge) ~ td.pltt-amount-col {
+		margin-left: 0;
+	}
+
+	.pltt-stack-entries > tbody > tr > td.pltt-type-cell:not(:has(*)) {
+		display: none;
+	}
+
 	.pltt-stack-entries > tbody > tr::after {
 		order: 9;
 	}
@@ -198,6 +214,8 @@
 	.pltt-stack-entries .pltt-billable-indicator {
 		pointer-events: none;
 	}
+	/* The Internal toggle stays tappable on a phone — it is the one per-entry
+	   decision this screen asks for. */
 
 	.pltt-stack-entries > tbody > tr > td.pltt-tag-cell:not(:has(.pltt-badge)) {
 		display: none;

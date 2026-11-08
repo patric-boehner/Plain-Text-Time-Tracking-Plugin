@@ -165,6 +165,9 @@
 
 	function show( trigger ) {
 		buildContent( trigger );
+		// A trigger with many label/value rows can ask for a wider card
+		// (data-tip-width); everything else keeps the stylesheet's max-width.
+		tipEl.style.maxWidth = trigger.getAttribute( 'data-tip-width' ) || '';
 		position( trigger );
 		tipEl.classList.add( 'is-visible' );
 		activeTrigger = trigger;

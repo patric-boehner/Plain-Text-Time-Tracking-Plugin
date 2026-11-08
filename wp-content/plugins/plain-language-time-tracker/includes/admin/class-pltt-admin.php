@@ -466,6 +466,14 @@ class PLTT_Admin {
 					'statusUnbilledTitle'     => __( 'Chargeable — not on a bill record yet', 'plain-language-time-tracker' ),
 					'statusNotCharged'        => __( 'Not charged', 'plain-language-time-tracker' ),
 					'statusNotChargedTitle'   => __( 'Billable was switched off for this entry', 'plain-language-time-tracker' ),
+					// The per-entry time type: the inline "Internal" toggle's two
+					// titles and the row-menu items that drive it.
+					'typeProject'             => __( 'Project', 'plain-language-time-tracker' ),
+					'typeInternal'            => __( 'Internal', 'plain-language-time-tracker' ),
+					'typeInternalTitle'       => __( 'Internal — your own time on this project. Click to count it as project work.', 'plain-language-time-tracker' ),
+					'typeProjectTitle'        => __( 'Project work — counts toward the client. Click to mark it internal.', 'plain-language-time-tracker' ),
+					'typeMarkInternal'        => __( 'Mark as internal', 'plain-language-time-tracker' ),
+					'typeMarkProject'         => __( 'Mark as project work', 'plain-language-time-tracker' ),
 					// The gap between what the work came to and what you're
 					// charging, named beside the amount box in the Record-bill
 					// modal. Only one of the two ever shows at a time.

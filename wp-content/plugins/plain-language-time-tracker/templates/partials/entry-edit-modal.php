@@ -38,16 +38,25 @@ $pltt_edit_modal_internal_id = pltt_get_internal_client_id();
 
 		<div class="pltt-entry-form" data-entry-id="">
 			<div class="pltt-entry-form-fields">
-				<div class="pltt-field pltt-field-description">
-					<label for="pltt-form-description-edit">
-						<?php esc_html_e( 'Description', 'plain-language-time-tracker' ); ?>
-					</label>
-					<input
-						type="text"
-						id="pltt-form-description-edit"
-						class="pltt-form-description regular-text"
-						value=""
-					>
+				<div class="pltt-field-row pltt-field-row-description">
+					<div class="pltt-field pltt-field-description">
+						<label for="pltt-form-description-edit">
+							<?php esc_html_e( 'Description', 'plain-language-time-tracker' ); ?>
+						</label>
+						<input
+							type="text"
+							id="pltt-form-description-edit"
+							class="pltt-form-description regular-text"
+							value=""
+						>
+					</div>
+					<div class="pltt-field pltt-field-time-type">
+						<label><?php esc_html_e( 'Type', 'plain-language-time-tracker' ); ?> <?php pltt_render_time_type_note(); ?></label>
+						<span class="pltt-type-toggle">
+							<input type="checkbox" class="pltt-form-time-type pltt-time-type" value="internal" tabindex="-1" aria-hidden="true">
+							<?php pltt_render_time_type_pill( 'project', array( 'button' => true, 'class' => 'pltt-form-type-pill' ) ); ?>
+						</span>
+					</div>
 				</div>
 
 				<div class="pltt-field-row pltt-field-row-time">
@@ -108,15 +117,6 @@ $pltt_edit_modal_internal_id = pltt_get_internal_client_id();
 						<div class="pltt-tag-input-wrap">
 							<input type="hidden" class="pltt-tags pltt-form-tags" value="">
 						</div>
-					</div>
-					<div class="pltt-field pltt-field-billable">
-						<label><?php esc_html_e( 'Billable', 'plain-language-time-tracker' ); ?></label>
-						<button type="button"
-							class="pltt-billable-symbol pltt-inline-toggle pltt-form-billable-btn not-billable"
-							aria-pressed="false"
-							aria-label="<?php esc_attr_e( 'Not billable — click to toggle', 'plain-language-time-tracker' ); ?>"
-							title="<?php esc_attr_e( 'Not billable — click to toggle', 'plain-language-time-tracker' ); ?>">$</button>
-						<input type="checkbox" class="pltt-form-billable" value="1" hidden>
 					</div>
 				</div>
 			</div>

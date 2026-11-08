@@ -46,35 +46,35 @@
 		allTagPickers.push( picker );
 	} );
 
-	// Billable $ symbol click handler — toggles the hidden checkbox.
-	document.querySelectorAll( '.pltt-billable-symbol' ).forEach( function( symbol ) {
-		symbol.addEventListener( 'click', function() {
-			var cell = this.closest( 'td' );
-			var checkbox = cell.querySelector( '.pltt-billable' );
-			if ( checkbox ) {
-				// A click here is a deliberate choice — flag it so a later project
-				// change won't re-apply the project default over the user's pick.
-				checkbox.dataset.userSet = '1';
-				checkbox.checked = ! checkbox.checked;
-				checkbox.dispatchEvent( new Event( 'change' ) );
-			}
-		} );
-	} );
+	/**
+	 * Set a Type pill to one of its two states: word, class and data-value.
+	 *
+	 * @param {HTMLElement} pill       The .pltt-type-pill button.
+	 * @param {boolean}     isInternal True for "Internal", false for "Project".
+	 */
+	function syncTypePill( pill, isInternal ) {
+		if ( ! pill ) {
+			return;
+		}
+		var i18n = ( typeof plttData !== 'undefined' && plttData.i18n ) || {};
+		pill.classList.toggle( 'pltt-badge-type-internal', isInternal );
+		pill.classList.toggle( 'pltt-badge-type-project', ! isInternal );
+		pill.dataset.value = isInternal ? 'internal' : 'project';
+		pill.textContent = isInternal ? ( i18n.typeInternal || 'Internal' ) : ( i18n.typeProject || 'Project' );
+	}
 
-	// Billable checkbox change — update $ symbol.
-	document.querySelectorAll( '.pltt-billable' ).forEach( function( checkbox ) {
-		// A direct click on the checkbox is also a deliberate choice. 'click'
-		// fires only on real interaction, never on a programmatic dispatch.
-		checkbox.addEventListener( 'click', function() {
-			this.dataset.userSet = '1';
-		} );
-		checkbox.addEventListener( 'change', function() {
-			var cell = this.closest( 'td' );
-			var symbol = cell.querySelector( '.pltt-billable-symbol' );
-			if ( symbol ) {
-				symbol.classList.toggle( 'is-billable', this.checked );
-				symbol.classList.toggle( 'not-billable', ! this.checked );
+	// The Type pill is the control: clicking it flips the row's hidden box
+	// between Project and Internal. Billable is no longer a control here — the
+	// server derives it from the type and the project.
+	document.querySelectorAll( '.pltt-type-toggle .pltt-type-pill' ).forEach( function( pill ) {
+		pill.addEventListener( 'click', function() {
+			var wrap = this.closest( '.pltt-type-toggle' );
+			var box = wrap && wrap.querySelector( '.pltt-time-type' );
+			if ( ! box ) {
+				return;
 			}
+			box.checked = ! box.checked;
+			syncTypePill( this, box.checked );
 		} );
 	} );
 
@@ -385,10 +385,6 @@
 					}
 				}
 
-				var ppRow = projectSelect.closest( '.pltt-entry-row' );
-				if ( ppRow ) {
-					applyBillableVisibility( ppRow );
-				}
 			}
 		} );
 	}
@@ -409,11 +405,9 @@
 				return;
 			}
 
-			// If the internal client is selected, mark the entry as non-billable.
-			var selectedClientOpt = this.options[ this.selectedIndex ];
-			if ( selectedClientOpt && selectedClientOpt.dataset.isInternal === '1' ) {
-				setBillableVisual( row, false );
-			}
+			// On the internal client every entry is internal — nothing to decide,
+			// so the Internal box steps aside (the server forces the type anyway).
+			applyTypeVisibility( row );
 
 			var originalProjectId = row.dataset.originalProjectId || '';
 			loadProjects( this, projectSelect, originalProjectId );
@@ -439,117 +433,51 @@
 				document.getElementById( 'pltt-new-project-client-id' ).value = clientSelect.value;
 				if ( window.PlttProjectType ) { PlttProjectType.reset(); } PLTT.showModal( 'pltt-project-modal' );
 				this.value = '';
-			} else {
-				var pRowVis = this.closest( '.pltt-entry-row' );
-				if ( pRowVis ) {
-					applyBillableVisibility( pRowVis );
-				}
-
-				// Apply the project's billability default to the billable checkbox,
-				// but never clobber a manual choice: if the user has toggled billable
-				// on this row, leave it alone (spec: billable defaults once).
-				//
-				// EXCEPT when the project type has no per-entry flag at all
-				// (data-billable-flag="0" — retainer/fixed-fee). There the type gate
-				// OUTRANKS the no-clobber guard: a manual choice made while the row
-				// pointed at an hourly project is not a choice about a retainer, and
-				// honouring it here is what let billable=1 reach 70 retainer/fixed
-				// entries ($2,323.50 of imputed dollars). applyBillableVisibility()
-				// has already forced the box off; this block must not turn it back on.
-				var selectedOpt = this.options[ this.selectedIndex ];
-				if ( selectedOpt && selectedOpt.value && selectedOpt.dataset.billableFlag !== '0' ) {
-					var billDefault = selectedOpt.dataset.billabilityDefault;
-					if ( billDefault !== undefined ) {
-						var entryRow = this.closest( '.pltt-entry-row' );
-						var checkbox = entryRow && entryRow.querySelector( '.pltt-billable' );
-						if ( checkbox && checkbox.dataset.userSet !== '1' ) {
-							var shouldBeBillable = billDefault === '1';
-							if ( checkbox.checked !== shouldBeBillable ) {
-								checkbox.checked = shouldBeBillable;
-								checkbox.dispatchEvent( new Event( 'change' ) );
-							}
-						}
-					}
-				}
 			}
+			// Nothing else to settle on a project change: the time type is a fact
+			// about the entry, not about the project, and billable derives from
+			// both on the server.
 		} );
 	} );
 
 	/**
-	 * Helper: update billable checkbox and $ symbol visually without side-effects.
-	 * Does NOT dispatch 'change' (which would fire the inline-save AJAX).
+	 * Show or hide a row's Internal box by its client.
 	 *
-	 * @param {HTMLElement} row         The .pltt-entry-row element.
-	 * @param {boolean}     isBillable  True to mark billable, false for non-billable.
-	 */
-	function setBillableVisual( row, isBillable ) {
-		var checkbox = row.querySelector( '.pltt-billable' );
-		if ( ! checkbox || checkbox.checked === isBillable ) {
-			return;
-		}
-		checkbox.checked = isBillable;
-		var cell = checkbox.closest( 'td' );
-		var symbol = cell && cell.querySelector( '.pltt-billable-symbol' );
-		if ( symbol ) {
-			symbol.classList.toggle( 'is-billable', isBillable );
-			symbol.classList.toggle( 'not-billable', ! isBillable );
-		}
-	}
-
-	/**
-	 * Show/hide a row's billable control based on the selected project's type.
-	 * Retainer/fixed-fee projects (data-billable-flag="0") bill at the period
-	 * level, so the per-entry flag is hidden AND forced off.
-	 *
-	 * Hiding alone was the bug: the checkbox stays in the DOM and submits whatever
-	 * it holds, so a row toggled billable while on an hourly project kept billable=1
-	 * after being switched to a retainer — invisible, uneditable, and taken verbatim
-	 * by the save path. Forcing it off (and clearing the userSet stamp, so a later
-	 * switch back to hourly re-applies that project's default) is what makes the
-	 * "still submits its non-billable value" promise true.
+	 * On the internal client every entry is internal by definition, so the box
+	 * is hidden and cleared (the server resolves the type from the client
+	 * regardless — this only keeps the row from showing a choice that isn't
+	 * one). Any other client gets the box back, unchanged.
 	 *
 	 * @param {HTMLElement} row The .pltt-entry-row element.
 	 */
-	function applyBillableVisibility( row ) {
-		var projectSelect = row.querySelector( '.pltt-project-select' );
-		var cell = row.querySelector( '.pltt-billable-indicator' );
-		if ( ! projectSelect || ! cell ) {
+	function applyTypeVisibility( row ) {
+		var clientSelect = row.querySelector( '.pltt-client-select' );
+		var toggle = row.querySelector( '.pltt-type-toggle' );
+		if ( ! clientSelect || ! toggle ) {
 			return;
 		}
-		var opt = projectSelect.options[ projectSelect.selectedIndex ];
-		var hide = !! ( opt && opt.dataset.billableFlag === '0' );
-		if ( hide ) {
-			setBillableVisual( row, false );
-			var box = row.querySelector( '.pltt-billable' );
-			if ( box ) {
-				delete box.dataset.userSet;
+		var opt = clientSelect.options[ clientSelect.selectedIndex ];
+		var isInternalClient = !! ( opt && opt.dataset.isInternal === '1' );
+		toggle.classList.toggle( 'pltt-hidden', isInternalClient );
+		var dash = row.querySelector( '.pltt-type-empty' );
+		if ( dash ) {
+			dash.classList.toggle( 'pltt-hidden', ! isInternalClient );
+		}
+		if ( isInternalClient ) {
+			var box = toggle.querySelector( '.pltt-time-type' );
+			if ( box && box.checked ) {
+				box.checked = false;
+				syncTypePill( toggle.querySelector( '.pltt-type-pill' ), false );
 			}
 		}
-		cell.querySelectorAll( '.pltt-billable-symbol, .pltt-billable' ).forEach( function( el ) {
-			el.classList.toggle( 'pltt-hidden', hide );
-		} );
 	}
 
 	/**
-	 * On page load: apply internal-client non-billable rule for rows already on the page.
-	 * Handles entries that already have the internal client assigned (change handler only
-	 * fires on user interaction, not on initial render).
+	 * On page load: settle the Internal box for rows already on the page (the
+	 * change handler only fires on user interaction, not on initial render).
 	 */
 	document.querySelectorAll( '.pltt-entry-row' ).forEach( function( row ) {
-		var clientSelect  = row.querySelector( '.pltt-client-select' );
-		var projectSelect = row.querySelector( '.pltt-project-select' );
-		if ( ! clientSelect || ! projectSelect ) {
-			return;
-		}
-
-		var selectedClientOpt = clientSelect.options[ clientSelect.selectedIndex ];
-		var hasProject = projectSelect.value && projectSelect.value !== 'new';
-
-		if ( selectedClientOpt && selectedClientOpt.dataset.isInternal === '1' && ! hasProject ) {
-			setBillableVisual( row, false );
-		}
-
-		applyBillableVisibility( row );
+		applyTypeVisibility( row );
 	} );
 
 	/**
@@ -756,7 +684,7 @@
 		const entries = [];
 
 		rows.forEach( function( row, index ) {
-			const billableCheckbox = row.querySelector( '.pltt-billable' );
+			const typeBox = row.querySelector( '.pltt-time-type' );
 			const entry = {
 				id: row.dataset.entryId || 0,
 				entry_date: row.querySelector( '.pltt-entry-date-input' ).value,
@@ -767,7 +695,7 @@
 				client_id: row.querySelector( '.pltt-client-select' ).value,
 				project_id: row.querySelector( '.pltt-project-select' ).value,
 				tags: row.querySelector( '.pltt-tags' ).value,
-				billable: billableCheckbox ? ( billableCheckbox.checked ? 1 : 0 ) : 0
+				time_type: ( typeBox && typeBox.checked ) ? 'internal' : 'project'
 			};
 
 			entries.push( entry );
@@ -842,17 +770,20 @@
 			} );
 		}
 
-		// Only where the per-entry flag means something — hourly work. Retainer
-		// and fixed-fee bill at the period level.
-		if ( d.billableApplies === '1' ) {
+		// The entry's time type — offered on every client but the internal one,
+		// where every entry is internal and there is nothing to decide.
+		if ( d.typeApplies === '1' ) {
+			const toInternal = d.timeType !== 'internal';
 			items.push( {
-				label: d.billable === '1' ? 'Mark not billable' : 'Mark billable',
+				label: toInternal
+					? ( i18n.typeMarkInternal || 'Mark as internal' )
+					: ( i18n.typeMarkProject || 'Mark as project work' ),
 				onSelect: function( t ) {
 					const row = t.closest( 'tr' );
 					const entry = row ? row.dataset.entryId : 0;
 					PLTT.ajax(
 						'pltt_update_entry_field',
-						{ entry_id: entry, field: 'billable', value: d.billable === '1' ? '0' : '1' },
+						{ entry_id: entry, field: 'time_type', value: toInternal ? 'internal' : 'project' },
 						function( response ) {
 							if ( ! response.success ) {
 								window.alert( response.data || i18n.error );

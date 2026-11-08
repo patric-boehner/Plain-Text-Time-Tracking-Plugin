@@ -515,41 +515,40 @@ class PLTT_Project_Report {
 	 * @return array[]
 	 */
 	private static function cards_fixed( $project, $stats, $rate ) {
-		$total_minutes = isset( $stats->total_minutes ) ? (int) $stats->total_minutes : 0;
-		$entry_count   = isset( $stats->total_count ) ? (int) $stats->total_count : 0;
-		$fee           = self::num( $project->budget_fee );
+		$total_minutes   = isset( $stats->total_minutes ) ? (int) $stats->total_minutes : 0;
+		$project_minutes = self::project_minutes( $stats );
+		$entry_count     = isset( $stats->total_count ) ? (int) $stats->total_count : 0;
+		$fee             = self::num( $project->budget_fee );
 
 		$budgeted_minutes = pltt_budgeted_minutes( $project, $rate );
 
-		// 1 — Total hours.
+		// 1 — Total hours: everything logged, internal time included — this is
+		// what the project cost. The basis names the internal share when there is
+		// one, so the gap to the budget figure below is explained where it starts.
 		$cards = array(
 			self::card(
 				__( 'Total hours', 'plain-language-time-tracker' ),
 				pltt_format_duration( $total_minutes ),
 				array(
-					'sub' => $entry_count > 0
-						? sprintf(
-							/* translators: %s: entry count. */
-							_n( '%s entry', '%s entries', $entry_count, 'plain-language-time-tracker' ),
-							number_format_i18n( $entry_count )
-						)
-						: '',
+					'sub' => self::hours_basis( $stats, $entry_count ),
 				)
 			),
 		);
 
-		// 2 — Budget left / Budget overrun. The value is the actionable number —
-		// hours remaining or hours past the budget — with the ratio and percentage
-		// on the basis line (ui/pltt-budget-figure.html).
+		// 2 — Budget left / Budget overrun, measured in PROJECT time: the client's
+		// scope consumed. Internal time is the user's own and doesn't count against
+		// the budget. The value is the actionable number — hours remaining or hours
+		// past the budget — with the ratio and percentage on the basis line
+		// (ui/pltt-budget-figure.html).
 		if ( $budgeted_minutes > 0 ) {
-			$diff  = $total_minutes - $budgeted_minutes;
+			$diff  = $project_minutes - $budgeted_minutes;
 			$over  = $diff > 0;
 			$basis = sprintf(
 				/* translators: 1: hours used; 2: hours budgeted; 3: percent used. */
 				__( '%1$s of %2$s used · %3$d%%', 'plain-language-time-tracker' ),
-				pltt_format_duration( $total_minutes ),
+				pltt_format_duration( $project_minutes ),
 				pltt_format_duration( $budgeted_minutes ),
-				(int) round( $total_minutes / $budgeted_minutes * 100 )
+				(int) round( $project_minutes / $budgeted_minutes * 100 )
 			);
 			$cards[] = self::card(
 				$over
@@ -576,6 +575,8 @@ class PLTT_Project_Report {
 		// from an absurd high (two hours into a $3,870 job it reads $1,935/hr), so
 		// it flatters early and accuses late; it is only true once work stops.
 		// Matches the "live EHR tracking — archived projects only" call in PROJECT.md.
+		// Divides by ALL hours, internal included: the fee bought the whole job,
+		// rework and all, and this is the figure that says whether it was enough.
 		if ( 'archived' === $project->status ) {
 			$ehr = pltt_effective_rate( $fee, $total_minutes );
 			if ( $ehr > 0 ) {
@@ -638,19 +639,13 @@ class PLTT_Project_Report {
 		$billed        = (float) $rec['billed'];
 		$record_count  = (int) $rec['total'];
 
-		// 1 — Total hours.
+		// 1 — Total hours, with the internal share named when there is one.
 		$cards = array(
 			self::card(
 				__( 'Total hours', 'plain-language-time-tracker' ),
 				pltt_format_duration( $total_minutes ),
 				array(
-					'sub' => $entry_count > 0
-						? sprintf(
-							/* translators: %s: entry count. */
-							_n( '%s entry', '%s entries', $entry_count, 'plain-language-time-tracker' ),
-							number_format_i18n( $entry_count )
-						)
-						: '',
+					'sub' => self::hours_basis( $stats, $entry_count ),
 				)
 			),
 		);
@@ -771,9 +766,14 @@ class PLTT_Project_Report {
 	private static function cards_recurring( $project, $stats, $rate, $window = null, $lifetime = null ) {
 		$alloc_minutes = (int) round( self::num( $project->budget_hours ) * 60 );
 		$life          = ( null !== $lifetime ) ? $lifetime : $stats;
+		// Lifetime figures: $life_minutes is everything logged (what the retainer
+		// cost); $life_project is the project-time share, the only part that
+		// draws down the included hours, so it is what the averages compare
+		// against the allocation.
 		$life_minutes  = isset( $life->total_minutes ) ? (int) $life->total_minutes : 0;
+		$life_project  = self::project_minutes( $life );
 		$months        = self::months_between( $life->first_entry_date ?? '', $life->last_entry_date ?? '' );
-		$avg_minutes   = $months > 0 ? (int) round( $life_minutes / $months ) : $life_minutes;
+		$avg_minutes   = $months > 0 ? (int) round( $life_project / $months ) : $life_project;
 
 		// Average per period vs allocation. The basis names the allocation itself
 		// ("29% of the 2h included") rather than the word "allocation" — the number
@@ -793,11 +793,19 @@ class PLTT_Project_Report {
 
 		// ── Period view: the selected/most-recent period against its allocation ──
 		if ( $window && ! empty( $window['is_period'] ) ) {
-			$used_minutes = isset( $stats->total_minutes ) ? (int) $stats->total_minutes : 0;
+			// Project time only: internal time on the project neither draws down
+			// the included hours nor becomes overage (pltt_compute_overage_threshold
+			// walks the same rule). The period's total is on the Total hours card.
+			$used_minutes = self::project_minutes( $stats );
 			$over_minutes = $alloc_minutes > 0 ? max( 0, $used_minutes - $alloc_minutes ) : 0;
 			$overage      = round( ( $over_minutes / 60.0 ) * $rate, 2 );
 
 			$used = self::card( __( 'This period', 'plain-language-time-tracker' ), pltt_format_duration( $used_minutes ) );
+			$period_internal = self::internal_minutes( $stats );
+			if ( $period_internal > 0 ) {
+				/* translators: %s: internal hours this period, e.g. "1h 10m". */
+				$used['sub'] = sprintf( __( '+ %s internal', 'plain-language-time-tracker' ), pltt_format_duration( $period_internal ) );
+			}
 			if ( $alloc_minutes > 0 ) {
 				$pct = (int) round( $used_minutes / $alloc_minutes * 100 );
 				/* translators: %s: hour allocation per period. */
@@ -860,22 +868,26 @@ class PLTT_Project_Report {
 		$summary  = self::retainer_summary( $project );
 		$periods  = (int) $summary['periods'];
 		$adj      = self::period_adjective( $project );
-		$avg_life = $periods > 0 ? (int) round( $life_minutes / $periods ) : $life_minutes;
+		$avg_life = $periods > 0 ? (int) round( $life_project / $periods ) : $life_project;
 
-		// 1 — Total hours across the run.
+		// 1 — Total hours across the run, internal time included and named.
+		$total_sub = $periods > 0
+			? sprintf(
+				/* translators: 1: number of periods; 2: cadence adjective, e.g. "monthly". */
+				_n( 'Across %1$d %2$s period', 'Across %1$d %2$s periods', $periods, 'plain-language-time-tracker' ),
+				$periods,
+				$adj
+			)
+			: '';
+		$life_internal = self::internal_minutes( $life );
+		if ( $life_internal > 0 ) {
+			/* translators: %s: internal hours, e.g. "3h 20m". */
+			$total_sub .= ( '' !== $total_sub ? ' · ' : '' ) . sprintf( __( '%s internal', 'plain-language-time-tracker' ), pltt_format_duration( $life_internal ) );
+		}
 		$total = self::card(
 			__( 'Total hours', 'plain-language-time-tracker' ),
 			pltt_format_duration( $life_minutes ),
-			array(
-				'sub' => $periods > 0
-					? sprintf(
-						/* translators: 1: number of periods; 2: cadence adjective, e.g. "monthly". */
-						_n( 'Across %1$d %2$s period', 'Across %1$d %2$s periods', $periods, 'plain-language-time-tracker' ),
-						$periods,
-						$adj
-					)
-					: '',
-			)
+			array( 'sub' => $total_sub )
 		);
 
 		// 2 — Average per period against the allocation, plus how many ran over.
@@ -1123,7 +1135,10 @@ class PLTT_Project_Report {
 		// budget runs out around Jan 13, 2027") was built here and DROPPED
 		// 2026-08-13 before it shipped — Patrick's call, while we were still
 		// settling its wording. Recoverable from git; don't rebuild it on a hunch.
-		$total = isset( $stats->total_minutes ) ? (int) $stats->total_minutes : 0;
+		//
+		// Project time, not the total: internal time doesn't consume the budget,
+		// so it can't be what crossed it.
+		$total = self::project_minutes( $stats );
 		if ( $total > $ceiling ) {
 			$out['cross'] = self::budget_cross( $project, $stats, $ceiling, $total, $chart );
 		}
@@ -1269,6 +1284,55 @@ class PLTT_Project_Report {
 	 * @param mixed $value Raw value.
 	 * @return float
 	 */
+	/**
+	 * Project-time minutes from a stats row: the share that counts toward the
+	 * client. Falls back to the total for a row built before the split existed.
+	 *
+	 * @param object|null $stats Stats row.
+	 * @return int
+	 */
+	private static function project_minutes( $stats ) {
+		if ( isset( $stats->project_minutes ) ) {
+			return (int) $stats->project_minutes;
+		}
+		return isset( $stats->total_minutes ) ? (int) $stats->total_minutes : 0;
+	}
+
+	/**
+	 * Internal minutes from a stats row — the user's own time on the project.
+	 *
+	 * @param object|null $stats Stats row.
+	 * @return int
+	 */
+	private static function internal_minutes( $stats ) {
+		return isset( $stats->internal_minutes ) ? (int) $stats->internal_minutes : 0;
+	}
+
+	/**
+	 * Basis line for a Total hours card: the entry count, plus the internal
+	 * share when there is one ("41 entries · 3h 20m internal").
+	 *
+	 * @param object|null $stats       Stats row.
+	 * @param int         $entry_count Entry count.
+	 * @return string
+	 */
+	private static function hours_basis( $stats, $entry_count ) {
+		$parts = array();
+		if ( $entry_count > 0 ) {
+			$parts[] = sprintf(
+				/* translators: %s: entry count. */
+				_n( '%s entry', '%s entries', $entry_count, 'plain-language-time-tracker' ),
+				number_format_i18n( $entry_count )
+			);
+		}
+		$internal = self::internal_minutes( $stats );
+		if ( $internal > 0 ) {
+			/* translators: %s: internal hours, e.g. "3h 20m". */
+			$parts[] = sprintf( __( '%s internal', 'plain-language-time-tracker' ), pltt_format_duration( $internal ) );
+		}
+		return implode( ' · ', $parts );
+	}
+
 	private static function num( $value ) {
 		return ( null !== $value && '' !== $value ) ? (float) $value : 0.0;
 	}

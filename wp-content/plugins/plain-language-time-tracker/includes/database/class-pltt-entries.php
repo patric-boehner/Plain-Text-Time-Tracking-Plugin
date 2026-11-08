@@ -100,7 +100,7 @@ class PLTT_Entries {
 			$allowed_cols = array(
 				'id', 'entry_date', 'start_time', 'end_time', 'duration_minutes',
 				'raw_text', 'description', 'client_id', 'project_id', 'verified',
-				'billable', 'billable_rate', 'billable_amount', 'billed',
+				'billable', 'billable_rate', 'billable_amount', 'billed', 'time_type',
 				'created_at', 'updated_at',
 			);
 			$requested = array_values( array_intersect( (array) $args['fields'], $allowed_cols ) );
@@ -178,24 +178,22 @@ class PLTT_Entries {
 		$client_id  = ! empty( $data['client_id'] ) ? absint( $data['client_id'] ) : null;
 		$project_id = ! empty( $data['project_id'] ) ? absint( $data['project_id'] ) : null;
 
-		// Determine billable default: explicit value wins; otherwise inherit from project; fall back to 1.
-		// The project row is loaded once and reused for the type clamp below, so
-		// inheriting the default costs no extra query.
+		// Time type first: the internal client forces 'internal', otherwise the
+		// caller's value (default 'project'). Billable then DERIVES from it — an
+		// internal entry is never billable; project time follows the project's
+		// default unless the caller passed an explicit flag — and is clamped to
+		// the project type either way (retainer / fixed-fee / internal projects
+		// never carry a per-entry flag). The project row is loaded once and
+		// shared with the derivation so inheriting the default costs no query.
+		$time_type        = pltt_resolve_time_type( $data['time_type'] ?? 'project', $client_id );
 		$billable_project = ( null !== $project_id ) ? PLTT_Projects::get( $project_id ) : null;
-
-		if ( array_key_exists( 'billable', $data ) ) {
-			$billable = ! empty( $data['billable'] ) ? 1 : 0;
-		} elseif ( $billable_project && null !== $billable_project->billability_default ) {
-			$billable = (int) $billable_project->billability_default;
-		} else {
-			$billable = 1;
-		}
-
-		// Enforce the invariant regardless of how billable was resolved: retainer,
-		// fixed-fee and internal projects never carry a per-entry billable flag.
-		// A project whose billability_default is stale (1 on a retainer) would
-		// otherwise seed every new entry with a flag the UI can't show or edit.
-		$billable = pltt_clamp_billable( $billable, $project_id, $billable_project ? array( (int) $project_id => $billable_project ) : array() );
+		$projects_cache   = $billable_project ? array( (int) $project_id => $billable_project ) : array();
+		$billable         = pltt_derive_billable(
+			$time_type,
+			$project_id,
+			$projects_cache,
+			array_key_exists( 'billable', $data ) ? $data['billable'] : null
+		);
 
 		$insert_data = array(
 			'entry_date'       => pltt_sanitize_date( $data['entry_date'] ?? '' ),
@@ -206,9 +204,10 @@ class PLTT_Entries {
 			'description'      => sanitize_textarea_field( $data['description'] ?? '' ),
 			'verified'         => ! empty( $data['verified'] ) ? 1 : 0,
 			'billable'         => $billable,
+			'time_type'        => $time_type,
 		);
 
-		$formats = array( '%s', '%s', '%s', '%d', '%s', '%s', '%d', '%d' );
+		$formats = array( '%s', '%s', '%s', '%d', '%s', '%s', '%d', '%d', '%s' );
 
 		// Only include nullable fields when they have values.
 		// wpdb->insert() converts NULL to 0 with %d format; omitting them lets MySQL use NULL.
@@ -287,6 +286,7 @@ class PLTT_Entries {
 			'billable_rate'    => '%f',
 			'billable_amount'  => '%f',
 			'billed'           => '%d',
+			'time_type'        => '%s',
 		);
 
 		// Nullable fields: wpdb->update() cannot set columns to NULL with %d format.
@@ -309,6 +309,11 @@ class PLTT_Entries {
 					$formats[]             = $format;
 				} elseif ( 'entry_date' === $field ) {
 					$update_data[ $field ] = pltt_sanitize_date( $data[ $field ] );
+					$formats[]             = $format;
+				} elseif ( 'time_type' === $field ) {
+					// Callers resolve the internal-client rule before they get here
+					// (pltt_resolve_time_type()); this only keeps the value in range.
+					$update_data[ $field ] = pltt_sanitize_time_type( $data[ $field ] );
 					$formats[]             = $format;
 				} elseif ( '%f' === $format ) {
 					$update_data[ $field ] = (float) $data[ $field ];
@@ -556,10 +561,16 @@ class PLTT_Entries {
 		// SEC-L1: Resolve via is_internal flag (DB 1.9.3+) rather than hardcoded ID.
 		// pltt_get_internal_client_id() is request-cached; the fallback handles fresh installs
 		// where the migration has not yet run.
+		// "Client-facing" time is time that counts toward a client: not on the
+		// internal client, and not the user's own time on a client's project
+		// (time_type = 'internal'). The two clauses overlap on purpose — every
+		// internal-client entry is also typed internal — so either alone would do;
+		// both are kept so the figure reads right on a row the type hasn't
+		// reached yet.
 		$internal_client_id = pltt_get_internal_client_id();
 		$exclude_clause     = $internal_client_id > 0
-			? "e.client_id != {$internal_client_id}"
-			: "LOWER(c.name) != 'internal'";
+			? "e.client_id != {$internal_client_id} AND e.time_type <> 'internal'"
+			: "LOWER(c.name) != 'internal' AND e.time_type <> 'internal'";
 
 		$amount = self::billable_amount_expr();
 		// "Unbilled" means no committed bill record covers the entry — the legacy
@@ -571,9 +582,15 @@ class PLTT_Entries {
 		// every billing surface additionally requires verified = 1. Without the
 		// count, billable-but-unverified work shows as money in one figure, is
 		// invisible to the other, and offers no action and no explanation.
+		//
+		// project_minutes / internal_minutes split total_minutes by time type:
+		// project time is what budgets and allocations are measured against;
+		// internal time is shown beside them, never inside them.
 		$sql = "SELECT
 			COUNT(*) AS total_count,
 			COALESCE(SUM(e.duration_minutes), 0) AS total_minutes,
+			COALESCE(SUM(CASE WHEN e.time_type <> 'internal' THEN e.duration_minutes ELSE 0 END), 0) AS project_minutes,
+			COALESCE(SUM(CASE WHEN e.time_type = 'internal' THEN e.duration_minutes ELSE 0 END), 0) AS internal_minutes,
 			COALESCE(SUM(CASE WHEN e.billable = 1 THEN e.duration_minutes ELSE 0 END), 0) AS billable_minutes,
 			COALESCE(SUM(CASE WHEN e.billable = 1 AND NOT EXISTS (
 				SELECT 1 FROM {$record_entries} bre WHERE bre.entry_id = e.id
@@ -668,6 +685,8 @@ class PLTT_Entries {
 			e.{$group_by} AS group_key,
 			COUNT(*) AS total_count,
 			COALESCE(SUM(e.duration_minutes), 0) AS total_minutes,
+			COALESCE(SUM(CASE WHEN e.time_type <> 'internal' THEN e.duration_minutes ELSE 0 END), 0) AS project_minutes,
+			COALESCE(SUM(CASE WHEN e.time_type = 'internal' THEN e.duration_minutes ELSE 0 END), 0) AS internal_minutes,
 			COALESCE(SUM(CASE WHEN e.billable = 1 THEN e.duration_minutes ELSE 0 END), 0) AS billable_minutes,
 			COALESCE(SUM(CASE WHEN e.billable = 1 AND NOT EXISTS (
 				SELECT 1 FROM {$record_entries} bre WHERE bre.entry_id = e.id
@@ -736,6 +755,8 @@ class PLTT_Entries {
 					c.id AS client_id,
 					c.name AS client_name,
 					SUM(e.duration_minutes) AS total_minutes,
+					COALESCE(SUM(CASE WHEN e.time_type <> 'internal' THEN e.duration_minutes ELSE 0 END), 0) AS project_minutes,
+					COALESCE(SUM(CASE WHEN e.time_type = 'internal' THEN e.duration_minutes ELSE 0 END), 0) AS internal_minutes,
 					COALESCE(SUM(CASE WHEN e.billable = 1 THEN e.duration_minutes ELSE 0 END), 0) AS billable_minutes,
 					COALESCE(SUM(CASE WHEN e.billable = 1 THEN {$amount} ELSE 0 END), 0) AS billable_amount,
 					COUNT(e.id) AS entry_count
@@ -876,10 +897,12 @@ class PLTT_Entries {
 		$where_sql = implode( ' AND ', $where );
 
 		// SEC-L1 pattern: resolve via is_internal flag (DB 1.9.3+) rather than hardcoded ID.
+		// "Internal" on the chart is the user's own time wherever it sits: the
+		// internal client's entries AND internal-typed entries on client projects.
 		$internal_client_id = pltt_get_internal_client_id();
 		$internal_clause    = $internal_client_id > 0
-			? "e.client_id = {$internal_client_id}"
-			: "LOWER(c.name) = 'internal'";
+			? "(e.client_id = {$internal_client_id} OR e.time_type = 'internal')"
+			: "(LOWER(c.name) = 'internal' OR e.time_type = 'internal')";
 
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
 		return $wpdb->get_results(

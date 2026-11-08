@@ -40,13 +40,15 @@ foreach ( $entries as $e ) {
 $row_clients_cache  = PLTT_Clients::get_multiple( array_unique( $entry_client_ids ) );
 $row_projects_cache = PLTT_Projects::get_multiple( array_unique( $entry_project_ids ) );
 
-// Compact-row columns: Date/Time, Duration, Description, Tags (+ Billable when at
-// least one entry's project uses the per-entry flag — hourly), then the kebab.
-// All-retainer/fixed-fee lists drop the Billable column.
-$show_billable_col = false;
+// Compact-row columns: Date/Time, Duration, Description, Tags (+ Internal when
+// at least one entry is on a client other than the internal one), then the
+// kebab. An all-internal-client day drops the column: nothing to decide there.
+// ($show_billable_col keeps its historical name — the column once held the
+// billable flag, which now derives from the time type.)
+$editor_internal_client_id = pltt_get_internal_client_id();
+$show_billable_col         = false;
 foreach ( $entries as $e ) {
-	$p = ! empty( $e['project_id'] ) && isset( $row_projects_cache[ (int) $e['project_id'] ] ) ? $row_projects_cache[ (int) $e['project_id'] ] : null;
-	if ( pltt_billable_flag_applies( $p ) ) {
+	if ( (int) ( $e['client_id'] ?? 0 ) !== $editor_internal_client_id ) {
 		$show_billable_col = true;
 		break;
 	}
@@ -61,7 +63,7 @@ foreach ( $entries as $e ) {
 			<th class="pltt-col-description"><?php esc_html_e( 'Description', 'plain-language-time-tracker' ); ?></th>
 			<th class="pltt-col-tags"><?php esc_html_e( 'Tags', 'plain-language-time-tracker' ); ?></th>
 			<?php if ( $show_billable_col ) : ?>
-				<th class="pltt-col-billable"><?php esc_html_e( 'Billable', 'plain-language-time-tracker' ); ?></th>
+				<th class="pltt-col-type"><?php esc_html_e( 'Type', 'plain-language-time-tracker' ); ?></th>
 			<?php endif; ?>
 			<th class="pltt-rowmenu-col"><span class="screen-reader-text"><?php esc_html_e( 'Actions', 'plain-language-time-tracker' ); ?></span></th>
 		</tr>
@@ -69,8 +71,9 @@ foreach ( $entries as $e ) {
 	<tbody id="pltt-entries-tbody">
 		<?php foreach ( $entries as $entry ) : ?>
 			<?php
-			$entry_id    = (int) $entry['id'];
-			$is_billable = ! empty( $entry['billable'] );
+			$entry_id     = (int) $entry['id'];
+			$is_internal  = ( 'internal' === ( $entry['time_type'] ?? 'project' ) );
+			$type_applies = ( (int) ( $entry['client_id'] ?? 0 ) !== $editor_internal_client_id );
 			?>
 			<tr class="pltt-entry-row pltt-entry-compact" data-entry-id="<?php echo esc_attr( $entry_id ); ?>">
 				<td class="pltt-time-cell">
@@ -115,11 +118,11 @@ foreach ( $entries as $e ) {
 					</div>
 				</td>
 				<?php if ( $show_billable_col ) : ?>
-					<td class="pltt-billable-indicator">
-						<?php if ( pltt_billable_flag_applies( $project ) ) : ?>
-							<span class="pltt-billable-symbol <?php echo $is_billable ? 'is-billable' : 'not-billable'; ?>"
-								aria-label="<?php echo $is_billable ? esc_attr__( 'Billable', 'plain-language-time-tracker' ) : esc_attr__( 'Not billable', 'plain-language-time-tracker' ); ?>"
-								title="<?php echo $is_billable ? esc_attr__( 'Billable', 'plain-language-time-tracker' ) : esc_attr__( 'Not billable', 'plain-language-time-tracker' ); ?>">$</span>
+					<td class="pltt-type-cell">
+						<?php if ( $type_applies ) : ?>
+							<?php pltt_render_time_type_pill( $is_internal ? 'internal' : 'project' ); ?>
+						<?php else : ?>
+							<span class="pltt-empty" aria-label="<?php esc_attr_e( 'Not applicable — internal client', 'plain-language-time-tracker' ); ?>">&mdash;</span>
 						<?php endif; ?>
 					</td>
 				<?php endif; ?>
@@ -132,10 +135,10 @@ foreach ( $entries as $e ) {
 						/* translators: %s: entry description. */
 						sprintf( __( 'Actions for %s', 'plain-language-time-tracker' ), $entry['description'] ?? '' ),
 						array(
-							'entry-id'         => $entry_id,
-							'date'             => $entry['entry_date'] ?? $date,
-							'billable'         => $is_billable ? '1' : '0',
-							'billable-applies' => pltt_billable_flag_applies( $project ) ? '1' : '0',
+							'entry-id'     => $entry_id,
+							'date'         => $entry['entry_date'] ?? $date,
+							'time-type'    => $is_internal ? 'internal' : 'project',
+							'type-applies' => $type_applies ? '1' : '0',
 						)
 					);
 					?>

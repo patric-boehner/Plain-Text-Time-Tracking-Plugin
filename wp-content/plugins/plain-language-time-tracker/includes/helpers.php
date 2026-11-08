@@ -1159,12 +1159,35 @@ function pltt_render_row_menu_trigger( $type, $label, $data = array() ) {
  * @param string $text     Plain-text sentence. Markup would render as literal
  *                         characters — PlttTooltip writes with textContent.
  * @param string $sr_label Accessible name for the button. Defaults to "More information".
+ * @param string $title    Optional heading for the card (data-tip-title).
+ * @param array  $rows     Optional [label, value] rows under the sentence; a ""
+ *                         label renders the value as a full-width line.
  */
-function pltt_render_info_note( $text, $sr_label = '' ) {
+function pltt_render_info_note( $text, $sr_label = '', $title = '', $rows = array() ) {
 	$text = trim( (string) $text );
-	if ( '' === $text ) {
+	$rows = array_values( array_filter( (array) $rows, 'is_array' ) );
+	if ( '' === $text && empty( $rows ) ) {
 		return;
 	}
+
+	// What the card shows: the sentence as a full-width line, then any rows.
+	// What assistive tech reads: the same content flattened to one string.
+	$tip_rows = array();
+	$sr_parts = array();
+	if ( '' !== $title ) {
+		$sr_parts[] = $title;
+	}
+	if ( '' !== $text ) {
+		$tip_rows[] = array( '', $text );
+		$sr_parts[] = $text;
+	}
+	foreach ( $rows as $row ) {
+		$row_label  = (string) ( $row[0] ?? '' );
+		$row_value  = (string) ( $row[1] ?? '' );
+		$tip_rows[] = array( $row_label, $row_value );
+		$sr_parts[] = '' === $row_label ? $row_value : $row_label . ': ' . $row_value;
+	}
+	$sr_text = implode( ' ', $sr_parts );
 
 	// Unique per render: the description span and the button that names it must
 	// pair up even with several notes on one screen.
@@ -1180,12 +1203,14 @@ function pltt_render_info_note( $text, $sr_label = '' ) {
 	<button type="button" class="pltt-info-note"
 		data-pltt-tip
 		data-tip-color="none"
-		data-tip-rows="<?php echo esc_attr( wp_json_encode( array( array( '', $text ) ) ) ); ?>"
+		<?php if ( '' !== $title ) : ?>data-tip-title="<?php echo esc_attr( $title ); ?>"<?php endif; ?>
+		<?php if ( ! empty( $rows ) ) : ?>data-tip-width="360px"<?php endif; ?>
+		data-tip-rows="<?php echo esc_attr( wp_json_encode( $tip_rows ) ); ?>"
 		aria-describedby="<?php echo esc_attr( $id ); ?>">
 		<span aria-hidden="true">i</span>
 		<span class="screen-reader-text"><?php echo esc_html( $sr_label ); ?></span>
 	</button>
-	<span id="<?php echo esc_attr( $id ); ?>" class="screen-reader-text"><?php echo esc_html( $text ); ?></span>
+	<span id="<?php echo esc_attr( $id ); ?>" class="screen-reader-text"><?php echo esc_html( $sr_text ); ?></span>
 	<?php
 }
 
@@ -1601,21 +1626,24 @@ function pltt_render_entry_table( $entries, $options = array() ) {
 	$entry_ids     = array_map( fn( $e ) => (int) $e->id, $entries );
 	$tags_by_entry = PLTT_Tags::get_for_entries( $entry_ids );
 
-	// Billable column appears only when at least one entry's project uses the
-	// per-entry billable flag (plain hourly). Retainer/fixed-fee tables, where
-	// billing is computed at the period level, drop the column entirely.
+	// The "Internal" column — the entry's time type — appears when at least one
+	// entry is on a client other than the internal one. On the internal client
+	// every entry is internal by definition, so an all-internal table has
+	// nothing to show and drops the column.
 	//
 	// A caller rendering several tables that must line up (e.g. the Overview's
 	// per-day tables, table-layout: fixed) can pass 'force_billable_col' to pin the
-	// column on/off across all of them — otherwise an all-retainer day drops it and
+	// column on/off across all of them — otherwise an all-internal day drops it and
 	// the tables misalign. When set, it overrides the per-table detection below.
+	// (The option keeps its historical name; the column used to hold the
+	// billable flag, which now derives from the type.)
+	$internal_client_id = pltt_get_internal_client_id();
 	if ( isset( $options['force_billable_col'] ) ) {
 		$show_billable_col = (bool) $options['force_billable_col'];
 	} else {
 		$show_billable_col = false;
 		foreach ( $entries as $e ) {
-			$p = ! empty( $e->project_id ) && isset( $projects_cache[ (int) $e->project_id ] ) ? $projects_cache[ (int) $e->project_id ] : null;
-			if ( pltt_billable_flag_applies( $p ) ) {
+			if ( (int) $e->client_id !== $internal_client_id ) {
 				$show_billable_col = true;
 				break;
 			}
@@ -1635,7 +1663,7 @@ function pltt_render_entry_table( $entries, $options = array() ) {
 				<th><?php esc_html_e( 'Time', 'plain-language-time-tracker' ); ?></th>
 				<th><?php esc_html_e( 'Duration', 'plain-language-time-tracker' ); ?></th>
 				<?php if ( $show_billable_col ) : ?>
-					<th><?php esc_html_e( 'Billable', 'plain-language-time-tracker' ); ?></th>
+					<th class="pltt-col-type"><?php esc_html_e( 'Type', 'plain-language-time-tracker' ); ?></th>
 				<?php endif; ?>
 				<?php if ( $show_status_col ) : ?>
 					<th class="pltt-status-col"><?php esc_html_e( 'Status', 'plain-language-time-tracker' ); ?></th>
@@ -1656,10 +1684,16 @@ function pltt_render_entry_table( $entries, $options = array() ) {
 				$entry_tags   = $tags_by_entry[ (int) $entry->id ] ?? array();
 				$is_billable  = ! empty( $entry->billable );
 				$entry_id_int = (int) $entry->id;
+				$is_internal  = ! pltt_entry_counts_toward_client( $entry );
+				// Whether the type is a decision on this row at all: on the
+				// internal client every entry is internal, nothing to choose.
+				$type_applies = ( (int) $entry->client_id !== $internal_client_id );
 
 				$is_covered = isset( $covered_lookup[ $entry_id_int ] );
 
 				// One tint, one meaning: this entry sits on a committed bill record.
+				// Internal time is marked by its pill alone — a second row shade
+				// would muddle what the shading already means.
 				$tr_classes = array();
 				if ( $is_covered ) {
 					$tr_classes[] = 'pltt-row-covered';
@@ -1749,31 +1783,36 @@ function pltt_render_entry_table( $entries, $options = array() ) {
 						<?php echo esc_html( pltt_format_duration( $entry->duration_minutes ) ); ?>
 					</td>
 					<?php if ( $show_billable_col ) : ?>
-						<td class="pltt-billable-indicator">
-							<?php if ( ! pltt_billable_flag_applies( $project ) ) : ?>
-								<?php /* Retainer, fixed fee or internal: no per-entry flag to set.
-								         A dash, matching the Projects list and spec §4 — an empty
-								         cell reads as missing rather than as not-applicable. */ ?>
-								<span class="pltt-empty" aria-label="<?php esc_attr_e( 'Not billed per entry', 'plain-language-time-tracker' ); ?>">&mdash;</span>
+						<td class="pltt-type-cell">
+							<?php if ( ! $type_applies ) : ?>
+								<?php /* Internal client: every entry is internal, nothing to decide —
+								         a dash, as the Status column does for not-applicable. */ ?>
+								<span class="pltt-empty" aria-label="<?php esc_attr_e( 'Not applicable — internal client', 'plain-language-time-tracker' ); ?>">&mdash;</span>
 							<?php elseif ( $is_covered ) : ?>
-								<?php /* Locked: a committed record froze this entry's amount, so the
-								         flag can't move without contradicting money already billed
-								         (spec §4). Greyed but still readable — the value stays
-								         legible, it just isn't a control any more. */ ?>
-								<span class="pltt-billable-symbol pltt-billable-locked <?php echo $is_billable ? 'is-billable' : 'not-billable'; ?>"
-									aria-label="<?php echo $is_billable ? esc_attr__( 'Billable — locked, this entry is on a bill record', 'plain-language-time-tracker' ) : esc_attr__( 'Not billable — locked, this entry is on a bill record', 'plain-language-time-tracker' ); ?>"
-									title="<?php esc_attr_e( 'On a bill record — delete the record to change this', 'plain-language-time-tracker' ); ?>">$</span>
+								<?php /* Locked: a committed record froze this entry's amount, so its
+								         type can't move without contradicting money already billed. */ ?>
+								<?php pltt_render_time_type_pill( $is_internal ? 'internal' : 'project', array( 'title' => __( 'On a bill record — delete the record to change this', 'plain-language-time-tracker' ) ) ); ?>
 							<?php elseif ( $inline_edit ) : ?>
-								<button type="button"
-									class="pltt-billable-symbol pltt-inline-toggle <?php echo $is_billable ? 'is-billable' : 'not-billable'; ?>"
-									data-entry-id="<?php echo esc_attr( $entry->id ); ?>"
-									data-field="billable"
-									data-value="<?php echo $is_billable ? '1' : '0'; ?>"
-									data-minutes="<?php echo esc_attr( (int) $entry->duration_minutes ); ?>"
-									aria-label="<?php echo $is_billable ? esc_attr__( 'Billable — click to toggle', 'plain-language-time-tracker' ) : esc_attr__( 'Not billable — click to toggle', 'plain-language-time-tracker' ); ?>"
-									title="<?php echo $is_billable ? esc_attr__( 'Billable — click to toggle', 'plain-language-time-tracker' ) : esc_attr__( 'Not billable — click to toggle', 'plain-language-time-tracker' ); ?>">$</button>
+								<?php
+								pltt_render_time_type_pill(
+									$is_internal ? 'internal' : 'project',
+									array(
+										'button' => true,
+										'class'  => 'pltt-inline-toggle',
+										'title'  => $is_internal
+											? __( 'Internal — your own time on this project. Click to count it as project work.', 'plain-language-time-tracker' )
+											: __( 'Project work — counts toward the client. Click to mark it internal.', 'plain-language-time-tracker' ),
+										'data'   => array(
+											'entry-id'         => (int) $entry->id,
+											'field'            => 'time_type',
+											'minutes'          => (int) $entry->duration_minutes,
+											'billable-applies' => pltt_billable_flag_applies( $project ) ? '1' : '0',
+										),
+									)
+								);
+								?>
 							<?php else : ?>
-								<span class="pltt-billable-symbol <?php echo $is_billable ? 'is-billable' : 'not-billable'; ?>" aria-label="<?php echo $is_billable ? esc_attr__( 'Billable', 'plain-language-time-tracker' ) : esc_attr__( 'Not billable', 'plain-language-time-tracker' ); ?>" title="<?php echo $is_billable ? esc_attr__( 'Billable', 'plain-language-time-tracker' ) : esc_attr__( 'Not billable', 'plain-language-time-tracker' ); ?>">$</span>
+								<?php pltt_render_time_type_pill( $is_internal ? 'internal' : 'project' ); ?>
 							<?php endif; ?>
 						</td>
 					<?php endif; ?>
@@ -1837,11 +1876,11 @@ function pltt_render_entry_table( $entries, $options = array() ) {
 								/* translators: %s: entry description. */
 								sprintf( __( 'Actions for %s', 'plain-language-time-tracker' ), $entry->description ),
 								array(
-									'entry-id'         => $entry_id_int,
-									'date'             => $entry->entry_date,
-									'billable'         => $is_billable ? '1' : '0',
-									'billable-applies' => pltt_billable_flag_applies( $project ) ? '1' : '0',
-									'covered'          => $is_covered ? '1' : '0',
+									'entry-id'     => $entry_id_int,
+									'date'         => $entry->entry_date,
+									'time-type'    => $is_internal ? 'internal' : 'project',
+									'type-applies' => $type_applies ? '1' : '0',
+									'covered'      => $is_covered ? '1' : '0',
 								)
 							);
 							?>
@@ -4111,6 +4150,194 @@ function pltt_clamp_billable( $billable, $project_id, $projects_cache = array() 
 }
 
 /**
+ * The kinds of time an entry can be.
+ *
+ * 'project'  — counts toward the client: bills by the hour on an hourly
+ *              project, draws down the included hours on a retainer, consumes
+ *              the budget on a fixed fee.
+ * 'internal' — the user's own time on a client's project: fixing their own
+ *              mistake, learning, tooling, talk about the account rather than
+ *              the work. Stays on the client and project (so the project page
+ *              and the alias learning keep the whole story) but is left out of
+ *              every figure that turns time into money or measures it against
+ *              a budget. Every entry on the internal client is 'internal'.
+ *
+ * The list is deliberately short. A longer "kind of time" axis (communication,
+ * admin…) would be the same mechanism with more values — add here if ever.
+ *
+ * @return string[]
+ */
+function pltt_time_types() {
+	return array( 'project', 'internal' );
+}
+
+/**
+ * Normalise a submitted time type. Anything not in the list is 'project'.
+ *
+ * Accepts the checkbox shorthand too: '1' / 'on' / true mean internal, since
+ * the control on every screen is a single "Internal" box.
+ *
+ * @param mixed $value Submitted value.
+ * @return string 'project' or 'internal'.
+ */
+function pltt_sanitize_time_type( $value ) {
+	if ( true === $value || 1 === $value || '1' === $value || 'on' === $value ) {
+		return 'internal';
+	}
+	$value = is_string( $value ) ? strtolower( trim( $value ) ) : '';
+	return in_array( $value, pltt_time_types(), true ) ? $value : 'project';
+}
+
+/**
+ * Resolve the time type an entry should carry.
+ *
+ * The internal client outranks the request: its entries are internal whatever
+ * the form said, because there is no client for the time to count toward.
+ * Route EVERY write of `time_type` through this.
+ *
+ * @param mixed    $requested Submitted value (see pltt_sanitize_time_type()).
+ * @param int|null $client_id The entry's client.
+ * @return string 'project' or 'internal'.
+ */
+function pltt_resolve_time_type( $requested, $client_id ) {
+	$client_id = (int) $client_id;
+	if ( $client_id > 0 && $client_id === pltt_get_internal_client_id() ) {
+		return 'internal';
+	}
+	return pltt_sanitize_time_type( $requested );
+}
+
+/**
+ * Whether an entry counts toward its client.
+ *
+ * @param object|array $entry Entry row or array with a time_type key.
+ * @return bool True for 'project' time (and for legacy rows with no type).
+ */
+function pltt_entry_counts_toward_client( $entry ) {
+	$type = is_array( $entry ) ? ( $entry['time_type'] ?? 'project' ) : ( $entry->time_type ?? 'project' );
+	return 'internal' !== $type;
+}
+
+/**
+ * The ⓘ beside the Type heading on the finalize table and the Type label in the
+ * edit form: the rule for when time is internal. Not on the read-only tables —
+ * the decision is made where the pill is set, so that is where the rule sits.
+ *
+ * Same tooltip as every other ⓘ in the tool (pltt_render_info_note() →
+ * PlttTooltip), with a title and the recurring cases as rows. The rule is what
+ * makes the control usable, so it travels with it onto every surface.
+ */
+function pltt_render_time_type_note() {
+	pltt_render_info_note(
+		__( 'The client did: they asked for it, or it\'s needed to deliver what they asked for → Project. I did: my mistake, my learning curve, my tooling, more than was asked, or talk about the account rather than the work → Internal. Internal time stays on the project but never reaches the client\'s numbers.', 'plain-language-time-tracker' ),
+		__( 'When is work internal?', 'plain-language-time-tracker' ),
+		__( 'Who caused this time to exist?', 'plain-language-time-tracker' ),
+		array(
+			array( __( 'Fixing something I broke', 'plain-language-time-tracker' ), __( 'Internal', 'plain-language-time-tracker' ) ),
+			array( __( 'Learning a tool I needed for the job', 'plain-language-time-tracker' ), __( 'Internal', 'plain-language-time-tracker' ) ),
+			array( __( 'Research the client asked for', 'plain-language-time-tracker' ), __( 'Project', 'plain-language-time-tracker' ) ),
+			array( __( 'Email about the work: questions, proofs, decisions', 'plain-language-time-tracker' ), __( 'Project', 'plain-language-time-tracker' ) ),
+			array( __( 'Email about the account: scheduling, invoices, contracts, scope', 'plain-language-time-tracker' ), __( 'Internal', 'plain-language-time-tracker' ) ),
+			array( __( 'A change they asked for after seeing the work', 'plain-language-time-tracker' ), __( 'Project', 'plain-language-time-tracker' ) ),
+			array( __( 'Redoing it because my first attempt was wrong', 'plain-language-time-tracker' ), __( 'Internal', 'plain-language-time-tracker' ) ),
+			array( __( 'Building more than was asked', 'plain-language-time-tracker' ), __( 'The extra is internal', 'plain-language-time-tracker' ) ),
+			array( __( 'Setting a client up on my own systems', 'plain-language-time-tracker' ), __( 'Internal, on their project', 'plain-language-time-tracker' ) ),
+			array( '', __( 'Gut check: if they asked me to walk through this line, could I say why they\'re paying for it without flinching?', 'plain-language-time-tracker' ) ),
+		)
+	);
+}
+
+/**
+ * Render an entry's Type pill: "Project" or "Internal".
+ *
+ * Same shape as the billing-model pills (Hourly / Monthly / Fixed / Internal)
+ * — a word in a quiet categorical colour, neither louder than the other.
+ * Internal shares its grey with the Internal model badge, so one colour means
+ * "your own time" everywhere. With 'button' => true the pill is the control:
+ * a <button> carrying data-value, which the screen's script flips.
+ *
+ * @param string $time_type 'project' or 'internal'.
+ * @param array  $args      Optional: button (bool), class (string), title
+ *                          (string), aria_label (string), data (array of
+ *                          data-* attributes).
+ */
+function pltt_render_time_type_pill( $time_type, $args = array() ) {
+	$is_internal = ( 'internal' === $time_type );
+	$label       = $is_internal ? __( 'Internal', 'plain-language-time-tracker' ) : __( 'Project', 'plain-language-time-tracker' );
+	$class       = 'pltt-badge ' . ( $is_internal ? 'pltt-badge-type-internal' : 'pltt-badge-type-project' );
+	if ( ! empty( $args['class'] ) ) {
+		$class .= ' ' . $args['class'];
+	}
+
+	$attrs = '';
+	foreach ( (array) ( $args['data'] ?? array() ) as $key => $value ) {
+		$attrs .= ' data-' . esc_attr( $key ) . '="' . esc_attr( $value ) . '"';
+	}
+	if ( ! empty( $args['title'] ) ) {
+		$attrs .= ' title="' . esc_attr( $args['title'] ) . '"';
+	}
+
+	if ( ! empty( $args['button'] ) ) {
+		$aria = ! empty( $args['aria_label'] )
+			? $args['aria_label']
+			/* translators: %s: the current value, "Project" or "Internal". */
+			: sprintf( __( 'Type: %s — click to change', 'plain-language-time-tracker' ), $label );
+		printf(
+			'<button type="button" class="%1$s pltt-type-pill" data-value="%2$s" aria-label="%3$s"%4$s>%5$s</button>',
+			esc_attr( $class ),
+			$is_internal ? 'internal' : 'project',
+			esc_attr( $aria ),
+			$attrs, // phpcs:ignore WordPress.Security.EscapeOutput -- escaped above.
+			esc_html( $label )
+		);
+		return;
+	}
+
+	printf(
+		'<span class="%1$s"%2$s>%3$s</span>',
+		esc_attr( $class ),
+		$attrs, // phpcs:ignore WordPress.Security.EscapeOutput -- escaped above.
+		esc_html( $label )
+	);
+}
+
+/**
+ * Derive the billable flag from the time type and the project.
+ *
+ * The flag is no longer a control of its own: an internal entry is never
+ * billable, and a project-time entry is billable exactly when its project
+ * bills by the hour and defaults to billable (pltt_clamp_billable() still has
+ * the final say on type). A caller that knows the old explicit value — a
+ * legacy "non-billable" hourly entry being re-saved — can pass it so the
+ * decision survives the save.
+ *
+ * @param string     $time_type      'project' or 'internal'.
+ * @param int|null   $project_id     Target project, or null/0 for unassigned.
+ * @param array      $projects_cache Optional id => project map, to avoid a query.
+ * @param mixed|null $explicit       An explicit billable value to honour for
+ *                                   project time, or null to use the project's
+ *                                   default.
+ * @return int 1 or 0.
+ */
+function pltt_derive_billable( $time_type, $project_id, $projects_cache = array(), $explicit = null ) {
+	if ( 'internal' === $time_type ) {
+		return 0;
+	}
+	$project_id = (int) $project_id;
+	if ( null !== $explicit ) {
+		return pltt_clamp_billable( ! empty( $explicit ), $project_id, $projects_cache );
+	}
+	if ( $project_id <= 0 ) {
+		return 1;
+	}
+	$project = isset( $projects_cache[ $project_id ] ) ? $projects_cache[ $project_id ] : PLTT_Projects::get( $project_id );
+	if ( $project && null !== $project->billability_default && empty( $project->billability_default ) ) {
+		return 0;
+	}
+	return pltt_clamp_billable( 1, $project_id, $project ? array( $project_id => $project ) : $projects_cache );
+}
+
+/**
  * Re-assert the billable invariant across one project's existing entries.
  *
  * pltt_clamp_billable() guards every ENTRY write, but nothing re-checks the
@@ -4560,6 +4787,13 @@ function pltt_compute_overage_threshold( $project, $filter_args ) {
 	$marked_amount  = 0.0;
 
 	foreach ( $period_entries as $e ) {
+		// Internal time on the project is the user's own: it neither draws down
+		// the allocation nor becomes overage. It still shows in the period's
+		// total hours elsewhere; here it simply isn't walked.
+		if ( ! pltt_entry_counts_toward_client( $e ) ) {
+			continue;
+		}
+
 		$dur  = (int) $e->duration_minutes;
 		$next = $cumulative + $dur;
 

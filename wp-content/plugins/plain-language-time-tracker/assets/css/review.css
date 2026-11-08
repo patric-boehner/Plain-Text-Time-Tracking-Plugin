@@ -365,3 +365,11 @@
 .pltt-review-table.pltt-no-status-col .pltt-warning-cell {
 	display: none;
 }
+
+/* Internal column — the per-entry time type, where the Billable $ used to sit.
+   Narrow and centred; the pill itself is styled in pltt-system.css. */
+.pltt-col-type {
+	width: 90px;
+	text-align: center;
+	white-space: nowrap;
+}

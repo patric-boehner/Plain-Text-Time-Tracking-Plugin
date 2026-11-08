@@ -300,7 +300,11 @@ class PLTT_Ajax {
 		// 'billed' is gone: billed state comes from bill-record coverage, so there
 		// is nothing on the entry to set. Leaving the write path open would have
 		// let a stray request re-populate the fossil flag.
-		$allowed_fields = array( 'billable', 'tags' );
+		//
+		// 'billable' is no longer set directly either: it derives from the time
+		// type (an internal entry is never billable; project time follows the
+		// project). The inline control and the row menu both write 'time_type'.
+		$allowed_fields = array( 'time_type', 'tags' );
 		if ( ! in_array( $field, $allowed_fields, true ) ) {
 			wp_send_json_error( __( 'Invalid field.', 'plain-language-time-tracker' ) );
 			return;
@@ -313,6 +317,69 @@ class PLTT_Ajax {
 				wp_send_json_error( __( 'Failed to update tags.', 'plain-language-time-tracker' ) );
 				return;
 			}
+		} elseif ( 'time_type' === $field ) {
+			if ( ! in_array( $value, pltt_time_types(), true ) ) {
+				wp_send_json_error( __( 'Invalid value.', 'plain-language-time-tracker' ) );
+				return;
+			}
+
+			// Locked once a bill record covers the entry (spec §4). A record froze
+			// this entry's amount into a committed total; re-typing it as internal
+			// would contradict money already billed. Undoing means deleting the
+			// record. Enforced here rather than only in the markup: a UI-only lock
+			// isn't a lock.
+			if ( in_array( $entry_id, PLTT_Billing_Record_Entries::get_all_covered_entry_ids(), true ) ) {
+				wp_send_json_error( __( 'This entry is on a bill record. Delete the record to change its type.', 'plain-language-time-tracker' ) );
+				return;
+			}
+
+			PLTT_Database::begin_transaction();
+
+			$entry = PLTT_Entries::get( $entry_id );
+			if ( ! $entry ) {
+				PLTT_Database::rollback_transaction();
+				wp_send_json_error( __( 'Entry not found.', 'plain-language-time-tracker' ) );
+				return;
+			}
+
+			// The internal client outranks the request, and billable follows the
+			// resolved type: derived, clamped to the project type, never taken
+			// from the request.
+			$time_type   = pltt_resolve_time_type( $value, (int) $entry->client_id );
+			$billable    = pltt_derive_billable( $time_type, (int) $entry->project_id );
+			$update_data = array(
+				'time_type' => $time_type,
+				'billable'  => $billable,
+			);
+
+			if ( 1 === $billable && $entry->duration_minutes > 0 ) {
+				$hourly_rate                    = pltt_resolve_billable_rate( (int) $entry->client_id, (int) $entry->project_id );
+				$update_data['billable_rate']   = $hourly_rate;
+				$update_data['billable_amount'] = pltt_billable_amount( $entry->duration_minutes, $hourly_rate );
+			} else {
+				$update_data['billable_rate']   = 0.00;
+				$update_data['billable_amount'] = 0.00;
+			}
+
+			$result = PLTT_Entries::update( $entry_id, $update_data );
+			if ( $result ) {
+				PLTT_Database::commit_transaction();
+			} else {
+				PLTT_Database::rollback_transaction();
+			}
+
+			if ( ! $result ) {
+				wp_send_json_error( __( 'Failed to update entry.', 'plain-language-time-tracker' ) );
+				return;
+			}
+
+			wp_send_json_success( array(
+				'message'         => __( 'Saved.', 'plain-language-time-tracker' ),
+				'time_type'       => $time_type,
+				'billable'        => $billable,
+				'billable_amount' => $update_data['billable_amount'] ?? 0.0,
+			) );
+			return;
 		} elseif ( 'billable' === $field ) {
 			$int_value = (int) $value;
 
@@ -426,6 +493,11 @@ class PLTT_Ajax {
 			// so the modal can settle that field before it opens rather than
 			// after the projects request lands.
 			'billable_applies' => pltt_billable_flag_applies( $project ) ? 1 : 0,
+			// The entry's time type, and whether the control is offered at all:
+			// on the internal client every entry is internal, so there is
+			// nothing to decide and the field stays hidden.
+			'time_type'        => $entry->time_type ?? 'project',
+			'type_applies'     => ( (int) $entry->client_id !== pltt_get_internal_client_id() ) ? 1 : 0,
 		);
 		// Deliberately not here: the client and project names, the billable
 		// amount, and whether a bill record covers the entry. Nothing reads them
@@ -735,12 +807,14 @@ class PLTT_Ajax {
 		$client_id   = isset( $_POST['client_id'] ) && '' !== $_POST['client_id'] ? absint( $_POST['client_id'] ) : 0;
 		$project_id  = isset( $_POST['project_id'] ) && '' !== $_POST['project_id'] ? absint( $_POST['project_id'] ) : 0;
 		$tags        = isset( $_POST['tags'] ) ? sanitize_text_field( wp_unslash( $_POST['tags'] ) ) : '';
-		// Clamped to the project type — the entry-form billable field is hidden for
-		// retainer/fixed, and hidden fields still post.
-		$billable    = pltt_clamp_billable(
-			isset( $_POST['billable'] ) && '1' === (string) $_POST['billable'],
-			$project_id
+		// Time type from the form's "Internal" box (the internal client outranks
+		// it), and billable derived from the type + project — the form has no
+		// billable control of its own any more.
+		$time_type   = pltt_resolve_time_type(
+			isset( $_POST['time_type'] ) ? sanitize_text_field( wp_unslash( $_POST['time_type'] ) ) : 'project',
+			$client_id
 		);
+		$billable    = pltt_derive_billable( $time_type, $project_id );
 
 		if ( empty( $entry_date ) ) {
 			wp_send_json_error( __( 'A date is required.', 'plain-language-time-tracker' ) );
@@ -798,6 +872,7 @@ class PLTT_Ajax {
 			'client_id'        => $client_id > 0 ? $client_id : null,
 			'project_id'       => $project_id > 0 ? $project_id : null,
 			'tags'             => $tags,
+			'time_type'        => $time_type,
 			'billable'         => $billable,
 			'verified'         => 1,
 		);
