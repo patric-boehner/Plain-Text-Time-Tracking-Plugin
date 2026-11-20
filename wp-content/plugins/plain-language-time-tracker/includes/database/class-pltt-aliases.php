@@ -335,6 +335,50 @@ class PLTT_Aliases {
 	}
 
 	/**
+	 * Point an alias at a project (and that project's client).
+	 *
+	 * Used by the finalize screen's learning for internal work, where a word
+	 * follows the project it was most recently confirmed with. The confidence
+	 * and counts are left alone: they keep scoring the word's reliability, and
+	 * record_usage() will judge it on project accuracy from here on.
+	 *
+	 * @param int $id         Alias ID.
+	 * @param int $project_id Project to bind to; 0 unbinds (client-only alias).
+	 * @return bool
+	 */
+	public static function set_project( $id, $project_id ) {
+		global $wpdb;
+		$table      = PLTT_Database::get_table_name( 'aliases' );
+		$id         = absint( $id );
+		$project_id = absint( $project_id );
+
+		if ( ! $id ) {
+			return false;
+		}
+
+		if ( $project_id > 0 ) {
+			$project = PLTT_Projects::get( $project_id );
+			if ( ! $project ) {
+				return false;
+			}
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
+			$result = $wpdb->update(
+				$table,
+				array( 'project_id' => $project_id, 'client_id' => (int) $project->client_id ),
+				array( 'id' => $id ),
+				array( '%d', '%d' ),
+				array( '%d' )
+			);
+		} else {
+			// wpdb can't write NULL through %d — see pltt_set_nullable_fields().
+			$result = pltt_set_nullable_fields( 'aliases', $id, array( 'project_id' => null ) );
+		}
+
+		pltt_flush_alias_cache();
+		return false !== $result;
+	}
+
+	/**
 	 * Record a usage of an alias.
 	 *
 	 * @param int  $id         Alias ID.

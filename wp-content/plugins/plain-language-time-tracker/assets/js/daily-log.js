@@ -24,6 +24,7 @@
 	// Track save state.
 	let isDirty        = false;
 	let navigatingAway = false;
+	let justProcessed  = false;
 
 	/**
 	 * Mark the log as saved — persistent timestamp, clears dirty flag.
@@ -213,6 +214,10 @@
 					}
 
 					if ( redirectUrl && redirectUrl.origin === window.location.origin ) {
+						// Process already saved this text and marked the day processed.
+						// The on-leave save below would send it again as an
+						// "unprocessed" save and clear that mark — skip it.
+						justProcessed = true;
 						const here  = window.location.href.split( '#' )[ 0 ];
 						const there = redirectUrl.href.split( '#' )[ 0 ];
 
@@ -305,6 +310,9 @@
 	 * Save before leaving page.
 	 */
 	window.addEventListener( 'beforeunload', function() {
+		if ( justProcessed ) {
+			return;
+		}
 		if ( textarea.value.trim() ) {
 			// Use pageDate (not dateInput.value) — the date picker's change event mutates
 			// dateInput.value to the destination date before this handler fires.

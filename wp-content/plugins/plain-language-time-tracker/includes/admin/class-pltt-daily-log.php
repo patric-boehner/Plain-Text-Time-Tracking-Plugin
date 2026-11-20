@@ -77,8 +77,13 @@ class PLTT_Daily_Log {
 		if ( $existing ) {
 			$update_data = array( 'content' => $content );
 
-			// Only reset processed if not preserving.
-			if ( ! $preserve_processed ) {
+			// Only reset processed if not preserving, and only when the text
+			// actually changed. A page that was opened before the day was
+			// processed still believes the day is unprocessed, and it re-saves
+			// the same text as you leave it (the on-leave save in daily-log.js)
+			// — including the reload that Process itself triggers. That save
+			// must not undo the processed mark Process just set.
+			if ( ! $preserve_processed && (string) $existing->content !== (string) $content ) {
 				$update_data['processed'] = 0;
 			}
 

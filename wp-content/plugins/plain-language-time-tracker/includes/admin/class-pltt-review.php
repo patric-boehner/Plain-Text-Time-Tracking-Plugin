@@ -669,13 +669,32 @@ class PLTT_Review {
 			}
 		}
 
+		// Internal work learns differently. A client's name token recurs across
+		// that client's projects, which is why binding is gated on the project
+		// name above; but the words in an internal line ("Linkedin", "Comms",
+		// "invoices") ARE the signal for which internal project it belongs to,
+		// and none of them appears in a project name. So on the internal client
+		// every learned word binds to the project it was confirmed with, and an
+		// existing word FOLLOWS the latest confirmation — the finalize screen then
+		// predicts the project outright instead of guessing from whichever
+		// internal project you touched last (which is how LinkedIn drifted from
+		// Marketing to Business Development to Networking & Community over a
+		// summer). Client projects keep the name-token gate.
+		$is_internal_client = ( $saved_client === pltt_get_internal_client_id() );
+
 		// Create new aliases from text patterns.
 		// OPT-L7: Pass pre-loaded tag names to avoid a DB call per entry.
 		$potentials = PLTT_Aliases::extract_potential( $text, $known_tags );
 
 		foreach ( $potentials as $potential ) {
-			if ( PLTT_Aliases::get_by_text( $potential ) ) {
-				continue; // Don't clobber an existing alias's learned target/confidence.
+			$existing = PLTT_Aliases::get_by_text( $potential );
+			if ( $existing ) {
+				if ( $is_internal_client && $saved_project > 0
+					&& (int) $existing->client_id === $saved_client
+					&& (int) $existing->project_id !== $saved_project ) {
+					PLTT_Aliases::set_project( (int) $existing->id, $saved_project );
+				}
+				continue; // Otherwise don't clobber an existing alias's learned target/confidence.
 			}
 
 			$alias_data = array(
@@ -683,8 +702,9 @@ class PLTT_Review {
 				'client_id'  => $saved_client,
 			);
 
-			// Bind to the project only when this token is part of the project name.
-			if ( $saved_project > 0 && in_array( strtolower( $potential ), $project_tokens, true ) ) {
+			// Bind to the project when this token is part of the project name, or
+			// always on the internal client (see above).
+			if ( $saved_project > 0 && ( $is_internal_client || in_array( strtolower( $potential ), $project_tokens, true ) ) ) {
 				$alias_data['project_id'] = $saved_project;
 			}
 
